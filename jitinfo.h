@@ -34,15 +34,16 @@ using namespace std;
 class CorJitInfo : public ICorJitInfo {
 private:
 	HANDLE m_codeHeap;
+	CExecutionEngine& m_executionEngine;
 
 public:
-	CorJitInfo() {
+	CorJitInfo(CExecutionEngine& executionEngine) : m_executionEngine(executionEngine) {
 		m_codeHeap = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
 	}
 
 	/* ICorJitInfo */
 	IEEMemoryManager* getMemoryManager() {
-		return NULL;
+		return &m_executionEngine;
 	}
 
 	virtual void allocMem(
@@ -55,7 +56,7 @@ public:
 		void **             coldCodeBlock,  /* OUT */
 		void **             roDataBlock     /* OUT */
 		) {
-		printf("allocMem\r\n");
+		//printf("allocMem\r\n");
 		// TODO: Alignment?
 		auto code = HeapAlloc(m_codeHeap, 0, hotCodeSize);
 		memcpy(code, *hotCodeBlock, hotCodeSize);
@@ -67,7 +68,7 @@ public:
 		BOOL                isColdCode,            /* IN */
 		ULONG               unwindSize             /* IN */
 		) {
-		printf("reserveUnwindInfo\r\n");
+		//printf("reserveUnwindInfo\r\n");
 	}
 
 	virtual void allocUnwindInfo(
@@ -79,13 +80,13 @@ public:
 		BYTE *              pUnwindBlock,          /* IN */
 		CorJitFuncKind      funcKind               /* IN */
 		) {
-		printf("allocUnwindInfo\r\n");
+		//printf("allocUnwindInfo\r\n");
 	}
 
 	virtual void * allocGCInfo(
 		size_t                  size        /* IN */
 		) {
-		printf("allocGCInfo\r\n");
+		//printf("allocGCInfo\r\n");
 		return malloc(size);
 	}
 
@@ -116,7 +117,7 @@ public:
 	}
 
 	virtual void reportFatalError(CorJitResult result) {
-		printf("Fatal error");
+		printf("Fatal error %X\r\n", result);
 	}
 
 	virtual HRESULT allocBBProfileBuffer(
@@ -147,7 +148,7 @@ public:
 		CORINFO_SIG_INFO *    callSig,      /* IN */
 		CORINFO_METHOD_HANDLE methodHandle  /* IN */
 		) {
-		printf("recordCallSite\r\n");
+		//printf("recordCallSite\r\n");
 	}
 
 #endif // !defined(RYUJIT_CTPBUILD)
@@ -159,7 +160,7 @@ public:
 		WORD                   slotNum = 0,  /* IN  */
 		INT32                  addlDelta = 0 /* IN  */
 		) {
-		printf("recordRelocation\r\n");
+		//printf("recordRelocation\r\n");
 		switch (fRelocType) {
 		case IMAGE_REL_BASED_DIR64:
 			*((UINT64 *)((BYTE *)location + slotNum)) = (UINT64)target;
@@ -230,7 +231,7 @@ public:
 	// different value than if it was compiling for the host architecture.
 	// 
 	virtual DWORD getExpectedTargetArchitecture() {
-		printf("getExpectedTargetArchitecture\r\n");
+		//printf("getExpectedTargetArchitecture\r\n");
 #ifdef _TARGET_AMD64_
 		return IMAGE_FILE_MACHINE_AMD64;
 #elif defined(_TARGET_X86_)
@@ -322,7 +323,7 @@ public:
 		pResult->accessType = IAT_PVALUE;
 		pResult->addr = &method->m_addr;
 
-		printf("getFunctionEntryPoint\r\n");
+		//printf("getFunctionEntryPoint\r\n");
 	}
 
 	// return a directly callable address. This can be used similarly to the
@@ -534,7 +535,7 @@ public:
 		pResult->sig.retTypeClass = nullptr;
 		pResult->verSig = pResult->sig;		
 		pResult->accessAllowed = CORINFO_ACCESS_ALLOWED;
-		printf("getCallInfo\r\n");
+		//printf("getCallInfo\r\n");
 	}
 
 	virtual BOOL canAccessFamily(CORINFO_METHOD_HANDLE hCaller,
@@ -660,7 +661,7 @@ public:
 	virtual DWORD getMethodAttribs(
 		CORINFO_METHOD_HANDLE       ftn         /* IN */
 		) {
-		printf("getMethodAttribs\r\n");
+		//printf("getMethodAttribs\r\n");
 		auto res = (int)CORINFO_FLG_NOSECURITYWRAP;
 		auto method = (Method*)ftn;
 		if (method->m_vtableInfo != nullptr) {
@@ -682,7 +683,7 @@ public:
 		CORINFO_METHOD_HANDLE       ftn,        /* IN */
 		CorInfoMethodRuntimeFlags   attribs     /* IN */
 		) {
-		printf("setMethodAttribs\r\n");
+		//printf("setMethodAttribs\r\n");
 	}
 
 	// Given a method descriptor ftnHnd, extract signature information into sigInfo
@@ -695,7 +696,7 @@ public:
 		CORINFO_CLASS_HANDLE      memberParent = NULL /* IN */
 		) {
 		Method* m = (Method*)ftn;
-		printf("getMethodSig %p\r\n", ftn);
+		//printf("getMethodSig %p\r\n", ftn);
 		sig->retType = m->m_retType;
 		sig->retTypeClass = nullptr;
 		sig->args = (CORINFO_ARG_LIST_HANDLE)(m->m_params.size() != 0 ? &m->m_params[0] : nullptr);
@@ -743,7 +744,7 @@ public:
 		CORINFO_METHOD_HANDLE inlineeHnd,
 		CorInfoInline inlineResult,
 		const char * reason) {
-		printf("reportInliningDecision\r\n");
+		//printf("reportInliningDecision\r\n");
 	}
 
 
@@ -783,7 +784,8 @@ public:
 	virtual CORINFO_CLASS_HANDLE getMethodClass(
 		CORINFO_METHOD_HANDLE       method
 		) {
-		printf("getMethodClass\r\n"); return nullptr;
+		//printf("getMethodClass\r\n"); 
+		return nullptr;
 	}
 
 	// return module it belongs to
@@ -847,7 +849,8 @@ public:
 		CORINFO_CLASS_HANDLE        parent, // the exact parent of the method
 		CORINFO_METHOD_HANDLE       method
 		) {
-		printf("satisfiesMethodConstraints\r\n"); return TRUE;
+		//printf("satisfiesMethodConstraints\r\n"); 
+		return TRUE;
 	}
 
 	// Given a delegate target class, a target method parent class,  a  target method,
@@ -878,7 +881,8 @@ public:
 	virtual CorInfoInstantiationVerification isInstantiationOfVerifiedGeneric(
 		CORINFO_METHOD_HANDLE   method /* IN  */
 		) {
-		printf("isInstantiationOfVerifiedGeneric\r\n"); return  INSTVER_NOT_INSTANTIATION;
+		//printf("isInstantiationOfVerifiedGeneric\r\n"); 
+		return  INSTVER_NOT_INSTANTIATION;
 	}
 
 	// Loads the constraints on a typical method definition, detecting cycles;
@@ -890,7 +894,7 @@ public:
 		) {
 		*pfHasCircularClassConstraints = FALSE;
 		*pfHasCircularMethodConstraint = FALSE;
-		printf("initConstraintsForVerification\r\n");
+		//printf("initConstraintsForVerification\r\n");
 	}
 
 	// Returns enum whether the method does not require verification
@@ -898,7 +902,8 @@ public:
 	virtual CorInfoCanSkipVerificationResult canSkipMethodVerification(
 		CORINFO_METHOD_HANDLE       ftnHandle
 		) {
-		printf("canSkipMethodVerification\r\n"); return CORINFO_VERIFICATION_CAN_SKIP;
+		//printf("canSkipMethodVerification\r\n"); 
+		return CORINFO_VERIFICATION_CAN_SKIP;
 	}
 
 	// load and restore the method
@@ -922,7 +927,7 @@ public:
 		) {
 		*pCookieVal = 0x1234; // TODO: Should be a secure value
 		*ppCookieVal = nullptr;
-		printf("getGSCookie\r\n");
+		//printf("getGSCookie\r\n");
 	}
 
 #ifdef  MDIL
@@ -1031,7 +1036,7 @@ public:
 		Module* mod = (Module*)pResolvedToken->tokenScope;
 		Method* method = mod->ResolveMethod(pResolvedToken->token);
 		pResolvedToken->hMethod = (CORINFO_METHOD_HANDLE)method;
-		printf("resolveToken %d\r\n", pResolvedToken->token);
+		//printf("resolveToken %d\r\n", pResolvedToken->token);
 	}
 
 #ifdef MDIL
@@ -1148,7 +1153,7 @@ public:
 	virtual const char* getClassName(
 		CORINFO_CLASS_HANDLE    cls
 		) {
-		printf("getClassName\r\n");
+		//printf("getClassName\r\n");
 		return NULL;
 
 	}
@@ -1184,7 +1189,7 @@ public:
 	virtual DWORD getClassAttribs(
 		CORINFO_CLASS_HANDLE    cls
 		) {
-		printf("getClassAttribs\r\n");
+		//printf("getClassAttribs\r\n");
 		return 0;
 	}
 
@@ -1408,7 +1413,7 @@ public:
 		CORINFO_CONTEXT_HANDLE  context,        // Exact context of method
 		BOOL                    speculative = FALSE     // TRUE means don't actually run it
 		) {
-		printf("initClass\r\n");
+		//printf("initClass\r\n");
 		return CORINFO_INITCLASS_NOT_REQUIRED;
 	}
 
@@ -1425,7 +1430,7 @@ public:
 	virtual void classMustBeLoadedBeforeCodeIsRun(
 		CORINFO_CLASS_HANDLE        cls
 		) {
-		printf("classMustBeLoadedBeforeCodeIsRun\r\n");
+		//printf("classMustBeLoadedBeforeCodeIsRun\r\n");
 	}
 
 	// returns the class handle for the special builtin classes
@@ -1498,7 +1503,7 @@ public:
 	virtual BOOL satisfiesClassConstraints(
 		CORINFO_CLASS_HANDLE cls
 		) {
-		printf("satisfiesClassConstraints\r\n");
+		//printf("satisfiesClassConstraints\r\n");
 		return TRUE;
 	}
 

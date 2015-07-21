@@ -25,7 +25,7 @@
 
 using namespace std;
 
-class CExecutionEngine : public IExecutionEngine
+class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager, public IUnknown
 {
 public:
 	// Thread Local Storage is based on logical threads.  The underlying
@@ -36,7 +36,7 @@ public:
 	// Associate a callback function for releasing TLS on thread/fiber death.
 	// This can be NULL.
 	void TLS_AssociateCallback(DWORD slot, PTLS_CALLBACK_FUNCTION callback) {
-		printf("associate callback\r\n");
+		//printf("associate callback\r\n");
 	}
 
 	// Get the TLS block for fast Get/Set operations
@@ -188,6 +188,10 @@ public:
 			*ppvObject = (void*)static_cast<IExecutionEngine*>(this);
 			return S_OK;
 		}
+		else if (iid == IID_IEEMemoryManager) {
+			*ppvObject = (void*)static_cast<IEEMemoryManager*>(this);
+			return S_OK;
+		}
 		return E_NOINTERFACE;
 	}
 
@@ -195,8 +199,93 @@ public:
 		return InterlockedDecrement(&m_refCount);
 	}
 
+	LPVOID ClrVirtualAlloc(
+		 LPVOID lpAddress,        // region to reserve or commit
+		 SIZE_T dwSize,           // size of region
+		 DWORD flAllocationType,  // type of allocation
+		 DWORD flProtect          // type of access protection
+		) {
+		return ::VirtualAlloc(lpAddress, dwSize, flAllocationType, flProtect);
+	}
+
+	BOOL ClrVirtualFree(
+		 LPVOID lpAddress,   // address of region
+		 SIZE_T dwSize,      // size of region
+		 DWORD dwFreeType    // operation type
+		) {
+		return ::VirtualFree(lpAddress, dwSize, dwFreeType);
+	}
+
+	SIZE_T ClrVirtualQuery(
+		 const void* lpAddress,                    // address of region
+		 PMEMORY_BASIC_INFORMATION lpBuffer,  // information buffer
+		 SIZE_T dwLength                      // size of buffer
+		) {
+		return ::VirtualQuery(lpAddress, lpBuffer, dwLength);
+	}
+
+	BOOL ClrVirtualProtect(
+		 LPVOID lpAddress,       // region of committed pages
+		 SIZE_T dwSize,          // size of the region
+		 DWORD flNewProtect,     // desired access protection
+		 DWORD* lpflOldProtect   // old protection
+		) {
+		return ::VirtualProtect(lpAddress, dwSize, flNewProtect, lpflOldProtect);
+	}
+
+	HANDLE ClrGetProcessHeap() {
+		return ::GetProcessHeap();
+	}
+
+	HANDLE ClrHeapCreate(
+		 DWORD flOptions,       // heap allocation attributes
+		 SIZE_T dwInitialSize,  // initial heap size
+		 SIZE_T dwMaximumSize   // maximum heap size
+		) {
+		return ::HeapCreate(flOptions, dwInitialSize, dwMaximumSize);
+	}
+
+	BOOL ClrHeapDestroy(
+		 HANDLE hHeap   // handle to heap
+		) {
+		return ::HeapDestroy(hHeap);
+	}
+
+	LPVOID ClrHeapAlloc(
+		 HANDLE hHeap,   // handle to private heap block
+		 DWORD dwFlags,  // heap allocation control
+		 SIZE_T dwBytes  // number of bytes to allocate
+		) {
+		return ::HeapAlloc(hHeap, dwFlags, dwBytes);
+	}
+
+	BOOL ClrHeapFree(
+		 HANDLE hHeap,  // handle to heap
+		 DWORD dwFlags, // heap free options
+		 LPVOID lpMem   // pointer to memory
+		) {
+		return ::HeapFree(hHeap, dwFlags, lpMem);
+	}
+
+	BOOL ClrHeapValidate(
+		 HANDLE hHeap,  // handle to heap
+		 DWORD dwFlags, // heap access options
+		 const void* lpMem   // optional pointer to memory block
+		) {
+		return ::HeapValidate(hHeap, dwFlags, lpMem);
+	}
+
+	HANDLE ClrGetProcessExecutableHeap() {
+		if (m_executableHeap == NULL) {
+			m_executableHeap = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
+		}
+		return m_executableHeap;
+	}
+
+
 private:
 	ULONG m_refCount;
+	HANDLE m_executableHeap;
 };  // interface IExecutionEngine
 
 void CeeInit();

@@ -1,4 +1,5 @@
 #include "cee.h"
+#include "jitinfo.h"
 
 HRESULT __stdcall GetCORSystemDirectoryInternal(__out_ecount_part_opt(cchBuffer, *pdwLength) LPWSTR pBuffer,
 	DWORD  cchBuffer,
@@ -19,9 +20,10 @@ void* __stdcall GetCLRFunction(LPCSTR functionName) {
 }
 
 CExecutionEngine g_execEngine;
+CorJitInfo g_corJitInfo(g_execEngine);
 
 IExecutionEngine* __stdcall IEE() {
-	printf("iee\n");
+	//printf("iee\n");
 	return &g_execEngine;
 }
 

@@ -60,6 +60,9 @@
 #define METHOD_EH_TRACE						0x00000038
 #define METHOD_COMPARE_EXCEPTIONS			0x00000039
 #define METHOD_UNBOUND_LOCAL				0x0000003A
+#define METHOD_DEBUG_TRACE					0x0000003B
+#define METHOD_FUNC_SET_DEFAULTS			0x0000003C
+#define	METHOD_CALLNKW_TOKEN				0x0000003D
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -95,6 +98,9 @@
 
 // signatures for calli methods
 #define SIG_ITERNEXT_TOKEN			0x00040000
+
+#define NAME_ERROR_MSG \
+    "name '%.200s' is not defined"
 
 #define UNBOUNDLOCAL_ERROR_MSG \
     "local variable '%.200s' referenced before assignment"
@@ -141,7 +147,7 @@ format_exc_unbound(PyCodeObject *co, int oparg)
 }
 
 Module *g_module;
-CorJitInfo g_corJitInfo;
+extern CorJitInfo g_corJitInfo;
 ICorJitCompiler* g_jit;
 
 #define LD_FIELDA(type, field) il.ld_i(offsetof(type, field)); il.add(); 
@@ -193,6 +199,9 @@ PyObject* DoCellGet(PyFrameObject* frame, size_t index) {
 
 	if (value == nullptr) {
 		format_exc_unbound(frame->f_code, index);
+	}
+	else{
+		Py_INCREF(value);	
 	}
 	return value;
 }
@@ -535,6 +544,22 @@ void DoUnboundLocal(PyObject* name) {
 		);
 }
 
+void DoDebugTrace(char* msg) {
+	puts(msg);
+}
+
+int DoFunctionSetDefaults(PyObject* defs, PyObject* func) {
+	if (PyFunction_SetDefaults(func, defs) != 0) {
+		/* Can't happen unless
+		PyFunction_SetDefaults changes. */
+		Py_DECREF(defs);
+		Py_DECREF(func);
+		return 1;
+	}
+	Py_DECREF(defs);
+	return 0;
+}
+
 void DoEhTrace(PyFrameObject *f) {
 	PyTraceBack_Here(f);
 
@@ -672,12 +697,12 @@ PyObject* DoLoadClassDeref(PyFrameObject* frame, size_t oparg) {
 	return value;
 }
 
-PyObject* DoStoreMap(PyObject* map, PyObject *value, PyObject *key) {
+int DoStoreMap(PyObject *key, PyObject *value, PyObject* map) {
 	assert(PyDict_CheckExact(map));
 	auto res = PyDict_SetItem(map, key, value);
 	Py_DECREF(key);
 	Py_DECREF(value);
-	return map;
+	return res;
 }
 
 int DoStoreSubscr(PyObject* value, PyObject *container, PyObject *index) {
@@ -702,6 +727,17 @@ PyObject* CallN(PyObject *target, PyObject* args) {
 	return res;
 }
 
+PyObject* CallNKW(PyObject *target, PyObject* args, PyObject* kwargs) {
+	// we stole references for the tuple...
+	printf("%d\r\n", kwargs->ob_refcnt);
+	auto res = PyObject_Call(target, args, kwargs);
+	printf("%d\r\n", kwargs->ob_refcnt);
+	Py_DECREF(target);
+	Py_DECREF(args);
+	Py_DECREF(kwargs);
+	return res;
+}
+
 int StoreGlobal(PyObject* v, PyFrameObject* f, PyObject* name) {
 	int err = PyDict_SetItem(f->f_globals, name, v);
 	Py_DECREF(v);
@@ -714,19 +750,19 @@ int DeleteGlobal(PyFrameObject* f, PyObject* name) {
 
 PyObject* LoadGlobal(PyFrameObject* f, PyObject* name) {
 	PyObject* v;
-	//if (PyDict_CheckExact(f->f_globals)
-	//	&& PyDict_CheckExact(f->f_builtins)) {
-	//	v = _PyDict_LoadGlobal((PyDictObject *)f->f_globals,
-	//		(PyDictObject *)f->f_builtins,
-	//		name);
-	//	if (v == NULL) {
-	//		//if (!_PyErr_OCCURRED())
-	//		//	format_exc_check_arg(PyExc_NameError, NAME_ERROR_MSG, name);
-	//		//goto error;
-	//	}
-	//	Py_INCREF(v);
-	//}
-	//else 
+	if (PyDict_CheckExact(f->f_globals)
+		&& PyDict_CheckExact(f->f_builtins)) {
+		v = _PyDict_LoadGlobal((PyDictObject *)f->f_globals,
+			(PyDictObject *)f->f_builtins,
+			name);
+		if (v == NULL) {
+			if (!_PyErr_OCCURRED())
+				format_exc_check_arg(PyExc_NameError, NAME_ERROR_MSG, name);
+			return nullptr;
+		}
+		Py_INCREF(v);
+	}
+	else 
 	{
 		/* Slow-path if globals or builtins is not a dict */
 		auto asciiName = PyUnicode_AsUTF8(name);
@@ -735,11 +771,11 @@ PyObject* LoadGlobal(PyFrameObject* f, PyObject* name) {
 
 			v = PyObject_GetItem(f->f_builtins, name);
 			if (v == NULL) {
-				//if (PyErr_ExceptionMatches(PyExc_KeyError))
-				//	format_exc_check_arg(
-				//	PyExc_NameError,
-				//	NAME_ERROR_MSG, name);
-				//goto error;
+				if (PyErr_ExceptionMatches(PyExc_KeyError))
+					format_exc_check_arg(
+					PyExc_NameError,
+					NAME_ERROR_MSG, name);
+				return nullptr;
 			}
 			else{
 				PyErr_Clear();
@@ -988,37 +1024,35 @@ PyObject* LoadName(PyFrameObject* f, PyObject* name) {
 	return v;
 }
 
-void StoreName(PyObject* v, PyFrameObject* f, PyObject* name) {
+int StoreName(PyObject* v, PyFrameObject* f, PyObject* name) {
 	PyObject *ns = f->f_locals;
 	int err;
-	//if (ns == NULL) {
-	//	PyErr_Format(PyExc_SystemError,
-	//		"no locals found when storing %R", name);
-	//	Py_DECREF(v);
-	//	goto error;
-	//}
+	if (ns == NULL) {
+		PyErr_Format(PyExc_SystemError,
+			"no locals found when storing %R", name);
+		Py_DECREF(v);
+		return 1;
+	}
 	if (PyDict_CheckExact(ns))
 		err = PyDict_SetItem(ns, name, v);
 	else
 		err = PyObject_SetItem(ns, name, v);
 	Py_DECREF(v);
-	//if (err != 0)
-	//	goto error;
+	return err;
 }
 
-void DeleteName(PyObject* v, PyFrameObject* f, PyObject* name) {
+int DeleteName(PyObject* v, PyFrameObject* f, PyObject* name) {
 	PyObject *ns = f->f_locals;
 	int err;
-	//if (ns == NULL) {
-	//	PyErr_Format(PyExc_SystemError,
-	//		"no locals when deleting %R", name);
-	//	Py_DECREF(v);
-	//	goto error;
-	//}
+	if (ns == NULL) {
+		PyErr_Format(PyExc_SystemError,
+			"no locals when deleting %R", name);
+		Py_DECREF(v);
+		return 1;
+	}
 	err = PyObject_DelItem(ns, name);
 	Py_DECREF(v);
-	//if (err != 0)
-	//	goto error;
+	return err;
 }
 
 PyObject* g_emptyTuple;
@@ -1069,6 +1103,7 @@ bool can_skip_lasti_update(int opcode) {
 	case CONTINUE_LOOP:
 	case END_FINALLY:
 	case LOAD_CONST:
+	case JUMP_FORWARD:
 		return true;
 	}
 	return false;
@@ -1247,6 +1282,21 @@ private:
 	void build_map(int argCnt) {
 		il.push_ptr((void*)argCnt);
 		il.emit_call(METHOD_PYDICT_NEWPRESIZED);
+		{
+			// 3.6 doesn't have STORE_OP and instead does it all in BUILD_MAP...
+			if (argCnt > 0) {
+				auto map = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(map);
+				for (int curArg = 0; curArg < argCnt; curArg++) {
+					il.ld_loc(map);
+					il.emit_call(METHOD_STOREMAP_TOKEN);
+					check_int_error();
+				}
+				il.ld_loc(map);
+
+				il.free_local(map);
+			}
+		}
 	}
 
 	Label getOffsetLabel(int jumpTo) {
@@ -1295,11 +1345,22 @@ private:
 		il.mark_label(noErr);
 	}
 
+	void check_int_error_leave() {
+		auto noErr = il.define_label();
+		il.ld_i4(0);
+		il.branch(BranchEqual, noErr);
+		// we need to issue a leave to clear the stack as we may have
+		// values on the stack...
+		il.branch(BranchLeave, GetEHBlock().Raise);
+		il.mark_label(noErr);
+	}
+
 	// Checks to see if we have a non-zero error code on the stack, and if so,
 	// branches to the current error handler.  Consumes the error code in the process
 	void check_int_error() {
-		il.ld_i4(0);
-		il.branch(BranchNotEqual, GetEHBlock().Raise);
+		check_int_error_leave();
+		//il.ld_i4(0);
+		//il.branch(BranchNotEqual, GetEHBlock().Raise);
 	}
 
 	BlockInfo GetEHBlock() {
@@ -1362,6 +1423,9 @@ private:
 		int oparg;
 		Label ok;
 
+		il.push_ptr(PyUnicode_AsUTF8(code->co_name));
+		il.emit_call(METHOD_DEBUG_TRACE);
+
 		auto raiseLabel = il.define_label();
 		auto reraiseLabel = il.define_label();
 
@@ -1379,6 +1443,11 @@ private:
 		auto retValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 
 		for (int i = 0; i < size; i++) {
+			//char * tmp = (char*)malloc(8);
+			//sprintf_s(tmp, 8, "%d", i);
+			//il.push_ptr(tmp);
+			//il.emit_call(METHOD_DEBUG_TRACE);
+
 			auto byte = byteCode[i];
 
 			// See FOR_ITER for special handling of the offset label
@@ -1671,6 +1740,7 @@ private:
 				il.push_ptr(globalName);
 			}
 				il.emit_call(METHOD_LOADATTR_TOKEN);
+				check_error();
 				break;
 			case STORE_GLOBAL:
 				// value is on the stack
@@ -1710,11 +1780,13 @@ private:
 				load_frame();
 				il.push_ptr(PyTuple_GetItem(code->co_names, oparg));
 				il.emit_call(METHOD_STORENAME_TOKEN);
+				//check_int_error(); // TODO: Enable me
 				break;
 			case DELETE_NAME:
 				load_frame();
 				il.push_ptr(PyTuple_GetItem(code->co_names, oparg));
 				il.emit_call(METHOD_DELETENAME_TOKEN);
+				//check_int_error(); // TODO: Enable me
 				break;
 			case DELETE_FAST:
 			{
@@ -1882,7 +1954,9 @@ private:
 			case CALL_FUNCTION_VAR:
 			case CALL_FUNCTION_KW:
 			case CALL_FUNCTION_VAR_KW:
-				_ASSERT(FALSE);
+				printf("Not supported: fancy calls\r\n");
+				return nullptr;
+				//_ASSERT(FALSE);
 				break;
 			case CALL_FUNCTION:
 			{
@@ -1894,7 +1968,9 @@ private:
 				// target + args popped, result pushed
 				if (kwArgCnt == 0) {
 					switch (argCnt) {
-					case 0: il.emit_call(METHOD_CALL0_TOKEN); break;
+					case 0: 
+						il.emit_call(METHOD_CALL0_TOKEN); 
+						check_error(); break;
 						/*
 						case 1: emit_call(il, METHOD_CALL1_TOKEN); break;
 						case 2: emit_call(il, METHOD_CALL2_TOKEN); break;
@@ -1911,9 +1987,21 @@ private:
 
 						// target is on the stack already...
 						il.emit_call(METHOD_CALLN_TOKEN);
-
+						check_error();
 						break;
 					}
+				}
+				else{
+					build_map(kwArgCnt);
+					auto map = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+					il.st_loc(map);
+
+					build_tuple(argCnt);
+					il.ld_loc(map);
+					il.emit_call(METHOD_CALLNKW_TOKEN);
+					check_error();
+					il.free_local(map);
+					break;
 				}
 			}
 				break;
@@ -1931,10 +2019,13 @@ private:
 			case BUILD_MAP:
 				build_map(oparg);
 				break;
+#if PY_MINOR_VERSION == 5
 			case STORE_MAP:
+				return nullptr;
 				// stack is map, key, value
 				il.emit_call(METHOD_STOREMAP_TOKEN);
 				break;
+#endif
 			case STORE_SUBSCR:
 				// stack is value, container, index
 				il.emit_call(METHOD_STORESUBSCR_TOKEN);
@@ -2009,6 +2100,8 @@ private:
 				}
 
 				if (!inFinally) {
+					il.push_ptr("Returning...");
+					il.emit_call(METHOD_DEBUG_TRACE);
 					il.ret();
 				}
 			}
@@ -2033,26 +2126,35 @@ private:
 				if (byte == MAKE_CLOSURE) {
 					il.emit_call(METHOD_SET_CLOSURE);
 				}
-
-				if (num_annotations > 0) {
-					_ASSERTE(FALSE);
-				}
-				if (kwdefaults > 0) {
-					_ASSERTE(FALSE);
-				}
-				if (posdefaults > 0) {
-					_ASSERTE(FALSE);
+				if (num_annotations > 0 || kwdefaults > 0 || posdefaults > 0) {
+					auto func = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+					il.st_loc(func);
+					if (num_annotations > 0) {
+						printf("Make function, annotations not supported\r\n");
+						return nullptr;
+					}
+					if (kwdefaults > 0) {
+						printf("Make function, kwdefaults not supported\r\n");
+						return nullptr;
+					}
+					if (posdefaults > 0) {
+						build_tuple(posdefaults);
+						il.ld_loc(func);
+						il.emit_call(METHOD_FUNC_SET_DEFAULTS);
+						//check_int_error_leave();// TODO: enable me
+					}
+					il.ld_loc(func);
 				}
 				break;
 			}
 			case LOAD_DEREF:
 				load_frame();
-				il.ld_i(offsetof(PyFrameObject, f_localsplus) + code->co_nlocals * sizeof(size_t) + oparg);
-				il.add();
-				il.ld_ind_i();
+				il.ld_i4(oparg);
+				//il.ld_i(offsetof(PyFrameObject, f_localsplus) + code->co_nlocals * sizeof(size_t) + oparg);
+				//il.add();
+				//il.ld_ind_i();
 				il.emit_call(METHOD_PYCELL_GET);
 				check_error();
-				incref();
 				break;
 			case STORE_DEREF:
 				load_frame();
@@ -2274,6 +2376,12 @@ private:
 				// clear the exception.
 				il.load_null();
 				il.st_loc(ehVal);
+				{
+					char* tmp = (char*)malloc(100);
+					sprintf_s(tmp, 100, "Exception cleared %d", i);
+					il.push_ptr(tmp);
+					il.emit_call(METHOD_DEBUG_TRACE);
+				}
 				break;
 			case POP_BLOCK:
 			{
@@ -2335,7 +2443,7 @@ private:
 							if (m_blockStack[i].Kind == SETUP_LOOP) {
 								il.ld_loc(finallyReason);
 								il.ld_i(BLOCK_BREAKS);
-								il.branch(BranchEqual, m_blockStack[i].EndOffset);
+								il.branch(BranchEqual, getOffsetLabel(m_blockStack[i].EndOffset));
 								break;
 							}
 							else if (m_blockStack[i].Kind == SETUP_FINALLY) {
@@ -2416,10 +2524,11 @@ private:
 			case IMPORT_STAR:
 			case IMPORT_FROM:
 
-			case WITH_CLEANUP:
+			case WITH_CLEANUP_START:
+			case WITH_CLEANUP_FINISH:
 			default:
-				_ASSERT(FALSE);
-				break;
+				//_ASSERT(FALSE);
+				return nullptr;
 			}
 
 
@@ -2433,10 +2542,16 @@ private:
 		if (allHandlers.size() != 0) {
 			for (int i = 0; i < allHandlers.size(); i++) {
 				il.mark_label(allHandlers[i].Raise);
+				il.push_ptr("Exception raised");
+				il.emit_call(METHOD_DEBUG_TRACE);
+
 				load_frame();
 				il.emit_call(METHOD_EH_TRACE);
 
 				il.mark_label(allHandlers[i].ReRaise);
+				il.push_ptr("Exception reraised");
+				il.emit_call(METHOD_DEBUG_TRACE);
+				
 				il.ld_loca(tb);
 				il.ld_loca(ehVal);
 				il.ld_loca(excType);
@@ -2457,6 +2572,10 @@ private:
 		il.emit_call(METHOD_EH_TRACE);
 
 		il.mark_label(reraiseLabel);
+
+		il.push_ptr("Re-raising exception ");
+		il.emit_call(METHOD_DEBUG_TRACE);
+
 		il.load_null();
 		il.ret();
 
@@ -2465,11 +2584,12 @@ private:
 };
 
 extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
+	printf("Compiling %s\r\n", PyUnicode_AsUTF8(code->co_name));
 	Jitter jitter(code);
 	return jitter.Compile();
 }
 
-VTableInfo g_iterNextVtable{ 2, { offsetof(PyObject, ob_type), offsetof(PyTypeObject, tp_iternext) } };
+//VTableInfo g_iterNextVtable{ 2, { offsetof(PyObject, ob_type), offsetof(PyTypeObject, tp_iternext) } };
 
 extern "C" __declspec(dllexport) void JitInit() {
 	CeeInit();
@@ -2574,7 +2694,7 @@ extern "C" __declspec(dllexport) void JitInit() {
 
 	g_module->m_methods[METHOD_STOREMAP_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_NATIVEINT,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DoStoreMap
 		);
@@ -2689,11 +2809,18 @@ extern "C" __declspec(dllexport) void JitInit() {
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
 		&Call0
 		);
+	
 	g_module->m_methods[METHOD_CALLN_TOKEN] = Method(
 		nullptr,
 		CORINFO_TYPE_NATIVEINT,
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&CallN
+		);
+	g_module->m_methods[METHOD_CALLNKW_TOKEN] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
+		&CallNKW
 		);
 	g_module->m_methods[METHOD_STOREGLOBAL_TOKEN] = Method(
 		nullptr,
@@ -2979,6 +3106,21 @@ extern "C" __declspec(dllexport) void JitInit() {
 		);
 
 
+	g_module->m_methods[METHOD_DEBUG_TRACE] = Method(
+		nullptr,
+		CORINFO_TYPE_VOID,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
+		&DoDebugTrace
+		);
+
+	g_module->m_methods[METHOD_FUNC_SET_DEFAULTS] = Method(
+		nullptr,
+		CORINFO_TYPE_VOID,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
+		&DoFunctionSetDefaults
+		);
+
+	
 
 	//g_module->m_methods[SIG_ITERNEXT_TOKEN] = Method(
 	//	nullptr,

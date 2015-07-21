@@ -118,6 +118,14 @@ public:
 		else{
 			localList = &(existing->second);
 		}
+#if _DEBUG
+		for (int i = 0; i < localList->size(); i++) {
+			if ((*localList)[i].m_index == local.m_index) {
+				// locals shouldn't be double freed...
+				assert(FALSE);
+			}
+		}
+#endif
 		localList->push_back(local);
 	}
 
@@ -455,7 +463,7 @@ public:
 		CorJitResult result = jit->compileMethod(
 			/*ICorJitInfo*/jitInfo,
 			/*CORINFO_METHOD_INFO */&methodInfo,
-			/*flags*/0,
+			/*flags*/CORJIT_FLG_SKIP_VERIFICATION,
 			&nativeEntry,
 			&nativeSizeOfCode
 			);

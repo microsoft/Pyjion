@@ -97,6 +97,46 @@ void PyJitTest() {
 
 	TestCase cases[] = {
 		TestCase(
+			"def f(module, loader=None, origin=None):\n    # This function is meant for use in _setup().\n    try:\n        spec = module.__spec__\n    except AttributeError:\n        pass\n    else:\n        if spec is not None:\n            return spec\n\n    name = module.__name__\n    if loader is None:\n        try:\n            loader = module.__loader__\n        except AttributeError:\n            # loader will stay None.\n            pass\n    try:\n        location = module.__file__\n    except AttributeError:\n        location = None\n    if origin is None:\n        if location is None:\n            try:\n                origin = loader._ORIGIN\n            except AttributeError:\n                origin = None\n        else:\n            origin = location\n    try:\n        cached = module.__cached__\n    except AttributeError:\n        cached = None\n    try:\n        submodule_search_locations = list(module.__path__)\n    except AttributeError:\n        submodule_search_locations = None\n\n    spec = ModuleSpec(name, loader, origin=origin)\n    spec._set_fileattr = False if location is None else True\n    spec.cached = cached\n    spec.submodule_search_locations = submodule_search_locations\n    return spec\n",
+			TestInput("{'y': 2}")
+		),
+		TestCase(
+			"def f():\n    x = {}\n    x.update(y=2)\n    return x",
+			TestInput("{'y': 2}")
+		),
+		TestCase(
+			"def f(a):\n    return 1 if a else 2",
+			vector<TestInput>({
+				TestInput("1", vector<PyObject*>({ PyLong_FromLong(42) })),
+				TestInput("2", vector<PyObject*>({ PyLong_FromLong(0) })),
+				TestInput("1", vector<PyObject*>({ Incremented(Py_True) })),
+				TestInput("2", vector<PyObject*>({ Incremented(Py_False) }))
+			})
+		),
+		TestCase(
+			"def f(v):\n    try:\n        x = v.real\n    except AttributeError:\n        return 42\n    else:\n        return x\n",
+			vector<TestInput>({
+				TestInput("1", vector<PyObject*>({ PyLong_FromLong(1) })),
+				TestInput("42", vector<PyObject*>({ PyUnicode_FromString("hi") }))
+			})
+		),
+		TestCase(
+			"def f():\n    a=1\n    def x():\n        return a\n    return a",
+			TestInput("1", vector<PyObject*>({ NULL, PyCell_New(NULL) }))
+		),
+		TestCase(
+			"def f():\n    x = 2\n    def g():    return x\n    \n    str(g)\n    return g()",
+			TestInput("2", vector<PyObject*>({ NULL, PyCell_New(NULL) }))
+		),
+		TestCase(
+			"def f():\n    a=2\n    def g(): return a\n    return g()",
+			TestInput("2", vector<PyObject*>({ NULL, PyCell_New(NULL) }))
+		),
+		TestCase(
+			"def f():\n    def g(a=2): return a\n    return g()",
+			TestInput("2")
+		),
+		TestCase(
 			"def f():\n    try:\n        raise Exception(2)\n    except Exception as e:\n        return e.args[0]",
 			TestInput("2")
 		),
