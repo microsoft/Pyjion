@@ -294,6 +294,10 @@ public:
 	static void ThrowFunc() {
 	}
 
+	static void FailFast() {
+		::ExitProcess(1);
+	}
+
 	// return the native entry point to an EE helper (see CorInfoHelpFunc)
 	virtual void* getHelperFtn(
 		CorInfoHelpFunc         ftnNum,
@@ -301,6 +305,7 @@ public:
 		) {
 		switch (ftnNum) {
 		case CORINFO_HELP_THROW: return &ThrowFunc;
+		case CORINFO_HELP_FAIL_FAST: return &FailFast;
 		}
 		printf("unknown getHelperFtn\r\n");
 		return NULL;
@@ -529,6 +534,7 @@ public:
 		pResult->sig.callConv = CORINFO_CALLCONV_DEFAULT;		
 		pResult->sig.retTypeClass = nullptr;
 		pResult->verSig = pResult->sig;		
+		pResult->accessAllowed = CORINFO_ACCESS_ALLOWED;
 		printf("getCallInfo\r\n");
 	}
 
@@ -915,6 +921,8 @@ public:
 		GSCookie * pCookieVal,                     // OUT
 		GSCookie ** ppCookieVal                    // OUT
 		) {
+		*pCookieVal = 0x1234; // TODO: Should be a secure value
+		*ppCookieVal = nullptr;
 		printf("getGSCookie\r\n");
 	}
 

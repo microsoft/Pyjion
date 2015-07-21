@@ -96,6 +96,225 @@ void PyJitTest() {
 	PyList_SetItem(list, 0, PyLong_FromLong(42));
 
 	TestCase cases[] = {
+		TestCase(	// hits JUMP_FORWARD
+			"def f(a):\n    if a:\n        x = 1\n    else:\n        x = 2\n    return x",
+			vector<TestInput>({
+				TestInput("1", vector<PyObject*>({ PyLong_FromLong(42) })),
+				TestInput("2", vector<PyObject*>({ PyLong_FromLong(0) })),
+				TestInput("1", vector<PyObject*>({ Incremented(Py_True) })),
+				TestInput("2", vector<PyObject*>({ Incremented(Py_False) }))
+			})
+		),
+		TestCase(
+			"def f(a, b):\n    return a and b",
+			vector<TestInput>({
+				TestInput("2", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(2) })),
+				TestInput("0", vector<PyObject*>({ PyLong_FromLong(0), PyLong_FromLong(1) })),
+				TestInput("False", vector<PyObject*>({ Py_True, Py_False })),
+				TestInput("False", vector<PyObject*>({ Py_False, Py_True })),
+				TestInput("True", vector<PyObject*>({ Py_True, Py_True })),
+				TestInput("False", vector<PyObject*>({ Py_False, Py_False })),
+			})
+		),
+		TestCase(
+			"def f(a, b):\n    return a or b",
+			vector<TestInput>({
+				TestInput("1", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(2) })),
+				TestInput("1", vector<PyObject*>({ PyLong_FromLong(0), PyLong_FromLong(1) })),
+				TestInput("True", vector<PyObject*>({ Py_True, Py_False })),
+				TestInput("True", vector<PyObject*>({ Py_False, Py_True })),
+				TestInput("True", vector<PyObject*>({ Py_True, Py_True })),
+				TestInput("False", vector<PyObject*>({ Py_False, Py_False })),
+			})
+		),
+		TestCase(		 // hits ROT_TWO, POP_TWO, DUP_TOP, ROT_THREE
+			"def f(a, b, c):\n    return a < b < c",
+			vector<TestInput>({
+				TestInput("True", vector<PyObject*>({ PyLong_FromLong(2), PyLong_FromLong(3), PyLong_FromLong(4) })),
+				TestInput("False", vector<PyObject*>({ PyLong_FromLong(4), PyLong_FromLong(3), PyLong_FromLong(2) }))
+			})
+		),
+		TestCase(
+			"def f(a, b):\n    a **= b\n    return a",
+			TestInput("8", vector<PyObject*>({ PyLong_FromLong(2), PyLong_FromLong(3) }))
+		),
+		TestCase(
+			"def f(a, b):\n    a *= b\n    return a",
+			TestInput("6", vector<PyObject*>({ PyLong_FromLong(2), PyLong_FromLong(3) }))
+		),
+		TestCase(
+			"def f(a, b):\n    a /= b\n    return a",
+			TestInput("0.5", vector<PyObject*>({ PyLong_FromLong(2), PyLong_FromLong(4) }))
+		),
+		TestCase(
+			"def f(a, b):\n    a //= b\n    return a",
+			vector<TestInput>({
+				TestInput("0", vector<PyObject*>({ PyLong_FromLong(2), PyLong_FromLong(4) })),
+				TestInput("2", vector<PyObject*>({ PyLong_FromLong(4), PyLong_FromLong(2) }))
+			})
+		),
+		TestCase(
+			"def f(a, b):\n    a %= b\n    return a",
+			TestInput("1", vector<PyObject*>({ PyLong_FromLong(3), PyLong_FromLong(2) }))
+		),
+		TestCase(
+			"def f(a, b):\n    a += b\n    return a",
+			vector<TestInput>({
+				TestInput("9", vector<PyObject*>({ PyLong_FromLong(6), PyLong_FromLong(3) })),
+				TestInput("'hibye'", vector<PyObject*>({ PyUnicode_FromString("hi"), PyUnicode_FromString("bye") }))
+			})
+		),
+		TestCase(
+			"def f(a, b):\n    a -= b\n    return a",
+			TestInput("1", vector<PyObject*>({ PyLong_FromLong(3), PyLong_FromLong(2) }))
+		),
+		TestCase(
+			"def f(a, b):\n    a <<= b\n    return a",
+			TestInput("4", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(2) }))
+		),
+		TestCase(
+			"def f(a, b):\n    a >>= b\n    return a",
+			TestInput("1", vector<PyObject*>({ PyLong_FromLong(2), PyLong_FromLong(1) }))
+		),
+		TestCase(
+			"def f(a, b):\n    a &= b\n    return a",
+			TestInput("2", vector<PyObject*>({ PyLong_FromLong(6), PyLong_FromLong(3) }))
+		),
+		TestCase(
+			"def f(a, b):\n    a ^= b\n    return a",
+			TestInput("5", vector<PyObject*>({ PyLong_FromLong(6), PyLong_FromLong(3) }))
+		),
+		TestCase(
+			"def f(a, b):\n    a |= b\n    return a",
+			TestInput("7", vector<PyObject*>({ PyLong_FromLong(6), PyLong_FromLong(3) }))
+		),
+		TestCase(
+			"def f(x):\n    return -x",
+			TestInput("-1", vector<PyObject*>({ PyLong_FromLong(1) }))
+		),
+		TestCase(
+			"def f(x):\n    return +x",
+			TestInput("1", vector<PyObject*>({ PyLong_FromLong(1) }))
+		),
+		TestCase(
+			"def f(x):\n    return ~x",
+			TestInput("-2", vector<PyObject*>({ PyLong_FromLong(1) }))
+		),
+		TestCase(
+			"def f(a, b): return a << b",
+			TestInput("4", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(2) }))
+		),
+		TestCase(
+			"def f(a, b): return a >> b",
+			TestInput("2", vector<PyObject*>({ PyLong_FromLong(4), PyLong_FromLong(1) }))
+		),
+		TestCase(
+			"def f(a, b): return a & b",
+			TestInput("2", vector<PyObject*>({ PyLong_FromLong(6), PyLong_FromLong(3) }))
+		),
+		TestCase(
+			"def f(a, b): return a | b",
+			TestInput("3", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(2) }))
+		),
+		TestCase(
+			"def f(a, b): return a ^ b",
+			TestInput("6", vector<PyObject*>({ PyLong_FromLong(3), PyLong_FromLong(5) }))
+		),
+		TestCase(
+			"def f(x):\n    return not x",
+			vector<TestInput>({
+				TestInput("False", vector<PyObject*>({ PyLong_FromLong(1) })),
+				TestInput("True", vector<PyObject*>({ PyLong_FromLong(0) }))
+			})
+		),
+		TestCase(
+			"def f():\n    for i in range(3):\n        if i == 0: continue\n        break\n    return i",
+			TestInput("1")
+		),
+		TestCase(
+			"def f():\n    for i in range(3):\n        if i == 1: break\n    return i",
+			TestInput("1")
+		),
+		TestCase(
+			"def f():\n    return [1,2,3][1:]",
+			TestInput("[2, 3]")
+		),
+		TestCase(
+			"def f():\n    return [1,2,3][:1]",
+			TestInput("[1]")
+		),
+		TestCase(
+			"def f():\n    return [1,2,3][1:2]",
+			TestInput("[2]")
+		),
+		TestCase(
+			"def f():\n    return [1,2,3][0::2]",
+			TestInput("[1, 3]")
+		),
+		TestCase(
+			"def f():\n    x = 2\n    def g():    return x\n    return g()",
+			TestInput("2", vector<PyObject*>({ NULL, PyCell_New(NULL) }))
+		),
+		TestCase(
+			"def f():\n    a, *b, c = range(3)\n    return a",
+			TestInput("0")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = range(3)\n    return b",
+			TestInput("[1]")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = range(3)\n    return c",
+			TestInput("2")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = 1, 2, 3\n    return a",
+			TestInput("1")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = 1, 2, 3\n    return b",
+			TestInput("[2]")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = 1, 2, 3\n    return c",
+			TestInput("3")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = 1, 3\n    return c",
+			TestInput("3")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = 1, 3\n    return b",
+			TestInput("[]")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = [1, 2, 3]\n    return a",
+			TestInput("1")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = [1, 2, 3]\n    return b",
+			TestInput("[2]")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = [1, 2, 3]\n    return c",
+			TestInput("3")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = [1, 3]\n    return c",
+			TestInput("3")
+		),
+		TestCase(
+			"def f():\n    a, *b, c = [1, 3]\n    return b",
+			TestInput("[]")
+		),
+		TestCase(
+			"def f():\n    a, b = range(2)\n    return a",
+			TestInput("0")
+		),
+		TestCase(
+			"def f():\n    a, b = 1, 2\n    return a",
+			TestInput("1")
+		),
 		TestCase(
 			"def f():\n    class C:\n        pass\n    return C",
 			TestInput("<class 'C'>")
@@ -237,7 +456,7 @@ void PyJitTest() {
 			for (size_t arg = 0; arg < input.m_args.size(); arg++) {
 				frame->f_localsplus[arg] = input.m_args[arg];
 			}
-
+			
 			auto res = ((evalFunc)addr)(frame);
 
 			auto repr = PyUnicode_AsUTF8(PyObject_Repr(res));

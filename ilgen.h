@@ -31,6 +31,7 @@ enum BranchType {
 	BranchTrue,
 	BranchFalse,
 	BranchEqual,
+	BranchLeave,
 };
 
 
@@ -38,7 +39,7 @@ class Local {
 public:
 	int m_index;
 
-	Local(int index) {
+	Local(int index = -1) {
 		m_index = index;
 	}
 };
@@ -163,6 +164,9 @@ public:
 	void branch(BranchType branchType, int offset) {
 		if ((offset - 2) <= 128 && (offset - 2) >= -127) {
 			switch (branchType) {
+			case BranchLeave:
+				m_il.push_back(CEE_LEAVE_S);
+				break;
 			case BranchAlways:
 				m_il.push_back(CEE_BR_S);
 				break;
@@ -180,6 +184,9 @@ public:
 		}
 		else{
 			switch (branchType) {
+			case BranchLeave:
+				m_il.push_back(CEE_LEAVE);
+				break;
 			case BranchAlways:
 				m_il.push_back(CEE_BR);
 				break;
@@ -257,6 +264,10 @@ public:
 		ld_loc(param.m_index);
 	}
 
+	void ld_loca(Local param) {
+		ld_loca(param.m_index);
+	}
+
 	void st_loc(int index) {
 		switch (index) {
 		case 0: m_il.push_back(CEE_STLOC_0); break;
@@ -294,6 +305,19 @@ public:
 				m_il.push_back(index & 0xff);
 				m_il.push_back((index >> 8) & 0xff);
 			}
+		}
+	}
+
+	void ld_loca(int index) {
+		if (index < 256) {
+			m_il.push_back(CEE_LDLOCA_S);
+			m_il.push_back(index);
+		}
+		else{
+			m_il.push_back(CEE_PREFIX1);
+			m_il.push_back((byte)CEE_LDLOCA);
+			m_il.push_back(index & 0xff);
+			m_il.push_back((index >> 8) & 0xff);
 		}
 	}
 
