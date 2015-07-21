@@ -42,7 +42,6 @@ public:
 
 	/* ICorJitInfo */
 	IEEMemoryManager* getMemoryManager() {
-		printf("getMemoryManager\r\n");
 		return NULL;
 	}
 
@@ -1720,7 +1719,7 @@ public:
 	virtual CORINFO_ARG_LIST_HANDLE getArgNext(
 		CORINFO_ARG_LIST_HANDLE     args            /* IN */
 		) {
-		printf("getArgNext %p\r\n", args);
+		//printf("getArgNext %p\r\n", args);
 		return (CORINFO_ARG_LIST_HANDLE)(((Parameter*)args) + 1);
 	}
 
@@ -1738,7 +1737,7 @@ public:
 		CORINFO_ARG_LIST_HANDLE     args,           /* IN */
 		CORINFO_CLASS_HANDLE       *vcTypeRet       /* OUT */
 		) {
-		printf("getArgType %p\r\n", args);
+		//printf("getArgType %p\r\n", args);
 		*vcTypeRet = nullptr;
 		return (CorInfoTypeWithMod)((Parameter*)args)->m_type;
 	}
@@ -1748,7 +1747,7 @@ public:
 		CORINFO_SIG_INFO*           sig,            /* IN */
 		CORINFO_ARG_LIST_HANDLE     args            /* IN */
 		) {
-		printf("getArgClass\r\n");
+		//printf("getArgClass\r\n");
 		return NULL;
 	}
 
@@ -1871,7 +1870,7 @@ public:
 		const char                **moduleName  /* OUT */
 		) {
 		*moduleName = "foo";
-		printf("getMethodName %p\r\n", ftn);
+		//printf("getMethodName %p\r\n", ftn);
 		return "bar";
 	}
 

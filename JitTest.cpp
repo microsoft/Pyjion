@@ -96,6 +96,46 @@ void PyJitTest() {
 	PyList_SetItem(list, 0, PyLong_FromLong(42));
 
 	TestCase cases[] = {
+		TestCase(
+			"def f():\n    try:\n        raise Exception(2)\n    except Exception as e:\n        return e.args[0]",
+			TestInput("2")
+		),
+		TestCase(
+			"def f():\n    for i in range(5):\n        try:\n            continue\n        finally:\n            return i",
+			TestInput("0")
+		),
+		TestCase(
+			"def f():\n    for i in range(5):\n        try:\n            break\n        finally:\n            return i",
+			TestInput("0")
+		),
+		TestCase(
+			"def f():\n    try:\n        raise Exception()\n    finally:\n        return 42",
+			TestInput("42")
+		),
+		TestCase(
+			"def f():\n    try:\n        raise Exception()\n    finally:\n        pass",
+			TestInput("<NULL>")
+		),
+		TestCase(
+			"def f():\n    try:\n        pass\n    finally:\n        return 42",
+			TestInput("42")
+		),
+		TestCase(
+			"def f():\n    try:\n        raise Exception()\n    except:\n        return 2",
+			TestInput("2")
+		),
+		TestCase(
+			"def f():\n    try:\n        raise Exception()\n    except Exception:\n        return 2",
+			TestInput("2")
+		),
+		TestCase(
+			"def f():\n    try:\n        raise Exception()\n    except AssertionError:\n        return 2\n    return 4",
+			TestInput("<NULL>")
+		),
+		TestCase(
+			"def f():\n    global x\n    x = 2\n    return x",
+			TestInput("2")
+		),
 		TestCase(	// hits JUMP_FORWARD
 			"def f(a):\n    if a:\n        x = 1\n    else:\n        x = 2\n    return x",
 			vector<TestInput>({
@@ -464,9 +504,11 @@ void PyJitTest() {
 				printf("Unexpected: %s\r\n", repr);
 				_ASSERT(FALSE);
 			}
-
+			if (res == nullptr) {
+				PyErr_Clear();
+			}
 			//Py_DECREF(frame);
-			Py_DECREF(res);
+			Py_XDECREF(res);
 			Py_DECREF(codeObj);
 		}
 	}

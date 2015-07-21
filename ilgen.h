@@ -31,6 +31,7 @@ enum BranchType {
 	BranchTrue,
 	BranchFalse,
 	BranchEqual,
+	BranchNotEqual,
 	BranchLeave,
 };
 
@@ -57,9 +58,11 @@ class LabelInfo {
 public:
 	int m_location;
 	vector<int> m_branchOffsets;
+	int m_stackDepth;
 
 	LabelInfo() {
 		m_location = -1;
+		m_stackDepth = -1;
 	}
 };
 
@@ -69,6 +72,7 @@ class ILGenerator {
 	CorInfoType m_retType;
 	Module* m_module;
 	unordered_map<CorInfoType, vector<Local>> m_freedLocals;
+	int m_stackDepth;
 
 public:
 	vector<byte> m_il;
@@ -82,6 +86,14 @@ public:
 		m_retType = returnType;
 		m_params = params;
 		m_localCount = 0;
+	}
+
+	int getStackDepth() {
+		return m_stackDepth;
+	}
+
+	void setStackDepth(int depth) {
+		m_stackDepth = depth;
 	}
 
 	Local define_local(Parameter param) {
@@ -118,43 +130,97 @@ public:
 		auto info = &m_labels[label.m_index];
 		info->m_location = (int)m_il.size();
 		for (int i = 0; i < info->m_branchOffsets.size(); i++) {
-			auto from = info->m_branchOffsets[i] ;	
+			auto from = info->m_branchOffsets[i];
 			auto offset = info->m_location - (from + 4);		// relative to the end of the instruction
 
 			m_il[from] = offset & 0xFF;
-			m_il[from + 1] = (offset>>8) & 0xFF;
-			m_il[from + 2] = (offset>>16) & 0xFF;
-			m_il[from + 3] = (offset>>24) & 0xFF;
+			m_il[from + 1] = (offset >> 8) & 0xFF;
+			m_il[from + 2] = (offset >> 16) & 0xFF;
+			m_il[from + 3] = (offset >> 24) & 0xFF;
+		}
+		if (info->m_stackDepth != -1) {
+			m_stackDepth = info->m_stackDepth;
+		}
+	}
+
+	void localloc(){
+		push_back(CEE_PREFIX1);
+		push_back(CEE_LOCALLOC);
+	}
+
+	void ret() {
+		if (m_retType != CORINFO_TYPE_VOID) {
+			m_stackDepth--;	
+			//assert(m_stackDepth >= 0);
+		}
+		//assert(m_stackDepth == 0);
+		push_back(CEE_RET);
+	}
+
+	void ld_i4(int i) {
+		m_stackDepth++;
+		switch (i) {
+		case 0: push_back(CEE_LDC_I4_0); break;
+		case 1: push_back(CEE_LDC_I4_1); break;
+		case 2: push_back(CEE_LDC_I4_2); break;
+		case 3: push_back(CEE_LDC_I4_3); break;
+		case 4: push_back(CEE_LDC_I4_4); break;
+		case 5: push_back(CEE_LDC_I4_5); break;
+		case 6: push_back(CEE_LDC_I4_6); break;
+		case 7: push_back(CEE_LDC_I4_7); break;
+		default:
+			if (i < 256) {
+				push_back(CEE_LDC_I4_S); 
+				m_il.push_back(i);
+
+			}
+			else{
+				m_il.push_back(CEE_LDC_I4);
+				m_il.push_back((byte)CEE_STLOC);
+				emit_int(i);
+			}
 		}
 	}
 
 	void load_null() {
-		m_il.push_back(CEE_LDC_I4_0);
+		ld_i4(0);
 		m_il.push_back(CEE_CONV_I);
 	}
 
-	void emit_int(int value) {
-		m_il.push_back(value & 0xff);
-		m_il.push_back((value >> 8) & 0xff);
-		m_il.push_back((value >> 16) & 0xff);
-		m_il.push_back((value >> 24) & 0xff);
+	void st_ind_i() {
+		push_back(CEE_STIND_I);
+		m_stackDepth -= 2;
+		//assert(m_stackDepth >= 0);
+	}
+
+	void ld_ind_i(){
+		push_back(CEE_LDIND_I);		
+	}
+
+	void st_ind_i4() {
+		push_back(CEE_STIND_I4);
+		m_stackDepth -= 2;
+		//assert(m_stackDepth >= 0);
+	}
+
+	void ld_ind_i4(){
+		push_back(CEE_LDIND_I4);
 	}
 
 	void ld_i(int i) {
 		m_il.push_back(CEE_LDC_I4);
 		emit_int(i);
 		m_il.push_back(CEE_CONV_I);
+		m_stackDepth++;
 	}
 
-	void push_back(byte b) {
-		m_il.push_back(b);
-	}
-	
 	void branch(BranchType branchType, Label label) {
 		auto info = &m_labels[label.m_index];
 		if (info->m_location == -1) {
 			info->m_branchOffsets.push_back((int)m_il.size() + 1);
-			branch(branchType, 0xFFFF);	
+			branch(branchType, 0xFFFF);
+//			assert(info->m_stackDepth == -1 || info->m_stackDepth == m_stackDepth);
+			info->m_stackDepth = m_stackDepth;
 		}
 		else{
 			branch(branchType, (int)(info->m_location - m_il.size()));
@@ -165,6 +231,7 @@ public:
 		if ((offset - 2) <= 128 && (offset - 2) >= -127) {
 			switch (branchType) {
 			case BranchLeave:
+				m_stackDepth = 0;
 				m_il.push_back(CEE_LEAVE_S);
 				break;
 			case BranchAlways:
@@ -172,12 +239,19 @@ public:
 				break;
 			case BranchTrue:
 				m_il.push_back(CEE_BRTRUE_S);
+				m_stackDepth--;
 				break;
 			case BranchFalse:
 				m_il.push_back(CEE_BRFALSE_S);
+				m_stackDepth--;
 				break;
 			case BranchEqual:
 				m_il.push_back(CEE_BEQ_S);
+				m_stackDepth -= 2;
+				break;
+			case BranchNotEqual:
+				m_il.push_back(CEE_BNE_UN_S);
+				m_stackDepth -= 2;
 				break;
 			}
 			m_il.push_back((byte)offset - 2);
@@ -185,6 +259,7 @@ public:
 		else{
 			switch (branchType) {
 			case BranchLeave:
+				m_stackDepth = 0;
 				m_il.push_back(CEE_LEAVE);
 				break;
 			case BranchAlways:
@@ -192,12 +267,19 @@ public:
 				break;
 			case BranchTrue:
 				m_il.push_back(CEE_BRTRUE);
+				m_stackDepth--;
 				break;
 			case BranchFalse:
 				m_il.push_back(CEE_BRFALSE);
+				m_stackDepth--;
 				break;
 			case BranchEqual:
 				m_il.push_back(CEE_BEQ);
+				m_stackDepth -= 2;
+				break;
+			case BranchNotEqual:
+				m_il.push_back(CEE_BNE_UN);
+				m_stackDepth -= 2;
 				break;
 			}
 			emit_int(offset - 5);
@@ -206,15 +288,20 @@ public:
 
 	void dup() {
 		m_il.push_back(CEE_DUP);
+		m_stackDepth++;
 	}
 
 	void pop() {
 		m_il.push_back(CEE_POP);
+		m_stackDepth--;
+		//assert(m_stackDepth >= 0);
 	}
 
 	void compare_eq() {
 		m_il.push_back(CEE_PREFIX1);
 		m_il.push_back((byte)CEE_CEQ);
+		m_stackDepth--;
+		//assert(m_stackDepth >= 0);
 	}
 
 	void push_ptr(void* ptr) {
@@ -234,6 +321,7 @@ public:
 			m_il.push_back((value >> 48) & 0xff);
 			m_il.push_back((value >> 56) & 0xff);
 			m_il.push_back(CEE_CONV_I);
+			m_stackDepth++;
 		}
 #else
 		ld_i(value);
@@ -244,17 +332,30 @@ public:
 	void emit_call(int token) {
 		m_il.push_back(CEE_CALL);
 		emit_int(token);
+
+		update_stack_for_call(token);
 	}
 
-	void emit_calli(int token) {
-		m_il.push_back(CEE_CALLI);
-		emit_int(token);
+	void update_stack_for_call(int token) {
+		auto method = m_module->ResolveMethod(token);
+		m_stackDepth -= method->m_params.size();
+
+		//assert(m_stackDepth >= 0);
+
+		if (method->m_retType != CORINFO_TYPE_VOID) {
+			m_stackDepth++;
+		}
 	}
 
-	void emit_callvirt(int token) {
-		m_il.push_back(CEE_CALLVIRT);
-		emit_int(token);
-	}
+	//void emit_calli(int token) {
+	//	m_il.push_back(CEE_CALLI);
+	//	emit_int(token);
+	//}
+
+	//void emit_callvirt(int token) {
+	//	m_il.push_back(CEE_CALLVIRT);
+	//	emit_int(token);
+	//}
 
 	void st_loc(Local param) {
 		st_loc(param.m_index);
@@ -269,6 +370,8 @@ public:
 	}
 
 	void st_loc(int index) {
+		m_stackDepth--;
+		//assert(m_stackDepth >= 0);
 		switch (index) {
 		case 0: m_il.push_back(CEE_STLOC_0); break;
 		case 1: m_il.push_back(CEE_STLOC_1); break;
@@ -289,6 +392,7 @@ public:
 	}
 
 	void ld_loc(int index) {
+		m_stackDepth++;
 		switch (index) {
 		case 0: m_il.push_back(CEE_LDLOC_0); break;
 		case 1: m_il.push_back(CEE_LDLOC_1); break;
@@ -309,6 +413,7 @@ public:
 	}
 
 	void ld_loca(int index) {
+		m_stackDepth++;
 		if (index < 256) {
 			m_il.push_back(CEE_LDLOCA_S);
 			m_il.push_back(index);
@@ -353,10 +458,51 @@ public:
 			/*flags*/0,
 			&nativeEntry,
 			&nativeSizeOfCode
-		);
+			);
 		res.m_addr = nativeEntry;
 		return res;
 	}
+
+	void add() {
+		push_back(CEE_ADD);
+		m_stackDepth--;
+	}
+
+	void ld_arg(int index){
+		m_stackDepth++;
+		switch (index) {
+		case 0: push_back(CEE_LDARG_0); break;
+		case 1: push_back(CEE_LDARG_1); break;
+		case 2: push_back(CEE_LDARG_2); break;
+		case 3: push_back(CEE_LDARG_3); break;
+		default:
+			if (index < 256) {
+				push_back(CEE_LDARG_3);
+				m_il.push_back(index);
+			}				
+			else{
+				m_il.push_back(CEE_PREFIX1);
+				m_il.push_back((byte)CEE_LDARG);
+				m_il.push_back(index & 0xff);
+				m_il.push_back((index >> 8) & 0xff);
+			}
+
+			break;
+		}
+}
+private:
+	void emit_int(int value) {
+		m_il.push_back(value & 0xff);
+		m_il.push_back((value >> 8) & 0xff);
+		m_il.push_back((value >> 16) & 0xff);
+		m_il.push_back((value >> 24) & 0xff);
+	}
+
+	void push_back(byte b) {
+		m_il.push_back(b);
+	}
+
+
 };
 
 #endif

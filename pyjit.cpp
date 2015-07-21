@@ -55,6 +55,11 @@
 #define METHOD_MAP_ADD_TOKEN				0x00000033
 #define METHOD_PRINT_EXPR_TOKEN				0x00000034
 #define METHOD_LOAD_CLASSDEREF_TOKEN		0x00000035
+#define METHOD_PREPARE_EXCEPTION			0x00000036
+#define METHOD_DO_RAISE						0x00000037
+#define METHOD_EH_TRACE						0x00000038
+#define METHOD_COMPARE_EXCEPTIONS			0x00000039
+#define METHOD_UNBOUND_LOCAL				0x0000003A
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -78,6 +83,7 @@
 #define METHOD_PYOBJECT_ISTRUE		0x00020005
 #define METHOD_PYITER_NEXT			0x00020006
 #define METHOD_PYCELL_GET			0x00020007
+#define METHOD_PYERR_RESTORE		0x00020008
 
 // Misc helpers
 #define METHOD_LOADGLOBAL_TOKEN		0x00030000
@@ -90,46 +96,57 @@
 // signatures for calli methods
 #define SIG_ITERNEXT_TOKEN			0x00040000
 
+#define UNBOUNDLOCAL_ERROR_MSG \
+    "local variable '%.200s' referenced before assignment"
+#define UNBOUNDFREE_ERROR_MSG \
+    "free variable '%.200s' referenced before assignment" \
+    " in enclosing scope"
+
+static void
+format_exc_check_arg(PyObject *exc, const char *format_str, PyObject *obj)
+{
+	const char *obj_str;
+
+	if (!obj)
+		return;
+
+	obj_str = _PyUnicode_AsString(obj);
+	if (!obj_str)
+		return;
+
+	PyErr_Format(exc, format_str, obj_str);
+}
+
+static void
+format_exc_unbound(PyCodeObject *co, int oparg)
+{
+	PyObject *name;
+	/* Don't stomp existing exception */
+	if (PyErr_Occurred())
+		return;
+	if (oparg < PyTuple_GET_SIZE(co->co_cellvars)) {
+		name = PyTuple_GET_ITEM(co->co_cellvars,
+			oparg);
+		format_exc_check_arg(
+			PyExc_UnboundLocalError,
+			UNBOUNDLOCAL_ERROR_MSG,
+			name);
+	}
+	else {
+		name = PyTuple_GET_ITEM(co->co_freevars, oparg -
+			PyTuple_GET_SIZE(co->co_cellvars));
+		format_exc_check_arg(PyExc_NameError,
+			UNBOUNDFREE_ERROR_MSG, name);
+	}
+}
+
 Module *g_module;
 CorJitInfo g_corJitInfo;
 ICorJitCompiler* g_jit;
 
-void load_frame(ILGenerator &il) {
-	il.push_back(CEE_LDARG_0);
-}
-
-#define LD_FIELDA(type, field) il.ld_i(offsetof(type, field)); il.push_back(CEE_ADD); 
-#define LD_FIELD(type, field) il.ld_i(offsetof(type, field)); il.push_back(CEE_ADD); il.push_back(CEE_LDIND_I);
-#define ST_FIELD(type, field) il.ld_i(offsetof(type, field)); il.push_back(CEE_ADD); il.push_back(CEE_STIND_I);
-
-void load_local(ILGenerator& il, int oparg) {
-	load_frame(il);
-	il.ld_i(offsetof(PyFrameObject, f_localsplus) + oparg * sizeof(size_t));
-	il.push_back(CEE_ADD);
-	il.push_back(CEE_LDIND_I);
-}
-
-void incref(ILGenerator&il) {
-	LD_FIELDA(PyObject, ob_refcnt);
-	il.push_back(CEE_DUP);
-	il.push_back(CEE_LDIND_I4);
-	il.push_back(CEE_LDC_I4_1);
-	il.push_back(CEE_ADD);
-	il.push_back(CEE_STIND_I4);
-}
-
-void decref(ILGenerator&il) {
-	il.emit_call(METHOD_DECREF_TOKEN);
-	//LD_FIELDA(PyObject, ob_refcnt);
-	//il.push_back(CEE_DUP);
-	//il.push_back(CEE_LDIND_I4);
-	//il.push_back(CEE_LDC_I4_1);
-	//il.push_back(CEE_SUB);
-	////il.push_back(CEE_DUP);
-	//// _Py_Dealloc(_py_decref_tmp)
-
-	//il.push_back(CEE_STIND_I4);
-}
+#define LD_FIELDA(type, field) il.ld_i(offsetof(type, field)); il.add(); 
+#define LD_FIELD(type, field) il.ld_i(offsetof(type, field)); il.add(); il.ld_ind_i();
+#define ST_FIELD(type, field) il.ld_i(offsetof(type, field)); il.add(); il.st_ind_i();
 
 PyObject* DoAdd(PyObject *left, PyObject *right) {
 	// TODO: Verify ref counting...
@@ -169,6 +186,17 @@ PyObject* DoContains(PyObject *left, PyObject *right) {
 	Py_DECREF(right);
 	return res ? Py_True : Py_False;
 }
+
+PyObject* DoCellGet(PyFrameObject* frame, size_t index) {
+	PyObject** cells = frame->f_localsplus + frame->f_code->co_nlocals;
+	PyObject *value = PyCell_GET(cells[index]);
+
+	if (value == nullptr) {
+		format_exc_unbound(frame->f_code, index);
+	}
+	return value;
+}
+
 
 PyObject* DoNotContains(PyObject *left, PyObject *right, int op) {
 	auto res = PySequence_Contains(right, left);
@@ -224,8 +252,7 @@ PyObject* DoUnaryNot(PyObject* value) {
 	else if (err > 0) {
 		Py_INCREF(Py_False);
 		return Py_False;
-	}
-	// TODO: Error handling?
+	}	
 	return nullptr;
 }
 
@@ -235,29 +262,23 @@ PyObject* DoUnaryInvert(PyObject* value) {
 	return res;
 }
 
-void DoListAppend(PyObject* list, PyObject* value) {
+int DoListAppend(PyObject* list, PyObject* value) {
 	int err = PyList_Append(list, value);
 	Py_DECREF(value);
-	if (err != 0) {
-		// TODO: Error handling
-	}
+	return err;
 }
 
-void DoSetAdd(PyObject* set, PyObject* value) {
+int DoSetAdd(PyObject* set, PyObject* value) {
 	int err = PySet_Add(set, value);
 	Py_DECREF(value);
-	if (err != 0) {
-		// TODO: Error handling
-	}
+	return err;
 }
 
-void DoMapAdd(PyObject*map, PyObject*key, PyObject* value) {
-	PyDict_SetItem(map, key, value);  /* v[w] = u */
+int DoMapAdd(PyObject*map, PyObject*key, PyObject* value) {
+	int err = PyDict_SetItem(map, key, value);  /* v[w] = u */
 	Py_DECREF(value);
 	Py_DECREF(key);
-	// TODO: Error handling
-	//if (err != 0)
-	//	goto error;
+	return err;
 }
 
 PyObject* DoMultiply(PyObject *left, PyObject *right) {
@@ -434,20 +455,187 @@ PyObject* DoInplaceOr(PyObject *left, PyObject *right) {
 	return res;
 }
 
-void DoPrintExpr(PyObject *value) {
+int DoPrintExpr(PyObject *value) {
+	_Py_IDENTIFIER(displayhook);
 	PyObject *hook = _PySys_GetObjectId(&PyId_displayhook);
 	PyObject *res;
 	if (hook == NULL) {
 		PyErr_SetString(PyExc_RuntimeError,
 			"lost sys.displayhook");
 		Py_DECREF(value);
-		/*goto error;*/ // TODO: Error
+		return 1;
 	}
 	res = PyObject_CallFunctionObjArgs(hook, value, NULL);
 	Py_DECREF(value);
-	//if (res == NULL)	// TODO: Error
-	//	goto error;
+	if (res == NULL) {
+		return 1;
+	}
 	Py_DECREF(res);
+	return 0;
+}
+
+void DoPrepareException(PyObject** tb, PyObject**val, PyObject** exc) {
+	auto tstate = PyThreadState_GET();
+
+	PyErr_Fetch(exc, val, tb);
+	/* Make the raw exception data
+	available to the handler,
+	so a program can emulate the
+	Python main loop. */
+	PyErr_NormalizeException(
+		exc, val, tb);
+	if (tb != NULL)
+		PyException_SetTraceback(*val, *tb);
+	else
+		PyException_SetTraceback(*val, Py_None);
+	Py_INCREF(*exc);
+	tstate->exc_type = *exc;
+	Py_INCREF(*val);
+	tstate->exc_value = *val;
+	tstate->exc_traceback = *tb;
+	if (*tb == NULL)
+		*tb = Py_None;
+	Py_INCREF(*tb);
+}
+
+#define CANNOT_CATCH_MSG "catching classes that do not inherit from "\
+                         "BaseException is not allowed"
+
+PyObject* DoCompareExceptions(PyObject*v, PyObject* w) {
+	if (PyTuple_Check(w)) {
+		Py_ssize_t i, length;
+		length = PyTuple_Size(w);
+		for (i = 0; i < length; i += 1) {
+			PyObject *exc = PyTuple_GET_ITEM(w, i);
+			if (!PyExceptionClass_Check(exc)) {
+				PyErr_SetString(PyExc_TypeError,
+					CANNOT_CATCH_MSG);
+				return NULL;
+			}
+		}
+	}
+	else {
+		if (!PyExceptionClass_Check(w)) {
+			PyErr_SetString(PyExc_TypeError,
+				CANNOT_CATCH_MSG);
+			return NULL;
+		}
+	}
+	bool res = PyErr_GivenExceptionMatches(v, w);
+	v = res ? Py_True : Py_False;
+	Py_INCREF(v);
+	return v;
+}
+
+void DoUnboundLocal(PyObject* name) {
+	format_exc_check_arg(
+		PyExc_UnboundLocalError,
+		UNBOUNDLOCAL_ERROR_MSG,
+		name
+	);
+}
+
+void DoEhTrace(PyFrameObject *f) {
+	PyTraceBack_Here(f);
+
+	//auto tstate = PyThreadState_GET();
+
+	//if (tstate->c_tracefunc != NULL) {
+	//	call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj,
+	//		tstate, f);
+	//}
+}
+
+int DoRaise(PyObject *exc, PyObject *cause)
+{
+	PyObject *type = NULL, *value = NULL;
+
+	if (exc == NULL) {
+		/* Reraise */
+		PyThreadState *tstate = PyThreadState_GET();
+		PyObject *tb;
+		type = tstate->exc_type;
+		value = tstate->exc_value;
+		tb = tstate->exc_traceback;
+		if (type == Py_None) {
+			PyErr_SetString(PyExc_RuntimeError,
+				"No active exception to reraise");
+			return 0;
+		}
+		Py_XINCREF(type);
+		Py_XINCREF(value);
+		Py_XINCREF(tb);
+		PyErr_Restore(type, value, tb);
+		return 1;
+	}
+
+	/* We support the following forms of raise:
+	raise
+	raise <instance>
+	raise <type> */
+
+	if (PyExceptionClass_Check(exc)) {
+		type = exc;
+		value = PyObject_CallObject(exc, NULL);
+		if (value == NULL)
+			goto raise_error;
+		if (!PyExceptionInstance_Check(value)) {
+			PyErr_Format(PyExc_TypeError,
+				"calling %R should have returned an instance of "
+				"BaseException, not %R",
+				type, Py_TYPE(value));
+			goto raise_error;
+		}
+	}
+	else if (PyExceptionInstance_Check(exc)) {
+		value = exc;
+		type = PyExceptionInstance_Class(exc);
+		Py_INCREF(type);
+	}
+	else {
+		/* Not something you can raise.  You get an exception
+		anyway, just not what you specified :-) */
+		Py_DECREF(exc);
+		PyErr_SetString(PyExc_TypeError,
+			"exceptions must derive from BaseException");
+		goto raise_error;
+	}
+
+	if (cause) {
+		PyObject *fixed_cause;
+		if (PyExceptionClass_Check(cause)) {
+			fixed_cause = PyObject_CallObject(cause, NULL);
+			if (fixed_cause == NULL)
+				goto raise_error;
+			Py_DECREF(cause);
+		}
+		else if (PyExceptionInstance_Check(cause)) {
+			fixed_cause = cause;
+		}
+		else if (cause == Py_None) {
+			Py_DECREF(cause);
+			fixed_cause = NULL;
+		}
+		else {
+			PyErr_SetString(PyExc_TypeError,
+				"exception causes must derive from "
+				"BaseException");
+			goto raise_error;
+		}
+		PyException_SetCause(value, fixed_cause);
+	}
+
+	PyErr_SetObject(type, value);
+	/* PyErr_SetObject incref's its arguments */
+	Py_XDECREF(value);
+	Py_XDECREF(type);
+	return 0;
+
+raise_error:
+	Py_XDECREF(value);
+	Py_XDECREF(type);
+	Py_XDECREF(cause);
+	return 0;
 }
 
 PyObject* DoLoadClassDeref(PyFrameObject* frame, size_t oparg) {
@@ -465,7 +653,7 @@ PyObject* DoLoadClassDeref(PyFrameObject* frame, size_t oparg) {
 		value = PyObject_GetItem(locals, name);
 		if (value == NULL && PyErr_Occurred()) {
 			if (!PyErr_ExceptionMatches(PyExc_KeyError)) {
-				//goto error; // TODO: Error handling
+				return nullptr;
 			}
 			PyErr_Clear();
 		}
@@ -475,9 +663,8 @@ PyObject* DoLoadClassDeref(PyFrameObject* frame, size_t oparg) {
 		PyObject *cell = freevars[oparg];
 		value = PyCell_GET(cell);
 		if (value == NULL) {
-			// TODO: Error handling
-			//format_exc_unbound(co, oparg);
-			//goto error;
+			format_exc_unbound(co, oparg);
+			return nullptr;
 		}
 		Py_INCREF(value);
 	}
@@ -493,17 +680,19 @@ PyObject* DoStoreMap(PyObject* map, PyObject *value, PyObject *key) {
 	return map;
 }
 
-void DoStoreSubscr(PyObject* value, PyObject *container, PyObject *index) {
+int DoStoreSubscr(PyObject* value, PyObject *container, PyObject *index) {
 	auto res = PyObject_SetItem(container, index, value);
 	Py_DECREF(index);
 	Py_DECREF(value);
 	Py_DECREF(container);
+	return res;
 }
 
-void DoDeleteSubscr(PyObject *container, PyObject *index) {
+int DoDeleteSubscr(PyObject *container, PyObject *index) {
 	auto res = PyObject_DelItem(container, index);
 	Py_DECREF(index);
 	Py_DECREF(container);
+	return res;
 }
 
 PyObject* CallN(PyObject *target, PyObject* args) {
@@ -513,17 +702,14 @@ PyObject* CallN(PyObject *target, PyObject* args) {
 	return res;
 }
 
-void StoreGlobal(PyObject* v, PyFrameObject* f, PyObject* name) {
-	int err;
-	err = PyDict_SetItem(f->f_globals, name, v);
+int StoreGlobal(PyObject* v, PyFrameObject* f, PyObject* name) {
+	int err = PyDict_SetItem(f->f_globals, name, v);
 	Py_DECREF(v);
-	// TODO: Error handling
+	return err;
 }
 
-void DeleteGlobal(PyFrameObject* f, PyObject* name) {
-	int err;
-	err = PyDict_DelItem(f->f_globals, name);
-	// TODO: Error handling
+int DeleteGlobal(PyFrameObject* f, PyObject* name) {
+	return PyDict_DelItem(f->f_globals, name);
 }
 
 PyObject* LoadGlobal(PyFrameObject* f, PyObject* name) {
@@ -572,8 +758,22 @@ PyObject* DoGetIter(PyObject* iterable) {
 	return res;
 }
 
-PyObject* DoIterNext(PyObject* iter) {
-	return (*iter->ob_type->tp_iternext)(iter);
+PyObject* DoIterNext(PyObject* iter, int*error) {
+	auto res = (*iter->ob_type->tp_iternext)(iter);
+	if (res == nullptr) {
+		if (PyErr_Occurred()) {
+			if (!PyErr_ExceptionMatches(PyExc_StopIteration)) {
+				*error = 1;
+				return nullptr;
+			}
+			*error = 0;
+			// TODO: Tracing...
+			//else if (tstate->c_tracefunc != NULL)
+			//	call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj, tstate, f);
+			PyErr_Clear();
+		}
+	}
+	return res;
 }
 
 void DoCellSet(PyObject* value, PyObject* cell) {
@@ -590,23 +790,21 @@ PyObject* DoBuildClass(PyFrameObject *f) {
 		if (bc == NULL) {
 			PyErr_SetString(PyExc_NameError,
 				"__build_class__ not found");
-			// TODO: Error handling
-			//goto error;
+			return nullptr;
 		}
 		Py_INCREF(bc);
 	}
 	else {
 		PyObject *build_class_str = _PyUnicode_FromId(&PyId___build_class__);
-		// TODO: Error handling
-		/*if (build_class_str == NULL)
-			break;*/
+		if (build_class_str == NULL) {
+			return nullptr;
+		}
 		bc = PyObject_GetItem(f->f_builtins, build_class_str);
 		if (bc == NULL) {
-			// TODO Error handling
-			//if (PyErr_ExceptionMatches(PyExc_KeyError))
-			//	PyErr_SetString(PyExc_NameError,
-			//	"__build_class__ not found");
-			//goto error;
+			if (PyErr_ExceptionMatches(PyExc_KeyError)) {
+				PyErr_SetString(PyExc_NameError, "__build_class__ not found");
+				return nullptr;
+			}
 		}
 	}
 	return bc;
@@ -645,46 +843,44 @@ PyObject** DoUnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSize, 
 			auto w = PyIter_Next(it);
 			if (w == NULL) {
 				/* Iterator done, via error or exhaustion. */
-				// TODO: Error handling
-				/*if (!PyErr_Occurred()) {
-				PyErr_Format(PyExc_ValueError,
-				"need more than %d value%s to unpack",
-				i, i == 1 ? "" : "s");
+				if (!PyErr_Occurred()) {
+					PyErr_Format(PyExc_ValueError,
+					"need more than %d value%s to unpack",
+					i, i == 1 ? "" : "s");
 				}
-				goto Error;*/
+				goto Error;
 			}
 			tempStorage[i] = w;
 		}
 
 		if (listRes == nullptr) {
-			// TODO: Error handling
-			//	/* We better have exhausted the iterator now. */
-			//	w = PyIter_Next(it);
-			//	if (w == NULL) {
-			//		if (PyErr_Occurred())
-			//			goto Error;
-			//		Py_DECREF(it);
-			//		return 1;
-			//	}
-			//	Py_DECREF(w);
-			//	PyErr_Format(PyExc_ValueError, "too many values to unpack "
-			//		"(expected %d)", argcnt);
-			//	goto Error;
+				/* We better have exhausted the iterator now. */
+				auto w = PyIter_Next(it);
+				if (w == NULL) {
+					if (PyErr_Occurred())
+						goto Error;
+					Py_DECREF(it);
+					return tempStorage;
+				}
+				Py_DECREF(w);
+				PyErr_Format(PyExc_ValueError, "too many values to unpack "
+					"(expected %d)", leftSize);
+				goto Error;
 		}
 		else{
 
 			auto l = PySequence_List(it);
-			//if (l == NULL)
-			//	goto Error;
+			if (l == NULL)
+				goto Error;
 			*listRes = l;
 			i++;
 
 			auto ll = PyList_GET_SIZE(l);
-			//if (ll < argcntafter) {
-			//	PyErr_Format(PyExc_ValueError, "need more than %zd values to unpack",
-			//		argcnt + ll);
-			//	goto Error;
-			//}
+			if (ll < rightSize) {
+				PyErr_Format(PyExc_ValueError, "need more than %zd values to unpack",
+					leftSize + ll);
+				goto Error;
+			}
 
 			/* Pop the "after-variable" args off the list. */
 			for (auto j = rightSize; j > 0; j--, i++) {
@@ -698,6 +894,13 @@ PyObject** DoUnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSize, 
 			*remainder = tempStorage + leftSize;
 		}
 		return tempStorage;
+
+	Error:
+		for (; i > 0; i--, sp++)
+			Py_DECREF(*sp);
+		Py_XDECREF(it);
+		return nullptr;
+
 	}
 }
 
@@ -723,16 +926,17 @@ PyObject* LoadAttr(PyObject* owner, PyObject* name) {
 	return res;
 }
 
-void StoreAttr(PyObject* owner, PyObject* name, PyObject* value) {
+int StoreAttr(PyObject* owner, PyObject* name, PyObject* value) {
 	int res = PyObject_SetAttr(owner, name, value);
-	// TODO: Error handling
 	Py_DECREF(owner);
 	Py_DECREF(value);
+	return res;
 }
 
-void DeleteAttr(PyObject* owner, PyObject* name) {
-	int res = PyObject_DelAttr(owner, name); // TODO: Error handling
+int DeleteAttr(PyObject* owner, PyObject* name) {
+	int res = PyObject_DelAttr(owner, name);
 	Py_DECREF(owner);
+	return res;
 }
 
 PyObject* LoadName(PyFrameObject* f, PyObject* name) {
@@ -825,1086 +1029,1564 @@ PyObject* Call0(PyObject *target) {
 	return res;
 }
 
-PyObject* Call1(PyObject *target, PyObject* arg1) {
-	return nullptr;
-}
+#define BLOCK_CONTINUES 0x01
+#define BLOCK_RETURNS	0x02
+#define BLOCK_BREAKS	0x04
 
-void build_tuple(ILGenerator& il, int argCnt) {
-	auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-	auto tupleTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+struct BlockInfo {
+	Label Raise,		// our raise stub label, prepares the exception
+		  ReRaise,		// our re-raise stub label, prepares the exception w/o traceback update
+		  ErrorTarget;	// the actual label for the handler
+	int EndOffset, Kind, Flags, ContinueOffset;
 
-	il.push_ptr((void*)argCnt);
-	il.emit_call(METHOD_PYTUPLE_NEW);
-	il.st_loc(tupleTmp);
-
-	for (int arg = argCnt - 1; arg >= 0; arg--) {
-		// save the argument into a temporary...
-		il.st_loc(valueTmp);
-
-		// load the address of the tuple item...
-		il.ld_loc(tupleTmp);
-		il.ld_i(arg * sizeof(size_t) + offsetof(PyTupleObject, ob_item));
-		il.push_back(CEE_ADD);
-
-		// reload the value
-		il.ld_loc(valueTmp);
-
-		// store into the array
-		il.push_back(CEE_STIND_I);
+	BlockInfo() {
 	}
-	il.ld_loc(tupleTmp);
 
-	il.free_local(valueTmp);
-	il.free_local(tupleTmp);
+	BlockInfo(Label raise, Label reraise, Label errorTarget, int endOffset, int kind, int flags = 0, int continueOffset = 0) {
+		Raise = raise;
+		ReRaise = reraise;
+		ErrorTarget = errorTarget;
+		EndOffset = endOffset;
+		Kind = kind;
+		Flags = flags;
+		ContinueOffset = continueOffset;
+	}
+};
+
+bool can_skip_lasti_update(int opcode) {
+	switch (opcode) {
+	case DUP_TOP:
+	case SETUP_EXCEPT:
+	case NOP:
+	case ROT_TWO:
+	case ROT_THREE:
+	case POP_BLOCK:
+	case POP_JUMP_IF_FALSE:
+	case POP_JUMP_IF_TRUE:
+	case POP_TOP:
+	case DUP_TOP_TWO:
+	case BREAK_LOOP:
+	case CONTINUE_LOOP:
+	case END_FINALLY:
+	case LOAD_CONST:
+		return true;
+	}
+	return false;
 }
 
-void build_list(ILGenerator& il, int argCnt) {
+#define NEXTARG() oparg = *(unsigned short*)&byteCode[i + 1]; i+= 2
 
-	il.push_ptr((void*)argCnt);
-	il.emit_call(METHOD_PYLIST_NEW);
+class Jitter {
+	PyCodeObject *code;
+	// pre-calculate some information...
+	ILGenerator il;
+	unordered_map<int, Local> sequenceLocals;
+	unsigned char *byteCode;
+	size_t size;
+	vector<BlockInfo> m_blockStack;		// maintains the current label we should branch to when we take an exception
+	vector<BlockInfo> allHandlers;
+	unordered_map<int, Label> offsetLabels;
 
-	if (argCnt != 0) {
-		auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-		auto listTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-		auto listItems = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+public:
+	Jitter(PyCodeObject *code) : il(g_module, CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) }){
+		if (g_emptyTuple == nullptr) {
+			g_emptyTuple = PyTuple_New(0);
+		}
 
+		this->code = code;
+		this->byteCode = (unsigned char *)((PyBytesObject*)code->co_code)->ob_sval;
+		this->size = PyBytes_Size(code->co_code);
+	}
+
+	PVOID Compile() {
+		PreProcess();
+		return CompileWorker();
+	}
+
+private:
+	void load_frame() {
+		il.ld_arg(0);
+	}
+
+	void load_local(int oparg) {
+		load_frame();
+		il.ld_i(offsetof(PyFrameObject, f_localsplus) + oparg * sizeof(size_t));
+		il.add();
+		il.ld_ind_i();
+	}
+
+	void incref() {
+		LD_FIELDA(PyObject, ob_refcnt);
 		il.dup();
-		il.st_loc(listTmp);
+		il.ld_ind_i4();
+		il.ld_i4(1);
+		il.add();
+		il.st_ind_i4();
+	}
 
-		// load the address of the tuple item...
-		il.ld_i(offsetof(PyListObject, ob_item));
-		il.push_back(CEE_ADD);
-		il.push_back(CEE_LDIND_I);
+	void decref() {
+		il.emit_call(METHOD_DECREF_TOKEN);
+		//LD_FIELDA(PyObject, ob_refcnt);
+		//il.push_back(CEE_DUP);
+		//il.push_back(CEE_LDIND_I4);
+		//il.push_back(CEE_LDC_I4_1);
+		//il.push_back(CEE_SUB);
+		////il.push_back(CEE_DUP);
+		//// _Py_Dealloc(_py_decref_tmp)
 
-		il.st_loc(listItems);
+		//il.push_back(CEE_STIND_I4);
+	}
+
+	void build_tuple(int argCnt) {
+		auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+		auto tupleTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+
+		il.push_ptr((void*)argCnt);
+		il.emit_call(METHOD_PYTUPLE_NEW);
+		il.st_loc(tupleTmp);
 
 		for (int arg = argCnt - 1; arg >= 0; arg--) {
 			// save the argument into a temporary...
 			il.st_loc(valueTmp);
 
 			// load the address of the tuple item...
-			il.ld_loc(listItems);
-			il.ld_i(arg * sizeof(size_t));
-			il.push_back(CEE_ADD);
+			il.ld_loc(tupleTmp);
+			il.ld_i(arg * sizeof(size_t) + offsetof(PyTupleObject, ob_item));
+			il.add();
 
 			// reload the value
 			il.ld_loc(valueTmp);
 
 			// store into the array
-			il.push_back(CEE_STIND_I);
+			il.st_ind_i();
 		}
-
-		// update the size of the list...
-		il.ld_loc(listTmp);
-		il.dup();
-		il.ld_i(offsetof(PyVarObject, ob_size));
-		il.push_back(CEE_ADD);
-		il.push_ptr((void*)argCnt);
-		il.push_back(CEE_STIND_I);
+		il.ld_loc(tupleTmp);
 
 		il.free_local(valueTmp);
-		il.free_local(listTmp);
-		il.free_local(listItems);
+		il.free_local(tupleTmp);
 	}
 
-}
+	void build_list(int argCnt) {
 
-void build_set(ILGenerator& il, int argCnt) {
-	il.load_null();
-	il.emit_call(METHOD_PYSET_NEW);
+		il.push_ptr((void*)argCnt);
+		il.emit_call(METHOD_PYLIST_NEW);
 
-	if (argCnt != 0) {
-		auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-		auto setTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+		if (argCnt != 0) {
+			auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+			auto listTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+			auto listItems = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 
-		il.st_loc(setTmp);
-
-		for (int arg = argCnt - 1; arg >= 0; arg--) {
-			// save the argument into a temporary...
-			il.st_loc(valueTmp);
+			il.dup();
+			il.st_loc(listTmp);
 
 			// load the address of the tuple item...
+			il.ld_i(offsetof(PyListObject, ob_item));
+			il.add();
+			il.ld_ind_i();
+
+			il.st_loc(listItems);
+
+			for (int arg = argCnt - 1; arg >= 0; arg--) {
+				// save the argument into a temporary...
+				il.st_loc(valueTmp);
+
+				// load the address of the tuple item...
+				il.ld_loc(listItems);
+				il.ld_i(arg * sizeof(size_t));
+				il.add();
+
+				// reload the value
+				il.ld_loc(valueTmp);
+
+				// store into the array
+				il.st_ind_i();
+			}
+
+			// update the size of the list...
+			il.ld_loc(listTmp);
+			il.dup();
+			il.ld_i(offsetof(PyVarObject, ob_size));
+			il.add();
+			il.push_ptr((void*)argCnt);
+			il.st_ind_i();
+
+			il.free_local(valueTmp);
+			il.free_local(listTmp);
+			il.free_local(listItems);
+		}
+
+	}
+
+	void build_set(int argCnt) {
+		il.load_null();
+		il.emit_call(METHOD_PYSET_NEW);
+
+		if (argCnt != 0) {
+			auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+			auto setTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+
+			il.st_loc(setTmp);
+
+			for (int arg = argCnt - 1; arg >= 0; arg--) {
+				// save the argument into a temporary...
+				il.st_loc(valueTmp);
+
+				// load the address of the tuple item...
+				il.ld_loc(setTmp);
+				il.ld_loc(valueTmp);
+				il.emit_call(METHOD_PYSET_ADD);
+				il.pop();
+			}
+
 			il.ld_loc(setTmp);
-			il.ld_loc(valueTmp);
-			il.emit_call(METHOD_PYSET_ADD);
-			il.pop();
-		}
-
-		il.ld_loc(setTmp);
-		il.free_local(valueTmp);
-		il.free_local(setTmp);
-	}
-}
-
-void build_map(ILGenerator& il, int argCnt) {
-	il.push_ptr((void*)argCnt);
-	il.emit_call(METHOD_PYDICT_NEWPRESIZED);
-}
-
-Label getOffsetLabel(ILGenerator&il, unordered_map<int, Label>& offsetLabels, int jumpTo) {
-	auto jumpToLabelIter = offsetLabels.find(jumpTo);
-	Label jumpToLabel;
-	if (jumpToLabelIter == offsetLabels.end()) {
-		offsetLabels[jumpTo] = jumpToLabel = il.define_label();
-	}
-	else{
-		jumpToLabel = jumpToLabelIter->second;
-	}
-	return jumpToLabel;
-}
-
-#define NEXTARG() oparg = *(unsigned short*)&byteCode[i + 1]; i+= 2
-extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
-	if (g_emptyTuple == nullptr) {
-		g_emptyTuple = PyTuple_New(0);
-	}
-
-	// pre-calculate some information...
-	ILGenerator il(g_module, CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) });
-
-	unordered_map<int, Local> sequenceLocals;
-	unsigned char *byteCode = (unsigned char *)((PyBytesObject*)code->co_code)->ob_sval;
-	auto size = PyBytes_Size(code->co_code);
-	int oparg;
-	for (int i = 0; i < size; i++) {
-		auto byte = byteCode[i];
-		if (HAS_ARG(byte)){
-			oparg = NEXTARG();
-		}
-
-		switch (byte) {
-		case UNPACK_EX:
-		{
-			auto sequenceTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.ld_i(((oparg & 0xFF) + (oparg >> 8)) * sizeof(void*));
-			il.push_back(CEE_PREFIX1);
-			il.push_back(CEE_LOCALLOC);
-			il.st_loc(sequenceTmp);
-
-			sequenceLocals[i] = sequenceTmp;
-		}
-			break;
-		case UNPACK_SEQUENCE:
-			// we need a buffer for the slow case, but we need 
-			// to avoid allocating it in loops.
-			auto sequenceTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.ld_i(oparg * sizeof(void*));
-			il.push_back(CEE_PREFIX1);
-			il.push_back(CEE_LOCALLOC);
-			il.st_loc(sequenceTmp);
-
-			sequenceLocals[i] = sequenceTmp;
-			break;
+			il.free_local(valueTmp);
+			il.free_local(setTmp);
 		}
 	}
 
-	Label ok;
-	unordered_map<int, Label> offsetLabels;
-	vector<size_t> loopEnd;
-	int stackDepth = 0;
-	for (int i = 0; i < size; i++) {
+	void build_map(int argCnt) {
+		il.push_ptr((void*)argCnt);
+		il.emit_call(METHOD_PYDICT_NEWPRESIZED);
+	}
 
-		while (loopEnd.size() != 0 && loopEnd.back() == i) {
-			loopEnd.pop_back();
+	Label getOffsetLabel(int jumpTo) {
+		auto jumpToLabelIter = offsetLabels.find(jumpTo);
+		Label jumpToLabel;
+		if (jumpToLabelIter == offsetLabels.end()) {
+			offsetLabels[jumpTo] = jumpToLabel = il.define_label();
 		}
+		else{
+			jumpToLabel = jumpToLabelIter->second;
+		}
+		return jumpToLabel;
+	}
 
-		auto existingLabel = offsetLabels.find(i);
+	bool can_skip_lasti_update(int opcode) {
+		switch (opcode) {
+		case DUP_TOP:
+		case SETUP_EXCEPT:
+		case NOP:
+		case ROT_TWO:
+		case ROT_THREE:
+		case POP_BLOCK:
+		case POP_JUMP_IF_FALSE:
+		case POP_JUMP_IF_TRUE:
+		case POP_TOP:
+		case DUP_TOP_TWO:
+		case BREAK_LOOP:
+		case CONTINUE_LOOP:
+		case END_FINALLY:
+		case LOAD_CONST:
+			return true;
+		}
+		return false;
+	}
+
+	// Checks to see if we have a null value as the last value on our stack
+	// indicating an error, and if so, branches to our current error handler.
+	void check_error() {
+		il.dup();
+		il.load_null();
+		il.branch(BranchEqual, GetEHBlock().Raise);
+	}
+
+	// Checks to see if we have a non-zero error code on the stack, and if so,
+	// branches to the current error handler.  Consumes the error code in the process
+	void check_int_error() {
+		il.ld_i4(0);
+		il.branch(BranchNotEqual, GetEHBlock().Raise);
+	}
+
+	BlockInfo GetEHBlock() {
+		for (int i = m_blockStack.size() - 1; i >= 0; i--) {
+			if (m_blockStack[i].Kind != SETUP_LOOP) {
+				return m_blockStack[i];
+			}
+		}
+		assert(FALSE);
+		return BlockInfo();
+	}
+
+	void mark_offset_label(int index) {
+		auto existingLabel = offsetLabels.find(index);
 		if (existingLabel != offsetLabels.end()) {
 			il.mark_label(existingLabel->second);
 		}
 		else{
 			auto label = il.define_label();
-			offsetLabels[i] = label;
+			offsetLabels[index] = label;
 			il.mark_label(label);
 		}
 
-		auto byte = byteCode[i];
-		if (HAS_ARG(byte)){
-			oparg = NEXTARG();
-		}
-	processOpCode:
-		switch (byte) {
-		case NOP:
-			break;
-		case ROT_TWO:
-		{
-			auto top = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			auto second = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+	}
 
-			il.st_loc(top);
-			il.st_loc(second);
+	void PreProcess() {
+		int oparg;
+		for (int i = 0; i < size; i++) {
+			auto byte = byteCode[i];
+			if (HAS_ARG(byte)){
+				oparg = NEXTARG();
+			}
 
-			il.ld_loc(top);
-			il.ld_loc(second);
-
-			il.free_local(top);
-			il.free_local(second);
-		}
-			break;
-		case ROT_THREE:
-		{
-			auto top = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			auto second = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			auto third = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-
-			il.st_loc(top);
-			il.st_loc(second);
-			il.st_loc(third);
-
-			il.ld_loc(top);
-			il.ld_loc(third);
-			il.ld_loc(second);
-
-			il.free_local(top);
-			il.free_local(second);
-			il.free_local(third);
-		}
-			break;
-		case POP_TOP:
-			decref(il);
-			stackDepth--;
-			break;
-		case DUP_TOP:
-			il.dup();
-			il.dup();
-			incref(il);
-			stackDepth++;
-			break;
-		case DUP_TOP_TWO:
-		{
-			auto top = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			auto second = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-
-			il.st_loc(top);
-			il.st_loc(second);
-
-			il.ld_loc(second);
-			il.ld_loc(top);
-			il.ld_loc(second);
-			il.ld_loc(top);
-
-			il.ld_loc(top);
-			incref(il);
-			il.ld_loc(second);
-			incref(il);
-
-			il.free_local(top);
-			il.free_local(second);
-
-			stackDepth += 2;
-		}
-			break;
-		case COMPARE_OP:
-		{
-			auto compareType = oparg;
-			switch (compareType) {
-			case PyCmp_IS:
-			case PyCmp_IS_NOT:
-				// TODO: Missing dec refs here...
+			switch (byte) {
+			case UNPACK_EX:
 			{
-				Label same = il.define_label();
-				Label done = il.define_label();
-				il.branch(BranchEqual, same);
-				il.push_ptr(compareType == PyCmp_IS ? Py_False : Py_True);
-				il.branch(BranchAlways, done);
-				il.mark_label(same);
-				il.push_ptr(compareType == PyCmp_IS ? Py_True : Py_False);
-				il.mark_label(done);
-				il.dup();
-				incref(il);
+				auto sequenceTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.ld_i(((oparg & 0xFF) + (oparg >> 8)) * sizeof(void*));
+				il.localloc();
+				il.st_loc(sequenceTmp);
+
+				sequenceLocals[i] = sequenceTmp;
 			}
 				break;
-			case PyCmp_IN:
-				il.emit_call(METHOD_CONTAINS_TOKEN);
+			case UNPACK_SEQUENCE:
+				// we need a buffer for the slow case, but we need 
+				// to avoid allocating it in loops.
+				auto sequenceTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.ld_i(oparg * sizeof(void*));
+				il.localloc();
+				il.st_loc(sequenceTmp);
+
+				sequenceLocals[i] = sequenceTmp;
 				break;
-			case PyCmp_NOT_IN:
-				il.emit_call(METHOD_NOTCONTAINS_TOKEN);
-				break;
-			case PyCmp_EXC_MATCH:
-				_ASSERTE(FALSE);
-				break;
-				//	if (PyTuple_Check(w)) {
-				//		Py_ssize_t i, length;
-				//		length = PyTuple_Size(w);
-				//		for (i = 0; i < length; i += 1) {
-				//			PyObject *exc = PyTuple_GET_ITEM(w, i);
-				//			if (!PyExceptionClass_Check(exc)) {
-				//				PyErr_SetString(PyExc_TypeError,
-				//					CANNOT_CATCH_MSG);
-				//				return NULL;
-				//			}
-				//		}
-				//	}
-				//	else {
-				//		if (!PyExceptionClass_Check(w)) {
-				//			PyErr_SetString(PyExc_TypeError,
-				//				CANNOT_CATCH_MSG);
-				//			return NULL;
-				//		}
-				//	}
-				//	res = PyErr_GivenExceptionMatches(v, w);
-				//	break;
-			default:
-				il.ld_i(oparg);
-				il.emit_call(METHOD_RICHCMP_TOKEN);
 			}
-		}
-			break;
-		case SETUP_LOOP:
-			// offset is relative to end of current instruction
-			loopEnd.push_back(oparg + i + 1);
-			break;
-		case BREAK_LOOP:
-			il.branch(BranchLeave, getOffsetLabel(il, offsetLabels, loopEnd.back()));
-			break;
-		case CONTINUE_LOOP:
-			// used in exceptional case...
-			il.branch(BranchLeave, getOffsetLabel(il, offsetLabels, oparg));
-			break;
-		case POP_BLOCK:
-			break;
-		case LOAD_BUILD_CLASS:
-			load_frame(il);
-			il.emit_call(METHOD_GETBUILDCLASS_TOKEN);
-			break;
-		case JUMP_ABSOLUTE:
-		{
-			il.branch(BranchAlways, getOffsetLabel(il, offsetLabels, oparg));
-			break;
-		}
-		case JUMP_FORWARD:
-			il.branch(BranchAlways, getOffsetLabel(il, offsetLabels, oparg + i + 1));
-			break;
-		case JUMP_IF_FALSE_OR_POP:
-		case JUMP_IF_TRUE_OR_POP:
-		{
-			auto tmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.st_loc(tmp);
-			
-
-			auto noJump = il.define_label();
-			auto willJump = il.define_label();
-			// fast checks for true/false...
-			il.ld_loc(tmp);
-			il.push_ptr(byte == JUMP_IF_FALSE_OR_POP ? Py_True : Py_False);
-			il.compare_eq();
-			il.branch(BranchTrue, noJump);
-
-			il.ld_loc(tmp);
-			il.push_ptr(byte == JUMP_IF_FALSE_OR_POP ? Py_False : Py_True);
-			il.compare_eq();
-			il.branch(BranchTrue, willJump);
-
-			// Use PyObject_IsTrue
-			il.ld_loc(tmp);
-			il.emit_call(METHOD_PYOBJECT_ISTRUE);
-			il.ld_i(0);
-			il.compare_eq();
-			il.branch(byte == JUMP_IF_FALSE_OR_POP ? BranchFalse : BranchTrue, noJump);
-
-			il.mark_label(willJump);			
-
-			il.ld_loc(tmp);	// load the value back onto the stack
-			il.branch(BranchAlways, getOffsetLabel(il, offsetLabels, oparg));
-
-			il.mark_label(noJump);
-			
-			// dec ref because we're popping...
-			il.ld_loc(tmp);
-			decref(il);
-			stackDepth--;
-
-			il.free_local(tmp);
-		}
-			break;
-		case POP_JUMP_IF_TRUE:
-		case POP_JUMP_IF_FALSE:
-		{
-			auto noJump = il.define_label();
-			auto willJump = il.define_label();
-			// fast checks for true/false...
-			il.dup();
-			il.push_ptr(byte == POP_JUMP_IF_FALSE ? Py_True : Py_False);
-			il.compare_eq();
-			il.branch(BranchTrue, noJump);
-
-			il.dup();
-			il.push_ptr(byte == POP_JUMP_IF_FALSE ? Py_False : Py_True);
-			il.compare_eq();
-			il.branch(BranchTrue, willJump);
-
-			// Use PyObject_IsTrue
-			il.dup();
-			il.emit_call(METHOD_PYOBJECT_ISTRUE);
-			il.ld_i(0);
-			il.compare_eq();
-			il.branch(byte == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, noJump);
-
-			il.mark_label(willJump);
-			decref(il);
-
-			il.branch(BranchAlways, getOffsetLabel(il, offsetLabels, oparg));
-
-			il.mark_label(noJump);
-			decref(il);
-			stackDepth--;
-		}
-			break;
-		case LOAD_NAME:
-			load_frame(il);
-			il.push_ptr(PyTuple_GetItem(code->co_names, oparg));
-			il.emit_call(METHOD_LOADNAME_TOKEN);
-			break;
-		case STORE_ATTR:
-		{
-			auto globalName = PyTuple_GetItem(code->co_names, oparg);
-			il.push_ptr(globalName);
-		}
-			il.emit_call(METHOD_STOREATTR_TOKEN);
-			break;
-		case DELETE_ATTR:
-		{
-			auto globalName = PyTuple_GetItem(code->co_names, oparg);
-			il.push_ptr(globalName);
-		}
-			il.emit_call(METHOD_DELETEATTR_TOKEN);
-			break;
-		case LOAD_ATTR:
-		{
-			auto globalName = PyTuple_GetItem(code->co_names, oparg);
-			il.push_ptr(globalName);
-		}
-			il.emit_call(METHOD_LOADATTR_TOKEN);
-			break;
-		case STORE_GLOBAL:
-			// value is on the stack
-			stackDepth--;
-			load_frame(il);
-			{
-				auto globalName = PyTuple_GetItem(code->co_names, oparg);
-				il.push_ptr(globalName);
-			}
-			il.emit_call(METHOD_STOREGLOBAL_TOKEN);
-			break;
-		case DELETE_GLOBAL:
-			load_frame(il);
-			{
-				auto globalName = PyTuple_GetItem(code->co_names, oparg);
-				il.push_ptr(globalName);
-			}
-			il.emit_call(METHOD_DELETEGLOBAL_TOKEN);
-			break;
-			
-		case LOAD_GLOBAL:
-			stackDepth++;
-			load_frame(il);
-			{
-				auto globalName = PyTuple_GetItem(code->co_names, oparg);
-				il.push_ptr(globalName);
-			}
-			il.emit_call(METHOD_LOADGLOBAL_TOKEN);
-			break;
-		case LOAD_CONST:
-			stackDepth++;
-			il.push_ptr(PyTuple_GetItem(code->co_consts, oparg));
-			il.dup();
-			incref(il);
-			break;
-		case STORE_NAME:
-			load_frame(il);
-			il.push_ptr(PyTuple_GetItem(code->co_names, oparg));
-			il.emit_call(METHOD_STORENAME_TOKEN);
-			break;
-		case DELETE_NAME:
-			load_frame(il);
-			il.push_ptr(PyTuple_GetItem(code->co_names, oparg));
-			il.emit_call(METHOD_DELETENAME_TOKEN);
-			break;
-		case DELETE_FAST:
-			// TODO: Check if value is null and report error
-			load_frame(il);
-			il.ld_i(offsetof(PyFrameObject, f_localsplus) + oparg * sizeof(size_t));
-			il.push_back(CEE_ADD);
-			il.load_null();
-			il.push_back(CEE_STIND_I);
-		case STORE_FAST:
-			// TODO: Move locals out of the Python frame object and into real locals
-		{
-			stackDepth--;
-			auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.st_loc(valueTmp);
-
-			load_frame(il);
-			il.ld_i(offsetof(PyFrameObject, f_localsplus) + oparg * sizeof(size_t));
-			il.push_back(CEE_ADD);
-
-			il.ld_loc(valueTmp);
-
-			il.push_back(CEE_STIND_I);
-
-			il.free_local(valueTmp);
-		}
-			break;
-		case LOAD_FAST:
-			/* PyObject *value = GETLOCAL(oparg); */
-			load_local(il, oparg);
-
-			//// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
-			//// locals that are provably assigned)
-			///*if (value == NULL) {*/
-			//il.dup();
-			//il.load_null();
-			//il.push_back(CEE_PREFIX1);
-			//il.push_back((unsigned char)CEE_CEQ);
-			//ok = il.define_label();			
-			//il.branch(BranchFalse, ok);
-			//il.pop();
-			//for (int cnt = 0; cnt < stackDepth; cnt++) {
-			//	il.pop();
-			//}
-			//il.push_back(CEE_LDNULL);
-			//il.push_back(CEE_THROW);
-			//il.mark_label(ok);
-
-			/* TODO: Implement this, update branch above...
-			format_exc_check_arg(PyExc_UnboundLocalError,
-			UNBOUNDLOCAL_ERROR_MSG,
-			PyTuple_GetItem(co->co_varnames, oparg));
-			goto error;
-			}*/
-
-			il.dup();
-			incref(il);
-			stackDepth++;
-			break;
-		case UNPACK_SEQUENCE:
-		{
-			auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.st_loc(valueTmp); // save the sequence
-
-			// load the iterable, the count, and our temporary 
-			// storage if we need to iterate over the object.
-			il.ld_loc(valueTmp);
-			il.push_ptr((void*)oparg);
-			il.ld_loc(sequenceLocals[i]);
-			il.emit_call(METHOD_UNPACK_SEQUENCE_TOKEN);
-
-			auto fastTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.st_loc(fastTmp);
-
-			//while (oparg--) {
-			//	item = items[oparg];
-			//	Py_INCREF(item);
-			//	PUSH(item);
-			//}
-
-			auto tmpOpArg = oparg;
-			while (tmpOpArg--) {
-				il.ld_loc(fastTmp);
-				il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
-				il.push_back(CEE_ADD);
-				il.push_back(CEE_LDIND_I);
-				il.dup();
-				incref(il);
-			}
-
-			il.ld_loc(valueTmp);
-			decref(il);
-
-			il.free_local(valueTmp);
-			il.free_local(fastTmp);
-		}
-			break;
-		case UNPACK_EX:
-		{
-			auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			auto listTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			auto remainderTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.st_loc(valueTmp); // save the sequence
-
-			// load the iterable, the sizes, and our temporary 
-			// storage if we need to iterate over the object, 
-			// the list local address, and the remainder address
-			// PyObject* seq, size_t leftSize, size_t rightSize, PyObject** tempStorage, PyObject** list, PyObject*** remainder
-
-			il.ld_loc(valueTmp);
-			il.push_ptr((void*)(oparg & 0xFF));
-			il.push_ptr((void*)(oparg >> 8));
-			il.ld_loc(sequenceLocals[i]);
-			il.ld_loca(listTmp);
-			il.ld_loca(remainderTmp);
-			il.emit_call(METHOD_UNPACK_SEQUENCEEX_TOKEN);
-
-			auto fastTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.st_loc(fastTmp);
-
-			// load the right hand side...
-			auto tmpOpArg = oparg >> 8;
-			while (tmpOpArg--) {
-				il.ld_loc(remainderTmp);
-				il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
-				il.push_back(CEE_ADD);
-				il.push_back(CEE_LDIND_I);
-				il.dup();
-				incref(il);
-			}
-
-			// load the list
-			il.ld_loc(listTmp);
-
-			// load the left hand side
-			//while (oparg--) {
-			//	item = items[oparg];
-			//	Py_INCREF(item);
-			//	PUSH(item);
-			//}
-
-			tmpOpArg = oparg & 0xff;
-			while (tmpOpArg--) {
-				il.ld_loc(fastTmp);
-				il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
-				il.push_back(CEE_ADD);
-				il.push_back(CEE_LDIND_I);
-				il.dup();
-				incref(il);
-			}
-
-			il.ld_loc(valueTmp);
-			decref(il);
-
-			il.free_local(valueTmp);
-			il.free_local(fastTmp);
-			il.free_local(remainderTmp);
-			il.free_local(listTmp);
-		}
-			break;
-		case CALL_FUNCTION:
-		{
-			int argCnt = oparg & 0xff;
-			int kwArgCnt = (oparg >> 8) & 0xff;
-			// Optimize for # of calls, and various call types...
-			// Function is last thing on the stack...
-
-			// target + args popped, result pushed
-			stackDepth -= argCnt;
-
-			if (kwArgCnt == 0) {
-				switch (argCnt) {
-				case 0: il.emit_call(METHOD_CALL0_TOKEN); break;
-					/*
-					case 1: emit_call(il, METHOD_CALL1_TOKEN); break;
-					case 2: emit_call(il, METHOD_CALL2_TOKEN); break;
-					case 3: emit_call(il, METHOD_CALL3_TOKEN); break;
-					case 4: emit_call(il, METHOD_CALL4_TOKEN); break;
-					case 5: emit_call(il, METHOD_CALL5_TOKEN); break;
-					case 6: emit_call(il, METHOD_CALL6_TOKEN); break;
-					case 7: emit_call(il, METHOD_CALL7_TOKEN); break;
-					case 8: emit_call(il, METHOD_CALL8_TOKEN); break;
-					case 9: emit_call(il, METHOD_CALL9_TOKEN); break;*/
-				default:
-					// generic call, build a tuple for the call...
-					build_tuple(il, argCnt);
-
-					// target is on the stack already...
-					il.emit_call(METHOD_CALLN_TOKEN);
-
-					break;
-				}
-			}
-		}
-			break;
-		case BUILD_TUPLE:
-		{
-			if (oparg == 0) {
-				il.push_ptr(PyTuple_New(0));
-				stackDepth++;
-			}
-			else{
-				build_tuple(il, oparg);
-			}
-			stackDepth -= oparg;
-			stackDepth++;
-		}
-			break;
-		case BUILD_LIST:
-		{
-			build_list(il, oparg);
-			stackDepth -= oparg;
-			stackDepth++;
-		}
-			break;
-		case BUILD_MAP:
-			build_map(il, oparg);
-			stackDepth++;
-			break;
-		case STORE_MAP:
-			// stack is map, key, value
-			il.emit_call(METHOD_STOREMAP_TOKEN);
-			stackDepth -= 2;	// map stays on the stack
-			break;
-		case STORE_SUBSCR:
-			// stack is value, container, index
-			// TODO: Error check
-			il.emit_call(METHOD_STORESUBSCR_TOKEN);
-			stackDepth -= 3;
-			break;
-		case DELETE_SUBSCR:
-			// stack is container, index
-			// TODO: Error check
-			il.emit_call(METHOD_DELETESUBSCR_TOKEN);
-			stackDepth -= 2;
-			break;
-		case BUILD_SLICE:
-			if (oparg != 3) {
-				il.load_null();
-			}
-			il.emit_call(METHOD_BUILD_SLICE);
-			break;
-		case BUILD_SET:
-		{
-			build_set(il, oparg);
-			stackDepth -= oparg;
-			stackDepth++;
-		}
-			break;
-		case UNARY_POSITIVE:
-			il.emit_call(METHOD_UNARY_POSITIVE);
-			break;
-		case UNARY_NEGATIVE:
-			il.emit_call(METHOD_UNARY_NEGATIVE);
-			break;
-		case UNARY_NOT:
-			il.emit_call(METHOD_UNARY_NOT);
-			break;
-		case UNARY_INVERT:
-			il.emit_call(METHOD_UNARY_INVERT);
-			break;
-		case BINARY_SUBSCR:
-			stackDepth -= 2;
-			il.emit_call(METHOD_SUBSCR_TOKEN);
-			break;
-		case BINARY_ADD:
-			stackDepth -= 2;
-			il.emit_call(METHOD_ADD_TOKEN);
-			break;
-		case BINARY_TRUE_DIVIDE:
-			stackDepth -= 2;
-			il.emit_call(METHOD_DIVIDE_TOKEN);
-			break;
-		case BINARY_FLOOR_DIVIDE:
-			stackDepth -= 2;
-			il.emit_call(METHOD_FLOORDIVIDE_TOKEN);
-			break;
-		case BINARY_POWER:
-			stackDepth -= 2;
-			il.emit_call(METHOD_POWER_TOKEN);
-			break;
-		case BINARY_MODULO:
-			stackDepth -= 2;
-			il.emit_call(METHOD_MODULO_TOKEN);
-			break;
-		case BINARY_MATRIX_MULTIPLY:
-			stackDepth--;
-			il.emit_call(METHOD_MATRIX_MULTIPLY_TOKEN);
-			break;
-		case BINARY_LSHIFT:
-			stackDepth--;
-			il.emit_call(METHOD_BINARY_LSHIFT_TOKEN);
-			break;
-		case BINARY_RSHIFT:
-			stackDepth--;
-			il.emit_call(METHOD_BINARY_RSHIFT_TOKEN);
-			break;
-		case BINARY_AND:
-			stackDepth--;
-			il.emit_call(METHOD_BINARY_AND_TOKEN);
-			break;
-		case BINARY_XOR:
-			stackDepth--;
-			il.emit_call(METHOD_BINARY_XOR_TOKEN);
-			break;
-		case BINARY_OR:
-			stackDepth--;
-			il.emit_call(METHOD_BINARY_OR_TOKEN);
-			break;
-		case BINARY_MULTIPLY:
-			stackDepth--;
-			il.emit_call(METHOD_MULTIPLY_TOKEN);
-			break;
-		case BINARY_SUBTRACT:
-			/*
-			PyObject *right = POP();
-			PyObject *left = TOP();
-			PyObject *res = PyNumber_Subtract(left, right);
-			Py_DECREF(left);
-			Py_DECREF(right);
-			SET_TOP(res);
-			if (res == NULL)
-			goto error;
-			break;
-			*/
-			stackDepth -= 2;
-			il.emit_call(METHOD_SUBTRACT_TOKEN);
-			break;
-		case RETURN_VALUE:
-			stackDepth -= 1;
-			il.push_back(CEE_RET);
-			break;
-		case EXTENDED_ARG:
-		{
-			byte = byteCode[i + 1];
-			auto bottomArg = NEXTARG();
-			oparg = (oparg << 16) | bottomArg;
-			goto processOpCode;
-		}
-		case MAKE_CLOSURE:
-		case MAKE_FUNCTION:
-		{
-			int posdefaults = oparg & 0xff;
-			int kwdefaults = (oparg >> 8) & 0xff;
-			int num_annotations = (oparg >> 16) & 0x7fff;
-
-			load_frame(il);
-			il.emit_call(METHOD_NEWFUNCTION_TOKEN);
-
-			if (byte == MAKE_CLOSURE) {
-				il.emit_call(METHOD_SET_CLOSURE);
-			}
-
-			if (num_annotations > 0) {
-				_ASSERTE(FALSE);
-			}
-			if (kwdefaults > 0) {
-				_ASSERTE(FALSE);
-			}
-			if (posdefaults > 0) {
-				_ASSERTE(FALSE);
-			}
-			break;
-		}
-		case LOAD_DEREF:
-			load_frame(il);
-			il.ld_i(offsetof(PyFrameObject, f_localsplus) + code->co_nlocals * sizeof(size_t));
-			il.push_back(CEE_ADD);
-			il.push_back(CEE_LDIND_I);
-			il.emit_call(METHOD_PYCELL_GET);
-			// TODO:
-			//if (value == NULL) {
-			//	format_exc_unbound(co, oparg);
-			//	goto error;
-			//}
-			incref(il);
-			break;
-		case STORE_DEREF:
-			stackDepth--;
-			load_frame(il);
-			il.ld_i(offsetof(PyFrameObject, f_localsplus) + code->co_nlocals * sizeof(size_t));
-			il.push_back(CEE_ADD);
-			il.push_back(CEE_LDIND_I);
-			il.emit_call(METHOD_PYCELL_SET_TOKEN);
-			break;
-		case DELETE_DEREF:
-			il.load_null();
-			load_frame(il);
-			il.ld_i(offsetof(PyFrameObject, f_localsplus) + code->co_nlocals * sizeof(size_t));
-			il.push_back(CEE_ADD);
-			il.push_back(CEE_LDIND_I);
-			il.emit_call(METHOD_PYCELL_SET_TOKEN);
-			break;
-		case LOAD_CLOSURE:
-			load_frame(il);
-			il.ld_i(offsetof(PyFrameObject, f_localsplus) + code->co_nlocals * sizeof(size_t));
-			il.push_back(CEE_ADD);
-			il.push_back(CEE_LDIND_I);
-			il.push_back(CEE_DUP);
-			incref(il);
-			break;
-		case GET_ITER:
-			il.emit_call(METHOD_GETITER_TOKEN);
-			break;
-		case FOR_ITER:
-		{
-			// oparg is where to jump on break
-			il.dup();	// keep value on stack in non-error/exit case
-			/*il.dup();
-			LD_FIELD(PyObject, ob_type);
-			LD_FIELD(PyTypeObject, tp_iternext);*/
-			//il.push_ptr((void*)offsetof(PyObject, ob_type));
-			//il.push_back(CEE_ADD);
-			il.emit_call(SIG_ITERNEXT_TOKEN);
-			auto processValue = il.define_label();
-			il.dup();
-			il.push_ptr(nullptr);
-			il.compare_eq();
-			il.branch(BranchFalse, processValue);
-			// iteration has ended, or an exception was raised...
-			// TODO: Error check besides stop iteration...
-
-			il.pop();
-			decref(il);
-			il.branch(BranchAlways, getOffsetLabel(il, offsetLabels, i + oparg + 1));
-
-			// leave iter and value on stack
-			il.mark_label(processValue);
-			stackDepth++;
-		}
-			break;
-		case SET_ADD:
-		{
-			vector<Local> tmps;
-			Local tmpValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.st_loc(tmpValue);
-
-			for (int i = 0; i < oparg - 1; i++) {
-				auto loc = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-				il.st_loc(loc);
-				tmps.push_back(loc);
-			}
-
-			il.ld_loc(tmpValue);
-			il.emit_call(METHOD_SET_ADD_TOKEN);
-
-			il.free_local(tmpValue);
-			for (int i = tmps.size() - 1; i >= 0; i--) {
-				il.ld_loc(tmps[i]);
-				il.free_local(tmps[i]);
-			}
-		}
-			break;
-		case MAP_ADD:
-		{
-			vector<Local> tmps;
-			Local keyValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			Local valueValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.st_loc(keyValue);
-			il.st_loc(valueValue);
-
-			for (int i = 0; i < oparg - 1; i++) {
-				auto loc = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-				il.st_loc(loc);
-				tmps.push_back(loc);
-			}
-
-			il.ld_loc(keyValue);
-			il.ld_loc(valueValue);
-			il.emit_call(METHOD_MAP_ADD_TOKEN);
-
-			il.free_local(keyValue);
-			il.free_local(valueValue);
-			for (int i = tmps.size() - 1; i >= 0; i--) {
-				il.ld_loc(tmps[i]);
-				il.free_local(tmps[i]);
-			}
-		}
-			break;
-		case LIST_APPEND:
-			// stack on entry is: list, <temps>, value
-			// we need to spill the values in the middle...
-		{
-			vector<Local> tmps;
-			Local tmpValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-			il.st_loc(tmpValue);
-
-			for (int i = 0; i < oparg - 1; i++) {
-				auto loc = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-				il.st_loc(loc);
-				tmps.push_back(loc);
-			}
-
-			il.ld_loc(tmpValue);
-			il.emit_call(METHOD_LIST_APPEND_TOKEN);
-
-			il.free_local(tmpValue);
-			for (int i = tmps.size() - 1; i >= 0; i--) {
-				il.ld_loc(tmps[i]);
-				il.free_local(tmps[i]);
-			}
-		}
-			break;
-		case INPLACE_POWER:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_POWER_TOKEN);
-			break;
-		case INPLACE_MULTIPLY:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_MULTIPLY_TOKEN);
-			break;
-		case INPLACE_MATRIX_MULTIPLY:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_MATRIX_MULTIPLY_TOKEN);
-			break;
-		case INPLACE_TRUE_DIVIDE:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_TRUE_DIVIDE_TOKEN);
-			break;
-		case INPLACE_FLOOR_DIVIDE:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_FLOOR_DIVIDE_TOKEN);
-			break;
-		case INPLACE_MODULO:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_MODULO_TOKEN);
-			break;
-		case INPLACE_ADD:
-			// TODO: We should do the unicode_concatenate ref count optimization
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_ADD_TOKEN);
-			break;
-		case INPLACE_SUBTRACT:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_SUBTRACT_TOKEN);
-			break;
-		case INPLACE_LSHIFT:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_LSHIFT_TOKEN);
-			break;
-		case INPLACE_RSHIFT:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_RSHIFT_TOKEN);
-			break;
-		case INPLACE_AND:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_AND_TOKEN);
-			break;
-		case INPLACE_XOR:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_XOR_TOKEN);
-			break;
-		case INPLACE_OR:
-			stackDepth--;
-			il.emit_call(METHOD_INPLACE_OR_TOKEN);
-			break;
-		case PRINT_EXPR:
-			stackDepth--;
-			il.emit_call(METHOD_PRINT_EXPR_TOKEN);
-			break;
-		case LOAD_CLASSDEREF:
-			load_frame(il);
-			il.ld_i(oparg);
-			il.emit_call(METHOD_LOAD_CLASSDEREF_TOKEN);
-			break;
-		case CALL_FUNCTION_VAR_KW:
-		
-		case YIELD_FROM:
-		case YIELD_VALUE:
-
-		case IMPORT_NAME:
-		case IMPORT_STAR:
-		case IMPORT_FROM:
-
-		case RAISE_VARARGS:
-		case POP_EXCEPT:
-		case END_FINALLY:
-		case SETUP_EXCEPT:
-		case SETUP_WITH:
-		case WITH_CLEANUP:
-		default:
-			_ASSERT(FALSE);
-			break;
 		}
 	}
 
-	return il.compile(&g_corJitInfo, g_jit).m_addr;
+	PVOID CompileWorker() {
+		int oparg;
+		Label ok;
+
+		auto raiseLabel = il.define_label();
+		auto reraiseLabel = il.define_label();
+
+		auto lasti = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+		load_frame();
+		il.ld_i(offsetof(PyFrameObject, f_lasti));
+		il.add();
+		il.st_loc(lasti);
+
+		m_blockStack.push_back(BlockInfo(raiseLabel, reraiseLabel, Label(), -1, NOP));
+
+		auto tb = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+		auto ehVal = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+		auto excType = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+		auto retValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+
+		int stackDepth = 0;
+		for (int i = 0; i < size; i++) {
+			auto byte = byteCode[i];
+
+			// See FOR_ITER for special handling of the offset label
+			if (byte != FOR_ITER) {
+				mark_offset_label(i);
+			}
+
+			// update f_lasti
+			if (!can_skip_lasti_update(byteCode[i])) {
+				il.ld_loc(lasti);
+				il.ld_i(i);
+				il.st_ind_i4();
+			}
+
+			if (HAS_ARG(byte)){
+				oparg = NEXTARG();
+			}
+		processOpCode:
+			switch (byte) {
+			case NOP:
+				break;
+			case ROT_TWO:
+			{
+				auto top = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				auto second = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+
+				il.st_loc(top);
+				il.st_loc(second);
+
+				il.ld_loc(top);
+				il.ld_loc(second);
+
+				il.free_local(top);
+				il.free_local(second);
+			}
+				break;
+			case ROT_THREE:
+			{
+				auto top = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				auto second = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				auto third = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+
+				il.st_loc(top);
+				il.st_loc(second);
+				il.st_loc(third);
+
+				il.ld_loc(top);
+				il.ld_loc(third);
+				il.ld_loc(second);
+
+				il.free_local(top);
+				il.free_local(second);
+				il.free_local(third);
+			}
+				break;
+			case POP_TOP:
+				decref();
+				stackDepth--;
+				break;
+			case DUP_TOP:
+				il.dup();
+				il.dup();
+				incref();
+				stackDepth++;
+				break;
+			case DUP_TOP_TWO:
+			{
+				auto top = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				auto second = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+
+				il.st_loc(top);
+				il.st_loc(second);
+
+				il.ld_loc(second);
+				il.ld_loc(top);
+				il.ld_loc(second);
+				il.ld_loc(top);
+
+				il.ld_loc(top);
+				incref();
+				il.ld_loc(second);
+				incref();
+
+				il.free_local(top);
+				il.free_local(second);
+
+				stackDepth += 2;
+			}
+				break;
+			case COMPARE_OP:
+			{
+				auto compareType = oparg;
+				switch (compareType) {
+				case PyCmp_IS:
+				case PyCmp_IS_NOT:
+					// TODO: Missing dec refs here...
+				{
+					Label same = il.define_label();
+					Label done = il.define_label();
+					il.branch(BranchEqual, same);
+					il.push_ptr(compareType == PyCmp_IS ? Py_False : Py_True);
+					il.branch(BranchAlways, done);
+					il.mark_label(same);
+					il.push_ptr(compareType == PyCmp_IS ? Py_True : Py_False);
+					il.mark_label(done);
+					il.dup();
+					incref();
+				}
+					break;
+				case PyCmp_IN:
+					il.emit_call(METHOD_CONTAINS_TOKEN);
+					break;
+				case PyCmp_NOT_IN:
+					il.emit_call(METHOD_NOTCONTAINS_TOKEN);
+					break;
+				case PyCmp_EXC_MATCH:
+					il.emit_call(METHOD_COMPARE_EXCEPTIONS);
+					break;
+				default:
+					il.ld_i(oparg);
+					il.emit_call(METHOD_RICHCMP_TOKEN);
+				}
+			}
+				break;
+			case SETUP_LOOP:
+				// offset is relative to end of current instruction
+				m_blockStack.push_back(
+					BlockInfo(
+						m_blockStack.back().Raise, 
+						m_blockStack.back().ReRaise, 
+						m_blockStack.back().ErrorTarget,
+						oparg + i + 1, 
+						SETUP_LOOP
+					)
+				);
+				break;
+			case BREAK_LOOP:
+			case CONTINUE_LOOP:
+				// if we have finally blocks we need to unwind through them...
+				// used in exceptional case...
+			{
+				bool inFinally = false;
+				for (int i = m_blockStack.size() - 1; i >= 0; i--) {
+					if (m_blockStack[i].Kind == SETUP_LOOP) {
+						// we found our loop, we don't need additional processing...
+						break;
+					}
+					if (m_blockStack[i].Kind == SETUP_FINALLY) {
+						// we need to run the finally before continuing to the loop...
+						// That means we need to spill the stack, branch to the finally,
+						// run it, and have the finally branch back to our oparg.
+						// CPython handles this by pushing the opcode to continue at onto
+						// the stack, and then pushing an integer value which indicates END_FINALLY
+						// should continue execution.  Our END_FINALLY expects only a single value
+						// on the stack, and we also need to preserve any loop variables.
+						m_blockStack.data()[i].Flags |= byte == BREAK_LOOP ? BLOCK_BREAKS : BLOCK_CONTINUES;
+
+						if (!inFinally) {
+							// only emit the branch to the first finally, subsequent branches
+							// to other finallys will be handled by the END_FINALLY code.  But we
+							// need to mark those finallys as needing special handling.
+							inFinally = true;
+							il.ld_i4(byte == BREAK_LOOP ? BLOCK_BREAKS : BLOCK_CONTINUES);
+							il.branch(BranchAlways, m_blockStack[i].ErrorTarget);
+							if (byte == CONTINUE_LOOP) {
+								m_blockStack.data()[i].ContinueOffset = oparg;
+							}
+						}
+					}					
+				}
+
+				if (!inFinally) {
+					if (byte == BREAK_LOOP) {
+						il.branch(BranchAlways, getOffsetLabel(m_blockStack.back().EndOffset));
+					}
+					else{
+						il.branch(BranchAlways, getOffsetLabel(oparg));
+					}
+				}
+				
+			}
+				break;
+			case LOAD_BUILD_CLASS:
+				load_frame();
+				il.emit_call(METHOD_GETBUILDCLASS_TOKEN);
+				check_error();
+				break;
+			case JUMP_ABSOLUTE:
+			{
+				il.branch(BranchAlways, getOffsetLabel(oparg));
+				break;
+			}
+			case JUMP_FORWARD:
+				il.branch(BranchAlways, getOffsetLabel(oparg + i + 1));
+				break;
+			case JUMP_IF_FALSE_OR_POP:
+			case JUMP_IF_TRUE_OR_POP:
+			{
+				auto tmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(tmp);
+
+
+				auto noJump = il.define_label();
+				auto willJump = il.define_label();
+				// fast checks for true/false...
+				il.ld_loc(tmp);
+				il.push_ptr(byte == JUMP_IF_FALSE_OR_POP ? Py_True : Py_False);
+				il.compare_eq();
+				il.branch(BranchTrue, noJump);
+
+				il.ld_loc(tmp);
+				il.push_ptr(byte == JUMP_IF_FALSE_OR_POP ? Py_False : Py_True);
+				il.compare_eq();
+				il.branch(BranchTrue, willJump);
+
+				// Use PyObject_IsTrue
+				il.ld_loc(tmp);
+				il.emit_call(METHOD_PYOBJECT_ISTRUE);
+				il.ld_i(0);
+				il.compare_eq();
+				il.branch(byte == JUMP_IF_FALSE_OR_POP ? BranchFalse : BranchTrue, noJump);
+
+				il.mark_label(willJump);
+
+				il.ld_loc(tmp);	// load the value back onto the stack
+				il.branch(BranchAlways, getOffsetLabel(oparg));
+
+				il.mark_label(noJump);
+
+				// dec ref because we're popping...
+				il.ld_loc(tmp);
+				decref();
+				stackDepth--;
+
+				il.free_local(tmp);
+			}
+				break;
+			case POP_JUMP_IF_TRUE:
+			case POP_JUMP_IF_FALSE:
+			{
+				auto noJump = il.define_label();
+				auto willJump = il.define_label();
+				// fast checks for true/false...
+				il.dup();
+				il.push_ptr(byte == POP_JUMP_IF_FALSE ? Py_True : Py_False);
+				il.compare_eq();
+				il.branch(BranchTrue, noJump);
+
+				il.dup();
+				il.push_ptr(byte == POP_JUMP_IF_FALSE ? Py_False : Py_True);
+				il.compare_eq();
+				il.branch(BranchTrue, willJump);
+
+				// Use PyObject_IsTrue
+				il.dup();
+				il.emit_call(METHOD_PYOBJECT_ISTRUE);
+				il.ld_i(0);
+				il.compare_eq();
+				il.branch(byte == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, noJump);
+
+				il.mark_label(willJump);
+				decref();
+
+				il.branch(BranchAlways, getOffsetLabel(oparg));
+
+				il.mark_label(noJump);
+				decref();
+				stackDepth--;
+			}
+				break;
+			case LOAD_NAME:
+				load_frame();
+				il.push_ptr(PyTuple_GetItem(code->co_names, oparg));
+				il.emit_call(METHOD_LOADNAME_TOKEN);
+				break;
+			case STORE_ATTR:
+			{
+				auto globalName = PyTuple_GetItem(code->co_names, oparg);
+				il.push_ptr(globalName);
+			}
+				il.emit_call(METHOD_STOREATTR_TOKEN);
+				check_int_error();
+				break;
+			case DELETE_ATTR:
+			{
+				auto globalName = PyTuple_GetItem(code->co_names, oparg);
+				il.push_ptr(globalName);
+			}
+				il.emit_call(METHOD_DELETEATTR_TOKEN);
+				check_int_error();
+				break;
+			case LOAD_ATTR:
+			{
+				auto globalName = PyTuple_GetItem(code->co_names, oparg);
+				il.push_ptr(globalName);
+			}
+				il.emit_call(METHOD_LOADATTR_TOKEN);
+				break;
+			case STORE_GLOBAL:
+				// value is on the stack
+				stackDepth--;
+				load_frame();
+				{
+					auto globalName = PyTuple_GetItem(code->co_names, oparg);
+					il.push_ptr(globalName);
+				}
+				il.emit_call(METHOD_STOREGLOBAL_TOKEN);
+				check_int_error();
+				break;
+			case DELETE_GLOBAL:
+				load_frame();
+				{
+					auto globalName = PyTuple_GetItem(code->co_names, oparg);
+					il.push_ptr(globalName);
+				}
+				il.emit_call(METHOD_DELETEGLOBAL_TOKEN);
+				check_int_error();
+				break;
+
+			case LOAD_GLOBAL:
+				stackDepth++;
+				load_frame();
+				{
+					auto globalName = PyTuple_GetItem(code->co_names, oparg);
+					il.push_ptr(globalName);
+				}
+				il.emit_call(METHOD_LOADGLOBAL_TOKEN);
+				break;
+			case LOAD_CONST:
+				stackDepth++;
+				il.push_ptr(PyTuple_GetItem(code->co_consts, oparg));
+				il.dup();
+				incref();
+				break;
+			case STORE_NAME:
+				load_frame();
+				il.push_ptr(PyTuple_GetItem(code->co_names, oparg));
+				il.emit_call(METHOD_STORENAME_TOKEN);
+				break;
+			case DELETE_NAME:
+				load_frame();
+				il.push_ptr(PyTuple_GetItem(code->co_names, oparg));
+				il.emit_call(METHOD_DELETENAME_TOKEN);
+				break;
+			case DELETE_FAST:
+			{
+				load_local(oparg);
+				il.load_null();
+				auto valueSet = il.define_label();
+
+				il.branch(BranchNotEqual, valueSet);
+				il.push_ptr(PyTuple_GetItem(code->co_varnames, oparg));
+				il.emit_call(METHOD_UNBOUND_LOCAL);
+				il.branch(BranchEqual, GetEHBlock().Raise);
+
+				il.mark_label(valueSet);
+				load_frame();
+				il.ld_i(offsetof(PyFrameObject, f_localsplus) + oparg * sizeof(size_t));
+				il.add();
+				il.load_null();
+				il.st_ind_i();
+				break;
+			}
+			case STORE_FAST:
+				// TODO: Move locals out of the Python frame object and into real locals
+			{
+				stackDepth--;
+				auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(valueTmp);
+
+				load_frame();
+				il.ld_i(offsetof(PyFrameObject, f_localsplus) + oparg * sizeof(size_t));
+				il.add();
+
+				il.ld_loc(valueTmp);
+
+				il.st_ind_i();
+
+				il.free_local(valueTmp);
+			}
+				break;
+			case LOAD_FAST:
+				/* PyObject *value = GETLOCAL(oparg); */
+				load_local(oparg);
+
+				auto valueSet = il.define_label();
+
+				//// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
+				//// locals that are provably assigned)
+				il.dup();
+				il.load_null();
+				il.branch(BranchNotEqual, valueSet);
+				
+				il.pop();
+				il.push_ptr(PyTuple_GetItem(code->co_varnames, oparg));
+				il.emit_call(METHOD_UNBOUND_LOCAL);
+				il.branch(BranchEqual, GetEHBlock().Raise);
+
+				il.mark_label(valueSet);
+
+				il.dup();
+				incref();
+				stackDepth++;
+				break;
+			case UNPACK_SEQUENCE:
+			{
+				auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(valueTmp); // save the sequence
+
+				// load the iterable, the count, and our temporary 
+				// storage if we need to iterate over the object.
+				il.ld_loc(valueTmp);
+				il.push_ptr((void*)oparg);
+				il.ld_loc(sequenceLocals[i]);
+				il.emit_call(METHOD_UNPACK_SEQUENCE_TOKEN);
+				check_error();
+
+				auto fastTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(fastTmp);
+
+				//while (oparg--) {
+				//	item = items[oparg];
+				//	Py_INCREF(item);
+				//	PUSH(item);
+				//}
+
+				auto tmpOpArg = oparg;
+				while (tmpOpArg--) {
+					il.ld_loc(fastTmp);
+					il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
+					il.add();
+					il.ld_ind_i();
+					il.dup();
+					incref();
+				}
+
+				il.ld_loc(valueTmp);
+				decref();
+
+				il.free_local(valueTmp);
+				il.free_local(fastTmp);
+			}
+				break;
+			case UNPACK_EX:
+			{
+				auto valueTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				auto listTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				auto remainderTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(valueTmp); // save the sequence
+
+				// load the iterable, the sizes, and our temporary 
+				// storage if we need to iterate over the object, 
+				// the list local address, and the remainder address
+				// PyObject* seq, size_t leftSize, size_t rightSize, PyObject** tempStorage, PyObject** list, PyObject*** remainder
+
+				il.ld_loc(valueTmp);
+				il.push_ptr((void*)(oparg & 0xFF));
+				il.push_ptr((void*)(oparg >> 8));
+				il.ld_loc(sequenceLocals[i]);
+				il.ld_loca(listTmp);
+				il.ld_loca(remainderTmp);
+				il.emit_call(METHOD_UNPACK_SEQUENCEEX_TOKEN);
+				check_error();
+
+				auto fastTmp = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(fastTmp);
+
+				// load the right hand side...
+				auto tmpOpArg = oparg >> 8;
+				while (tmpOpArg--) {
+					il.ld_loc(remainderTmp);
+					il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
+					il.add();
+					il.ld_ind_i();
+					il.dup();
+					incref();
+				}
+
+				// load the list
+				il.ld_loc(listTmp);
+
+				// load the left hand side
+				//while (oparg--) {
+				//	item = items[oparg];
+				//	Py_INCREF(item);
+				//	PUSH(item);
+				//}
+
+				tmpOpArg = oparg & 0xff;
+				while (tmpOpArg--) {
+					il.ld_loc(fastTmp);
+					il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
+					il.add();
+					il.ld_ind_i();
+					il.dup();
+					incref();
+				}
+
+				il.ld_loc(valueTmp);
+				decref();
+
+				il.free_local(valueTmp);
+				il.free_local(fastTmp);
+				il.free_local(remainderTmp);
+				il.free_local(listTmp);
+			}
+				break;
+			case CALL_FUNCTION_VAR:
+			case CALL_FUNCTION_KW:
+			case CALL_FUNCTION_VAR_KW:
+				_ASSERT(FALSE);
+				break;
+			case CALL_FUNCTION:
+			{
+				int argCnt = oparg & 0xff;
+				int kwArgCnt = (oparg >> 8) & 0xff;
+				// Optimize for # of calls, and various call types...
+				// Function is last thing on the stack...
+
+				// target + args popped, result pushed
+				stackDepth -= argCnt;
+
+				if (kwArgCnt == 0) {
+					switch (argCnt) {
+					case 0: il.emit_call(METHOD_CALL0_TOKEN); break;
+						/*
+						case 1: emit_call(il, METHOD_CALL1_TOKEN); break;
+						case 2: emit_call(il, METHOD_CALL2_TOKEN); break;
+						case 3: emit_call(il, METHOD_CALL3_TOKEN); break;
+						case 4: emit_call(il, METHOD_CALL4_TOKEN); break;
+						case 5: emit_call(il, METHOD_CALL5_TOKEN); break;
+						case 6: emit_call(il, METHOD_CALL6_TOKEN); break;
+						case 7: emit_call(il, METHOD_CALL7_TOKEN); break;
+						case 8: emit_call(il, METHOD_CALL8_TOKEN); break;
+						case 9: emit_call(il, METHOD_CALL9_TOKEN); break;*/
+					default:
+						// generic call, build a tuple for the call...
+						build_tuple(argCnt);
+
+						// target is on the stack already...
+						il.emit_call(METHOD_CALLN_TOKEN);
+
+						break;
+					}
+				}
+			}
+				break;
+			case BUILD_TUPLE:
+			{
+				if (oparg == 0) {
+					il.push_ptr(PyTuple_New(0));
+					stackDepth++;
+				}
+				else{
+					build_tuple(oparg);
+				}
+				stackDepth -= oparg;
+				stackDepth++;
+			}
+				break;
+			case BUILD_LIST:
+			{
+				build_list(oparg);
+				stackDepth -= oparg;
+				stackDepth++;
+			}
+				break;
+			case BUILD_MAP:
+				build_map(oparg);
+				stackDepth++;
+				break;
+			case STORE_MAP:
+				// stack is map, key, value
+				il.emit_call(METHOD_STOREMAP_TOKEN);
+				stackDepth -= 2;	// map stays on the stack
+				break;
+			case STORE_SUBSCR:
+				// stack is value, container, index
+				il.emit_call(METHOD_STORESUBSCR_TOKEN);
+				check_int_error();
+				stackDepth -= 3;
+				break;
+			case DELETE_SUBSCR:
+				// stack is container, index
+				il.emit_call(METHOD_DELETESUBSCR_TOKEN);
+				check_int_error();
+				stackDepth -= 2;
+				break;
+			case BUILD_SLICE:
+				if (oparg != 3) {
+					il.load_null();
+				}
+				il.emit_call(METHOD_BUILD_SLICE);
+				break;
+			case BUILD_SET:
+			{
+				build_set(oparg);
+				stackDepth -= oparg;
+				stackDepth++;
+			}
+				break;
+			case UNARY_POSITIVE:
+				il.emit_call(METHOD_UNARY_POSITIVE);
+				break;
+			case UNARY_NEGATIVE:
+				il.emit_call(METHOD_UNARY_NEGATIVE);
+				break;
+			case UNARY_NOT:
+				il.emit_call(METHOD_UNARY_NOT);
+				check_error();
+				break;
+			case UNARY_INVERT:
+				il.emit_call(METHOD_UNARY_INVERT);
+				break;
+			case BINARY_SUBSCR:
+				stackDepth -= 2;
+				il.emit_call(METHOD_SUBSCR_TOKEN);
+				break;
+			case BINARY_ADD:
+				stackDepth -= 2;
+				il.emit_call(METHOD_ADD_TOKEN);
+				break;
+			case BINARY_TRUE_DIVIDE:
+				stackDepth -= 2;
+				il.emit_call(METHOD_DIVIDE_TOKEN);
+				break;
+			case BINARY_FLOOR_DIVIDE:
+				stackDepth -= 2;
+				il.emit_call(METHOD_FLOORDIVIDE_TOKEN);
+				break;
+			case BINARY_POWER:
+				stackDepth -= 2;
+				il.emit_call(METHOD_POWER_TOKEN);
+				break;
+			case BINARY_MODULO:
+				stackDepth -= 2;
+				il.emit_call(METHOD_MODULO_TOKEN);
+				break;
+			case BINARY_MATRIX_MULTIPLY:
+				stackDepth--;
+				il.emit_call(METHOD_MATRIX_MULTIPLY_TOKEN);
+				break;
+			case BINARY_LSHIFT:
+				stackDepth--;
+				il.emit_call(METHOD_BINARY_LSHIFT_TOKEN);
+				break;
+			case BINARY_RSHIFT:
+				stackDepth--;
+				il.emit_call(METHOD_BINARY_RSHIFT_TOKEN);
+				break;
+			case BINARY_AND:
+				stackDepth--;
+				il.emit_call(METHOD_BINARY_AND_TOKEN);
+				break;
+			case BINARY_XOR:
+				stackDepth--;
+				il.emit_call(METHOD_BINARY_XOR_TOKEN);
+				break;
+			case BINARY_OR:
+				stackDepth--;
+				il.emit_call(METHOD_BINARY_OR_TOKEN);
+				break;
+			case BINARY_MULTIPLY:
+				stackDepth--;
+				il.emit_call(METHOD_MULTIPLY_TOKEN);
+				break;
+			case BINARY_SUBTRACT:
+				/*
+				PyObject *right = POP();
+				PyObject *left = TOP();
+				PyObject *res = PyNumber_Subtract(left, right);
+				Py_DECREF(left);
+				Py_DECREF(right);
+				SET_TOP(res);
+				if (res == NULL)
+				goto error;
+				break;
+				*/
+				stackDepth -= 2;
+				il.emit_call(METHOD_SUBTRACT_TOKEN);
+				break;
+			case RETURN_VALUE:
+			{
+				stackDepth -= 1;
+				if (il.getStackDepth() > 1) {
+					// we can have values on the stack when we return, for example if
+					// we're returning from a finally.
+					il.st_loc(retValue);
+
+					while (il.getStackDepth() > 0) {
+						il.pop();
+					}
+
+					il.ld_loc(retValue);
+				}
+
+				bool inFinally = false;
+				for (int i = m_blockStack.size() - 1; i >= 0; i--) {
+					if (m_blockStack[i].Kind == SETUP_FINALLY) {
+						// we need to run the finally before returning...
+						m_blockStack.data()[i].Flags |= BLOCK_RETURNS;
+
+						if (!inFinally) {
+							// Only emit the store and branch to the inner most finally, but
+							// we need to mark all finallys as being capable of being returned
+							// through.
+							inFinally = true;
+							il.st_loc(retValue);
+							il.ld_i4(BLOCK_RETURNS);
+							il.branch(BranchAlways, m_blockStack[i].ErrorTarget);
+						}
+					}
+				}
+
+				if (!inFinally) {
+					il.ret();
+				}
+			}
+				break;
+			case EXTENDED_ARG:
+			{
+				byte = byteCode[i + 1];
+				auto bottomArg = NEXTARG();
+				oparg = (oparg << 16) | bottomArg;
+				goto processOpCode;
+			}
+			case MAKE_CLOSURE:
+			case MAKE_FUNCTION:
+			{
+				int posdefaults = oparg & 0xff;
+				int kwdefaults = (oparg >> 8) & 0xff;
+				int num_annotations = (oparg >> 16) & 0x7fff;
+
+				load_frame();
+				il.emit_call(METHOD_NEWFUNCTION_TOKEN);
+
+				if (byte == MAKE_CLOSURE) {
+					il.emit_call(METHOD_SET_CLOSURE);
+				}
+
+				if (num_annotations > 0) {
+					_ASSERTE(FALSE);
+				}
+				if (kwdefaults > 0) {
+					_ASSERTE(FALSE);
+				}
+				if (posdefaults > 0) {
+					_ASSERTE(FALSE);
+				}
+				break;
+			}
+			case LOAD_DEREF:
+				load_frame();
+				il.ld_i(offsetof(PyFrameObject, f_localsplus) + code->co_nlocals * sizeof(size_t) + oparg);
+				il.add();
+				il.ld_ind_i();
+				il.emit_call(METHOD_PYCELL_GET);
+				check_error();
+				incref();
+				break;
+			case STORE_DEREF:
+				stackDepth--;
+				load_frame();
+				il.ld_i(offsetof(PyFrameObject, f_localsplus) + code->co_nlocals * sizeof(size_t));
+				il.add();
+				il.ld_ind_i();
+				il.emit_call(METHOD_PYCELL_SET_TOKEN);
+				break;
+			case DELETE_DEREF:
+				il.load_null();
+				load_frame();
+				il.ld_i(offsetof(PyFrameObject, f_localsplus) + code->co_nlocals * sizeof(size_t));
+				il.add();
+				il.ld_ind_i();
+				il.emit_call(METHOD_PYCELL_SET_TOKEN);
+				break;
+			case LOAD_CLOSURE:
+				load_frame();
+				il.ld_i(offsetof(PyFrameObject, f_localsplus) + code->co_nlocals * sizeof(size_t));
+				il.add();
+				il.ld_ind_i();
+				il.dup();
+				incref();
+				break;
+			case GET_ITER:
+				il.emit_call(METHOD_GETITER_TOKEN);
+				break;
+			case FOR_ITER:
+			{
+				// CPython always generates LOAD_FAST or a GET_ITER before a FOR_ITER.
+				// Therefore we know that we always fall into a FOR_ITER when it is
+				// initialized, and we branch back to it for the loop condition.  We
+				// do this becaues keeping the value on the stack becomes problematic.
+				// At the very least it requires that we spill the value out when we
+				// are doing a "continue" in a for loop.
+
+				// oparg is where to jump on break
+				auto iterValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(iterValue);		// store the value...
+
+				// now that we've saved the value into a temp we can mark the offset
+				// label.
+				mark_offset_label(i - 2);	// minus 2 removes our oparg
+
+				il.ld_loc(iterValue);
+
+				/*
+				// TODO: It'd be nice to inline this...
+				il.dup();
+				LD_FIELD(PyObject, ob_type);
+				LD_FIELD(PyTypeObject, tp_iternext);*/
+				//il.push_ptr((void*)offsetof(PyObject, ob_type));
+				//il.push_back(CEE_ADD);
+				auto error = il.define_local(Parameter(CORINFO_TYPE_INT));
+				il.ld_loca(error);
+
+				il.emit_call(SIG_ITERNEXT_TOKEN);
+				auto processValue = il.define_label();
+				il.dup();
+				il.push_ptr(nullptr);				
+				il.compare_eq();
+				il.branch(BranchFalse, processValue);
+				
+				// iteration has ended, or an exception was raised...
+				il.pop();
+				il.ld_loc(error);
+				check_int_error();
+
+				il.branch(BranchAlways, getOffsetLabel(i + oparg + 1));
+
+				// leave iter and value on stack
+				il.mark_label(processValue);
+				il.free_local(error);
+				stackDepth++;
+			}
+				break;
+			case SET_ADD:
+			{
+				vector<Local> tmps;
+				Local tmpValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(tmpValue);
+
+				for (int i = 0; i < oparg - 1; i++) {
+					auto loc = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+					il.st_loc(loc);
+					tmps.push_back(loc);
+				}
+
+				il.ld_loc(tmpValue);
+				il.emit_call(METHOD_SET_ADD_TOKEN);
+				check_int_error();
+
+				il.free_local(tmpValue);
+				for (int i = tmps.size() - 1; i >= 0; i--) {
+					il.ld_loc(tmps[i]);
+					il.free_local(tmps[i]);
+				}
+			}
+				break;
+			case MAP_ADD:
+			{
+				vector<Local> tmps;
+				Local keyValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				Local valueValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(keyValue);
+				il.st_loc(valueValue);
+
+				for (int i = 0; i < oparg - 1; i++) {
+					auto loc = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+					il.st_loc(loc);
+					tmps.push_back(loc);
+				}
+
+				il.ld_loc(keyValue);
+				il.ld_loc(valueValue);
+				il.emit_call(METHOD_MAP_ADD_TOKEN);
+				check_int_error();
+
+				il.free_local(keyValue);
+				il.free_local(valueValue);
+				for (int i = tmps.size() - 1; i >= 0; i--) {
+					il.ld_loc(tmps[i]);
+					il.free_local(tmps[i]);
+				}
+			}
+				break;
+			case LIST_APPEND:
+				// stack on entry is: list, <temps>, value
+				// we need to spill the values in the middle...
+			{
+				vector<Local> tmps;
+				Local tmpValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				il.st_loc(tmpValue);
+
+				for (int i = 0; i < oparg - 1; i++) {
+					auto loc = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+					il.st_loc(loc);
+					tmps.push_back(loc);
+				}
+
+				il.ld_loc(tmpValue);
+				il.emit_call(METHOD_LIST_APPEND_TOKEN);
+				check_int_error();
+
+				il.free_local(tmpValue);
+				for (int i = tmps.size() - 1; i >= 0; i--) {
+					il.ld_loc(tmps[i]);
+					il.free_local(tmps[i]);
+				}
+			}
+				break;
+			case INPLACE_POWER:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_POWER_TOKEN);
+				break;
+			case INPLACE_MULTIPLY:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_MULTIPLY_TOKEN);
+				break;
+			case INPLACE_MATRIX_MULTIPLY:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_MATRIX_MULTIPLY_TOKEN);
+				break;
+			case INPLACE_TRUE_DIVIDE:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_TRUE_DIVIDE_TOKEN);
+				break;
+			case INPLACE_FLOOR_DIVIDE:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_FLOOR_DIVIDE_TOKEN);
+				break;
+			case INPLACE_MODULO:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_MODULO_TOKEN);
+				break;
+			case INPLACE_ADD:
+				// TODO: We should do the unicode_concatenate ref count optimization
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_ADD_TOKEN);
+				break;
+			case INPLACE_SUBTRACT:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_SUBTRACT_TOKEN);
+				break;
+			case INPLACE_LSHIFT:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_LSHIFT_TOKEN);
+				break;
+			case INPLACE_RSHIFT:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_RSHIFT_TOKEN);
+				break;
+			case INPLACE_AND:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_AND_TOKEN);
+				break;
+			case INPLACE_XOR:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_XOR_TOKEN);
+				break;
+			case INPLACE_OR:
+				stackDepth--;
+				il.emit_call(METHOD_INPLACE_OR_TOKEN);
+				break;
+			case PRINT_EXPR:
+				stackDepth--;
+				il.emit_call(METHOD_PRINT_EXPR_TOKEN);
+				check_int_error();
+				break;
+			case LOAD_CLASSDEREF:
+				load_frame();
+				il.ld_i(oparg);
+				il.emit_call(METHOD_LOAD_CLASSDEREF_TOKEN);
+				check_error();
+				break;
+			case RAISE_VARARGS:
+				// do raise (exception, cause)
+				// We can be invoked with no args (bare raise), raise exception, or raise w/ exceptoin and cause
+				switch (oparg) {
+				case 0: il.load_null();
+				case 1: il.load_null();
+				case 2:
+					// raise exc
+					il.emit_call(METHOD_DO_RAISE);
+					// returns 1 if we're doing a re-raise in which case we don't need
+					// to update the traceback.  Otherwise returns 0.
+					auto curHandler = GetEHBlock();
+					if (oparg == 0) {
+						il.branch(BranchFalse, curHandler.Raise);
+						il.branch(BranchAlways, curHandler.ReRaise);
+					}
+					else {
+						// if we have args we'll always return 0...
+						il.pop();
+						il.branch(BranchAlways, curHandler.Raise);
+					}
+					break;
+				}
+				break;
+			case SETUP_EXCEPT:
+			{
+				auto handlerLabel = getOffsetLabel(oparg + i + 1);
+				auto blockInfo = BlockInfo(il.define_label(), il.define_label(), handlerLabel, oparg + i + 1, SETUP_EXCEPT);
+				m_blockStack.push_back(blockInfo);
+				allHandlers.push_back(blockInfo);
+			}
+				break;
+			case SETUP_FINALLY: {
+				auto handlerLabel = getOffsetLabel(oparg + i + 1);
+				auto blockInfo = BlockInfo(il.define_label(), il.define_label(), handlerLabel, oparg + i + 1, SETUP_FINALLY);
+				m_blockStack.push_back(blockInfo);
+				allHandlers.push_back(blockInfo);
+			}
+				break;
+			case POP_EXCEPT:
+				// we made it to the end of an EH block w/o throwing,
+				// clear the exception.
+				il.load_null();
+				il.st_loc(ehVal);
+				break;
+			case POP_BLOCK:
+				{
+					auto curHandler = m_blockStack.back();
+					m_blockStack.pop_back();
+					if (curHandler.Kind == SETUP_FINALLY) {
+						// convert block into an END_FINALLY BlockInfo which will
+						// dispatch to all of the previous locations...
+						auto back = m_blockStack.back();
+						m_blockStack.push_back(
+							BlockInfo(
+								back.Raise,		// if we take a nested exception this is where we go to...
+								back.ReRaise, 
+								back.ErrorTarget, 
+								back.EndOffset, 
+								END_FINALLY, 
+								curHandler.Flags, 
+								curHandler.ContinueOffset
+							)
+						);
+					}
+				}
+				break;
+			case END_FINALLY:
+				// CPython excepts END_FINALLY can be entered in 1 of 3 ways:
+				//	1) With a status code for why the finally is unwinding, indicating a RETURN
+				//			or a continue.  In this case there is an extra retval on the stack
+				//	2) With an excpetion class which is being raised.  In this case there are 2 extra
+				//			values on the stack, the exception value, and the traceback.
+				//	3) After the try block has completed normally.  In this case None is on the stack.
+				//
+				//	That means in CPython this opcode can be branched to with 1 of 3 different stack
+				//		depths, and the CLR doesn't like that.  Worse still the rest of the generated
+				//		byte code assumes this is true.  For case 2 an except handler includes tests
+				//		and pops which remove the 3 values from the class.  For case 3 the byte code
+				//		at the end of the finally range includes the opcode to load None.
+				//
+				//  END_FINALLY can also be encountered w/o a SETUP_FINALLY, as happens when it's used
+				//	solely for re-throwing exceptions.
+				
+				if (m_blockStack.back().Kind == END_FINALLY) {
+					int flags = m_blockStack.back().Flags;
+					int continues = m_blockStack.back().ContinueOffset;
+
+					m_blockStack.pop_back();
+
+					// We're actually ending a finally.  If we're in an exceptional case we
+					// need to re-throw, otherwise we need to just continue execution.  Our
+					// exception handling code will only push the exception type on in this case.
+					auto finallyReason = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+					auto noException = il.define_label();
+					il.st_loc(finallyReason);
+					il.ld_loc(finallyReason);
+					il.load_null();
+					il.branch(BranchEqual, noException);
+
+					if (flags & BLOCK_BREAKS) {
+						for (int i = m_blockStack.size() - 1; i >= 0; i--) {
+							if (m_blockStack[i].Kind == SETUP_LOOP) {
+								il.ld_loc(finallyReason);
+								il.ld_i(BLOCK_BREAKS);
+								il.branch(BranchEqual, m_blockStack[i].EndOffset);
+								break;
+							}
+							else if (m_blockStack[i].Kind == SETUP_FINALLY) {
+								// need to dispatch to outer finally...
+								il.ld_loc(finallyReason);
+								il.branch(BranchAlways, m_blockStack[i].ErrorTarget);
+								break;
+							}
+						}
+					}
+
+					if (flags & BLOCK_CONTINUES) {
+						for (int i = m_blockStack.size() - 1; i >= 0; i--) {
+							if (m_blockStack[i].Kind == SETUP_LOOP) {
+								il.ld_loc(finallyReason);
+								il.ld_i(BLOCK_BREAKS);
+								il.branch(BranchEqual, getOffsetLabel(m_blockStack[i].ContinueOffset));
+								break;
+							}
+							else if (m_blockStack[i].Kind == SETUP_FINALLY) {
+								// need to dispatch to outer finally...
+								il.ld_loc(finallyReason);
+								il.branch(BranchAlways, m_blockStack[i].ErrorTarget);
+								break;
+							}
+						}
+					}
+
+					if (flags & BLOCK_RETURNS) {
+						auto exceptional = il.define_label();
+						il.ld_loc(finallyReason);
+						il.ld_i(BLOCK_RETURNS);
+						il.compare_eq();
+						il.branch(BranchFalse, exceptional);
+
+						bool hasOuterFinally = false;
+						for (int i = m_blockStack.size() - 1; i >= 0; i--) {
+							if (m_blockStack[i].Kind == SETUP_FINALLY) {
+								// need to dispatch to outer finally...
+								il.ld_loc(finallyReason);
+								il.branch(BranchAlways, m_blockStack[i].ErrorTarget);
+								hasOuterFinally = true;
+								break;
+							}
+						}
+						if (!hasOuterFinally) {
+							il.ld_loc(retValue);
+							il.ret();
+						}
+
+						il.mark_label(exceptional);
+					}
+
+					// re-raise the exception...
+					il.ld_loc(tb);
+					il.ld_loc(ehVal);
+					il.ld_loc(finallyReason);
+					il.emit_call(METHOD_PYERR_RESTORE);
+					il.branch(BranchAlways, GetEHBlock().ReRaise);
+
+					il.mark_label(noException);
+
+					il.free_local(finallyReason);
+				}
+				else{
+					// END_FINALLY is marking the EH rethrow
+					il.setStackDepth(3);
+					il.emit_call(METHOD_PYERR_RESTORE);
+					il.branch(BranchAlways, GetEHBlock().ReRaise);
+				}
+				break;
+			case SETUP_WITH:
+
+			case YIELD_FROM:
+			case YIELD_VALUE:
+
+			case IMPORT_NAME:
+			case IMPORT_STAR:
+			case IMPORT_FROM:
+
+			case WITH_CLEANUP:
+			default:
+				_ASSERT(FALSE);
+				break;
+			}
+
+
+		}
+
+
+		// for each exception handler we need to load the exception
+		// information onto the stack, and then branch to the correct
+		// handler.  When we take an error we'll branch down to this
+		// little stub and then back up to the correct handler.
+		if (allHandlers.size() != 0) {
+			for (int i = 0; i < allHandlers.size(); i++) {
+				il.mark_label(allHandlers[i].Raise);
+				load_frame();
+				il.emit_call(METHOD_EH_TRACE);
+
+				il.mark_label(allHandlers[i].ReRaise);
+				il.ld_loca(tb);
+				il.ld_loca(ehVal);
+				il.ld_loca(excType);
+				il.emit_call(METHOD_PREPARE_EXCEPTION);
+				if (allHandlers[i].Kind != SETUP_FINALLY) {
+					il.ld_loc(tb);
+					il.ld_loc(ehVal);
+				}
+				il.ld_loc(excType);
+				il.branch(BranchAlways, allHandlers[i].ErrorTarget);
+			}
+		}
+
+		// label we branch to for error handling when we have no EH handlers, return NULL.
+		il.mark_label(raiseLabel);
+
+		load_frame();
+		il.emit_call(METHOD_EH_TRACE);
+
+		il.mark_label(reraiseLabel);
+		il.load_null();
+		il.ret();
+
+		return il.compile(&g_corJitInfo, g_jit).m_addr;
+	}
+};
+
+extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
+	Jitter jitter(code);
+	return jitter.Compile();
 }
 
 VTableInfo g_iterNextVtable{ 2, { offsetof(PyObject, ob_type), offsetof(PyTypeObject, tp_iternext) } };
@@ -2018,13 +2700,13 @@ extern "C" __declspec(dllexport) void JitInit() {
 		);
 	g_module->m_methods[METHOD_STORESUBSCR_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DoStoreSubscr
 		);
 	g_module->m_methods[METHOD_DELETESUBSCR_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DoDeleteSubscr
 		);
@@ -2063,8 +2745,8 @@ extern "C" __declspec(dllexport) void JitInit() {
 	g_module->m_methods[METHOD_PYCELL_GET] = Method(
 		nullptr,
 		CORINFO_TYPE_NATIVEINT,
-		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-		&PyCell_Get
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
+		&DoCellGet
 		);
 
 	g_module->m_methods[METHOD_RICHCMP_TOKEN] = Method(
@@ -2135,13 +2817,13 @@ extern "C" __declspec(dllexport) void JitInit() {
 		);
 	g_module->m_methods[METHOD_STOREGLOBAL_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&StoreGlobal
 		);
 	g_module->m_methods[METHOD_DELETEGLOBAL_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DeleteGlobal
 		);
@@ -2159,13 +2841,13 @@ extern "C" __declspec(dllexport) void JitInit() {
 		);
 	g_module->m_methods[METHOD_STOREATTR_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&StoreAttr
 		);
 	g_module->m_methods[METHOD_DELETEATTR_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DeleteAttr
 		);
@@ -2196,7 +2878,7 @@ extern "C" __declspec(dllexport) void JitInit() {
 	g_module->m_methods[SIG_ITERNEXT_TOKEN] = Method(
 		nullptr,
 		CORINFO_TYPE_NATIVEINT,
-		std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT) },
+		std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DoIterNext
 		);
 	g_module->m_methods[METHOD_DECREF_TOKEN] = Method(
@@ -2251,20 +2933,20 @@ extern "C" __declspec(dllexport) void JitInit() {
 
 	g_module->m_methods[METHOD_LIST_APPEND_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DoListAppend
 		);
 	g_module->m_methods[METHOD_SET_ADD_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DoSetAdd
 		);
 	
 	g_module->m_methods[METHOD_MAP_ADD_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DoMapAdd
 		);
@@ -2362,7 +3044,7 @@ extern "C" __declspec(dllexport) void JitInit() {
 
 	g_module->m_methods[METHOD_PRINT_EXPR_TOKEN] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DoPrintExpr
 		);
@@ -2373,6 +3055,50 @@ extern "C" __declspec(dllexport) void JitInit() {
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DoLoadClassDeref
 		);
+
+	g_module->m_methods[METHOD_PREPARE_EXCEPTION] = Method(
+		nullptr,
+		CORINFO_TYPE_VOID,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
+		&DoPrepareException
+		);
+	
+	g_module->m_methods[METHOD_DO_RAISE] = Method(
+		nullptr,
+		CORINFO_TYPE_INT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
+		&DoRaise
+		);
+
+	g_module->m_methods[METHOD_EH_TRACE] = Method(
+		nullptr,
+		CORINFO_TYPE_VOID,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
+		&DoEhTrace
+		);
+
+	g_module->m_methods[METHOD_COMPARE_EXCEPTIONS] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
+		&DoCompareExceptions
+		);
+	
+	g_module->m_methods[METHOD_UNBOUND_LOCAL] = Method(
+		nullptr,
+		CORINFO_TYPE_VOID,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
+		&DoUnboundLocal
+	);
+
+	g_module->m_methods[METHOD_PYERR_RESTORE] = Method(
+		nullptr,
+		CORINFO_TYPE_VOID,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
+		&PyErr_Restore
+		);
+
+
 	
 	//g_module->m_methods[SIG_ITERNEXT_TOKEN] = Method(
 	//	nullptr,
