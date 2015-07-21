@@ -45,22 +45,29 @@ public:
 };
 
 
+struct VTableInfo {
+	WORD indirections;
+	SIZE_T                  offsets[CORINFO_MAXINDIRECTIONS];
+};
+
 class Method {
-	vector<BYTE> m_il;
 	Module* m_module;
 public:
+	vector<BYTE> m_il;
 	vector<Parameter> m_params, m_locals;
 	CorInfoType m_retType;
 	void* m_addr;
+	VTableInfo* m_vtableInfo;
 public:
 	Method() {
 	}
 
-	Method(Module* module, CorInfoType returnType, std::vector<Parameter> params, void* addr) {
+	Method(Module* module, CorInfoType returnType, std::vector<Parameter> params, void* addr, VTableInfo* vtableInfo = nullptr) {
 		m_retType = returnType;
 		m_params = params;
 		m_module = module;
 		m_addr = addr;
+		m_vtableInfo = vtableInfo;
 	}
 };
 

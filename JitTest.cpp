@@ -89,7 +89,71 @@ void PyJitTest() {
 	auto tupleOfOne = (PyTupleObject*)PyTuple_New(1);
 	tupleOfOne->ob_item[0] = PyLong_FromLong(42);
 	
+	auto list = PyList_New(1);
+	PyList_SetItem(list, 0, PyLong_FromLong(42));
+
+	auto list2 = PyList_New(1);
+	PyList_SetItem(list, 0, PyLong_FromLong(42));
+
 	TestCase cases[] = {
+		TestCase(
+			"def f():\n    class C:\n        pass\n    return C",
+			TestInput("<class 'C'>")
+		),
+		TestCase(
+			"def f():\n    a = 0\n    for x in[1]:\n        a = a + 1\n    return a",
+			TestInput("1")
+		),
+		TestCase(
+			"def f(): return [x for x in range(2)]",
+			TestInput("[0, 1]")
+		),
+		TestCase(
+			"def f():\n    def g(): pass\n    return g.__name__",
+			TestInput("'g'")
+		),
+		TestCase(
+			"def f(a, b, c):\n    a[b] = c\n    return a[b]",
+			TestInput("True", vector<PyObject*>({ list, PyLong_FromLong(0), Incremented(Py_True) }))
+		),
+		TestCase(
+			"def f(a, b):\n    del a[b]\n    return len(a)",
+			TestInput("0", vector<PyObject*>({ list2, PyLong_FromLong(0) }))
+		),
+		TestCase(
+			"def f(a, b):\n    return a in b",
+			vector<TestInput>({
+				TestInput("True", vector<PyObject*>({ PyLong_FromLong(42), Incremented((PyObject*)tupleOfOne) })),
+				TestInput("False", vector<PyObject*>({ PyLong_FromLong(1), Incremented((PyObject*)tupleOfOne) }))
+			})	
+		),
+		TestCase(
+			"def f(a, b):\n    return a not in b",
+			vector<TestInput>({
+				TestInput("False", vector<PyObject*>({ PyLong_FromLong(42), Incremented((PyObject*)tupleOfOne) })),
+				TestInput("True", vector<PyObject*>({ PyLong_FromLong(1), Incremented((PyObject*)tupleOfOne) }))
+			})
+		),
+		TestCase(
+			"def f(a, b):\n    return a == b",
+			TestInput("True", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(1) }))
+		),
+		TestCase(
+			"def f(a, b):\n    return a != b",
+			TestInput("False", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(1) }))
+		),
+		TestCase(
+			"def f(a, b):\n    return a is b",
+			TestInput("True", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(1) }))
+		),
+		TestCase(
+			"def f(a, b):\n    return a is not b",
+			TestInput("False", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(1) }))
+		),
+		TestCase(
+			"def f(a):\n    while a:\n        a = a - 1\n    return a",
+			TestInput("0", vector<PyObject*>({ PyLong_FromLong(42) }))
+		),
 		TestCase(
 			"def f(a):\n    if a:\n        return 1\n    else:\n        return 2",
 			vector<TestInput>({
@@ -193,6 +257,7 @@ void PyJitTest() {
 }
 
 int main() {
+	CoInitialize(NULL);
 	JitInit();
 	PyJitTest();
 }

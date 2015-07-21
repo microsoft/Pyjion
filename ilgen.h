@@ -161,7 +161,7 @@ public:
 	}
 
 	void branch(BranchType branchType, int offset) {
-		if (offset <= 128 && offset >= -127) {
+		if ((offset - 2) <= 128 && (offset - 2) >= -127) {
 			switch (branchType) {
 			case BranchAlways:
 				m_il.push_back(CEE_BR_S);
@@ -176,7 +176,7 @@ public:
 				m_il.push_back(CEE_BEQ_S);
 				break;
 			}
-			m_il.push_back((byte)offset);
+			m_il.push_back((byte)offset - 2);
 		}
 		else{
 			switch (branchType) {
@@ -193,7 +193,7 @@ public:
 				m_il.push_back(CEE_BEQ);
 				break;
 			}
-			emit_int(offset);
+			emit_int(offset - 5);
 		}
 	}
 
@@ -236,6 +236,16 @@ public:
 
 	void emit_call(int token) {
 		m_il.push_back(CEE_CALL);
+		emit_int(token);
+	}
+
+	void emit_calli(int token) {
+		m_il.push_back(CEE_CALLI);
+		emit_int(token);
+	}
+
+	void emit_callvirt(int token) {
+		m_il.push_back(CEE_CALLVIRT);
 		emit_int(token);
 	}
 
