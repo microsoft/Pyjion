@@ -107,7 +107,7 @@ public:
 	}
 
 	virtual BOOL logMsg(unsigned level, const char* fmt, va_list args) {
-		vprintf(fmt, args);
+		//vprintf(fmt, args);
 		return TRUE;
 	}
 
@@ -502,6 +502,7 @@ public:
 		) {
 		auto method = (Method*)pResolvedToken->hMethod;
 		pResult->hMethod = (CORINFO_METHOD_HANDLE)method;
+		
 		if (method->m_vtableInfo == nullptr) {
 			pResult->codePointerLookup.lookupKind.needsRuntimeLookup = false;
 			// TODO: If we use IAT_VALUE we need to generate a jump stub
@@ -757,7 +758,7 @@ public:
 		CORINFO_METHOD_HANDLE   exactCalleeHnd,     /* IN */
 		bool fIsTailPrefix                          /* IN */
 		) {
-		printf("canTailCall\r\n"); return TRUE;
+		return FALSE;
 	}
 
 	// Reports whether or not a method can be tail called, and why.
@@ -768,7 +769,7 @@ public:
 		bool fIsTailPrefix,
 		CorInfoTailCall tailCallResult,
 		const char * reason) {
-		printf("reportTailCallDecision\r\n");
+		//printf("reportTailCallDecision\r\n");
 	}
 
 	// get individual exception handler
@@ -1036,6 +1037,7 @@ public:
 		Module* mod = (Module*)pResolvedToken->tokenScope;
 		Method* method = mod->ResolveMethod(pResolvedToken->token);
 		pResolvedToken->hMethod = (CORINFO_METHOD_HANDLE)method;
+		pResolvedToken->hClass = (CORINFO_CLASS_HANDLE)1; // this just suppresses a JIT assert
 		//printf("resolveToken %d\r\n", pResolvedToken->token);
 	}
 

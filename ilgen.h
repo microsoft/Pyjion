@@ -434,13 +434,13 @@ public:
 		}
 	}
 
-	CORINFO_METHOD_INFO to_method(Method* addr) {
+	CORINFO_METHOD_INFO to_method(Method* addr, int stackSize) {
 		CORINFO_METHOD_INFO methodInfo;
 		methodInfo.ftn = (CORINFO_METHOD_HANDLE)addr;
 		methodInfo.scope = (CORINFO_MODULE_HANDLE)m_module;
 		methodInfo.ILCode = &m_il[0];
 		methodInfo.ILCodeSize = (unsigned int)m_il.size();
-		methodInfo.maxStack = 100;
+		methodInfo.maxStack = stackSize;
 		methodInfo.EHcount = 0;
 		methodInfo.options = CORINFO_OPT_INIT_LOCALS;
 		methodInfo.regionKind = CORINFO_REGION_JIT;
@@ -455,11 +455,11 @@ public:
 		return methodInfo;
 	}
 
-	Method compile(ICorJitInfo* jitInfo, ICorJitCompiler* jit) {
+	Method compile(ICorJitInfo* jitInfo, ICorJitCompiler* jit, int stackSize) {
 		BYTE* nativeEntry;
 		ULONG nativeSizeOfCode;
 		auto res = Method(m_module, m_retType, m_params, nullptr);
-		CORINFO_METHOD_INFO methodInfo = to_method(&res);
+		CORINFO_METHOD_INFO methodInfo = to_method(&res, stackSize);
 		CorJitResult result = jit->compileMethod(
 			/*ICorJitInfo*/jitInfo,
 			/*CORINFO_METHOD_INFO */&methodInfo,

@@ -97,8 +97,36 @@ void PyJitTest() {
 
 	TestCase cases[] = {
 		TestCase(
-			"def f(module, loader=None, origin=None):\n    # This function is meant for use in _setup().\n    try:\n        spec = module.__spec__\n    except AttributeError:\n        pass\n    else:\n        if spec is not None:\n            return spec\n\n    name = module.__name__\n    if loader is None:\n        try:\n            loader = module.__loader__\n        except AttributeError:\n            # loader will stay None.\n            pass\n    try:\n        location = module.__file__\n    except AttributeError:\n        location = None\n    if origin is None:\n        if location is None:\n            try:\n                origin = loader._ORIGIN\n            except AttributeError:\n                origin = None\n        else:\n            origin = location\n    try:\n        cached = module.__cached__\n    except AttributeError:\n        cached = None\n    try:\n        submodule_search_locations = list(module.__path__)\n    except AttributeError:\n        submodule_search_locations = None\n\n    spec = ModuleSpec(name, loader, origin=origin)\n    spec._set_fileattr = False if location is None else True\n    spec.cached = cached\n    spec.submodule_search_locations = submodule_search_locations\n    return spec\n",
-			TestInput("{'y': 2}")
+			"def f():\n    def g(): pass\n    g.abc = {fn.lower() for fn in ['A']}\n    return g.abc",
+			TestInput("{'a'}")
+		),
+		TestCase(
+			"def f():\n    for abc in [1,2,3]:\n        try:\n            break\n        except ImportError:\n            continue\n    return abc",
+			TestInput("1")
+		),
+		TestCase(
+			"def f():\n    a = 1\n    b = 2\n    def x():\n        return a, b\n    return x()",
+			TestInput("(1, 2)", vector<PyObject*>({ NULL, PyCell_New(NULL), PyCell_New(NULL) }))
+		),
+		TestCase(
+			"def f() :\n    def g(x) :\n        return x\n    a = 1\n    def x() :\n        return g(a)\n    return x()",
+			TestInput("1", vector<PyObject*>({ NULL, PyCell_New(NULL), PyCell_New(NULL) }))
+		),
+		TestCase(
+			"def f():\n    try:\n        raise Exception('hi')\n    except:\n        return 42",
+			TestInput("42")
+		),
+		//TestCase(
+		//	"def f(sys_module, _imp_module):\n    '''Setup importlib by importing needed built - in modules and injecting them\n    into the global namespace.\n\n    As sys is needed for sys.modules access and _imp is needed to load built - in\n    modules, those two modules must be explicitly passed in.\n\n    '''\n    global _imp, sys\n    _imp = _imp_module\n    sys = sys_module\n\n    # Set up the spec for existing builtin/frozen modules.\n    module_type = type(sys)\n    for name, module in sys.modules.items():\n        if isinstance(module, module_type):\n            if name in sys.builtin_module_names:\n                loader = BuiltinImporter\n            elif _imp.is_frozen(name):\n                loader = FrozenImporter\n            else:\n                continue\n            spec = _spec_from_module(module, loader)\n            _init_module_attrs(spec, module)\n\n    # Directly load built-in modules needed during bootstrap.\n    self_module = sys.modules[__name__]\n    for builtin_name in ('_warnings',):\n        if builtin_name not in sys.modules:\n            builtin_module = _builtin_from_name(builtin_name)\n        else:\n            builtin_module = sys.modules[builtin_name]\n        setattr(self_module, builtin_name, builtin_module)\n\n    # Directly load the _thread module (needed during bootstrap).\n    try:\n        thread_module = _builtin_from_name('_thread')\n    except ImportError:\n        # Python was built without threads\n        thread_module = None\n    setattr(self_module, '_thread', thread_module)\n\n    # Directly load the _weakref module (needed during bootstrap).\n    weakref_module = _builtin_from_name('_weakref')\n    setattr(self_module, '_weakref', weakref_module)\n",
+		//	TestInput("42")
+		//),
+		TestCase(
+			"def f():\n    x = {}\n    try:\n        return x[42]\n    except KeyError:\n        return 42",
+			TestInput("42")
+		),
+		TestCase(
+			"def f():\n    try:\n        pass\n    finally:\n        pass\n    return 42",
+			TestInput("42")
 		),
 		TestCase(
 			"def f():\n    x = {}\n    x.update(y=2)\n    return x",
@@ -542,9 +570,16 @@ void PyJitTest() {
 			auto repr = PyUnicode_AsUTF8(PyObject_Repr(res));
 			if (strcmp(input.m_expected, repr) != 0) {
 				printf("Unexpected: %s\r\n", repr);
+				if (strcmp(repr, "<NULL>") == 0) {
+					PyErr_Print();
+				}
 				_ASSERT(FALSE);
 			}
-			if (res == nullptr) {
+			if (res != nullptr) {
+				_ASSERT(!PyErr_Occurred());
+			}
+			else{
+				_ASSERT(PyErr_Occurred());
 				PyErr_Clear();
 			}
 			//Py_DECREF(frame);
