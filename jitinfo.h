@@ -107,7 +107,9 @@ public:
 	}
 
 	virtual BOOL logMsg(unsigned level, const char* fmt, va_list args) {
-		//vprintf(fmt, args);
+		if (level < 7) {
+			vprintf(fmt, args);
+		}
 		return TRUE;
 	}
 

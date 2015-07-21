@@ -97,6 +97,38 @@ void PyJitTest() {
 
 	TestCase cases[] = {
 		TestCase(
+			"def f():\n    from sys import winver, version_info\n    return winver[0]",
+			TestInput("'3'")
+		),
+		TestCase(
+			"def f():\n    from sys import winver\n    return winver[0]",
+			TestInput("'3'")
+		),
+		TestCase(
+			"def f():\n    def g(*a): return a\n    return g(1, 2, 3, **{})",
+			TestInput("(1, 2, 3)")
+		),
+		TestCase(
+			"def f():\n    def g(**a): return a\n    return g(y = 3, **{})",
+			TestInput("{'y': 3}")
+		),
+		TestCase(
+			"def f():\n    def g(**a): return a\n    return g(**{'x':2})",
+			TestInput("{'x': 2}")
+		),
+		TestCase(
+			"def f():\n    def g(**a): return a\n    return g(x = 2, *())",
+			TestInput("{'x': 2}")
+		),
+		TestCase(
+			"def f():\n    def g(*a): return a\n    return g(*(1, 2, 3))",
+			TestInput("(1, 2, 3)")
+		),
+		TestCase(
+			"def f():\n    def g(*a): return a\n    return g(1, *(2, 3))",
+			TestInput("(1, 2, 3)")
+		),
+		TestCase(
 			"def f():\n    def g(): pass\n    g.abc = {fn.lower() for fn in ['A']}\n    return g.abc",
 			TestInput("{'a'}")
 		),

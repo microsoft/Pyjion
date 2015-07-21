@@ -1,5 +1,8 @@
 #include "pyjit.h"
 
+// TODO: Pull helper/intrinsics into their own files, with nice definition syntax
+// TODO: pull jittest.cpp into it's own project
+
 // binary operator helpers
 #define METHOD_ADD_TOKEN					0x00000000
 #define METHOD_MULTIPLY_TOKEN				0x00000001
@@ -68,6 +71,9 @@
 #define METHOD_PY_CHECKFUNCTIONRESULT		0x00000040
 #define METHOD_PY_PUSHFRAME					0x00000041
 #define METHOD_PY_POPFRAME					0x00000042
+#define METHOD_PY_IMPORTNAME				0x00000043
+#define METHOD_PY_FANCYCALL					0x00000044
+#define METHOD_PY_IMPORTFROM				0x00000045
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -578,6 +584,168 @@ void DoPyErrRestore(PyObject*tb, PyObject*value, PyObject*exception) {
 
 PyObject* DoCheckFunctionResult(PyObject* value) {
 	return _Py_CheckFunctionResult(nullptr, value, "CompiledCode");
+}
+
+PyObject* DoImportName(PyObject*level, PyObject*from, PyObject* name, PyFrameObject* f) {
+	_Py_IDENTIFIER(__import__);
+	PyObject *func = _PyDict_GetItemId(f->f_builtins, &PyId___import__);
+	PyObject *args, *res;
+	if (func == NULL) {
+		PyErr_SetString(PyExc_ImportError,
+			"__import__ not found");
+		return nullptr;
+	}
+	Py_INCREF(func);
+	if (PyLong_AsLong(level) != -1 || PyErr_Occurred())
+		args = PyTuple_Pack(5,
+		name,
+		f->f_globals,
+		f->f_locals == NULL ?
+			Py_None : f->f_locals,
+					  from,
+					  level);
+	else
+		args = PyTuple_Pack(4,
+			name,
+			f->f_globals,
+			f->f_locals == NULL ?
+				Py_None : f->f_locals,
+						  from);
+	Py_DECREF(level);
+	Py_DECREF(from);
+	if (args == NULL) {
+		Py_DECREF(func);
+		//STACKADJ(-1);
+		return nullptr;
+	}
+	//READ_TIMESTAMP(intr0);
+	res = PyEval_CallObject(func, args);
+	//READ_TIMESTAMP(intr1);
+	Py_DECREF(args);
+	Py_DECREF(func);
+	return res;
+}
+
+PyObject* DoImportFrom(PyObject*v, PyObject* name) {
+	PyObject *x;
+	_Py_IDENTIFIER(__name__);
+	PyObject *fullmodname, *pkgname;
+
+	x = PyObject_GetAttr(v, name);
+	if (x != NULL || !PyErr_ExceptionMatches(PyExc_AttributeError))
+		return x;
+	/* Issue #17636: in case this failed because of a circular relative
+	import, try to fallback on reading the module directly from
+	sys.modules. */
+	PyErr_Clear();
+	pkgname = _PyObject_GetAttrId(v, &PyId___name__);
+	if (pkgname == NULL)
+		return NULL;
+	fullmodname = PyUnicode_FromFormat("%U.%U", pkgname, name);
+	Py_DECREF(pkgname);
+	if (fullmodname == NULL)
+		return NULL;
+	x = PyDict_GetItem(PyImport_GetModuleDict(), fullmodname);
+	if (x == NULL)
+		PyErr_Format(PyExc_ImportError, "cannot import name %R", name);
+	else
+		Py_INCREF(x);
+	Py_DECREF(fullmodname);
+	return x;
+}
+
+PyObject* DoFancyCall(PyObject* func, PyObject*args, PyObject*kwargs, PyObject* stararg, PyObject* kwdict) {
+	// any of these arguments can be null...
+	PyObject *finalArgs, *result = nullptr;
+	int nstar;
+	// Convert stararg to tuple if necessary...
+	if (stararg != nullptr) {
+		if (!PyTuple_Check(stararg)) {
+			auto newStarArg = PySequence_Tuple(stararg);
+			if (newStarArg == NULL) {
+				if (PyErr_ExceptionMatches(PyExc_TypeError)) {
+					PyErr_Format(PyExc_TypeError,
+						"%.200s%.200s argument after * "
+						"must be a sequence, not %.200s",
+						PyEval_GetFuncName(func),
+						PyEval_GetFuncDesc(func),
+						stararg->ob_type->tp_name);
+				}
+				goto ext_call_fail;
+			}
+			Py_DECREF(stararg);
+			stararg = newStarArg;
+		}
+		nstar = PyTuple_GET_SIZE(stararg);
+	}
+
+	if (kwdict != nullptr) {
+		if (kwargs == nullptr) {
+			// we haven't allocated the dict for the call yet, do so now
+			kwargs = PyDict_New();
+			if (kwargs == nullptr) {
+				goto ext_call_fail;
+			}
+		} // else we allocated it in the generated code
+
+		if (PyDict_Update(kwargs, kwdict) != 0) {
+			/* PyDict_Update raises attribute
+			* error (percolated from an attempt
+			* to get 'keys' attribute) instead of
+			* a type error if its second argument
+			* is not a mapping.
+			*/
+			if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+				PyErr_Format(PyExc_TypeError,
+					"%.200s%.200s argument after ** "
+					"must be a mapping, not %.200s",
+					PyEval_GetFuncName(func),
+					PyEval_GetFuncDesc(func),
+					kwdict->ob_type->tp_name);
+			}
+			goto ext_call_fail;
+		}
+	}
+
+	// Compute the final arg list...
+	if (args == nullptr) {
+		if (stararg != nullptr) {
+			args = stararg;
+			stararg = nullptr;
+		}
+		else{
+			args = PyTuple_New(0);
+		}
+	} else if (stararg != nullptr) {
+		// need to concat values together...
+		auto finalArgs = PyTuple_New(PyTuple_GET_SIZE(args) + nstar);
+		for (int i = 0; i < PyTuple_GET_SIZE(args); i++) {
+			auto item = PyTuple_GET_ITEM(args, i);
+			Py_INCREF(item);
+			PyTuple_SET_ITEM(finalArgs, i, item);
+		}
+		for (int i = 0; i < PyTuple_GET_SIZE(stararg); i++) {
+			auto item = PyTuple_GET_ITEM(stararg, i);
+			Py_INCREF(item);
+			PyTuple_SET_ITEM(
+				finalArgs, 
+				i + PyTuple_GET_SIZE(args), 
+				item
+			);
+		}
+		Py_DECREF(args);
+		args = finalArgs;
+	}
+
+	result = PyObject_Call(func, args , kwargs);
+
+ext_call_fail:
+	Py_XDECREF(func);
+	Py_XDECREF(args);
+	Py_XDECREF(kwargs);
+	Py_XDECREF(stararg);
+	Py_XDECREF(kwdict);
+	return result;
 }
 
 void DoDebugDumpFrame(PyFrameObject* frame) {
@@ -1142,17 +1310,20 @@ int StoreName(PyObject* v, PyFrameObject* f, PyObject* name) {
 	return err;
 }
 
-int DeleteName(PyObject* v, PyFrameObject* f, PyObject* name) {
+int DeleteName(PyFrameObject* f, PyObject* name) {
 	PyObject *ns = f->f_locals;
 	int err;
 	if (ns == NULL) {
 		PyErr_Format(PyExc_SystemError,
 			"no locals when deleting %R", name);
-		Py_DECREF(v);
 		return 1;
 	}
 	err = PyObject_DelItem(ns, name);
-	Py_DECREF(v);
+	if (err != 0) {
+		format_exc_check_arg(PyExc_NameError,
+			NAME_ERROR_MSG,
+			name);
+	}
 	return err;
 }
 
@@ -2084,9 +2255,77 @@ private:
 			case CALL_FUNCTION_VAR:
 			case CALL_FUNCTION_KW:
 			case CALL_FUNCTION_VAR_KW:
-				printf("Not supported: fancy calls\r\n");
-				return nullptr;
-				//_ASSERT(FALSE);
+			{
+				int na = oparg & 0xff;
+				int nk = (oparg >> 8) & 0xff;
+				int flags = (byte - CALL_FUNCTION) & 3;
+				int n = na + 2 * nk;
+				PyObject **pfunc, *func, **sp, *res;
+#define CALL_FLAG_VAR 1
+#define CALL_FLAG_KW 2
+				auto varArgs = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				auto varKwArgs = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+				if (flags & CALL_FLAG_KW) {
+					// kw args dict is last on the stack, save it....
+					il.st_loc(varKwArgs);
+				}
+
+				Local map;
+				if (nk != 0) {
+					// if we have keywords build the map, and then save them...
+					build_map(nk);
+					map = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+					il.st_loc(map);
+				}
+
+				if (flags & CALL_FLAG_VAR) {
+					// then save var args...
+					il.st_loc(varArgs);
+				}
+
+				// now we have the normal args (if any), and then the function
+				// Build a tuple of the normal args...
+				if (na != 0) {
+					build_tuple(na);
+				}
+				else{
+					il.load_null();
+				}
+
+				// If we have keywords load them or null
+				if (nk != 0) {
+					il.ld_loc(map);
+				}
+				else{
+					il.load_null();
+				}
+
+				// If we have var args load them or null
+				if (flags & CALL_FLAG_VAR) {
+					il.ld_loc(varArgs);
+				}
+				else{
+					il.load_null();
+				}
+
+				// If we have a kw dict, load it...
+				if (flags & CALL_FLAG_KW) {
+					il.ld_loc(varKwArgs);
+				}
+				else{
+					il.load_null();
+				}
+
+				// finally emit the call to our helper...
+				il.emit_call(METHOD_PY_FANCYCALL);
+				check_error(i, "fancy call");
+
+				il.free_local(varArgs);
+				il.free_local(varKwArgs);
+				if (nk != 0) {
+					il.free_local(map);
+				}
+			}
 				break;
 			case CALL_FUNCTION:
 			{
@@ -2356,80 +2595,23 @@ private:
 				break;
 			case SET_ADD:
 			{
-				// This code is all disabled - due to FOR_ITER magic we store the
+				// due to FOR_ITER magic we store the
 				// iterable off the stack, and oparg here is based upon the stacking
 				// of the generator indexes, so we don't need to spill anything...
-				//vector<Local> tmps;
-				//Local tmpValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-				//il.st_l oc(tmpValue);
-
-				//for (int i = 0; i < oparg - 1; i++) {
-				//	auto loc = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-				//	il.st_loc(loc);
-				//	tmps.push_back(loc);
-				//}
-
-				//il.ld_loc(tmpValue);
 				il.emit_call(METHOD_SET_ADD_TOKEN);
 				check_error(i, "set add");
-
-				//il.free_local(tmpValue);
-				//for (int i = tmps.size() - 1; i >= 0; i--) {
-				//	il.ld_loc(tmps[i]);
-				//	il.free_local(tmps[i]);
-				//}
 			}
 				break;
 			case MAP_ADD:
 			{
-				//vector<Local> tmps;
-				//Local keyValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-				//Local valueValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-				//il.st_loc(keyValue);
-				//il.st_loc(valueValue);
-
-				//for (int i = 0; i < oparg - 1; i++) {
-				//	auto loc = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-				//	il.st_loc(loc);
-				//	tmps.push_back(loc);
-				//}
-
-				//il.ld_loc(keyValue);
-				//il.ld_loc(valueValue);
 				il.emit_call(METHOD_MAP_ADD_TOKEN);
 				check_error(i, "map add");
-
-				//il.free_local(keyValue);
-				//il.free_local(valueValue);
-				//for (int i = tmps.size() - 1; i >= 0; i--) {
-				//	il.ld_loc(tmps[i]);
-				//	il.free_local(tmps[i]);
-				//}
 			}
 				break;
 			case LIST_APPEND:
-				// stack on entry is: list, <temps>, value
-				// we need to spill the values in the middle...
 			{
-				//vector<Local> tmps;
-				//Local tmpValue = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-				//il.st_loc(tmpValue);
-
-				//for (int i = 0; i < oparg - 1; i++) {
-				//	auto loc = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-				//	il.st_loc(loc);
-				//	tmps.push_back(loc);
-				//}
-
-				//il.ld_loc(tmpValue);
 				il.emit_call(METHOD_LIST_APPEND_TOKEN);
 				check_error(i, "list append");
-
-				//il.free_local(tmpValue);
-				//for (int i = tmps.size() - 1; i >= 0; i--) {
-				//	il.ld_loc(tmps[i]);
-				//	il.free_local(tmps[i]);
-				//}
 			}
 				break;
 			case INPLACE_POWER: il.emit_call(METHOD_INPLACE_POWER_TOKEN); check_error(i, "inplace power"); break;
@@ -2663,8 +2845,18 @@ private:
 				return nullptr;
 
 			case IMPORT_NAME:
-			case IMPORT_STAR:
+				il.push_ptr(PyTuple_GetItem(code->co_names, oparg));
+				load_frame();
+				il.emit_call(METHOD_PY_IMPORTNAME);
+				check_error(i, "import name");
+				break;
 			case IMPORT_FROM:
+				il.dup();
+				il.push_ptr(PyTuple_GetItem(code->co_names, oparg));
+				il.emit_call(METHOD_PY_IMPORTFROM);
+				check_error(i, "import from");
+				break;
+			case IMPORT_STAR:
 				printf("Unsupported opcode: %d (import related)\r\n", byte);
 				//_ASSERT(FALSE);
 				return nullptr;
@@ -3063,7 +3255,7 @@ extern "C" __declspec(dllexport) void JitInit() {
 	g_module->m_methods[METHOD_DELETENAME_TOKEN] = Method(
 		nullptr,
 		CORINFO_TYPE_VOID,
-		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)  },
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)  },
 		&DeleteName
 		);
 	g_module->m_methods[METHOD_GETITER_TOKEN] = Method(
@@ -3345,6 +3537,30 @@ extern "C" __declspec(dllexport) void JitInit() {
 		&DoCheckFunctionResult
 		);
 	
+	g_module->m_methods[METHOD_PY_IMPORTNAME] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
+		&DoImportName
+		);
+
+	
+	g_module->m_methods[METHOD_PY_FANCYCALL] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT),
+								Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
+		&DoFancyCall
+	);
+
+	g_module->m_methods[METHOD_PY_IMPORTFROM] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
+		&DoImportFrom
+		);
+
+
 	//g_module->m_methods[SIG_ITERNEXT_TOKEN] = Method(
 	//	nullptr,
 	//	CORINFO_TYPE_NATIVEINT,
