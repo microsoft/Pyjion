@@ -1,5 +1,5 @@
 #include "pyjit.h"
-
+//#define DEBUG_TRACE
 // TODO: Pull helper/intrinsics into their own files, with nice definition syntax
 // TODO: pull jittest.cpp into it's own project
 
@@ -74,6 +74,9 @@
 #define METHOD_PY_IMPORTNAME				0x00000043
 #define METHOD_PY_FANCYCALL					0x00000044
 #define METHOD_PY_IMPORTFROM				0x00000045
+#define METHOD_PY_IMPORTSTAR				0x00000046
+#define METHOD_PY_FUNC_SET_ANNOTATIONS		0x00000047
+#define METHOD_PY_FUNC_SET_KW_DEFAULTS		0x00000048
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -304,7 +307,7 @@ PyObject* DoSetAdd(PyObject* set, PyObject* value) {
 	return set;
 }
 
-PyObject* DoMapAdd(PyObject*map, PyObject*key, PyObject* value) {
+PyObject* DoMapAdd(PyObject*map, PyObject* value, PyObject*key) {
 	int err = PyDict_SetItem(map, key, value);  /* v[w] = u */
 	Py_DECREF(value);
 	Py_DECREF(key);
@@ -555,7 +558,7 @@ PyObject* DoCompareExceptions(PyObject*v, PyObject* w) {
 			return NULL;
 		}
 	}
-	bool res = PyErr_GivenExceptionMatches(v, w);
+	int res = PyErr_GivenExceptionMatches(v, w);
 	v = res ? Py_True : Py_False;
 	Py_INCREF(v);
 	return v;
@@ -576,9 +579,11 @@ void DoDebugTrace(char* msg) {
 const char * ObjInfo(PyObject *obj);
 
 void DoPyErrRestore(PyObject*tb, PyObject*value, PyObject*exception) {
+#ifdef DEBUG_TRACE
 	printf("Restoring exception %s\r\n", ObjInfo(exception));
 	printf("Restoring value %s\r\n", ObjInfo(value));
 	printf("Restoring tb %s\r\n", ObjInfo(tb));
+#endif
 	PyErr_Restore(exception, value, tb);
 }
 
@@ -652,6 +657,121 @@ PyObject* DoImportFrom(PyObject*v, PyObject* name) {
 		Py_INCREF(x);
 	Py_DECREF(fullmodname);
 	return x;
+}
+
+static int
+import_all_from(PyObject *locals, PyObject *v)
+{
+	_Py_IDENTIFIER(__all__);
+	_Py_IDENTIFIER(__dict__);
+	PyObject *all = _PyObject_GetAttrId(v, &PyId___all__);
+	PyObject *dict, *name, *value;
+	int skip_leading_underscores = 0;
+	int pos, err;
+
+	if (all == NULL) {
+		if (!PyErr_ExceptionMatches(PyExc_AttributeError))
+			return -1; /* Unexpected error */
+		PyErr_Clear();
+		dict = _PyObject_GetAttrId(v, &PyId___dict__);
+		if (dict == NULL) {
+			if (!PyErr_ExceptionMatches(PyExc_AttributeError))
+				return -1;
+			PyErr_SetString(PyExc_ImportError,
+				"from-import-* object has no __dict__ and no __all__");
+			return -1;
+		}
+		all = PyMapping_Keys(dict);
+		Py_DECREF(dict);
+		if (all == NULL)
+			return -1;
+		skip_leading_underscores = 1;
+	}
+
+	for (pos = 0, err = 0;; pos++) {
+		name = PySequence_GetItem(all, pos);
+		if (name == NULL) {
+			if (!PyErr_ExceptionMatches(PyExc_IndexError))
+				err = -1;
+			else
+				PyErr_Clear();
+			break;
+		}
+
+		// C++ doesn't like the asserts in these macros...
+#undef PyUnicode_READY
+#define PyUnicode_READY(op)                        \
+     (PyUnicode_IS_READY(op) ?                          \
+      0 : _PyUnicode_Ready((PyObject *)(op)))
+#undef PyUnicode_KIND
+#define PyUnicode_KIND(op) \
+     ((PyASCIIObject *)(op))->state.kind
+
+#undef PyUnicode_IS_ASCII
+#define PyUnicode_IS_ASCII(op)                   \
+     ((PyASCIIObject*)op)->state.ascii
+
+#undef _PyUnicode_NONCOMPACT_DATA
+#define _PyUnicode_NONCOMPACT_DATA(op)                  \
+     ((((PyUnicodeObject *)(op))->data.any))
+
+#undef PyUnicode_DATA
+#define PyUnicode_DATA(op) \
+     PyUnicode_IS_COMPACT(op) ? _PyUnicode_COMPACT_DATA(op) :   \
+     _PyUnicode_NONCOMPACT_DATA(op)
+
+#undef PyUnicode_READ_CHAR
+#define PyUnicode_READ_CHAR(unicode, index) \
+    ((Py_UCS4)                                  \
+        (PyUnicode_KIND((unicode)) == PyUnicode_1BYTE_KIND ? \
+            ((const Py_UCS1 *)(PyUnicode_DATA((unicode))))[(index)] : \
+            (PyUnicode_KIND((unicode)) == PyUnicode_2BYTE_KIND ? \
+                ((const Py_UCS2 *)(PyUnicode_DATA((unicode))))[(index)] : \
+                ((const Py_UCS4 *)(PyUnicode_DATA((unicode))))[(index)] \
+            ) \
+        ))
+
+		if (skip_leading_underscores &&
+			PyUnicode_Check(name) &&
+			PyUnicode_READY(name) != -1 &&
+			PyUnicode_READ_CHAR(name, 0) == '_')
+		{
+			Py_DECREF(name);
+			continue;
+		}
+		value = PyObject_GetAttr(v, name);
+		if (value == NULL)
+			err = -1;
+		else if (PyDict_CheckExact(locals))
+			err = PyDict_SetItem(locals, name, value);
+		else
+			err = PyObject_SetItem(locals, name, value);
+		Py_DECREF(name);
+		Py_XDECREF(value);
+		if (err != 0)
+			break;
+	}
+	Py_DECREF(all);
+	return err;
+}
+
+int DoImportStar(PyObject*from, PyFrameObject* f) {
+	PyObject *locals;
+	int err;
+	if (PyFrame_FastToLocalsWithError(f) < 0)
+		return 1;
+
+	locals = f->f_locals;
+	if (locals == NULL) {
+		PyErr_SetString(PyExc_SystemError,
+			"no locals found during 'import *'");
+		return 1;
+	}
+	err = import_all_from(locals, from);
+	PyFrame_LocalsToFast(f, 0);
+	Py_DECREF(from);
+	if (err != 0)
+		return err;
 }
 
 PyObject* DoFancyCall(PyObject* func, PyObject*args, PyObject*kwargs, PyObject* stararg, PyObject* kwdict) {
@@ -773,6 +893,17 @@ void DoDebugDumpFrame(PyFrameObject* frame) {
 	_dumping = false;
 }
 
+void DoClearError() {
+	PyErr_Clear();
+	auto tstate = PyThreadState_GET();
+	// TODO: This is probably not right for nested exceptions...
+	Py_XDECREF(tstate->exc_traceback);
+	Py_XDECREF(tstate->exc_type);
+	Py_XDECREF(tstate->exc_value);
+	tstate->exc_traceback = nullptr;
+	tstate->exc_type = nullptr;
+	tstate->exc_value = nullptr;
+}
 void DoPushFrame(PyFrameObject* frame) {
 	PyThreadState_Get()->frame = frame;
 }
@@ -787,6 +918,53 @@ int DoFunctionSetDefaults(PyObject* defs, PyObject* func) {
 		PyFunction_SetDefaults changes. */
 		Py_DECREF(defs);
 		Py_DECREF(func);
+		return 1;
+	}
+	Py_DECREF(defs);
+	return 0;
+}
+
+int DoFunctionSetAnnotations(PyObject* values, PyObject* names, PyObject* func) {
+	PyObject *anns = PyDict_New();
+	if (anns == NULL) {
+		Py_DECREF(func);
+		return 1;
+	}
+
+	auto name_ix = PyTuple_Size(names);
+	while (name_ix > 0) {
+		PyObject *name, *value;
+		int err;
+		--name_ix;
+		name = PyTuple_GET_ITEM(names, name_ix);
+		value = PyTuple_GET_ITEM(values, name_ix);
+		err = PyDict_SetItem(anns, name, value);
+		Py_DECREF(value);
+		if (err != 0) {
+			Py_DECREF(anns);
+			Py_DECREF(func);
+			return err;
+		}
+	}
+
+	if (PyFunction_SetAnnotations(func, anns) != 0) {
+		/* Can't happen unless
+		PyFunction_SetAnnotations changes. */
+		Py_DECREF(anns);
+		Py_DECREF(func);
+		return 1;
+	}
+	Py_DECREF(anns);
+	Py_DECREF(names);
+	return 0;
+}
+
+int DoFunctionSetKwDefaults(PyObject* defs, PyObject* func) {
+	if (PyFunction_SetKwDefaults(func, defs) != 0) {
+		/* Can't happen unless
+		PyFunction_SetKwDefaults changes. */
+		Py_DECREF(func);
+		Py_DECREF(defs);
 		return 1;
 	}
 	Py_DECREF(defs);
@@ -963,17 +1141,11 @@ PyObject* CallN(PyObject *target, PyObject* args) {
 PyObject* CallNKW(PyObject *target, PyObject* args, PyObject* kwargs) {
 	// we stole references for the tuple...
 #ifdef DEBUG_TRACE
-	auto targetRepr = PyObject_Repr(target);
-	printf("Target: %s\r\n", PyUnicode_AsUTF8(targetRepr));
-	Py_DECREF(targetRepr);
+	printf("Target: %s\r\n", ObjInfo(target));
 
-	auto repr = PyObject_Repr(args);
-	printf("Tuple: %s\r\n", PyUnicode_AsUTF8(repr));
-	Py_DECREF(repr);
+	printf("Tuple: %s\r\n", ObjInfo(args));
 
-	auto repr2 = PyObject_Repr(kwargs);
-	printf("KW Args: %s\r\n", PyUnicode_AsUTF8(repr2));
-	Py_DECREF(repr2);
+	printf("KW Args: %s\r\n", ObjInfo(kwargs));
 
 	printf("%d\r\n", kwargs->ob_refcnt);
 #endif
@@ -1208,7 +1380,7 @@ PyObject** DoUnpackSequence(PyObject* seq, size_t size, PyObject** tempStorage){
 PyObject* LoadAttr(PyObject* owner, PyObject* name) {
 	PyObject *res = PyObject_GetAttr(owner, name);
 	Py_DECREF(owner);
-#if DEBUG_TRACE
+#ifdef DEBUG_TRACE
 	if (res == nullptr) {
 		printf("Load attr failed: %s\r\n", PyUnicode_AsUTF8(name));
 	}
@@ -1381,7 +1553,7 @@ bool can_skip_lasti_update(int opcode) {
 	return false;
 }
 
-#define NEXTARG() oparg = *(unsigned short*)&byteCode[i + 1]; i+= 2
+#define NEXTARG() *(unsigned short*)&byteCode[i + 1]; i+= 2
 
 class Jitter {
 	PyCodeObject *code;
@@ -1450,6 +1622,7 @@ private:
 
 		il.push_ptr((void*)argCnt);
 		il.emit_call(METHOD_PYTUPLE_NEW);
+		check_error(-1, "new tuple failed");
 		il.st_loc(tupleTmp);
 
 		for (int arg = argCnt - 1; arg >= 0; arg--) {
@@ -1554,6 +1727,7 @@ private:
 	void build_map(int argCnt) {
 		il.push_ptr((void*)argCnt);
 		il.emit_call(METHOD_PYDICT_NEWPRESIZED);
+		check_error(-1, "new dict failed");
 		{
 			// 3.6 doesn't have STORE_OP and instead does it all in BUILD_MAP...
 			if (argCnt > 0) {
@@ -1613,7 +1787,7 @@ private:
 		il.branch(BranchNotEqual, noErr);
 		// we need to issue a leave to clear the stack as we may have
 		// values on the stack...
-#if DEBUG_TRACE
+#ifdef DEBUG_TRACE
 		char* tmp = (char*)malloc(100);
 		sprintf_s(tmp, 100, "Error at index %d %s %s", curIndex, PyUnicode_AsUTF8(code->co_name), reason);
 		il.push_ptr(tmp);
@@ -1630,7 +1804,7 @@ private:
 		il.branch(BranchEqual, noErr);
 		// we need to issue a leave to clear the stack as we may have
 		// values on the stack...
-#if DEBUG_TRACE
+#ifdef DEBUG_TRACE
 		char* tmp = (char*)malloc(100);
 		sprintf_s(tmp, 100, "Int Error at index %d %s", curIndex, PyUnicode_AsUTF8(code->co_name));
 		il.push_ptr(tmp);
@@ -1738,7 +1912,7 @@ private:
 		auto retLabel = il.define_label();
 
 		for (int i = 0; i < size; i++) {
-#if DEBUG_TRACE
+#ifdef DEBUG_TRACE
 			//char * tmp = (char*)malloc(8);
 			//sprintf_s(tmp, 8, "%d", i);
 			//il.push_ptr(tmp);
@@ -1853,16 +2027,21 @@ private:
 					break;
 				case PyCmp_IN:
 					il.emit_call(METHOD_CONTAINS_TOKEN);
+					check_error(i, "contains");
 					break;
 				case PyCmp_NOT_IN:
 					il.emit_call(METHOD_NOTCONTAINS_TOKEN);
+					check_error(i, "not contains");
 					break;
 				case PyCmp_EXC_MATCH:
 					il.emit_call(METHOD_COMPARE_EXCEPTIONS);
+					check_error(i, "compare ex");
 					break;
 				default:
 					il.ld_i(oparg);
 					il.emit_call(METHOD_RICHCMP_TOKEN);
+					check_error(i, "rich cmp");
+					break;
 				}
 			}
 				break;
@@ -2091,16 +2270,18 @@ private:
 				break;
 			case DELETE_FAST:
 			{
-				//load_local(oparg);
-				//il.load_null();
-				//auto valueSet = il.define_label();
+				load_local(oparg);
+				il.load_null();
+				auto valueSet = il.define_label();
 
-				//il.branch(BranchNotEqual, valueSet);
-				//il.push_ptr(PyTuple_GetItem(code->co_varnames, oparg));
-				//il.emit_call(METHOD_UNBOUND_LOCAL);
-				//il.branch(BranchAlways, GetEHBlock().Raise);
+				il.branch(BranchNotEqual, valueSet);
+				il.push_ptr(PyTuple_GetItem(code->co_varnames, oparg));
+				il.emit_call(METHOD_UNBOUND_LOCAL);
+				il.branch(BranchLeave, GetEHBlock().Raise);
 
-				//il.mark_label(valueSet);
+				il.mark_label(valueSet);
+				load_local(oparg);
+				decref();
 				load_frame();
 				il.ld_i(offsetof(PyFrameObject, f_localsplus) + oparg * sizeof(size_t));
 				il.add();
@@ -2458,7 +2639,7 @@ private:
 				}
 
 				if (!inFinally) {
-#if DEBUG_TRACE
+#ifdef DEBUG_TRACE
 					char* tmp = (char*)malloc(100);
 					sprintf_s(tmp, 100, "Returning %s...", PyUnicode_AsUTF8(code->co_name));
 					il.push_ptr(tmp);
@@ -2471,8 +2652,8 @@ private:
 				break;
 			case EXTENDED_ARG:
 			{
-				byte = byteCode[i + 1];
-				auto bottomArg = NEXTARG();
+				byte = byteCode[++i];
+				int bottomArg = NEXTARG();
 				oparg = (oparg << 16) | bottomArg;
 				goto processOpCode;
 			}
@@ -2493,18 +2674,34 @@ private:
 					auto func = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 					il.st_loc(func);
 					if (num_annotations > 0) {
-						printf("Make function, annotations not supported\r\n");
-						return nullptr;
+						// names is on stack, followed by values.
+						//PyObject* values, PyObject* names, PyObject* func
+						auto names = il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+						il.st_loc(names);
+
+						// for whatever reason ceval.c has "assert(num_annotations == name_ix+1);", where
+						// name_ix is the numbe of elements in the names tuple.  Otherwise num_annotations
+						// goes unused!
+						// TODO: If we hit an OOM here then build_tuple doesn't release the function
+						build_tuple(num_annotations - 1);
+						il.ld_loc(names);
+						il.ld_loc(func);
+						il.emit_call(METHOD_PY_FUNC_SET_ANNOTATIONS);
+						check_int_error(i);
+						il.free_local(names);
 					}
 					if (kwdefaults > 0) {
-						printf("Make function, kwdefaults not supported\r\n");
-						return nullptr;
+						// TODO: If we hit an OOM here then build_map doesn't release the function
+						build_map(kwdefaults);
+						il.ld_loc(func);
+						il.emit_call(METHOD_PY_FUNC_SET_KW_DEFAULTS);
+						check_int_error(i);
 					}
 					if (posdefaults > 0) {
 						build_tuple(posdefaults);
 						il.ld_loc(func);
 						il.emit_call(METHOD_FUNC_SET_DEFAULTS);
-						//check_int_error_leave();// TODO: enable me
+						check_int_error(i);
 					}
 					il.ld_loc(func);
 				}
@@ -2648,7 +2845,7 @@ private:
 				case 0: il.load_null();
 				case 1: il.load_null();
 				case 2:
-#if DEBUG_TRACE
+#ifdef DEBUG_TRACE
 					char* tmp = (char*)malloc(100);
 					sprintf_s(tmp, 100, "Exception explicitly raised in %s", PyUnicode_AsUTF8(code->co_name));
 					il.push_ptr(tmp);
@@ -2693,7 +2890,7 @@ private:
 				il.load_null();
 				il.st_loc(ehVal);
 				il.emit_call(METHOD_PYERR_CLEAR);
-#if DEBUG_TRACE
+#ifdef DEBUG_TRACE
 				{
 					char* tmp = (char*)malloc(100);
 					sprintf_s(tmp, 100, "Exception cleared %d", i);
@@ -2857,10 +3054,10 @@ private:
 				check_error(i, "import from");
 				break;
 			case IMPORT_STAR:
-				printf("Unsupported opcode: %d (import related)\r\n", byte);
-				//_ASSERT(FALSE);
-				return nullptr;
-
+				load_frame();
+				il.emit_call(METHOD_PY_IMPORTSTAR);
+				check_int_error(i);
+				break;
 			case SETUP_WITH:
 			case WITH_CLEANUP_START:
 			case WITH_CLEANUP_FINISH:
@@ -2919,7 +3116,7 @@ private:
 #endif
 		il.mark_label(reraiseLabel);
 
-#if DEBUG_TRACE
+#ifdef DEBUG_TRACE
 		char* tmp = (char*)malloc(100);
 		sprintf_s(tmp, 100, "Re-raising exception %s", PyUnicode_AsUTF8(code->co_name));
 		il.push_ptr(tmp);
@@ -2948,7 +3145,13 @@ private:
 };
 
 extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
-	if (code->co_stacksize > 200) {
+	int length = PyObject_Length(code->co_code);
+	if (length > 3000) {
+		printf("Skipping big code\r\n");
+		return nullptr;
+	}
+	if (code->co_stacksize > 200 ||
+		strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
 		// TODO: Remove me, currently we can't compile encodings\aliases.py.
 		return nullptr;
 	}
@@ -3497,7 +3700,7 @@ extern "C" __declspec(dllexport) void JitInit() {
 	
 	g_module->m_methods[METHOD_FUNC_SET_DEFAULTS] = Method(
 		nullptr,
-		CORINFO_TYPE_VOID,
+		CORINFO_TYPE_INT,
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
 		&DoFunctionSetDefaults
 		);
@@ -3527,7 +3730,7 @@ extern "C" __declspec(dllexport) void JitInit() {
 		nullptr,
 		CORINFO_TYPE_VOID,
 		std::vector < Parameter > {},
-		&PyErr_Clear
+		&DoClearError
 		);
 
 	g_module->m_methods[METHOD_PY_CHECKFUNCTIONRESULT] = Method(
@@ -3559,8 +3762,26 @@ extern "C" __declspec(dllexport) void JitInit() {
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
 		&DoImportFrom
 		);
+	g_module->m_methods[METHOD_PY_IMPORTSTAR] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
+		&DoImportStar
+		);
+	g_module->m_methods[METHOD_PY_FUNC_SET_ANNOTATIONS] = Method(
+		nullptr,
+		CORINFO_TYPE_INT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
+		&DoFunctionSetAnnotations
+		);	
 
-
+	g_module->m_methods[METHOD_PY_FUNC_SET_KW_DEFAULTS] = Method(
+		nullptr,
+		CORINFO_TYPE_INT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
+		&DoFunctionSetKwDefaults
+		);
+	
 	//g_module->m_methods[SIG_ITERNEXT_TOKEN] = Method(
 	//	nullptr,
 	//	CORINFO_TYPE_NATIVEINT,

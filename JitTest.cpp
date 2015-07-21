@@ -97,6 +97,22 @@ void PyJitTest() {
 
 	TestCase cases[] = {
 		TestCase(
+			"def f():\n    def g(b:1, *, a = 2):\n     return a\n    return g.__annotations__['b']",
+			TestInput("1")
+		),
+		TestCase(
+			"def f():\n    def g(b:1, *, a = 2):\n     return a\n    return g(3)",
+			TestInput("2")
+		),
+		TestCase(
+			"def f():\n    def g(*, a = 2):\n     return a\n    return g()",
+			TestInput("2")
+		),
+		TestCase(
+			"def f():\n    def g(a:1, b:2): pass\n    return g.__annotations__['a']",
+			TestInput("1")
+		),
+		TestCase(
 			"def f():\n    from sys import winver, version_info\n    return winver[0]",
 			TestInput("'3'")
 		),
