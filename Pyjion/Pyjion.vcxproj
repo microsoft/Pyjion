@@ -9,14 +9,6 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="DLL (Debug)|Win32">
-      <Configuration>DLL (Debug)</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="DLL (Debug)|x64">
-      <Configuration>DLL (Debug)</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
@@ -27,14 +19,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="JitTest.cpp" />
     <ClCompile Include="pyjit.cpp" />
     <ClCompile Include="cee.cpp" />
+    <ClCompile Include="intrins.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cee.h" />
     <ClInclude Include="codemodel.h" />
     <ClInclude Include="ilgen.h" />
+    <ClInclude Include="intrins.h" />
     <ClInclude Include="jitinfo.h" />
     <ClInclude Include="pyjit.h" />
   </ItemGroup>
@@ -42,6 +35,7 @@
     <ProjectGuid>{0B2F9AA3-F525-4042-B8C9-74F8B10F9D62}</ProjectGuid>
     <RootNamespace>JitTest</RootNamespace>
     <ProjectName>Pyjion</ProjectName>
+    <IncludePath>$(MSBuildProjectDirectory)\..\CoreClr\src\pal\prebuilt\inc;$(MSBuildProjectDirectory)\..\coreclr\src\inc\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include;$(IncludePath);$(MSBuildProjectDirectory)\..\Python\Include;$(MSBuildProjectDirectory)\..\Python\PC</IncludePath>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -50,19 +44,7 @@
     <PlatformToolset>v120</PlatformToolset>
     <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DLL (Debug)|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
-    <CharacterSet>NotSet</CharacterSet>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
-    <CharacterSet>NotSet</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DLL (Debug)|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v120</PlatformToolset>
@@ -76,7 +58,7 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v120</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -88,13 +70,7 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='DLL (Debug)|Win32'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='DLL (Debug)|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -104,45 +80,17 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>C:\Source\CoreClr\src\pal\prebuilt\inc;C:\Source\coreclr\src\inc\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include;$(IncludePath)</IncludePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DLL (Debug)|Win32'">
-    <IncludePath>C:\Source\CoreClr\src\pal\prebuilt\inc;C:\Source\coreclr\src\inc\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include;$(IncludePath)</IncludePath>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Source\CoreClr\src\pal\prebuilt\inc;C:\Source\coreclr\src\inc\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include;$(IncludePath);C:\Source\Python\Include;C:\Source\Python\PC</IncludePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);C:\Source\Python\PCbuild\amd64</LibraryPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DLL (Debug)|x64'">
-    <IncludePath>C:\Source\CoreClr\src\pal\prebuilt\inc;C:\Source\coreclr\src\inc\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include;$(IncludePath);C:\Source\Python\Include;C:\Source\Python\PC</IncludePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);C:\Source\Python\PCbuild\amd64</LibraryPath>
     <TargetExt>.dll</TargetExt>
     <TargetName>pyjit</TargetName>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>C:\Source\CoreClr\src\pal\prebuilt\inc;C:\Source\coreclr\src\inc\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include;$(IncludePath);C:\Source\Python\Include;C:\Source\Python\PC</IncludePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);C:\Source\Python\PCbuild\amd64</LibraryPath>
+    <TargetExt>.dll</TargetExt>
+    <TargetName>pyjit</TargetName>
+    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);_TARGET_ARM64_=1</PreprocessorDefinitions>
-      <CallingConvention>StdCall</CallingConvention>
-      <ExceptionHandling>false</ExceptionHandling>
-      <DebugInformationFormat>None</DebugInformationFormat>
-      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <MinimalRebuild>false</MinimalRebuild>
-      <ErrorReporting>None</ErrorReporting>
-    </ClCompile>
-    <Link>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);clrjit.lib;utilcode.lib;advapi32.lib ;OleAut32.lib;gcinfo.lib;user32.lib</AdditionalDependencies>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DLL (Debug)|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
@@ -175,26 +123,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);libs\debug\clrjit.lib;libs\debug\utilcode.lib;advapi32.lib ;OleAut32.lib;libs\debug\gcinfo.lib;user32.lib;python36_d.lib</AdditionalDependencies>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DLL (Debug)|x64'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);_TARGET_AMD64_=1</PreprocessorDefinitions>
-      <CallingConvention>StdCall</CallingConvention>
-      <ExceptionHandling>false</ExceptionHandling>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <MinimalRebuild>true</MinimalRebuild>
-      <ErrorReporting>None</ErrorReporting>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-    </ClCompile>
-    <Link>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);libs\Debug\clrjit.lib;libs\Debug\utilcode.lib;advapi32.lib ;OleAut32.lib;libs\Debug\gcinfo.lib;user32.lib;python36_d.lib</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);clrjit.lib;utilcode.lib;advapi32.lib ;OleAut32.lib;gcinfo.lib;user32.lib;python36_d.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
