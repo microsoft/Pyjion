@@ -22,3 +22,5 @@ Copy the build Pyjion\x64\Debug\pyjit.dll or Pyjion\x64\Release\pyjit.dll
 Launch python_d.exe or python.exe
 
 
+### Known Issues
+You'll need to run git clean -d -f -x in CoreCLR when switching between release and debug builds.
