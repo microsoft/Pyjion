@@ -43,6 +43,10 @@ public:
 	Local(int index = -1) {
 		m_index = index;
 	}
+
+	bool is_valid() {
+		return m_index != -1;
+	}
 };
 
 class Label {

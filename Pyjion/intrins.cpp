@@ -81,11 +81,11 @@ PyObject* PyJit_RichCompare(PyObject *left, PyObject *right, int op) {
 
 PyObject* PyJit_Contains(PyObject *left, PyObject *right) {
 	auto res = PySequence_Contains(right, left);
+	Py_DECREF(left);
+	Py_DECREF(right);
 	if (res < 0) {
 		return nullptr;
 	}
-	Py_DECREF(left);
-	Py_DECREF(right);
 	auto ret = res ? Py_True : Py_False;
 	Py_INCREF(ret);
 	return ret;
@@ -107,11 +107,11 @@ PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index) {
 
 PyObject* PyJit_NotContains(PyObject *left, PyObject *right, int op) {
 	auto res = PySequence_Contains(right, left);
+	Py_DECREF(left);
+	Py_DECREF(right);
 	if (res < 0) {
 		return nullptr;
 	}
-	Py_DECREF(left);
-	Py_DECREF(right);
 	auto ret = res ? Py_False : Py_True;
 	Py_INCREF(ret);
 	return ret;
@@ -463,6 +463,8 @@ PyObject* PyJit_CompareExceptions(PyObject*v, PyObject* w) {
 			if (!PyExceptionClass_Check(exc)) {
 				PyErr_SetString(PyExc_TypeError,
 					CANNOT_CATCH_MSG);
+				Py_DECREF(v);
+				Py_DECREF(w);
 				return NULL;
 			}
 		}
@@ -471,10 +473,14 @@ PyObject* PyJit_CompareExceptions(PyObject*v, PyObject* w) {
 		if (!PyExceptionClass_Check(w)) {
 			PyErr_SetString(PyExc_TypeError,
 				CANNOT_CATCH_MSG);
+			Py_DECREF(v);
+			Py_DECREF(w);
 			return NULL;
 		}
 	}
 	int res = PyErr_GivenExceptionMatches(v, w);
+	Py_DECREF(v);
+	Py_DECREF(w);
 	v = res ? Py_True : Py_False;
 	Py_INCREF(v);
 	return v;
@@ -832,6 +838,8 @@ int PyJit_FunctionSetDefaults(PyObject* defs, PyObject* func) {
 int PyJit_FunctionSetAnnotations(PyObject* values, PyObject* names, PyObject* func) {
 	PyObject *anns = PyDict_New();
 	if (anns == NULL) {
+		Py_DECREF(values);
+		Py_DECREF(names);
 		Py_DECREF(func);
 		return 1;
 	}
@@ -848,6 +856,7 @@ int PyJit_FunctionSetAnnotations(PyObject* values, PyObject* names, PyObject* fu
 		if (err != 0) {
 			Py_DECREF(anns);
 			Py_DECREF(func);
+			Py_DECREF(values);
 			return err;
 		}
 	}
@@ -857,10 +866,12 @@ int PyJit_FunctionSetAnnotations(PyObject* values, PyObject* names, PyObject* fu
 		PyFunction_SetAnnotations changes. */
 		Py_DECREF(anns);
 		Py_DECREF(func);
+		Py_DECREF(values);
 		return 1;
 	}
 	Py_DECREF(anns);
 	Py_DECREF(names);
+	Py_DECREF(values);
 	return 0;
 }
 
@@ -1040,6 +1051,7 @@ PyObject* PyJit_CallN(PyObject *target, PyObject* args) {
 	// we stole references for the tuple...
 	auto res = PyObject_Call(target, args, nullptr);
 	Py_DECREF(target);
+	Py_DECREF(args);
 	return res;
 }
 
@@ -1094,7 +1106,6 @@ PyObject* PyJit_LoadGlobal(PyFrameObject* f, PyObject* name) {
 		auto asciiName = PyUnicode_AsUTF8(name);
 		v = PyObject_GetItem(f->f_globals, name);
 		if (v == NULL) {
-
 			v = PyObject_GetItem(f->f_builtins, name);
 			if (v == NULL) {
 				if (PyErr_ExceptionMatches(PyExc_KeyError))
@@ -1108,9 +1119,6 @@ PyObject* PyJit_LoadGlobal(PyFrameObject* f, PyObject* name) {
 			}
 		}
 	}
-	if (v != nullptr) {
-		Py_INCREF(v);
-	}
 	return v;
 }
 
@@ -1120,7 +1128,66 @@ PyObject* PyJit_GetIter(PyObject* iterable) {
 	return res;
 }
 
+typedef struct {
+	PyObject_HEAD
+	PyObject *start;
+	PyObject *stop;
+	PyObject *step;
+	PyObject *length;
+} rangeobject;
+
+PyObject* PyJit_GetIterOptimized(PyObject* iterable, size_t* iterstate1, size_t* iterstate2) {
+	//if (PyRange_Check(iterable)) {
+	//	rangeobject* range = (rangeobject*)iterable;
+	//	auto step = PyLong_AsSize_t(range->step);
+	//	if (PyErr_ExceptionMatches(PyExc_OverflowError)) {
+	//		PyErr_Clear();		
+	//		goto common;
+	//	}
+	//	else if (step == 1) {
+	//		auto start  = PyLong_AsSize_t(range->start);
+	//		if (PyErr_ExceptionMatches(PyExc_OverflowError)) {
+	//			PyErr_Clear();
+	//			goto common;
+	//		}
+	//		auto end = PyLong_AsSize_t(range->start);
+	//		if (PyErr_ExceptionMatches(PyExc_OverflowError)) {
+	//			PyErr_Clear();
+	//			goto common;
+	//		}
+
+	//		// common iteration case
+	//		*iterstate1 = start;
+	//		*iterstate2 = end;
+	//		return (PyObject*)1;
+	//	}
+	//}
+common:
+	auto res = PyObject_GetIter(iterable);
+	Py_DECREF(iterable);
+	return res;
+}
+
 PyObject* PyJit_IterNext(PyObject* iter, int*error) {
+	auto res = (*iter->ob_type->tp_iternext)(iter);
+	if (res == nullptr) {
+		if (PyErr_Occurred()) {
+			if (!PyErr_ExceptionMatches(PyExc_StopIteration)) {
+				*error = 1;
+				return nullptr;
+			}
+			*error = 0;
+			// TODO: Tracing...
+			//else if (tstate->c_tracefunc != NULL)
+			//	call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj, tstate, f);
+			PyErr_Clear();
+		}
+	}
+	return res;
+}
+
+
+PyObject* PyJit_IterNextOptimized(PyObject* iter, int*error, size_t* iterstate1, size_t* iterstate2) {
 	auto res = (*iter->ob_type->tp_iternext)(iter);
 	if (res == nullptr) {
 		if (PyErr_Occurred()) {
@@ -1178,22 +1245,40 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
 	if (PyTuple_CheckExact(seq) && PyTuple_GET_SIZE(seq) >= (leftSize + rightSize)) {
 		auto listSize = PyTuple_GET_SIZE(seq) - (leftSize + rightSize);
 		auto list = (PyListObject*)PyList_New(listSize);
+		if (list == nullptr) {
+			return nullptr;
+		}
 		for (int i = 0; i < listSize; i++) {
 			list->ob_item[i] = ((PyTupleObject *)seq)->ob_item[i + leftSize];
+			
 		}
 		*remainder = ((PyTupleObject *)seq)->ob_item + leftSize + listSize;
 		*listRes = (PyObject*)list;
-		return ((PyTupleObject *)seq)->ob_item;
+		auto res = ((PyTupleObject *)seq)->ob_item;
+		auto size = PyTuple_GET_SIZE(seq);
+		for (int i = 0; i < size; i++) {
+			Py_INCREF(res[i]);
+		}
+		return res;
 	}
 	else if (PyList_CheckExact(seq) && PyList_GET_SIZE(seq) >= (leftSize + rightSize)) {
 		auto listSize = PyList_GET_SIZE(seq) - (leftSize + rightSize);
 		auto list = (PyListObject*)PyList_New(listSize);
+		if (list == nullptr) {
+			return nullptr;
+		}
 		for (int i = 0; i < listSize; i++) {
 			list->ob_item[i] = ((PyListObject *)seq)->ob_item[i + leftSize];
 		}
 		*remainder = ((PyListObject *)seq)->ob_item + leftSize + listSize;
 		*listRes = (PyObject*)list;
-		return ((PyListObject *)seq)->ob_item;
+
+		auto res = ((PyListObject *)seq)->ob_item;
+		auto size = PyTuple_GET_SIZE(seq);
+		for (int i = 0; i < size; i++) {
+			Py_INCREF(res[i]);
+		}
+		return res;
 	}
 	else {
 		// the function allocated space on the stack for us to
@@ -1258,8 +1343,9 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
 		return tempStorage;
 
 	Error:
-		for (; i > 0; i--, sp++)
-			Py_DECREF(*sp);
+		for (int i = 0; i < leftSize; i++) {
+			Py_DECREF(tempStorage[i]);
+		}
 		Py_XDECREF(it);
 		return nullptr;
 
@@ -1272,10 +1358,18 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
 // allocated on the stack when we entered the generated method body.
 PyObject** PyJit_UnpackSequence(PyObject* seq, size_t size, PyObject** tempStorage){
 	if (PyTuple_CheckExact(seq) && PyTuple_GET_SIZE(seq) == size) {
-		return ((PyTupleObject *)seq)->ob_item;
+		PyObject** res = ((PyTupleObject *)seq)->ob_item;
+		for (int i = 0; i < size; i++) {
+			Py_INCREF(res[i]);
+		}
+		return res;
 	}
 	else if (PyList_CheckExact(seq) && PyList_GET_SIZE(seq) == size) {
-		return ((PyListObject *)seq)->ob_item;
+		PyObject** res = ((PyListObject *)seq)->ob_item;
+		for (int i = 0; i < size; i++) {
+			Py_INCREF(res[i]);
+		}
+		return res;
 	}
 	else{
 		return PyJit_UnpackSequenceEx(seq, size, 0, tempStorage, nullptr, nullptr);
@@ -1404,8 +1498,224 @@ int PyJit_DeleteName(PyFrameObject* f, PyObject* name) {
 	return err;
 }
 
+static PyObject *
+fast_function(PyObject *func, PyObject **pp_stack, int n)
+{
+	PyCodeObject *co = (PyCodeObject *)PyFunction_GET_CODE(func);
+	PyObject *globals = PyFunction_GET_GLOBALS(func);
+	PyObject *argdefs = PyFunction_GET_DEFAULTS(func);
+
+	if (argdefs == NULL && co->co_argcount == n &&
+		co->co_kwonlyargcount == 0 &&
+		co->co_flags == (CO_OPTIMIZED | CO_NEWLOCALS | CO_NOFREE)) {
+		PyFrameObject *f;
+		PyObject *retval = NULL;
+		PyThreadState *tstate = PyThreadState_GET();
+		PyObject **fastlocals, **stack;
+		int i;
+
+		assert(globals != NULL);
+		/* XXX Perhaps we should create a specialized
+		PyFrame_New() that doesn't take locals, but does
+		take builtins without sanity checking them.
+		*/
+		assert(tstate != NULL);
+		f = PyFrame_New(tstate, co, globals, NULL);
+		if (f == NULL)
+			return NULL;
+
+		fastlocals = f->f_localsplus;
+		stack = pp_stack;
+
+		for (i = 0; i < n; i++) {
+			Py_INCREF(*stack);
+			fastlocals[i] = *stack++;
+		}
+		retval = PyEval_EvalFrameEx(f, 0);
+		++tstate->recursion_depth;
+		Py_DECREF(f);
+		--tstate->recursion_depth;
+		return retval;
+	}
+
+	auto args = PyTuple_New(n);
+	if (args == nullptr) {
+		return nullptr;
+	}
+	for (int i = 0; i < n; i++) {
+		Py_INCREF(pp_stack[i]);
+		PyTuple_SET_ITEM(args, i, pp_stack[i]);
+	}
+	auto res = PyObject_Call(func, args, nullptr);
+	Py_DECREF(args);
+	return res;
+#if FALSE
+	if (argdefs != NULL) {
+		d = &PyTuple_GET_ITEM(argdefs, 0);
+		nd = Py_SIZE(argdefs);
+	}
+	return _PyEval_EvalCodeWithName((PyObject*)co, globals,
+		(PyObject *)NULL, (pp_stack)-n, na,
+		(pp_stack)-2 * nk, nk, d, nd, kwdefs,
+		PyFunction_GET_CLOSURE(func),
+		name, qualname);
+#endif
+}
+
 PyObject* Call0(PyObject *target) {
-	auto res = PyObject_Call(target, g_emptyTuple, nullptr);
+	PyObject* res;
+	if (PyFunction_Check(target)) {
+		PyObject* empty[1] = { nullptr };
+		res = fast_function(target, empty, 0);
+	}
+	else if (PyCFunction_Check(target)) {
+		res = PyCFunction_Call(target, g_emptyTuple, nullptr);
+	}
+	else{
+		res = PyObject_Call(target, g_emptyTuple, nullptr);
+	}
 	Py_DECREF(target);
+	return res;
+}
+
+PyObject* Call1(PyObject *target, PyObject* arg0) {
+	PyObject* res = nullptr;
+	if (PyFunction_Check(target)) {
+		PyObject* stack[1] = { arg0 };
+		res = fast_function(target, stack, 1);
+		Py_DECREF(arg0);
+		goto error;
+	}
+
+	auto args = PyTuple_New(1);
+	if (args == nullptr) {
+		Py_DECREF(arg0);
+		goto error;
+	}
+	PyTuple_SET_ITEM(args, 0, arg0);
+	if (PyCFunction_Check(target)) {
+		res = PyCFunction_Call(target, args, nullptr);
+	}
+	else{
+		res = PyObject_Call(target, args, nullptr);
+	}
+	Py_DECREF(args);
+error:
+	Py_DECREF(target);
+	return res;
+}
+
+PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1) {
+	PyObject* res = nullptr;
+	if (PyFunction_Check(target)) {
+		PyObject* stack[2] = { arg0, arg1 };
+		res = fast_function(target, stack, 2);
+		Py_DECREF(arg0);
+		Py_DECREF(arg1);
+		goto error;
+	}
+	
+	auto args = PyTuple_New(2);
+	if (args == nullptr) {
+		Py_DECREF(arg0);
+		Py_DECREF(arg1);
+		goto error;
+	}
+	PyTuple_SET_ITEM(args, 0, arg0);
+	PyTuple_SET_ITEM(args, 1, arg1);
+	if (PyCFunction_Check(target)) {
+		res = PyCFunction_Call(target, args, nullptr);
+	}
+	else{
+		res = PyObject_Call(target, args, nullptr);
+	}
+	Py_DECREF(args);
+error:
+	Py_DECREF(target);
+	return res;
+}
+
+PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
+	PyObject* res = nullptr;
+	if (PyFunction_Check(target)) {
+		PyObject* stack[3] = { arg0, arg1, arg2 };
+		res = fast_function(target, stack, 3);
+		Py_DECREF(arg0);
+		Py_DECREF(arg1);
+		Py_DECREF(arg2);
+		goto error;
+	}
+
+	auto args = PyTuple_New(3);
+	if (args == nullptr) {
+		Py_DECREF(arg0);
+		Py_DECREF(arg1);
+		Py_DECREF(arg2);
+		goto error;
+	}
+	PyTuple_SET_ITEM(args, 0, arg0);
+	PyTuple_SET_ITEM(args, 1, arg1);
+	PyTuple_SET_ITEM(args, 2, arg2);
+	if (PyCFunction_Check(target)) {
+		res = PyCFunction_Call(target, args, nullptr);
+	}
+	else{
+		res = PyObject_Call(target, args, nullptr);
+	}
+	Py_DECREF(args);
+error:
+	Py_DECREF(target);
+	return res;
+}
+
+PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
+	PyObject* res = nullptr;
+	if (PyFunction_Check(target)) {
+		PyObject* stack[4] = { arg0, arg1, arg2, arg3 };
+		res = fast_function(target, stack, 4);
+		Py_DECREF(arg0);
+		Py_DECREF(arg1);
+		Py_DECREF(arg2);
+		Py_DECREF(arg3);
+		goto error;
+	}
+
+	auto args = PyTuple_New(4);
+	if (args == nullptr) {
+		Py_DECREF(arg0);
+		Py_DECREF(arg1);
+		Py_DECREF(arg2);
+		Py_DECREF(arg3);
+		goto error;
+	}
+	PyTuple_SET_ITEM(args, 0, arg0);
+	PyTuple_SET_ITEM(args, 1, arg1);
+	PyTuple_SET_ITEM(args, 2, arg2);
+	PyTuple_SET_ITEM(args, 3, arg3);
+	if (PyCFunction_Check(target)) {
+		res = PyCFunction_Call(target, args, nullptr);
+	}
+	else{
+		res = PyObject_Call(target, args, nullptr);
+	}
+	Py_DECREF(args);
+error:
+	Py_DECREF(target);
+	return res;
+}
+
+PyObject* PyJit_Is(PyObject* lhs, PyObject* rhs) {
+	auto res = lhs == rhs ? Py_True : Py_False;
+	Py_DECREF(lhs);
+	Py_DECREF(rhs);
+	Py_INCREF(res);
+	return res;
+}
+
+PyObject* PyJit_IsNot(PyObject* lhs, PyObject* rhs) {
+	auto res = lhs == rhs ? Py_False : Py_True;
+	Py_DECREF(lhs);
+	Py_DECREF(rhs);
+	Py_INCREF(res);
 	return res;
 }

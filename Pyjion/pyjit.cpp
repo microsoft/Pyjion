@@ -56,6 +56,7 @@ struct BlockInfo {
 		ErrorTarget;	// the actual label for the handler
 	int EndOffset, Kind, Flags, ContinueOffset;
 	ExceptionVars ExVars;
+	Local LoopVar, LoopOpt1, LoopOpt2;
 
 	BlockInfo() {
 	}
@@ -202,7 +203,6 @@ private:
 	}
 
 	void build_list(int argCnt) {
-
 		m_il.push_ptr((void*)argCnt);
 		m_il.emit_call(METHOD_PYLIST_NEW);
 
@@ -328,6 +328,8 @@ private:
 		m_il.emit_call(METHOD_DEBUG_TRACE);
 #endif
 
+		// TODO: We need to release any objects which are on the stack when we take an
+		// error.
 		m_il.branch(BranchLeave, GetEHBlock().Raise);	
 		m_il.mark_label(noErr);
 	}
@@ -345,6 +347,8 @@ private:
 		m_il.emit_call(METHOD_DEBUG_TRACE);
 #endif
 
+		// TODO: We need to release any objects which are on the stack when we take an
+		// error.
 		m_il.branch(BranchLeave, GetEHBlock().Raise);
 		m_il.mark_label(noErr);
 	}
@@ -384,7 +388,6 @@ private:
 			m_offsetLabels[index] = label;
 			m_il.mark_label(label);
 		}
-
 	}
 
 	void PreProcess() {
@@ -415,6 +418,50 @@ private:
 				m_il.st_loc(sequenceTmp);
 
 				m_sequenceLocals[i] = sequenceTmp;
+				break;
+			}
+		}
+	}
+
+	// Frees our iteration temporary variable which gets allocated when we hit
+	// a FOR_ITER.  Used when we're breaking from the current loop.
+	void free_iter_local() {
+		for (int i = m_blockStack.size() - 1; i >= 0; i--) {
+			if (m_blockStack[i].Kind == SETUP_LOOP) {
+				if (m_blockStack[i].LoopVar.is_valid()) {
+					m_il.ld_loc(m_blockStack[i].LoopVar);
+					decref();
+					break;
+				}
+			}
+		}
+	}
+
+	// Frees all of the iteration variables in a range. Used when we're
+	// going to branch to a finally through multiple loops.
+	void free_all_iter_locals(int to = 0) {
+		for (int i = m_blockStack.size() - 1; i >= to; i--) {
+			if (m_blockStack[i].Kind == SETUP_LOOP) {
+				if (m_blockStack[i].LoopVar.is_valid()) {
+					m_il.ld_loc(m_blockStack[i].LoopVar);
+					decref();
+				}
+			}
+		}
+	}
+
+	// Frees all of our iteration variables.  Used when we're unwinding the function
+	// on an exception.
+	void free_iter_locals_on_exception() {
+		int loopCount = 0;
+		for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
+			if (m_blockStack[i].Kind == SETUP_LOOP) {
+				if (m_blockStack[i].LoopVar.is_valid()) {
+					m_il.ld_loc(m_blockStack[i].LoopVar);
+					decref();
+				}
+			}
+			else{
 				break;
 			}
 		}
@@ -548,24 +595,25 @@ private:
 				break;
 			case COMPARE_OP:
 			{
+				// TODO: We could look at the next op, and if it's branch avoid some overhead.
 				auto compareType = oparg;
 				switch (compareType) {
-				case PyCmp_IS:
-				case PyCmp_IS_NOT:
-					// TODO: Missing dec refs here...
-				{
-					Label same = m_il.define_label();
-					Label done = m_il.define_label();
-					m_il.branch(BranchEqual, same);
-					m_il.push_ptr(compareType == PyCmp_IS ? Py_False : Py_True);
-					m_il.branch(BranchAlways, done);
-					m_il.mark_label(same);
-					m_il.push_ptr(compareType == PyCmp_IS ? Py_True : Py_False);
-					m_il.mark_label(done);
-					m_il.dup();
-					incref();
-				}
-					break;
+				case PyCmp_IS: m_il.emit_call(METHOD_IS); break;
+				case PyCmp_IS_NOT: m_il.emit_call(METHOD_ISNOT); break;
+				//	// TODO: Missing dec refs here...
+				//{
+				//	Label same = m_il.define_label();
+				//	Label done = m_il.define_label();
+				//	m_il.branch(BranchEqual, same);
+				//	m_il.push_ptr(compareType == PyCmp_IS ? Py_False : Py_True);
+				//	m_il.branch(BranchAlways, done);
+				//	m_il.mark_label(same);
+				//	m_il.push_ptr(compareType == PyCmp_IS ? Py_True : Py_False);
+				//	m_il.mark_label(done);
+				//	m_il.dup();
+				//	incref();
+				//}
+				//	break;
 				case PyCmp_IN:
 					m_il.emit_call(METHOD_CONTAINS_TOKEN);
 					check_error(i, "contains");
@@ -646,6 +694,10 @@ private:
 					if (clearEh != -1) {
 						unwind_eh(m_blockStack[clearEh].ExVars);
 					}
+					if (byte != CONTINUE_LOOP) {
+						free_iter_local();
+					}
+
 					if (byte == BREAK_LOOP) {
 						assert(loopIndex != -1);
 						m_il.branch(BranchAlways, getOffsetLabel(m_blockStack[loopIndex].EndOffset));
@@ -675,7 +727,6 @@ private:
 			{
 				auto tmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 				m_il.st_loc(tmp);
-
 
 				auto noJump = m_il.define_label();
 				auto willJump = m_il.define_label();
@@ -843,6 +894,9 @@ private:
 			case STORE_FAST:
 				// TODO: Move locals out of the Python frame object and into real locals
 			{
+				load_local(oparg);
+				decref();
+
 				auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 				m_il.st_loc(valueTmp);
 
@@ -892,8 +946,16 @@ private:
 				m_il.push_ptr((void*)oparg);
 				m_il.ld_loc(m_sequenceLocals[i]);
 				m_il.emit_call(METHOD_UNPACK_SEQUENCE_TOKEN);
-				check_error(i, "unapack sequence");
 
+				auto noErr = m_il.define_label();
+				m_il.dup();
+				m_il.load_null();
+				m_il.branch(BranchNotEqual, noErr);
+				m_il.ld_loc(valueTmp);
+				decref();
+				m_il.branch(BranchLeave, GetEHBlock().Raise);
+
+				m_il.mark_label(noErr);
 				auto fastTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 				m_il.st_loc(fastTmp);
 
@@ -909,8 +971,6 @@ private:
 					m_il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
 					m_il.add();
 					m_il.ld_ind_i();
-					m_il.dup();
-					incref();
 				}
 
 				m_il.ld_loc(valueTmp);
@@ -939,7 +999,7 @@ private:
 				m_il.ld_loca(listTmp);
 				m_il.ld_loca(remainderTmp);
 				m_il.emit_call(METHOD_UNPACK_SEQUENCEEX_TOKEN);
-				check_error(i, "unpack seq ex");
+				check_error(i, "unpack seq ex"); // TODO: We leak the sequence on failure
 
 				auto fastTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 				m_il.st_loc(fastTmp);
@@ -951,8 +1011,6 @@ private:
 					m_il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
 					m_il.add();
 					m_il.ld_ind_i();
-					m_il.dup();
-					incref();
 				}
 
 				// load the list
@@ -971,8 +1029,6 @@ private:
 					m_il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
 					m_il.add();
 					m_il.ld_ind_i();
-					m_il.dup();
-					incref();
 				}
 
 				m_il.ld_loc(valueTmp);
@@ -1071,11 +1127,10 @@ private:
 					case 0: 
 						m_il.emit_call(METHOD_CALL0_TOKEN); 
 						check_error(i, "call 0"); break;
-						/*
-						case 1: emit_call(m_il, METHOD_CALL1_TOKEN); break;
-						case 2: emit_call(m_il, METHOD_CALL2_TOKEN); break;
-						case 3: emit_call(m_il, METHOD_CALL3_TOKEN); break;
-						case 4: emit_call(m_il, METHOD_CALL4_TOKEN); break;
+						case 1: m_il.emit_call(METHOD_CALL1_TOKEN); check_error(i, "call 1"); break;
+						case 2: m_il.emit_call(METHOD_CALL2_TOKEN); check_error(i, "call 2"); break;
+						case 3: m_il.emit_call(METHOD_CALL3_TOKEN); check_error(i, "call 3"); break;
+						case 4: m_il.emit_call(METHOD_CALL4_TOKEN); check_error(i, "call 4"); break; /*
 						case 5: emit_call(m_il, METHOD_CALL5_TOKEN); break;
 						case 6: emit_call(m_il, METHOD_CALL6_TOKEN); break;
 						case 7: emit_call(m_il, METHOD_CALL7_TOKEN); break;
@@ -1186,6 +1241,7 @@ private:
 							if (clearEh != -1) {
 								unwind_eh(m_blockStack[clearEh].ExVars);
 							}
+							free_all_iter_locals(i);
 							m_il.ld_i4(BLOCK_RETURNS);
 							m_il.branch(BranchAlways, m_blockStack[i].ErrorTarget);
 						}
@@ -1208,7 +1264,7 @@ private:
 					if (clearEh != -1) {
 						unwind_eh(m_blockStack[clearEh].ExVars);
 					}
-
+					free_all_iter_locals();
 					m_il.branch(BranchLeave, retLabel);
 				}
 			}
@@ -1303,7 +1359,27 @@ private:
 				incref();
 				break;
 			case GET_ITER:
-				m_il.emit_call(METHOD_GETITER_TOKEN);
+				// GET_ITER can be followed by FOR_ITER, or a CALL_FUNCTION.
+				if (m_byteCode[i + 1] == FOR_ITER) {
+					Local loopOpt1, loopOpt2;
+					for (int i = m_blockStack.size() - 1; i >= 0; i--) {
+						if (m_blockStack[i].Kind == SETUP_LOOP) {
+							// save our iter variable so we can free it on break, continue, return, and
+							// when encountering an exception.
+							m_blockStack.data()[i].LoopOpt1 = loopOpt1 = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+							m_blockStack.data()[i].LoopOpt2 = loopOpt2 = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+							break;
+						}
+					}
+					m_il.ld_loca(loopOpt1);
+					m_il.ld_loca(loopOpt2);
+					m_il.emit_call(METHOD_GETITER_OPTIMIZED_TOKEN);
+					check_error(i, "getiter");
+				}
+				else{
+					m_il.emit_call(METHOD_GETITER_TOKEN);
+					check_error(i, "getiter");
+				}
 				break;
 			case FOR_ITER:
 			{
@@ -1318,6 +1394,20 @@ private:
 				auto iterValue = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 				m_il.st_loc(iterValue);		// store the value...
 
+				bool inLoop = false;
+				Local loopOpt1, loopOpt2;
+				for (int i = m_blockStack.size() - 1; i >= 0; i--) {
+					if (m_blockStack[i].Kind == SETUP_LOOP) {
+						// save our iter variable so we can free it on break, continue, return, and
+						// when encountering an exception.
+						m_blockStack.data()[i].LoopVar = iterValue;
+						loopOpt1 = m_blockStack.data()[i].LoopOpt1;
+						loopOpt2 = m_blockStack.data()[i].LoopOpt2;
+						inLoop = true;
+						break;
+					}
+				}
+				
 				// now that we've saved the value into a temp we can mark the offset
 				// label.
 				mark_offset_label(i - 2);	// minus 2 removes our oparg
@@ -1334,7 +1424,14 @@ private:
 				auto error = m_il.define_local(Parameter(CORINFO_TYPE_INT));
 				m_il.ld_loca(error);
 
-				m_il.emit_call(SIG_ITERNEXT_TOKEN);
+				if (inLoop) {
+					m_il.ld_loca(loopOpt1);
+					m_il.ld_loca(loopOpt2);
+					m_il.emit_call(SIG_ITERNEXT_OPTIMIZED_TOKEN);
+				}
+				else{
+					m_il.emit_call(SIG_ITERNEXT_TOKEN);
+				}
 				auto processValue = m_il.define_label();
 				m_il.dup();
 				m_il.push_ptr(nullptr);
@@ -1343,6 +1440,8 @@ private:
 
 				// iteration has ended, or an exception was raised...
 				m_il.pop();
+				m_il.ld_loc(iterValue);
+				decref();
 				m_il.ld_loc(error);
 				check_int_error(i);
 
@@ -1434,7 +1533,6 @@ private:
 				break;
 			case SETUP_EXCEPT:
 			{
-				// TODO :: Need to save existing exception state...
 				auto handlerLabel = getOffsetLabel(oparg + i + 1);
 				auto blockInfo = BlockInfo(m_il.define_label(), m_il.define_label(), handlerLabel, oparg + i + 1, SETUP_EXCEPT);
 				blockInfo.ExVars = ExceptionVars(
@@ -1600,6 +1698,8 @@ private:
 					}
 
 					// re-raise the exception...
+					free_iter_locals_on_exception();
+
 					m_il.ld_loc(tb);
 					m_il.ld_loc(ehVal);
 					m_il.ld_loc(finallyReason);
@@ -1617,6 +1717,7 @@ private:
 				else{
 					// END_FINALLY is marking the EH rethrow.  The byte code branches
 					// around this in the non-exceptional case.
+					free_iter_locals_on_exception();
 					m_il.setStackDepth(3);
 					m_il.emit_call(METHOD_PYERR_RESTORE);
 					m_il.branch(BranchAlways, GetEHBlock().ReRaise);
@@ -1739,10 +1840,10 @@ private:
 };
 
 extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
-	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
-		// TODO: Remove me, currently we can't compile encodings\aliases.py.
-		return nullptr;
-	}
+	//if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
+	//	// TODO: Remove me, currently we can't compile encodings\aliases.py.
+	//	return nullptr;
+	//}
 #ifdef DEBUG_TRACE
 	static int compileCount = 0, failCount = 0;
 	printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n", 
@@ -1984,7 +2085,31 @@ extern "C" __declspec(dllexport) void JitInit() {
 		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
 		&Call0
 		);
-	
+	g_module->m_methods[METHOD_CALL1_TOKEN] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
+		&Call1
+		);
+	g_module->m_methods[METHOD_CALL2_TOKEN] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)  },
+		&Call2
+		);
+	g_module->m_methods[METHOD_CALL3_TOKEN] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)  },
+		&Call3
+		);
+	g_module->m_methods[METHOD_CALL4_TOKEN] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)  },
+		&Call4
+		);
+
 	g_module->m_methods[METHOD_CALLN_TOKEN] = Method(
 		nullptr,
 		CORINFO_TYPE_NATIVEINT,
@@ -2373,6 +2498,33 @@ extern "C" __declspec(dllexport) void JitInit() {
 		&PyJit_FunctionSetKwDefaults
 		);
 	
+	g_module->m_methods[METHOD_IS] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
+		&PyJit_Is
+		);
+	g_module->m_methods[METHOD_ISNOT] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
+		&PyJit_IsNot
+		);
+
+	g_module->m_methods[METHOD_GETITER_OPTIMIZED_TOKEN] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
+		&PyJit_GetIterOptimized
+		);
+
+	g_module->m_methods[SIG_ITERNEXT_OPTIMIZED_TOKEN] = Method(
+		nullptr,
+		CORINFO_TYPE_NATIVEINT,
+		std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
+		&PyJit_IterNextOptimized
+		);
+
 	//g_module->m_methods[SIG_ITERNEXT_TOKEN] = Method(
 	//	nullptr,
 	//	CORINFO_TYPE_NATIVEINT,

@@ -164,6 +164,8 @@ int PyJit_DeleteGlobal(PyFrameObject* f, PyObject* name);
 PyObject* PyJit_LoadGlobal(PyFrameObject* f, PyObject* name);
 
 PyObject* PyJit_GetIter(PyObject* iterable);
+PyObject* PyJit_GetIterOptimized(PyObject* iterable, size_t* iterstate1, size_t* iterstate2);
+PyObject* PyJit_IterNextOptimized(PyObject* iter, int*error, size_t* iterstate1, size_t* iterstate2);
 
 PyObject* PyJit_IterNext(PyObject* iter, int*error);
 
@@ -194,7 +196,14 @@ PyObject* PyJit_LoadName(PyFrameObject* f, PyObject* name);
 int PyJit_StoreName(PyObject* v, PyFrameObject* f, PyObject* name);
 int PyJit_DeleteName(PyFrameObject* f, PyObject* name);
 
+PyObject* PyJit_Is(PyObject* lhs, PyObject* rhs);
+PyObject* PyJit_IsNot(PyObject* lhs, PyObject* rhs);
+
 PyObject* Call0(PyObject *target);
+PyObject* Call1(PyObject *target, PyObject* arg0);
+PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1);
+PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2);
+PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3);
 
 extern PyObject* g_emptyTuple;
 

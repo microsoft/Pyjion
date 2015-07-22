@@ -97,6 +97,9 @@
 #define METHOD_PY_IMPORTSTAR				0x00000046
 #define METHOD_PY_FUNC_SET_ANNOTATIONS		0x00000047
 #define METHOD_PY_FUNC_SET_KW_DEFAULTS		0x00000048
+#define METHOD_IS							0x00000049
+#define METHOD_ISNOT						0x0000004A
+#define METHOD_GETITER_OPTIMIZED_TOKEN		0x0000004B
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -132,6 +135,7 @@
 
 // signatures for calli methods
 #define SIG_ITERNEXT_TOKEN			0x00040000
+#define SIG_ITERNEXT_OPTIMIZED_TOKEN	0x00040001
 
 extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code);
 extern "C" __declspec(dllexport) void JitInit();

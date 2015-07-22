@@ -73,6 +73,10 @@ void PyJitTest() {
 
 	TestCase cases[] = {
 		TestCase(
+		"def f():\n    for i in range(5):\n        try:\n            break\n        finally:\n            return i",
+		TestInput("0")
+		),
+		TestCase(
 		"def f():\n    try:\n        raise Exception(2)\n    except Exception as e:\n        return e.args[0]",
 		TestInput("2")
 		),
@@ -202,10 +206,6 @@ void PyJitTest() {
 			),
 			TestCase(
 			"def f():\n    for i in range(5):\n        try:\n            continue\n        finally:\n            return i",
-			TestInput("0")
-			),
-			TestCase(
-			"def f():\n    for i in range(5):\n        try:\n            break\n        finally:\n            return i",
 			TestInput("0")
 			),
 			TestCase(
