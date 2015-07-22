@@ -58,7 +58,7 @@ class LabelInfo {
 public:
 	int m_location;
 	vector<int> m_branchOffsets;
-	int m_stackDepth;
+	size_t m_stackDepth;
 
 	LabelInfo() {
 		m_location = -1;
@@ -72,7 +72,7 @@ class ILGenerator {
 	CorInfoType m_retType;
 	Module* m_module;
 	unordered_map<CorInfoType, vector<Local>> m_freedLocals;
-	int m_stackDepth;
+	size_t m_stackDepth;
 
 public:
 	vector<byte> m_il;
@@ -88,11 +88,11 @@ public:
 		m_localCount = 0;
 	}
 
-	int getStackDepth() {
+	size_t getStackDepth() {
 		return m_stackDepth;
 	}
 
-	void setStackDepth(int depth) {
+	void setStackDepth(size_t depth) {
 		m_stackDepth = depth;
 	}
 
@@ -103,6 +103,10 @@ public:
 			existing->second.pop_back();
 			return res;
 		}
+		return define_local_no_cache(param);
+	}
+
+	Local define_local_no_cache(Parameter param) {
 		m_locals.push_back(param);
 		return Local(m_localCount++);
 	}
@@ -153,7 +157,7 @@ public:
 
 	void localloc(){
 		push_back(CEE_PREFIX1);
-		push_back(CEE_LOCALLOC);
+		push_back((byte)CEE_LOCALLOC);
 	}
 
 	void ret() {

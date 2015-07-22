@@ -58,8 +58,9 @@ public:
 		) {
 		//printf("allocMem\r\n");
 		// TODO: Alignment?
+		printf("Code size: %d\r\n", hotCodeSize);
 		auto code = HeapAlloc(m_codeHeap, 0, hotCodeSize);
-		memcpy(code, *hotCodeBlock, hotCodeSize);
+		//memcpy(code, *hotCodeBlock, hotCodeSize);
 		*hotCodeBlock = code;
 	}
 

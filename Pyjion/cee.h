@@ -25,7 +25,7 @@
 
 using namespace std;
 
-class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager, public IUnknown
+class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager
 {
 public:
 	// Thread Local Storage is based on logical threads.  The underlying
@@ -181,7 +181,7 @@ public:
 
 	HRESULT QueryInterface(REFIID iid, void** ppvObject) {
 		if (iid == IID_IUnknown) {
-			*ppvObject = (void*)static_cast<IUnknown*>(this);
+			*ppvObject = (void*)static_cast<IExecutionEngine*>(this);
 			return S_OK;
 		}
 		else if (iid == IID_IExecutionEngine) {
