@@ -18,7 +18,7 @@ goto Usage
 :BuildCoreCLR
 
 pushd coreclr
-build.cmd %__BuildArch% %__BuildType%
+call build.cmd %__BuildArch% %__BuildType%
 IF ERRORLEVEL 1 goto Error
 popd
 
@@ -29,9 +29,9 @@ copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\gcinfo\%__BuildType%\gci
 :BuildPython
 cd Python\PCBuild
 
-get_externals.bat
+call get_externals.bat
 IF ERRORLEVEL 1 goto Error
-.\build.bat -c %__BuildType% -p %__BuildArch__%
+call .\build.bat -c %__BuildType% -p %__BuildArch__%
 IF ERRORLEVEL 1 goto Error
 
 if /i "%__BuildArch%" == "x64" set arch=amd64
