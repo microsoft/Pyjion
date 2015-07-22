@@ -17,7 +17,7 @@ REM # Apply changes to disable COM interop support
 
 echo Disabling COM interop support...
 
-#git apply ..\coreclr.diff
+git apply ..\coreclr.diff
 popd
 
 REM ########################################################

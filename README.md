@@ -17,3 +17,6 @@ This will use git to download CoreCLR and hg to download Python.  It will also p
 
 This will build CoreCLR and Python.
 
+### Running
+Copy the build Pyjion\x64\Debug\pyjit.dll or Pyjion\x64\Release\pyjit.dll
+Launch python_d.exe or python.exe
