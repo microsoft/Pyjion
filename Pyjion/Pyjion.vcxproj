@@ -35,7 +35,6 @@
     <ProjectGuid>{0B2F9AA3-F525-4042-B8C9-74F8B10F9D62}</ProjectGuid>
     <RootNamespace>JitTest</RootNamespace>
     <ProjectName>Pyjion</ProjectName>
-    <IncludePath>$(MSBuildProjectDirectory)\..\CoreClr\src\pal\prebuilt\inc;$(MSBuildProjectDirectory)\..\coreclr\src\inc\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include;$(IncludePath);$(MSBuildProjectDirectory)\..\Python\Include;$(MSBuildProjectDirectory)\..\Python\PC</IncludePath>
     <Platform>x64</Platform>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -66,6 +65,9 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <IncludePath>$(WindowsSDK_IncludePath);$(MSBuildProjectDirectory)\..\CoreClr\src\pal\prebuilt\inc;$(MSBuildProjectDirectory)\..\coreclr\src\inc\;C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include;$(IncludePath);$(MSBuildProjectDirectory)\..\Python\Include;$(MSBuildProjectDirectory)\..\Python\PC</IncludePath>
+  </PropertyGroup>
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -89,7 +91,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetExt>.dll</TargetExt>
     <TargetName>pyjit</TargetName>
-    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform)</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -156,7 +158,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);libs\Release\clrjit.lib;libs\Release\utilcode.lib;advapi32.lib ;OleAut32.lib;libs\Release\gcinfo.lib;user32.lib;python36.lib</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);clrjit.lib;utilcode.lib;advapi32.lib ;OleAut32.lib;gcinfo.lib;user32.lib;python36.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
