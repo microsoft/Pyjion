@@ -1752,7 +1752,7 @@ private:
 
 			case YIELD_FROM:
 			case YIELD_VALUE:
-				printf("Unsupported opcode: %d (yield related)\r\n", byte);
+				//printf("Unsupported opcode: %d (yield related)\r\n", byte);
 				//_ASSERT(FALSE);
 				return nullptr;
 
@@ -1777,7 +1777,7 @@ private:
 			case WITH_CLEANUP_START:
 			case WITH_CLEANUP_FINISH:
 			default:
-				printf("Unsupported opcode: %d (with related)\r\n", byte);
+				//printf("Unsupported opcode: %d (with related)\r\n", byte);
 				//_ASSERT(FALSE);
 				return nullptr;
 			}

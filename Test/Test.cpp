@@ -98,6 +98,10 @@ void PyJitTest() {
 
 	TestCase cases[] = {
 		TestCase(
+		"def f():\n    for i in {2:3}:\n        pass\n    return i",
+		TestInput("2")
+		),
+		TestCase(
 		"def f():\n    for i in range(5):\n        try:\n            break\n        finally:\n            return i",
 		TestInput("0")
 		),
