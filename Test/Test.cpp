@@ -31,6 +31,7 @@ using namespace std;
 PyCodeObject* CompileCode(const char* code) {
     auto globals = PyDict_New();
     auto locals = PyDict_New();
+    PyRun_String("finalized = False\nclass RefCountCheck:\n    def __del__(self):\n        global finalized\n        finalized = True", Py_file_input, globals, locals);
     PyRun_String(code, Py_file_input, globals, locals);
     auto func = PyObject_GetItem(locals, PyUnicode_FromString("f"));
     auto codeObj = (PyCodeObject*)PyObject_GetAttrString(func, "__code__");

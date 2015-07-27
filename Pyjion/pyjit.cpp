@@ -1254,10 +1254,10 @@ private:
 
                 int clearEh = -1;
                 bool inFinally = false;
-                for (size_t i = m_blockStack.size() - 1; i != (-1); i--) {
-                    if (m_blockStack[i].Kind == SETUP_FINALLY) {
+                for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != (-1); blockIndex--) {
+                    if (m_blockStack[blockIndex].Kind == SETUP_FINALLY) {
                         // we need to run the finally before returning...
-                        m_blockStack.data()[i].Flags |= BLOCK_RETURNS;
+                        m_blockStack.data()[blockIndex].Flags |= BLOCK_RETURNS;
 
                         if (!inFinally) {
                             // Only emit the store and branch to the inner most finally, but
@@ -1267,12 +1267,12 @@ private:
                             if (clearEh != -1) {
                                 unwind_eh(m_blockStack[clearEh].ExVars);
                             }
-                            free_all_iter_locals(i);
+                            free_all_iter_locals(blockIndex);
                             m_il.ld_i4(BLOCK_RETURNS);
-                            m_il.branch(BranchAlways, m_blockStack[i].ErrorTarget);
+                            m_il.branch(BranchAlways, m_blockStack[blockIndex].ErrorTarget);
                         }
                     }
-                    else if (m_blockStack[i].Kind == POP_EXCEPT || m_blockStack[i].Kind == END_FINALLY) {
+                    else if (m_blockStack[blockIndex].Kind == POP_EXCEPT || m_blockStack[blockIndex].Kind == END_FINALLY) {
                         // we need to restore the previous exception before we return
                         if (clearEh == -1) {
                             clearEh = i;
@@ -1388,12 +1388,12 @@ private:
                 // GET_ITER can be followed by FOR_ITER, or a CALL_FUNCTION.
                 if (m_byteCode[i + 1] == FOR_ITER) {
                     Local loopOpt1, loopOpt2;
-                    for (int i = m_blockStack.size() - 1; i >= 0; i--) {
-                        if (m_blockStack[i].Kind == SETUP_LOOP) {
+                    for (int blockIndex = m_blockStack.size() - 1; blockIndex >= 0; blockIndex--) {
+                        if (m_blockStack[blockIndex].Kind == SETUP_LOOP) {
                             // save our iter variable so we can free it on break, continue, return, and
                             // when encountering an exception.
-                            m_blockStack.data()[i].LoopOpt1 = loopOpt1 = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-                            m_blockStack.data()[i].LoopOpt2 = loopOpt2 = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+                            m_blockStack.data()[blockIndex].LoopOpt1 = loopOpt1 = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+                            m_blockStack.data()[blockIndex].LoopOpt2 = loopOpt2 = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
                             break;
                         }
                     }
@@ -1422,13 +1422,13 @@ private:
 
                 bool inLoop = false;
                 Local loopOpt1, loopOpt2;
-                for (int i = m_blockStack.size() - 1; i >= 0; i--) {
-                    if (m_blockStack[i].Kind == SETUP_LOOP) {
+                for (int blockIndex = m_blockStack.size() - 1; blockIndex >= 0; blockIndex--) {
+                    if (m_blockStack[blockIndex].Kind == SETUP_LOOP) {
                         // save our iter variable so we can free it on break, continue, return, and
                         // when encountering an exception.
                         m_blockStack.data()[i].LoopVar = iterValue;
-                        loopOpt1 = m_blockStack.data()[i].LoopOpt1;
-                        loopOpt2 = m_blockStack.data()[i].LoopOpt2;
+                        loopOpt1 = m_blockStack.data()[blockIndex].LoopOpt1;
+                        loopOpt2 = m_blockStack.data()[blockIndex].LoopOpt2;
                         inLoop = true;
                         break;
                     }

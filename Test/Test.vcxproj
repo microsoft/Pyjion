@@ -69,12 +69,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\Pyjion;..\Python\Include;..\Python\PC</IncludePath>
-    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform);..\Pyjion\$(Platform)\$(Configuration)\</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform);..\Pyjion\$(Platform)\$(Configuration)\;..\Python\PCBuild\$(Configuration)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\Pyjion;..\Python\Include;..\Python\PC</IncludePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform);$(SolutionDir)$(Platform)\$(Configuration)\;$(MSBuildProjectDirectory)\..\Pyjion\$(Platform)\$(Configuration)\</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform);$(SolutionDir)$(Platform)\$(Configuration)\;$(MSBuildProjectDirectory)\..\$(Platform)\$(Configuration)\;..\Python\PCBuild\$(Configuration)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>

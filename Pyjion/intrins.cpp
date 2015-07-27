@@ -1020,7 +1020,7 @@ raise_error:
 PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg) {
     PyObject* value;
     PyCodeObject* co = frame->f_code;
-    auto idx = oparg - PyTuple_GET_SIZE(co->co_cellvars);
+    size_t idx = oparg - PyTuple_GET_SIZE(co->co_cellvars);
     assert(idx >= 0 && idx < PyTuple_GET_SIZE(co->co_freevars));
     auto name = PyTuple_GET_ITEM(co->co_freevars, idx);
     auto locals = frame->f_locals;
@@ -1349,7 +1349,7 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
             *listRes = l;
             i++;
 
-            auto ll = PyList_GET_SIZE(l);
+            size_t ll = PyList_GET_SIZE(l);
             if (ll < rightSize) {
                 PyErr_Format(PyExc_ValueError, "need more than %zd values to unpack",
                     leftSize + ll);
