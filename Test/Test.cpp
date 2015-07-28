@@ -30,9 +30,15 @@ using namespace std;
 
 PyCodeObject* CompileCode(const char* code) {
     auto globals = PyDict_New();
+    auto builtins = PyThreadState_GET()->interp->builtins;
+    PyDict_SetItemString(globals, "__builtins__", builtins);
+
     auto locals = PyDict_New();
-    PyRun_String("finalized = False\nclass RefCountCheck:\n    def __del__(self):\n        global finalized\n        finalized = True", Py_file_input, globals, locals);
     PyRun_String(code, Py_file_input, globals, locals);
+    if (PyErr_Occurred()) {
+        PyErr_Print();
+        return nullptr;
+    }
     auto func = PyObject_GetItem(locals, PyUnicode_FromString("f"));
     auto codeObj = (PyCodeObject*)PyObject_GetAttrString(func, "__code__");
 
@@ -98,9 +104,25 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
+        //TestCase(
+        //    "def f():\n    try:\n        a = RefCountCheck() + undefined\n        return 'noerr'\n    except:\n        return finalized",
+        //    TestInput("True")
+        //),
+        TestCase(
+            "def f():\n    a = RefCountCheck()\n    del a\n    return finalized",
+            TestInput("True")
+        ),
         TestCase(
             "def f():\n    for i in {2:3}:\n        pass\n    return i",
             TestInput("2")
+        ),
+        TestCase(
+            "def f():\n    for i in range(5):\n        try:\n            break\n        finally:\n            pass",
+            TestInput("None")
+        ),
+        TestCase(
+            "def f():\n    for i in range(5):\n        try:\n            pass\n        finally:\n            return i",
+            TestInput("0")
         ),
         TestCase(
             "def f():\n    for i in range(5):\n        try:\n            break\n        finally:\n            return i",
@@ -597,6 +619,7 @@ void PyJitTest() {
 
     typedef PyObject*(__stdcall * evalFunc)(PyFrameObject*);
 
+
     for (int i = 0; i < _countof(cases); i++) {
         auto curCase = cases[i];
         printf("---\r\n");
@@ -611,6 +634,11 @@ void PyJitTest() {
             auto globals = PyDict_New();
             auto builtins = PyThreadState_GET()->interp->builtins;
             PyDict_SetItemString(globals, "__builtins__", builtins);
+            PyRun_String("finalized = False\nclass RefCountCheck:\n    def __del__(self):\n        print('finalizing')\n        global finalized\n        finalized = True\n    def __add__(self, other):\n        return self", Py_file_input, globals, globals);
+            if (PyErr_Occurred()) {
+                PyErr_Print();
+                return;
+            }
 
             auto frame = PyFrame_New(PyThreadState_Get(), codeObj, globals, PyDict_New());
             for (size_t arg = 0; arg < input.m_args.size(); arg++) {

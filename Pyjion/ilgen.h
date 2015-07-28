@@ -117,14 +117,6 @@ public:
 		m_localCount = 0;
 	}
 
-	size_t getStackDepth() {
-		return m_stackDepth;
-	}
-
-	void setStackDepth(size_t depth) {
-		m_stackDepth = depth;
-	}
-
 	Local define_local(Parameter param) {
 		auto existing = m_freedLocals.find(param.m_type);
 		if (existing != m_freedLocals.end() && existing->second.size() != 0) {

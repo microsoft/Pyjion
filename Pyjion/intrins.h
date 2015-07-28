@@ -233,4 +233,5 @@ PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
 extern PyObject* g_emptyTuple;
 
 
+void PyJit_DebugDecRef(PyObject* value);
 #endif

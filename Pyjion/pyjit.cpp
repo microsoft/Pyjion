@@ -80,13 +80,15 @@ struct BlockInfo {
         ReRaise,		// our re-raise stub label, prepares the exception w/o traceback update
         ErrorTarget;	// the actual label for the handler
     int EndOffset, Kind, Flags, ContinueOffset;
+    size_t BlockId;
     ExceptionVars ExVars;
     Local LoopVar, LoopOpt1, LoopOpt2;
 
     BlockInfo() {
     }
 
-    BlockInfo(Label raise, Label reraise, Label errorTarget, int endOffset, int kind, int flags = 0, int continueOffset = 0) {
+    BlockInfo(size_t blockId, Label raise, Label reraise, Label errorTarget, int endOffset, int kind, int flags = 0, int continueOffset = 0) {
+        BlockId = blockId;
         Raise = raise;
         ReRaise = reraise;
         ErrorTarget = errorTarget;
@@ -128,6 +130,11 @@ class Jitter {
     // Labes that map from a Python byte code offset to an ilgen label.  This allows us to branch to any
     // byte code offset.
     unordered_map<int, Label> m_offsetLabels;
+    // Tracks the depth of the Python stack
+    size_t m_stackDepth, m_blockIds;
+    unordered_map<int, int> m_offsetStackDepth;
+    vector<vector<Label>> m_raiseAndFree;
+
 
 public:
     Jitter(PyCodeObject *code) : m_il(g_module, CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) }){
@@ -205,6 +212,7 @@ private:
         m_il.emit_call(METHOD_PYTUPLE_NEW);
         check_error(-1, "new tuple failed");
         m_il.st_loc(tupleTmp);
+        dec_stack(argCnt);
 
         for (int arg = argCnt - 1; arg >= 0; arg--) {
             // save the argument into a temporary...
@@ -230,8 +238,9 @@ private:
     void build_list(int argCnt) {
         m_il.push_ptr((void*)argCnt);
         m_il.emit_call(METHOD_PYLIST_NEW);
-
+        // TODO: Check for failure
         if (argCnt != 0) {
+            dec_stack(argCnt);
             auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
             auto listTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
             auto listItems = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
@@ -280,12 +289,14 @@ private:
     void build_set(int argCnt) {
         m_il.load_null();
         m_il.emit_call(METHOD_PYSET_NEW);
+        // TODO: Check for error
 
         if (argCnt != 0) {
             auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
             auto setTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 
             m_il.st_loc(setTmp);
+            dec_stack(argCnt);
 
             for (int arg = argCnt - 1; arg >= 0; arg--) {
                 // save the argument into a temporary...
@@ -309,6 +320,7 @@ private:
         m_il.emit_call(METHOD_PYDICT_NEWPRESIZED);
         check_error(-1, "new dict failed");
         {
+            
             // 3.6 doesn't have STORE_OP and instead does it all in BUILD_MAP...
             if (argCnt > 0) {
                 auto map = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
@@ -316,6 +328,7 @@ private:
                 for (int curArg = 0; curArg < argCnt; curArg++) {
                     m_il.ld_loc(map);
                     m_il.emit_call(METHOD_STOREMAP_TOKEN);
+                    dec_stack(2);
                     check_int_error(-1);
                 }
                 m_il.ld_loc(map);
@@ -355,8 +368,34 @@ private:
 
         // TODO: We need to release any objects which are on the stack when we take an
         // error.
-        m_il.branch(BranchLeave, GetEHBlock().Raise);
+        m_il.pop();
+        branch_raise();
         m_il.mark_label(noErr);
+    }
+
+    vector<Label>& getRaiseAndFreeLabels(size_t blockId) {
+        while (m_raiseAndFree.size() <= blockId) {
+            m_raiseAndFree.emplace_back();
+        }
+
+        return m_raiseAndFree.data()[blockId];
+    }
+    
+    void branch_raise() {
+        auto ehBlock = GetEHBlock();
+
+        if (m_stackDepth == 0) {
+            m_il.branch(BranchAlways, ehBlock.Raise);
+        }
+        else{
+            auto& labels = getRaiseAndFreeLabels(ehBlock.BlockId);
+
+            for (size_t i = labels.size(); i < m_stackDepth; i++) {
+                labels.push_back(m_il.define_label());
+            }
+
+            m_il.branch(BranchAlways, labels[m_stackDepth - 1]);
+        }
     }
 
     void check_int_error_leave(int curIndex) {
@@ -374,7 +413,7 @@ private:
 
         // TODO: We need to release any objects which are on the stack when we take an
         // error.
-        m_il.branch(BranchLeave, GetEHBlock().Raise);
+        branch_raise();
         m_il.mark_label(noErr);
     }
 
@@ -396,7 +435,7 @@ private:
     BlockInfo GetEHBlock() {
         for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
             if (m_blockStack[i].Kind != SETUP_LOOP) {
-                return m_blockStack[i];
+                return m_blockStack.data()[i];
             }
         }
         assert(FALSE);
@@ -451,7 +490,7 @@ private:
     // Frees our iteration temporary variable which gets allocated when we hit
     // a FOR_ITER.  Used when we're breaking from the current loop.
     void free_iter_local() {
-        for (int i = m_blockStack.size() - 1; i >= 0; i--) {
+        for (size_t i = m_blockStack.size() - 1; i >= 0; i--) {
             if (m_blockStack[i].Kind == SETUP_LOOP) {
                 if (m_blockStack[i].LoopVar.is_valid()) {
                     m_il.ld_loc(m_blockStack[i].LoopVar);
@@ -464,8 +503,8 @@ private:
 
     // Frees all of the iteration variables in a range. Used when we're
     // going to branch to a finally through multiple loops.
-    void free_all_iter_locals(int to = 0) {
-        for (int i = m_blockStack.size() - 1; i >= to; i--) {
+    void free_all_iter_locals(size_t to = 0) {
+        for (size_t i = m_blockStack.size() - 1; i != to - 1; i--) {
             if (m_blockStack[i].Kind == SETUP_LOOP) {
                 if (m_blockStack[i].LoopVar.is_valid()) {
                     m_il.ld_loc(m_blockStack[i].LoopVar);
@@ -492,6 +531,15 @@ private:
         }
     }
 
+    void dec_stack(int size = 1) {
+        _ASSERTE(m_stackDepth >= size);
+        m_stackDepth -= size;
+    }
+
+    void inc_stack(int size = 1) {
+        m_stackDepth += size;
+    }
+
     PVOID CompileWorker() {
         int oparg;
         Label ok;
@@ -516,7 +564,7 @@ private:
         load_frame();
         m_il.emit_call(METHOD_PY_PUSHFRAME);
 
-        m_blockStack.push_back(BlockInfo(raiseLabel, reraiseLabel, Label(), -1, NOP));
+        m_blockStack.push_back(BlockInfo(m_blockIds++, raiseLabel, reraiseLabel, Label(), -1, NOP));
 
         auto tb = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
         auto ehVal = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
@@ -539,6 +587,11 @@ private:
                 mark_offset_label(i);
             }
 
+            auto curStackDepth = m_offsetStackDepth.find(i);
+            if (curStackDepth != m_offsetStackDepth.end()) {
+                m_stackDepth = curStackDepth->second;
+            }
+
             // update f_lasti
             if (!can_skip_lasti_update(m_byteCode[i])) {
                 m_il.ld_loc(lasti);
@@ -551,8 +604,7 @@ private:
             }
         processOpCode:
             switch (byte) {
-            case NOP:
-                break;
+            case NOP: break;
             case ROT_TWO:
             {
                 auto top = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
@@ -588,9 +640,11 @@ private:
             }
             break;
             case POP_TOP:
+                dec_stack();
                 decref();
                 break;
             case DUP_TOP:
+                inc_stack();
                 m_il.dup();
                 m_il.dup();
                 incref();
@@ -600,6 +654,7 @@ private:
                 auto top = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
                 auto second = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 
+                inc_stack(2);
                 m_il.st_loc(top);
                 m_il.st_loc(second);
 
@@ -623,8 +678,14 @@ private:
                 // TODO: We could look at the next op, and if it's branch avoid some overhead.
                 auto compareType = oparg;
                 switch (compareType) {
-                case PyCmp_IS: m_il.emit_call(METHOD_IS); break;
-                case PyCmp_IS_NOT: m_il.emit_call(METHOD_ISNOT); break;
+                case PyCmp_IS: 
+                    m_il.emit_call(METHOD_IS);
+                    dec_stack();
+                    break;
+                case PyCmp_IS_NOT: 
+                    m_il.emit_call(METHOD_ISNOT); 
+                    dec_stack();
+                    break;
                     //	// TODO: Missing dec refs here...
                     //{
                     //	Label same = m_il.define_label();
@@ -641,20 +702,28 @@ private:
                     //	break;
                 case PyCmp_IN:
                     m_il.emit_call(METHOD_CONTAINS_TOKEN);
+                    dec_stack(2);
                     check_error(i, "contains");
+                    inc_stack();
                     break;
                 case PyCmp_NOT_IN:
                     m_il.emit_call(METHOD_NOTCONTAINS_TOKEN);
+                    dec_stack(2);
                     check_error(i, "not contains");
+                    inc_stack();
                     break;
                 case PyCmp_EXC_MATCH:
                     m_il.emit_call(METHOD_COMPARE_EXCEPTIONS);
+                    dec_stack(2);
                     check_error(i, "compare ex");
+                    inc_stack();
                     break;
                 default:
                     m_il.ld_i(oparg);
                     m_il.emit_call(METHOD_RICHCMP_TOKEN);
+                    dec_stack(2);
                     check_error(i, "rich cmp");
+                    inc_stack();
                     break;
                 }
             }
@@ -663,6 +732,7 @@ private:
                 // offset is relative to end of current instruction
                 m_blockStack.push_back(
                     BlockInfo(
+                    m_blockStack.back().BlockId,
                     m_blockStack.back().Raise,
                     m_blockStack.back().ReRaise,
                     m_blockStack.back().ErrorTarget,
@@ -739,13 +809,16 @@ private:
                 load_frame();
                 m_il.emit_call(METHOD_GETBUILDCLASS_TOKEN);
                 check_error(i, "get build class");
+                inc_stack();
                 break;
             case JUMP_ABSOLUTE:
             {
+                m_offsetStackDepth[oparg] = m_stackDepth;
                 m_il.branch(BranchAlways, getOffsetLabel(oparg));
                 break;
             }
             case JUMP_FORWARD:
+                m_offsetStackDepth[oparg + i + 1] = m_stackDepth;
                 m_il.branch(BranchAlways, getOffsetLabel(oparg + i + 1));
                 break;
             case JUMP_IF_FALSE_OR_POP:
@@ -777,6 +850,7 @@ private:
                 m_il.mark_label(willJump);
 
                 m_il.ld_loc(tmp);	// load the value back onto the stack
+                m_offsetStackDepth[oparg] = m_stackDepth;
                 m_il.branch(BranchAlways, getOffsetLabel(oparg));
 
                 m_il.mark_label(noJump);
@@ -786,6 +860,7 @@ private:
                 decref();
 
                 m_il.free_local(tmp);
+                dec_stack();
             }
             break;
             case POP_JUMP_IF_TRUE:
@@ -818,6 +893,8 @@ private:
 
                 m_il.mark_label(noJump);
                 decref();
+                dec_stack();
+                m_offsetStackDepth[oparg] = m_stackDepth;
             }
             break;
             case LOAD_NAME:
@@ -825,31 +902,36 @@ private:
                 m_il.push_ptr(PyTuple_GetItem(m_code->co_names, oparg));
                 m_il.emit_call(METHOD_LOADNAME_TOKEN);
                 check_error(i, "load name");
+                inc_stack();
                 break;
             case STORE_ATTR:
-            {
-                auto globalName = PyTuple_GetItem(m_code->co_names, oparg);
-                m_il.push_ptr(globalName);
-            }
-            m_il.emit_call(METHOD_STOREATTR_TOKEN);
-            check_int_error(i);
-            break;
+                {
+                    auto globalName = PyTuple_GetItem(m_code->co_names, oparg);
+                    m_il.push_ptr(globalName);
+                }
+                m_il.emit_call(METHOD_STOREATTR_TOKEN);
+                dec_stack(2);
+                check_int_error(i);
+                break;
             case DELETE_ATTR:
-            {
-                auto globalName = PyTuple_GetItem(m_code->co_names, oparg);
-                m_il.push_ptr(globalName);
-            }
-            m_il.emit_call(METHOD_DELETEATTR_TOKEN);
-            check_int_error(i);
-            break;
+                {
+                    auto globalName = PyTuple_GetItem(m_code->co_names, oparg);
+                    m_il.push_ptr(globalName);
+                }
+                m_il.emit_call(METHOD_DELETEATTR_TOKEN);
+                check_int_error(i);
+                dec_stack();
+                break;
             case LOAD_ATTR:
-            {
-                auto globalName = PyTuple_GetItem(m_code->co_names, oparg);
-                m_il.push_ptr(globalName);
-            }
-            m_il.emit_call(METHOD_LOADATTR_TOKEN);
-            check_error(i, "load attr");
-            break;
+                {
+                    auto globalName = PyTuple_GetItem(m_code->co_names, oparg);
+                    m_il.push_ptr(globalName);
+                }
+                m_il.emit_call(METHOD_LOADATTR_TOKEN);
+                dec_stack();
+                check_error(i, "load attr");
+                inc_stack();
+                break;
             case STORE_GLOBAL:
                 // value is on the stack
                 load_frame();
@@ -857,6 +939,7 @@ private:
                     auto globalName = PyTuple_GetItem(m_code->co_names, oparg);
                     m_il.push_ptr(globalName);
                 }
+                dec_stack();
                 m_il.emit_call(METHOD_STOREGLOBAL_TOKEN);
                 check_int_error(i);
                 break;
@@ -878,23 +961,26 @@ private:
                 }
                 m_il.emit_call(METHOD_LOADGLOBAL_TOKEN);
                 check_error(i, "load global");
+                inc_stack();
                 break;
             case LOAD_CONST:
                 m_il.push_ptr(PyTuple_GetItem(m_code->co_consts, oparg));
                 m_il.dup();
                 incref();
+                inc_stack();
                 break;
             case STORE_NAME:
                 load_frame();
                 m_il.push_ptr(PyTuple_GetItem(m_code->co_names, oparg));
                 m_il.emit_call(METHOD_STORENAME_TOKEN);
-                //check_int_error(i); // TODO: Enable me
+                dec_stack();
+                check_int_error(i);
                 break;
             case DELETE_NAME:
                 load_frame();
                 m_il.push_ptr(PyTuple_GetItem(m_code->co_names, oparg));
                 m_il.emit_call(METHOD_DELETENAME_TOKEN);
-                //check_int_error(i); // TODO: Enable me
+                check_int_error(i);
                 break;
             case DELETE_FAST:
             {
@@ -905,7 +991,7 @@ private:
                 m_il.branch(BranchNotEqual, valueSet);
                 m_il.push_ptr(PyTuple_GetItem(m_code->co_varnames, oparg));
                 m_il.emit_call(METHOD_UNBOUND_LOCAL);
-                m_il.branch(BranchLeave, GetEHBlock().Raise);
+                branch_raise();
 
                 m_il.mark_label(valueSet);
                 load_local(oparg);
@@ -935,8 +1021,9 @@ private:
                 m_il.st_ind_i();
 
                 m_il.free_local(valueTmp);
+                dec_stack();
             }
-            break;
+                break;
             case LOAD_FAST:
                 /* PyObject *value = GETLOCAL(oparg); */
             {
@@ -953,18 +1040,20 @@ private:
                 m_il.pop();
                 m_il.push_ptr(PyTuple_GetItem(m_code->co_varnames, oparg));
                 m_il.emit_call(METHOD_UNBOUND_LOCAL);
-                m_il.branch(BranchLeave, GetEHBlock().Raise);
+                branch_raise();
 
                 m_il.mark_label(valueSet);
 
                 m_il.dup();
                 incref();
+                inc_stack();
             }
             break;
             case UNPACK_SEQUENCE:
             {
                 auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
                 m_il.st_loc(valueTmp); // save the sequence
+                dec_stack();
 
                 // load the iterable, the count, and our temporary 
                 // storage if we need to iterate over the object.
@@ -977,9 +1066,10 @@ private:
                 m_il.dup();
                 m_il.load_null();
                 m_il.branch(BranchNotEqual, noErr);
+                m_il.pop();
                 m_il.ld_loc(valueTmp);
                 decref();
-                m_il.branch(BranchLeave, GetEHBlock().Raise);
+                branch_raise();
 
                 m_il.mark_label(noErr);
                 auto fastTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
@@ -997,6 +1087,7 @@ private:
                     m_il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
                     m_il.add();
                     m_il.ld_ind_i();
+                    inc_stack();
                 }
 
                 m_il.ld_loc(valueTmp);
@@ -1012,6 +1103,7 @@ private:
                 auto listTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
                 auto remainderTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
                 m_il.st_loc(valueTmp); // save the sequence
+                dec_stack();
 
                 // load the iterable, the sizes, and our temporary 
                 // storage if we need to iterate over the object, 
@@ -1037,11 +1129,12 @@ private:
                     m_il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
                     m_il.add();
                     m_il.ld_ind_i();
+                    inc_stack();
                 }
 
                 // load the list
                 m_il.ld_loc(listTmp);
-
+                inc_stack();
                 // load the left hand side
                 //while (oparg--) {
                 //	item = items[oparg];
@@ -1055,6 +1148,7 @@ private:
                     m_il.push_ptr((void*)(tmpOpArg * sizeof(size_t)));
                     m_il.add();
                     m_il.ld_ind_i();
+                    inc_stack();
                 }
 
                 m_il.ld_loc(valueTmp);
@@ -1081,6 +1175,7 @@ private:
                 if (flags & CALL_FLAG_KW) {
                     // kw args dict is last on the stack, save it....
                     m_il.st_loc(varKwArgs);
+                    dec_stack();
                 }
 
                 Local map;
@@ -1094,6 +1189,7 @@ private:
                 if (flags & CALL_FLAG_VAR) {
                     // then save var args...
                     m_il.st_loc(varArgs);
+                    dec_stack();
                 }
 
                 // now we have the normal args (if any), and then the function
@@ -1128,7 +1224,7 @@ private:
                 else{
                     m_il.load_null();
                 }
-
+                dec_stack(); // for the callable
                 // finally emit the call to our helper...
                 m_il.emit_call(METHOD_PY_FANCYCALL);
                 check_error(i, "fancy call");
@@ -1138,6 +1234,8 @@ private:
                 if (nk != 0) {
                     m_il.free_local(map);
                 }
+                // the result is back...
+                inc_stack();
             }
             break;
             case CALL_FUNCTION:
@@ -1152,11 +1250,14 @@ private:
                     switch (argCnt) {
                     case 0:
                         m_il.emit_call(METHOD_CALL0_TOKEN);
-                        check_error(i, "call 0"); break;
-                    case 1: m_il.emit_call(METHOD_CALL1_TOKEN); check_error(i, "call 1"); break;
-                    case 2: m_il.emit_call(METHOD_CALL2_TOKEN); check_error(i, "call 2"); break;
-                    case 3: m_il.emit_call(METHOD_CALL3_TOKEN); check_error(i, "call 3"); break;
-                    case 4: m_il.emit_call(METHOD_CALL4_TOKEN); check_error(i, "call 4"); break; /*
+                        dec_stack();
+                        check_error(i, "call 0"); 
+                        inc_stack();
+                        break;
+                    case 1: m_il.emit_call(METHOD_CALL1_TOKEN); dec_stack(2); check_error(i, "call 1"); inc_stack(); break;
+                    case 2: m_il.emit_call(METHOD_CALL2_TOKEN); dec_stack(3); check_error(i, "call 2"); inc_stack(); break;
+                    case 3: m_il.emit_call(METHOD_CALL3_TOKEN); dec_stack(4); check_error(i, "call 3"); inc_stack(); break;
+                    case 4: m_il.emit_call(METHOD_CALL4_TOKEN); dec_stack(5); check_error(i, "call 4"); inc_stack(); break; /*
                     case 5: emit_call(m_il, METHOD_CALL5_TOKEN); break;
                     case 6: emit_call(m_il, METHOD_CALL6_TOKEN); break;
                     case 7: emit_call(m_il, METHOD_CALL7_TOKEN); break;
@@ -1167,8 +1268,11 @@ private:
                         build_tuple(argCnt);
 
                         // target is on the stack already...
+
                         m_il.emit_call(METHOD_CALLN_TOKEN);
+                        dec_stack();
                         check_error(i, "call n");
+                        inc_stack();
                         break;
                     }
                 }
@@ -1180,7 +1284,9 @@ private:
                     build_tuple(argCnt);
                     m_il.ld_loc(map);
                     m_il.emit_call(METHOD_CALLNKW_TOKEN);
+                    dec_stack();
                     check_error(i, "call nkw");
+                    inc_stack();
                     m_il.free_local(map);
                     break;
                 }
@@ -1193,12 +1299,15 @@ private:
                 else{
                     build_tuple(oparg);
                 }
+                inc_stack();
                 break;
             case BUILD_LIST:
                 build_list(oparg);
+                inc_stack();
                 break;
             case BUILD_MAP:
                 build_map(oparg);
+                inc_stack();
                 break;
 #if PY_MINOR_VERSION == 5
             case STORE_MAP:
@@ -1209,50 +1318,73 @@ private:
 #endif
             case STORE_SUBSCR:
                 // stack is value, container, index
+                dec_stack(3);
                 m_il.emit_call(METHOD_STORESUBSCR_TOKEN);
                 check_int_error(i);
                 break;
             case DELETE_SUBSCR:
                 // stack is container, index
+                dec_stack(2);
                 m_il.emit_call(METHOD_DELETESUBSCR_TOKEN);
                 check_int_error(i);
                 break;
             case BUILD_SLICE:
+                dec_stack(oparg);
                 if (oparg != 3) {
                     m_il.load_null();
                 }
                 m_il.emit_call(METHOD_BUILD_SLICE);
+                inc_stack();
                 break;
             case BUILD_SET:
                 build_set(oparg);
+                inc_stack();
                 break;
             case UNARY_POSITIVE:
+                dec_stack();
                 m_il.emit_call(METHOD_UNARY_POSITIVE);
+                check_error(i, "unary positive");
+                inc_stack();
                 break;
             case UNARY_NEGATIVE:
+                dec_stack();
                 m_il.emit_call(METHOD_UNARY_NEGATIVE);
+                check_error(i, "unary negative");
+                inc_stack();
                 break;
-            case UNARY_NOT: m_il.emit_call(METHOD_UNARY_NOT); check_error(i, "not"); break;
-            case UNARY_INVERT: m_il.emit_call(METHOD_UNARY_INVERT); check_error(i, "invert");  break;
-            case BINARY_SUBSCR: m_il.emit_call(METHOD_SUBSCR_TOKEN); check_error(i, "subscr"); break;
-            case BINARY_ADD: m_il.emit_call(METHOD_ADD_TOKEN); check_error(i, "add"); break;
-            case BINARY_TRUE_DIVIDE: m_il.emit_call(METHOD_DIVIDE_TOKEN); check_error(i, "true divide"); break;
-            case BINARY_FLOOR_DIVIDE: m_il.emit_call(METHOD_FLOORDIVIDE_TOKEN); check_error(i, "floor divide"); break;
-            case BINARY_POWER: m_il.emit_call(METHOD_POWER_TOKEN); check_error(i, "power"); break;
-            case BINARY_MODULO: m_il.emit_call(METHOD_MODULO_TOKEN); check_error(i, "modulo"); break;
-            case BINARY_MATRIX_MULTIPLY: m_il.emit_call(METHOD_MATRIX_MULTIPLY_TOKEN); check_error(i, "matrix multi"); break;
-            case BINARY_LSHIFT: m_il.emit_call(METHOD_BINARY_LSHIFT_TOKEN); check_error(i, "lshift"); break;
-            case BINARY_RSHIFT: m_il.emit_call(METHOD_BINARY_RSHIFT_TOKEN); check_error(i, "rshift"); break;
-            case BINARY_AND: m_il.emit_call(METHOD_BINARY_AND_TOKEN); check_error(i, "and"); break;
-            case BINARY_XOR: m_il.emit_call(METHOD_BINARY_XOR_TOKEN); check_error(i, "xor"); break;
-            case BINARY_OR: m_il.emit_call(METHOD_BINARY_OR_TOKEN); check_error(i, "or"); break;
-            case BINARY_MULTIPLY: m_il.emit_call(METHOD_MULTIPLY_TOKEN); check_error(i, "multiply"); break;
-            case BINARY_SUBTRACT: m_il.emit_call(METHOD_SUBTRACT_TOKEN); check_error(i, "subtract"); break;
+            case UNARY_NOT: 
+                dec_stack(1);
+                m_il.emit_call(METHOD_UNARY_NOT);
+                check_error(i, "not");
+                inc_stack();
+                break;
+            case UNARY_INVERT:
+                dec_stack(1);
+                m_il.emit_call(METHOD_UNARY_INVERT);
+                check_error(i, "not");
+                inc_stack();
+                break;
+            case BINARY_SUBSCR: binary_op(METHOD_SUBSCR_TOKEN, i, "subscr"); break;
+            case BINARY_ADD: binary_op(METHOD_ADD_TOKEN, i, "add"); break;
+            case BINARY_TRUE_DIVIDE: binary_op(METHOD_DIVIDE_TOKEN, i, "true divide"); break;
+            case BINARY_FLOOR_DIVIDE: binary_op(METHOD_FLOORDIVIDE_TOKEN, i, "floor divide"); break;
+            case BINARY_POWER: binary_op(METHOD_POWER_TOKEN, i, "power"); break;
+            case BINARY_MODULO: binary_op(METHOD_MODULO_TOKEN, i, "modulo"); break;
+            case BINARY_MATRIX_MULTIPLY: binary_op(METHOD_MATRIX_MULTIPLY_TOKEN, i, "matrix multi"); break;
+            case BINARY_LSHIFT: binary_op(METHOD_BINARY_LSHIFT_TOKEN, i, "lshift"); break;
+            case BINARY_RSHIFT: binary_op(METHOD_BINARY_RSHIFT_TOKEN, i, "rshift"); break;
+            case BINARY_AND: binary_op(METHOD_BINARY_AND_TOKEN, i, "and"); break;
+            case BINARY_XOR: binary_op(METHOD_BINARY_XOR_TOKEN, i, "xor"); break;
+            case BINARY_OR: binary_op(METHOD_BINARY_OR_TOKEN, i, "or"); break;
+            case BINARY_MULTIPLY: binary_op(METHOD_MULTIPLY_TOKEN, i, "multiply"); break;
+            case BINARY_SUBTRACT: binary_op(METHOD_SUBTRACT_TOKEN, i, "subtract"); break;
             case RETURN_VALUE:
             {
+                dec_stack();
+
                 m_il.st_loc(retValue);
 
-                int clearEh = -1;
+                size_t clearEh = -1;
                 bool inFinally = false;
                 for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != (-1); blockIndex--) {
                     if (m_blockStack[blockIndex].Kind == SETUP_FINALLY) {
@@ -1275,7 +1407,7 @@ private:
                     else if (m_blockStack[blockIndex].Kind == POP_EXCEPT || m_blockStack[blockIndex].Kind == END_FINALLY) {
                         // we need to restore the previous exception before we return
                         if (clearEh == -1) {
-                            clearEh = i;
+                            clearEh = blockIndex;
                         }
                     }
                 }
@@ -1311,9 +1443,11 @@ private:
 
                 load_frame();
                 m_il.emit_call(METHOD_NEWFUNCTION_TOKEN);
+                dec_stack(2);
 
                 if (byte == MAKE_CLOSURE) {
                     m_il.emit_call(METHOD_SET_CLOSURE);
+                    dec_stack();
                 }
                 if (num_annotations > 0 || kwdefaults > 0 || posdefaults > 0) {
                     auto func = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
@@ -1323,6 +1457,7 @@ private:
                         //PyObject* values, PyObject* names, PyObject* func
                         auto names = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
                         m_il.st_loc(names);
+                        dec_stack(1);
 
                         // for whatever reason ceval.c has "assert(num_annotations == name_ix+1);", where
                         // name_ix is the numbe of elements in the names tuple.  Otherwise num_annotations
@@ -1350,6 +1485,7 @@ private:
                     }
                     m_il.ld_loc(func);
                 }
+                inc_stack();
                 break;
             }
             case LOAD_DEREF:
@@ -1360,8 +1496,10 @@ private:
                 //m_il.ld_ind_i();
                 m_il.emit_call(METHOD_PYCELL_GET);
                 check_error(i, "pycell get");
+                inc_stack();
                 break;
             case STORE_DEREF:
+                dec_stack();
                 load_frame();
                 m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + oparg) * sizeof(size_t));
                 m_il.add();
@@ -1383,12 +1521,13 @@ private:
                 m_il.ld_ind_i();
                 m_il.dup();
                 incref();
+                inc_stack();
                 break;
             case GET_ITER:
                 // GET_ITER can be followed by FOR_ITER, or a CALL_FUNCTION.
                 if (m_byteCode[i + 1] == FOR_ITER) {
                     Local loopOpt1, loopOpt2;
-                    for (int blockIndex = m_blockStack.size() - 1; blockIndex >= 0; blockIndex--) {
+                    for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != (-1); blockIndex--) {
                         if (m_blockStack[blockIndex].Kind == SETUP_LOOP) {
                             // save our iter variable so we can free it on break, continue, return, and
                             // when encountering an exception.
@@ -1400,11 +1539,15 @@ private:
                     m_il.ld_loca(loopOpt1);
                     m_il.ld_loca(loopOpt2);
                     m_il.emit_call(METHOD_GETITER_OPTIMIZED_TOKEN);
+                    dec_stack();
                     check_error(i, "getiter");
+                    inc_stack();
                 }
                 else{
                     m_il.emit_call(METHOD_GETITER_TOKEN);
+                    dec_stack();
                     check_error(i, "getiter");
+                    inc_stack();
                 }
                 break;
             case FOR_ITER:
@@ -1419,14 +1562,14 @@ private:
                 // oparg is where to jump on break
                 auto iterValue = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
                 m_il.st_loc(iterValue);		// store the value...
-
+                dec_stack();
                 bool inLoop = false;
                 Local loopOpt1, loopOpt2;
-                for (int blockIndex = m_blockStack.size() - 1; blockIndex >= 0; blockIndex--) {
+                for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != -1; blockIndex--) {
                     if (m_blockStack[blockIndex].Kind == SETUP_LOOP) {
                         // save our iter variable so we can free it on break, continue, return, and
                         // when encountering an exception.
-                        m_blockStack.data()[i].LoopVar = iterValue;
+                        m_blockStack.data()[blockIndex].LoopVar = iterValue;
                         loopOpt1 = m_blockStack.data()[blockIndex].LoopOpt1;
                         loopOpt2 = m_blockStack.data()[blockIndex].LoopOpt2;
                         inLoop = true;
@@ -1470,11 +1613,15 @@ private:
                 decref();
                 m_il.ld_loc(error);
                 check_int_error(i);
-
+                // TODO: Need to free iteration value on exception
                 m_il.branch(BranchAlways, getOffsetLabel(i + oparg + 1));
-
-                // leave iter and value on stack
+                
+                // Logically this value is on the Python stack, but we've 
+                // taken it off and won't need to free it.
+                m_offsetStackDepth[i + oparg + 1] = m_stackDepth;
+                
                 m_il.mark_label(processValue);
+                inc_stack();
                 m_il.free_local(error);
             }
             break;
@@ -1484,40 +1631,49 @@ private:
                 // iterable off the stack, and oparg here is based upon the stacking
                 // of the generator indexes, so we don't need to spill anything...
                 m_il.emit_call(METHOD_SET_ADD_TOKEN);
+                dec_stack(2);
                 check_error(i, "set add");
+                inc_stack();
             }
             break;
             case MAP_ADD:
             {
                 m_il.emit_call(METHOD_MAP_ADD_TOKEN);
+                dec_stack(3);
                 check_error(i, "map add");
+                inc_stack();
             }
             break;
             case LIST_APPEND:
             {
                 m_il.emit_call(METHOD_LIST_APPEND_TOKEN);
+                dec_stack(2);
                 check_error(i, "list append");
+                inc_stack();
             }
             break;
-            case INPLACE_POWER: m_il.emit_call(METHOD_INPLACE_POWER_TOKEN); check_error(i, "inplace power"); break;
-            case INPLACE_MULTIPLY: m_il.emit_call(METHOD_INPLACE_MULTIPLY_TOKEN); check_error(i, "inplace multiply"); break;
-            case INPLACE_MATRIX_MULTIPLY: m_il.emit_call(METHOD_INPLACE_MATRIX_MULTIPLY_TOKEN); check_error(i, "inplace matrix"); break;
-            case INPLACE_TRUE_DIVIDE: m_il.emit_call(METHOD_INPLACE_TRUE_DIVIDE_TOKEN); check_error(i, "inplace true div"); break;
-            case INPLACE_FLOOR_DIVIDE: m_il.emit_call(METHOD_INPLACE_FLOOR_DIVIDE_TOKEN); check_error(i, "inplace floor div"); break;
-            case INPLACE_MODULO: m_il.emit_call(METHOD_INPLACE_MODULO_TOKEN); check_error(i, "inplace modulo"); break;
+            case INPLACE_POWER: binary_op(METHOD_INPLACE_POWER_TOKEN, i, "inplace power"); break;
+            case INPLACE_MULTIPLY: binary_op(METHOD_INPLACE_MULTIPLY_TOKEN, i, "inplace multiply"); break;
+            case INPLACE_MATRIX_MULTIPLY: binary_op(METHOD_INPLACE_MATRIX_MULTIPLY_TOKEN, i, "inplace matrix"); break;
+            case INPLACE_TRUE_DIVIDE: binary_op(METHOD_INPLACE_TRUE_DIVIDE_TOKEN, i, "inplace true div"); break;
+            case INPLACE_FLOOR_DIVIDE: binary_op(METHOD_INPLACE_FLOOR_DIVIDE_TOKEN, i, "inplace floor div"); break;
+            case INPLACE_MODULO: binary_op(METHOD_INPLACE_MODULO_TOKEN, i, "inplace modulo"); break;
             case INPLACE_ADD:
                 // TODO: We should do the unicode_concatenate ref count optimization
                 m_il.emit_call(METHOD_INPLACE_ADD_TOKEN);
+                dec_stack(2);
                 check_error(i, "inplace add");
+                inc_stack();
                 break;
-            case INPLACE_SUBTRACT: m_il.emit_call(METHOD_INPLACE_SUBTRACT_TOKEN); check_error(i, "inplace subtract"); break;
-            case INPLACE_LSHIFT: m_il.emit_call(METHOD_INPLACE_LSHIFT_TOKEN); check_error(i, "inplace lshift"); break;
-            case INPLACE_RSHIFT:m_il.emit_call(METHOD_INPLACE_RSHIFT_TOKEN); check_error(i, "inplace rshift"); break;
-            case INPLACE_AND: m_il.emit_call(METHOD_INPLACE_AND_TOKEN); check_error(i, "inplace and"); break;
-            case INPLACE_XOR:m_il.emit_call(METHOD_INPLACE_XOR_TOKEN); check_error(i, "inplace xor"); break;
-            case INPLACE_OR: m_il.emit_call(METHOD_INPLACE_OR_TOKEN); check_error(i, "inplace or"); break;
+            case INPLACE_SUBTRACT: binary_op(METHOD_INPLACE_SUBTRACT_TOKEN, i, "inplace subtract"); break;
+            case INPLACE_LSHIFT: binary_op(METHOD_INPLACE_LSHIFT_TOKEN, i, "inplace lshift"); break;
+            case INPLACE_RSHIFT:binary_op(METHOD_INPLACE_RSHIFT_TOKEN, i, "inplace rshift"); break;
+            case INPLACE_AND: binary_op(METHOD_INPLACE_AND_TOKEN, i, "inplace and"); break;
+            case INPLACE_XOR:binary_op(METHOD_INPLACE_XOR_TOKEN, i, "inplace xor"); break;
+            case INPLACE_OR: binary_op(METHOD_INPLACE_OR_TOKEN, i, "inplace or"); break;
             case PRINT_EXPR:
                 m_il.emit_call(METHOD_PRINT_EXPR_TOKEN);
+                dec_stack();
                 check_int_error(i);
                 break;
             case LOAD_CLASSDEREF:
@@ -1525,13 +1681,16 @@ private:
                 m_il.ld_i(oparg);
                 m_il.emit_call(METHOD_LOAD_CLASSDEREF_TOKEN);
                 check_error(i, "class deref");
+                inc_stack();
                 break;
             case RAISE_VARARGS:
                 // do raise (exception, cause)
                 // We can be invoked with no args (bare raise), raise exception, or raise w/ exceptoin and cause
                 switch (oparg) {
-                case 0: m_il.load_null();
-                case 1: m_il.load_null();
+                case 0: 
+                    m_il.load_null();
+                case 1: 
+                    m_il.load_null();
                 case 2:
 #ifdef DEBUG_TRACE
                     char* tmp = (char*)malloc(100);
@@ -1540,6 +1699,7 @@ private:
                     m_il.emit_call(METHOD_DEBUG_TRACE);
 #endif
 
+                    dec_stack(oparg);
                     // raise exc
                     m_il.emit_call(METHOD_DO_RAISE);
                     // returns 1 if we're doing a re-raise in which case we don't need
@@ -1560,7 +1720,7 @@ private:
             case SETUP_EXCEPT:
             {
                 auto handlerLabel = getOffsetLabel(oparg + i + 1);
-                auto blockInfo = BlockInfo(m_il.define_label(), m_il.define_label(), handlerLabel, oparg + i + 1, SETUP_EXCEPT);
+                auto blockInfo = BlockInfo(m_blockIds++, m_il.define_label(), m_il.define_label(), handlerLabel, oparg + i + 1, SETUP_EXCEPT);
                 blockInfo.ExVars = ExceptionVars(
                     m_il.define_local_no_cache(Parameter(CORINFO_TYPE_NATIVEINT)),
                     m_il.define_local_no_cache(Parameter(CORINFO_TYPE_NATIVEINT)),
@@ -1569,11 +1729,12 @@ private:
                 m_blockStack.push_back(blockInfo);
                 m_allHandlers.push_back(blockInfo);
                 m_ehInfo.push_back(EhInfo(false));
+                m_offsetStackDepth[oparg + i + 1] = m_stackDepth + 3;
             }
             break;
             case SETUP_FINALLY: {
                 auto handlerLabel = getOffsetLabel(oparg + i + 1);
-                auto blockInfo = BlockInfo(m_il.define_label(), m_il.define_label(), handlerLabel, oparg + i + 1, SETUP_FINALLY);
+                auto blockInfo = BlockInfo(m_blockIds++, m_il.define_label(), m_il.define_label(), handlerLabel, oparg + i + 1, SETUP_FINALLY);
                 blockInfo.ExVars = ExceptionVars(
                     m_il.define_local_no_cache(Parameter(CORINFO_TYPE_NATIVEINT)),
                     m_il.define_local_no_cache(Parameter(CORINFO_TYPE_NATIVEINT)),
@@ -1614,6 +1775,7 @@ private:
                     // dispatch to all of the previous locations...
                     auto back = m_blockStack.back();
                     auto newBlock = BlockInfo(
+                        back.BlockId,
                         back.Raise,		// if we take a nested exception this is where we go to...
                         back.ReRaise,
                         back.ErrorTarget,
@@ -1660,6 +1822,7 @@ private:
                     // exception handling code will only push the exception type on in this case.
                     auto finallyReason = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
                     auto noException = m_il.define_label();
+                    dec_stack();
                     m_il.st_loc(finallyReason);
                     m_il.ld_loc(finallyReason);
                     m_il.push_ptr(Py_None);
@@ -1717,7 +1880,7 @@ private:
                             }
                         }
                         if (!hasOuterFinally) {
-                            m_il.branch(BranchLeave, retLabel);
+                            m_il.branch(BranchAlways, retLabel);
                         }
 
                         m_il.mark_label(exceptional);
@@ -1743,13 +1906,23 @@ private:
                 else{
                     // END_FINALLY is marking the EH rethrow.  The byte code branches
                     // around this in the non-exceptional case.
-                    free_iter_locals_on_exception();
-                    m_il.setStackDepth(3);
-                    m_il.emit_call(METHOD_PYERR_RESTORE);
-                    m_il.branch(BranchAlways, GetEHBlock().ReRaise);
+                    
+                    // If we haven't seend a branch to this END_FINALLY then we have
+                    // a bare try/except: which handles all exceptions.  In that case
+                    // we have no values to pop off, and this code will never be invoked
+                    // anyway.
+                    if (m_offsetStackDepth.find(i) != m_offsetStackDepth.end()) {
+                        dec_stack(3);
+                        free_iter_locals_on_exception();
+                        m_il.emit_call(METHOD_PYERR_RESTORE);
+                        m_il.branch(BranchAlways, GetEHBlock().ReRaise);
+                    }
+                    else {
+                        printf("...");
+                    }
                 }
             }
-                              break;
+            break;
 
             case YIELD_FROM:
             case YIELD_VALUE:
@@ -1761,18 +1934,23 @@ private:
                 m_il.push_ptr(PyTuple_GetItem(m_code->co_names, oparg));
                 load_frame();
                 m_il.emit_call(METHOD_PY_IMPORTNAME);
+                dec_stack(2);
                 check_error(i, "import name");
+                inc_stack();
                 break;
             case IMPORT_FROM:
                 m_il.dup();
                 m_il.push_ptr(PyTuple_GetItem(m_code->co_names, oparg));
                 m_il.emit_call(METHOD_PY_IMPORTFROM);
                 check_error(i, "import from");
+                inc_stack();
                 break;
             case IMPORT_STAR:
                 load_frame();
                 m_il.emit_call(METHOD_PY_IMPORTSTAR);
+                dec_stack(2);
                 check_int_error(i);
+                inc_stack();
                 break;
             case SETUP_WITH:
             case WITH_CLEANUP_START:
@@ -1782,8 +1960,6 @@ private:
                 //_ASSERT(FALSE);
                 return nullptr;
             }
-
-
         }
 
 
@@ -1793,6 +1969,12 @@ private:
         // little stub and then back up to the correct handler.
         if (m_allHandlers.size() != 0) {
             for (int i = 0; i < m_allHandlers.size(); i++) {
+                auto raiseAndFreeLabels = getRaiseAndFreeLabels(m_allHandlers[i].BlockId);
+                for (size_t curFree = raiseAndFreeLabels.size() - 1; curFree != -1; curFree--) {
+                    m_il.mark_label(raiseAndFreeLabels[curFree]);
+                    decref();
+                }
+
                 m_il.mark_label(m_allHandlers[i].Raise);
 #ifdef DEBUG_TRACE
                 m_il.push_ptr("Exception raised");
@@ -1827,6 +2009,11 @@ private:
         }
 
         // label we branch to for error handling when we have no EH handlers, return NULL.
+        auto raiseAndFreeLabels = getRaiseAndFreeLabels(m_blockStack[0].BlockId);
+        for (size_t curFree = raiseAndFreeLabels.size() - 1; curFree != -1; curFree--) {
+            m_il.mark_label(raiseAndFreeLabels[curFree]);
+            decref();
+        }
         m_il.mark_label(raiseLabel);
 #ifdef DEBUG_TRACE
         m_il.push_ptr("End raise exception ");
@@ -1863,6 +2050,12 @@ private:
     void debugLog(const char* fmt, va_list args) {
     }
 
+    void binary_op(int helper, int index, const char *msg) {
+        dec_stack(2);
+        m_il.emit_call(helper); 
+        check_error(index, msg);
+        inc_stack();
+    }
 };
 
 extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
@@ -1870,7 +2063,7 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
     //	// TODO: Remove me, currently we can't compile encodings\aliases.py.
     //	return nullptr;
     //}
-#ifdef DEBUG_TRACE
+#ifdef  TRUE//DEBUG_TRACE
     static int compileCount = 0, failCount = 0;
     printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n", 
         PyUnicode_AsUTF8(code->co_name), 
@@ -1878,6 +2071,9 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
         code->co_firstlineno,
         ++compileCount,
         failCount);
+    if (strcmp(PyUnicode_AsUTF8(code->co_name), "_get_spec") == 0) {
+        printf("_get_spec!");
+    }
 #endif
     Jitter jitter(code);
     auto res = jitter.Compile();
@@ -2218,7 +2414,11 @@ extern "C" __declspec(dllexport) void JitInit() {
         nullptr,
         CORINFO_TYPE_VOID,
         std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT) },
+#if _DEBUG
+        &PyJit_DebugDecRef
+#else
         &Py_DecRef
+#endif
         );
     g_module->m_methods[METHOD_PYCELL_SET_TOKEN] = Method(
         nullptr,

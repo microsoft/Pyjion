@@ -1746,3 +1746,7 @@ PyObject* PyJit_IsNot(PyObject* lhs, PyObject* rhs) {
     Py_INCREF(res);
     return res;
 }
+
+void PyJit_DebugDecRef(PyObject* value) {
+    Py_DecRef(value);
+}
