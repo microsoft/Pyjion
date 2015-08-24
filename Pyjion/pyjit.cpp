@@ -143,9 +143,9 @@ public:
         this->m_size = PyBytes_Size(code->co_code);
     }
 
-    PVOID Compile() {
-        PreProcess();
-        return CompileWorker();
+    PVOID compile() {
+        preprocess();
+        return compile_worker();
     }
 
 private:
@@ -454,7 +454,7 @@ private:
         }
     }
 
-    void PreProcess() {
+    void preprocess() {
         int oparg;
         for (int i = 0; i < m_size; i++) {
             auto byte = m_byteCode[i];
@@ -540,7 +540,7 @@ private:
         m_stackDepth += size;
     }
 
-    PVOID CompileWorker() {
+    PVOID compile_worker() {
         int oparg;
         Label ok;
 
@@ -2073,7 +2073,7 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
         failCount);
 #endif
     Jitter jitter(code);
-    auto res = jitter.Compile();
+    auto res = jitter.compile();
 #ifdef DEBUG_TRACE
     if (res == nullptr) {
         printf("Compilation failure #%d\r\n", ++failCount);
