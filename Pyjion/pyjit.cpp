@@ -127,12 +127,12 @@ class Jitter {
     // contain information about exceptions, and don't change as we transition from the body of the try to the body
     // of the handler.
     vector<EhInfo> m_ehInfo;
-    // Labes that map from a Python byte code offset to an ilgen label.  This allows us to branch to any
+    // Labels that map from a Python byte code offset to an ilgen label.  This allows us to branch to any
     // byte code offset.
     unordered_map<int, Label> m_offsetLabels;
     // Tracks the depth of the Python stack
     size_t m_stackDepth, m_blockIds;
-    unordered_map<int, int> m_offsetStackDepth;
+    unordered_map<int, size_t> m_offsetStackDepth;
     vector<vector<Label>> m_raiseAndFree;
 
 
@@ -382,7 +382,7 @@ private:
     }
     
     void branch_raise() {
-        auto ehBlock = GetEHBlock();
+        auto ehBlock = get_ehblock();
 
         if (m_stackDepth == 0) {
             m_il.branch(BranchAlways, ehBlock.Raise);
@@ -422,7 +422,7 @@ private:
     void check_int_error(int curIndex) {
         check_int_error_leave(curIndex);
         //m_il.ld_i4(0);
-        //m_il.branch(BranchNotEqual, GetEHBlock().Raise);
+        //m_il.branch(BranchNotEqual, get_ehblock().Raise);
     }
 
     void unwind_eh(ExceptionVars& exVars) {
@@ -432,7 +432,7 @@ private:
         m_il.emit_call(METHOD_UNWIND_EH);
     }
 
-    BlockInfo GetEHBlock() {
+    BlockInfo get_ehblock() {
         for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
             if (m_blockStack[i].Kind != SETUP_LOOP) {
                 return m_blockStack.data()[i];
@@ -1704,7 +1704,7 @@ private:
                     m_il.emit_call(METHOD_DO_RAISE);
                     // returns 1 if we're doing a re-raise in which case we don't need
                     // to update the traceback.  Otherwise returns 0.
-                    auto curHandler = GetEHBlock();
+                    auto curHandler = get_ehblock();
                     if (oparg == 0) {
                         m_il.branch(BranchFalse, curHandler.Raise);
                         m_il.branch(BranchAlways, curHandler.ReRaise);
@@ -1893,7 +1893,7 @@ private:
                     m_il.ld_loc(ehVal);
                     m_il.ld_loc(finallyReason);
                     m_il.emit_call(METHOD_PYERR_RESTORE);
-                    m_il.branch(BranchAlways, GetEHBlock().ReRaise);
+                    m_il.branch(BranchAlways, get_ehblock().ReRaise);
 
                     m_il.mark_label(noException);
 #ifdef DEBUG_TRACE
@@ -1915,7 +1915,7 @@ private:
                         dec_stack(3);
                         free_iter_locals_on_exception();
                         m_il.emit_call(METHOD_PYERR_RESTORE);
-                        m_il.branch(BranchAlways, GetEHBlock().ReRaise);
+                        m_il.branch(BranchAlways, get_ehblock().ReRaise);
                     }
                     else {
                         printf("...");
@@ -2065,15 +2065,12 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
     //}
 #ifdef  TRUE//DEBUG_TRACE
     static int compileCount = 0, failCount = 0;
-    printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n", 
+    printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n",
         PyUnicode_AsUTF8(code->co_name), 
         PyUnicode_AsUTF8(code->co_filename), 
         code->co_firstlineno,
         ++compileCount,
         failCount);
-    if (strcmp(PyUnicode_AsUTF8(code->co_name), "_get_spec") == 0) {
-        printf("_get_spec!");
-    }
 #endif
     Jitter jitter(code);
     auto res = jitter.Compile();

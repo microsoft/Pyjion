@@ -123,7 +123,7 @@ PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index) {
     PyObject *value = PyCell_GET(cells[index]);
 
     if (value == nullptr) {
-        format_exc_unbound(frame->f_code, index);
+        format_exc_unbound(frame->f_code, (int)index);
     }
     else{
         Py_INCREF(value);
@@ -1021,7 +1021,7 @@ PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg) {
     PyObject* value;
     PyCodeObject* co = frame->f_code;
     size_t idx = oparg - PyTuple_GET_SIZE(co->co_cellvars);
-    assert(idx >= 0 && idx < PyTuple_GET_SIZE(co->co_freevars));
+    assert(idx >= 0 && idx < ((size_t)PyTuple_GET_SIZE(co->co_freevars)));
     auto name = PyTuple_GET_ITEM(co->co_freevars, idx);
     auto locals = frame->f_locals;
     if (PyDict_CheckExact(locals)) {
@@ -1042,7 +1042,7 @@ PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg) {
         PyObject *cell = freevars[oparg];
         value = PyCell_GET(cell);
         if (value == NULL) {
-            format_exc_unbound(co, oparg);
+            format_exc_unbound(co, (int)oparg);
             return nullptr;
         }
         Py_INCREF(value);
@@ -1189,7 +1189,7 @@ PyObject* PyJit_GetIterOptimized(PyObject* iterable, size_t* iterstate1, size_t*
     //		return (PyObject*)1;
     //	}
     //}
-common:
+//common:
     auto res = PyObject_GetIter(iterable);
     Py_DECREF(iterable);
     return res;
@@ -1269,7 +1269,7 @@ PyObject* PyJit_BuildClass(PyFrameObject *f) {
 // Returns: the address for the 1st set of items, the constructed list, and the
 // address where the remainder live.
 PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSize, PyObject** tempStorage, PyObject** listRes, PyObject*** remainder){
-    if (PyTuple_CheckExact(seq) && PyTuple_GET_SIZE(seq) >= (leftSize + rightSize)) {
+    if (PyTuple_CheckExact(seq) && ((size_t)PyTuple_GET_SIZE(seq)) >= (leftSize + rightSize)) {
         auto listSize = PyTuple_GET_SIZE(seq) - (leftSize + rightSize);
         auto list = (PyListObject*)PyList_New(listSize);
         if (list == nullptr) {
@@ -1288,7 +1288,7 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
         }
         return res;
     }
-    else if (PyList_CheckExact(seq) && PyList_GET_SIZE(seq) >= (leftSize + rightSize)) {
+    else if (PyList_CheckExact(seq) && ((size_t)PyList_GET_SIZE(seq)) >= (leftSize + rightSize)) {
         auto listSize = PyList_GET_SIZE(seq) - (leftSize + rightSize);
         auto list = (PyListObject*)PyList_New(listSize);
         if (list == nullptr) {
