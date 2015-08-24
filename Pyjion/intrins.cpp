@@ -1598,6 +1598,13 @@ PyObject* Call0(PyObject *target) {
     else if (PyCFunction_Check(target)) {
         res = PyCFunction_Call(target, g_emptyTuple, nullptr);
     }
+    else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
+        PyObject *self = PyMethod_GET_SELF(target);
+        PyObject* func = PyMethod_GET_FUNCTION(target);
+        Py_INCREF(self);
+        Py_INCREF(func);
+        res = Call1(func, self);
+    }
     else{
         res = PyObject_Call(target, g_emptyTuple, nullptr);
     }
@@ -1612,7 +1619,15 @@ PyObject* Call1(PyObject *target, PyObject* arg0) {
         res = fast_function(target, stack, 1);
         Py_DECREF(arg0);
         goto error;
+    } else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
+        PyObject *self = PyMethod_GET_SELF(target);
+        PyObject* func = PyMethod_GET_FUNCTION(target);
+        Py_INCREF(self);
+        Py_INCREF(func);
+        res = Call2(func, self, arg0);
+        goto error;
     }
+
 
     auto args = PyTuple_New(1);
     if (args == nullptr) {
@@ -1641,6 +1656,15 @@ PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1) {
         Py_DECREF(arg1);
         goto error;
     }
+    else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
+        PyObject *self = PyMethod_GET_SELF(target);
+        PyObject* func = PyMethod_GET_FUNCTION(target);
+        Py_INCREF(self);
+        Py_INCREF(func);
+        res = Call3(func, self, arg0, arg1);
+        goto error;
+    }
+
 
     auto args = PyTuple_New(2);
     if (args == nullptr) {
@@ -1670,6 +1694,13 @@ PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
         Py_DECREF(arg0);
         Py_DECREF(arg1);
         Py_DECREF(arg2);
+        goto error;
+    } else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
+        PyObject *self = PyMethod_GET_SELF(target);
+        PyObject* func = PyMethod_GET_FUNCTION(target);
+        Py_INCREF(self);
+        Py_INCREF(func);
+        res = Call4(func, self, arg0, arg1, arg2);
         goto error;
     }
 
