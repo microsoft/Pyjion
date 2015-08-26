@@ -49,15 +49,33 @@
 using namespace std;
 
 class Method;
+class BaseMethod;
 
 class Module {
 public:
-    hash_map<int, Method> m_methods;
+    hash_map<int, BaseMethod*> m_methods;
     Module() {
     }
 
-    Method* ResolveMethod(int tokenId) {
-        return &m_methods[tokenId];
+    virtual BaseMethod* ResolveMethod(int tokenId) {
+        return m_methods[tokenId];
+    }
+};
+
+class UserModule : public Module {
+    Module& m_parent;
+public:
+    UserModule(Module& parent) : m_parent(parent) {
+
+    }
+
+    virtual BaseMethod* ResolveMethod(int tokenId) {
+        auto res = m_methods.find(tokenId);
+        if (res == m_methods.end()) {
+            return m_parent.ResolveMethod(tokenId);
+        }
+
+        return res->second;
     }
 };
 
@@ -82,6 +100,9 @@ public:
     virtual DWORD get_method_attrs() {
         return CORINFO_FLG_NOSECURITYWRAP | CORINFO_FLG_STATIC | CORINFO_FLG_NATIVE;
     }
+    virtual void findSig(CORINFO_SIG_INFO  *sig) = 0;
+    virtual void* get_addr() = 0;
+    virtual void getFunctionEntryPoint(CORINFO_CONST_LOOKUP *  pResult) = 0;
 };
 
 class Method : public BaseMethod {
@@ -101,6 +122,10 @@ public:
         m_addr = addr;
     }
 
+    virtual void* get_addr() {
+        return m_addr;
+    }
+
     virtual void get_call_info(CORINFO_CALL_INFO *pResult) {
         pResult->codePointerLookup.lookupKind.needsRuntimeLookup = false;
         // TODO: If we use IAT_VALUE we need to generate a jump stub
@@ -112,30 +137,47 @@ public:
         pResult->sig.retType = m_retType;
         pResult->sig.numArgs = m_params.size();
     }
-
+    virtual void findSig(CORINFO_SIG_INFO  *sig) {
+        sig->retType = m_retType;
+        sig->callConv = CORINFO_CALLCONV_STDCALL;
+        sig->retTypeClass = nullptr;
+        sig->args = (CORINFO_ARG_LIST_HANDLE)(m_params.size() != 0 ? &m_params[0] : nullptr);
+        sig->numArgs = m_params.size();
+    }
+    virtual void getFunctionEntryPoint(CORINFO_CONST_LOOKUP *  pResult) {
+        // TODO: If we use IAT_VALUE we need to generate a jump stub
+        pResult->accessType = IAT_PVALUE;
+        pResult->addr = &m_addr;
+    }
 };
 
-class IndirectDispatchMethod : BaseMethod {
-    Method& m_coreMethod;
+class IndirectDispatchMethod : public BaseMethod {
+    BaseMethod* m_coreMethod;
 public:
     void* m_addr;
 
-    IndirectDispatchMethod(Method& coreMethod) : m_coreMethod(coreMethod) {
-        m_addr = m_coreMethod.m_addr;
+    IndirectDispatchMethod(BaseMethod* coreMethod) : m_coreMethod(coreMethod) {
+        m_addr = m_coreMethod->get_addr();
     }
 
 public:
-    virtual void get_call_info(CORINFO_CALL_INFO *pResult) {
-        pResult->codePointerLookup.lookupKind.needsRuntimeLookup = false;
-        // TODO: If we use IAT_VALUE we need to generate a jump stub
-        pResult->codePointerLookup.constLookup.accessType = IAT_PVALUE;
-        pResult->codePointerLookup.constLookup.addr = &m_addr;
-        pResult->verMethodFlags = pResult->methodFlags = 0;
-        pResult->kind = CORINFO_VIRTUALCALL_STUB;
-        pResult->sig.args = (CORINFO_ARG_LIST_HANDLE)(m_coreMethod.m_params.size() == 0 ? nullptr : &m_coreMethod.m_params[0]);
-        pResult->sig.retType = m_coreMethod.m_retType;
-        pResult->sig.numArgs = m_coreMethod.m_params.size();
+    virtual void* get_addr() {
+        return m_addr;
     }
+
+    virtual void get_call_info(CORINFO_CALL_INFO *pResult) {
+        m_coreMethod->get_call_info(pResult);
+        pResult->codePointerLookup.constLookup.addr = &m_addr;
+    }
+
+    virtual void findSig(CORINFO_SIG_INFO  *sig) {
+        m_coreMethod->findSig(sig);
+    }
+    virtual void getFunctionEntryPoint(CORINFO_CONST_LOOKUP *  pResult) {
+        pResult->accessType = IAT_PVALUE;
+        pResult->addr = &m_addr;
+    }
+
 };
 
 // Not currently used...

@@ -347,12 +347,8 @@ public:
         CORINFO_METHOD_HANDLE   ftn,                 /* IN  */
         CORINFO_CONST_LOOKUP *  pResult,             /* OUT */
         CORINFO_ACCESS_FLAGS    accessFlags = CORINFO_ACCESS_ANY) {
-        Method* method = (Method*)ftn;
-        // TODO: If we use IAT_VALUE we need to generate a jump stub
-        pResult->accessType = IAT_PVALUE;
-        pResult->addr = &method->m_addr;
-
-        //printf("getFunctionEntryPoint\r\n");
+        BaseMethod* method = (BaseMethod*)ftn;
+        method->getFunctionEntryPoint(pResult);
     }
 
     // return a directly callable address. This can be used similarly to the
@@ -529,7 +525,7 @@ public:
         //out params
         CORINFO_CALL_INFO       *pResult
         ) {
-        auto method = (Method*)pResolvedToken->hMethod;
+        auto method = (BaseMethod*)pResolvedToken->hMethod;
         pResult->hMethod = (CORINFO_METHOD_HANDLE)method;
 
         method->get_call_info(pResult);
@@ -665,7 +661,7 @@ public:
         CORINFO_METHOD_HANDLE       ftn         /* IN */
         ) {
         //printf("getMethodAttribs\r\n");
-        auto method = (Method*)ftn;
+        auto method = (BaseMethod*)ftn;
         return method->get_method_attrs();
     }
 
@@ -686,12 +682,9 @@ public:
         CORINFO_SIG_INFO          *sig,        /* OUT */
         CORINFO_CLASS_HANDLE      memberParent = NULL /* IN */
         ) {
-        Method* m = (Method*)ftn;
+        BaseMethod* m = (BaseMethod*)ftn;
         //printf("getMethodSig %p\r\n", ftn);
-        sig->retType = m->m_retType;
-        sig->retTypeClass = nullptr;
-        sig->args = (CORINFO_ARG_LIST_HANDLE)(m->m_params.size() != 0 ? &m->m_params[0] : nullptr);
-        sig->numArgs = m->m_params.size();
+        m->findSig(sig);
     }
 
     /*********************************************************************
@@ -1025,7 +1018,7 @@ public:
     // Resolve metadata token into runtime method handles.
     virtual void resolveToken(/* IN, OUT */ CORINFO_RESOLVED_TOKEN * pResolvedToken) {
         Module* mod = (Module*)pResolvedToken->tokenScope;
-        Method* method = mod->ResolveMethod(pResolvedToken->token);
+        BaseMethod* method = mod->ResolveMethod(pResolvedToken->token);
         pResolvedToken->hMethod = (CORINFO_METHOD_HANDLE)method;
         pResolvedToken->hClass = (CORINFO_CLASS_HANDLE)1; // this just suppresses a JIT assert
         //printf("resolveToken %d\r\n", pResolvedToken->token);
@@ -1051,11 +1044,7 @@ public:
         printf("findSig %d\r\n", sigTOK);
         auto mod = (Module*)module;
         auto method = mod->ResolveMethod(sigTOK);
-        sig->retType = method->m_retType;
-        sig->numArgs = method->m_params.size();
-        sig->callConv = CORINFO_CALLCONV_STDCALL;
-        sig->retTypeClass = nullptr;
-        sig->args = (CORINFO_ARG_LIST_HANDLE)(&method->m_params[0]);
+        method->findSig(sig);
     }
 
     // for Varargs, the signature at the call site may differ from

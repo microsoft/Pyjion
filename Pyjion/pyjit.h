@@ -164,6 +164,8 @@
 #define SIG_ITERNEXT_TOKEN			0x00040000
 #define SIG_ITERNEXT_OPTIMIZED_TOKEN	0x00040001
 
+#define FIRST_USER_FUNCTION_TOKEN   0x00100000
+
 extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code);
 extern "C" __declspec(dllexport) void JitInit();
 

@@ -73,7 +73,9 @@ void CeeInit() {
     // TODO: We should re-enable contracts and handle exceptions from OOM
     // and just fail the whole compilation if we hit that.  Right now we
     // just leak an exception out across the JIT boundary.
+#if DEBUG
     DisableThrowCheck();
+#endif
 }
 
 class InitHolder {
@@ -181,10 +183,13 @@ class Jitter {
     size_t m_stackDepth, m_blockIds;
     unordered_map<int, size_t> m_offsetStackDepth;
     vector<vector<Label>> m_raiseAndFree;
+    UserModule* m_module;
 
 
 public:
-    Jitter(PyCodeObject *code) : m_il(&g_module, CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) }){
+    Jitter(PyCodeObject *code) : 
+        m_il(m_module = new UserModule(g_module), CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) }){
+        // TODO: m_module needs to be freed
         this->m_code = code;
         this->m_byteCode = (unsigned char *)((PyBytesObject*)code->co_code)->ob_sval;
         this->m_size = PyBytes_Size(code->co_code);
@@ -1297,17 +1302,20 @@ private:
                     switch (argCnt) {
                     case 0:
 
-                        m_il.emit_call(METHOD_CALL0_TOKEN);
+                        //m_il.emit_call(METHOD_CALL0_TOKEN);
 
                         
                         // TODO: Need to free this indirect dispatch method after the
                         // users function gets freed.
-                        //{
-                        //    auto id = new IndirectDispatchMethod(g_module->m_methods[METHOD_CALL0_OPT_TOKEN]);
-                        //    m_il.push_ptr(&id->m_addr);
-                        //    g_module->m_methods[0] = id;
-                        //    m_il.emit_call(METHOD_CALL0_OPT_TOKEN);
-                        //}
+                        {
+                            auto id = new IndirectDispatchMethod(
+                                g_module.m_methods[METHOD_CALL0_OPT_TOKEN]
+                            );
+                            m_il.push_ptr(&id->m_addr);
+                            auto token = (int)(FIRST_USER_FUNCTION_TOKEN + m_module->m_methods.size());
+                            m_module->m_methods[token] = id;
+                            m_il.emit_call(token);
+                        }
                         dec_stack();
                         check_error(i, "call 0"); 
                         inc_stack();
@@ -2121,7 +2129,7 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
     //	// TODO: Remove me, currently we can't compile encodings\aliases.py.
     //	return nullptr;
     //}
-#ifdef  TRUE//DEBUG_TRACE
+#ifdef  DEBUG_TRACE
     static int compileCount = 0, failCount = 0;
     printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n",
         PyUnicode_AsUTF8(code->co_name), 
@@ -2140,13 +2148,18 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
     return res;
 }
 
+extern "C" __declspec(dllexport) void JitFree(PVOID function) {
+
+}
 //VTableInfo g_iterNextVtable{ 2, { offsetof(PyObject, ob_type), offsetof(PyTypeObject, tp_iternext) } };
 
 
 class GlobalMethod {
+    Method m_method;
 public:
-    GlobalMethod(int token, Method& method) {
-        g_module.m_methods[token] = method;
+    GlobalMethod(int token, Method method) {
+        m_method = method;
+        g_module.m_methods[token] = &m_method;
     }
 };
 
@@ -2297,7 +2310,7 @@ GLOBAL_METHOD(METHOD_ISNOT, &PyJit_IsNot, CORINFO_TYPE_NATIVEINT, Parameter(CORI
 GLOBAL_METHOD(METHOD_GETITER_OPTIMIZED_TOKEN, &PyJit_GetIterOptimized, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(SIG_ITERNEXT_OPTIMIZED_TOKEN, &PyJit_IterNextOptimized, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
-GLOBAL_METHOD(METHOD_CALL0_OPT_TOKEN, &Call0_Generic, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALL0_OPT_TOKEN, &Call0_Generic, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 extern "C" __declspec(dllexport) void JitInit() {
     g_jit = getJit();
