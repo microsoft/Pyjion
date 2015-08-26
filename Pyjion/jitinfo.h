@@ -73,6 +73,10 @@ public:
         return &m_executionEngine;
     }
 
+    void freeMem(PVOID code) {
+        HeapFree(m_codeHeap, 0, code);
+    }
+
     virtual void allocMem(
         ULONG               hotCodeSize,    /* IN */
         ULONG               coldCodeSize,   /* IN */

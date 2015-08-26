@@ -73,7 +73,7 @@ void CeeInit() {
     // TODO: We should re-enable contracts and handle exceptions from OOM
     // and just fail the whole compilation if we hit that.  Right now we
     // just leak an exception out across the JIT boundary.
-#if DEBUG
+#if _DEBUG
     DisableThrowCheck();
 #endif
 }
@@ -101,6 +101,27 @@ InitHolder g_initHolder;
 
 extern CorJitInfo g_corJitInfo;
 extern ICorJitCompiler* g_jit;
+
+// Represents a completed success compilation. Keeps all of the state associated with the
+// compilation alive.  Freed when the Python code object is released.
+struct JittedCode {
+    PVOID Address;
+    PyCodeObject *Code;
+    UserModule* Module;
+
+    JittedCode(PVOID addr, PyCodeObject* code, UserModule* module) {
+        Address = addr;
+        Code = code;
+        Module = module;
+    }
+
+    ~JittedCode() {
+        g_corJitInfo.freeMem(Address);
+        delete Module;
+    }
+};
+
+unordered_map<PVOID, JittedCode*> g_jittedCode;
 
 struct ExceptionVars {
     Local PrevExc, PrevExcVal, PrevTraceback;
@@ -189,15 +210,23 @@ class Jitter {
 public:
     Jitter(PyCodeObject *code) : 
         m_il(m_module = new UserModule(g_module), CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) }){
-        // TODO: m_module needs to be freed
         this->m_code = code;
         this->m_byteCode = (unsigned char *)((PyBytesObject*)code->co_code)->ob_sval;
         this->m_size = PyBytes_Size(code->co_code);
     }
 
-    PVOID compile() {
+    JittedCode* compile() {
         preprocess();
-        return compile_worker();
+        auto addr = compile_worker();
+        if (addr != nullptr) {
+            // compilation succeeded, return a new JittedCode object which
+            // holds onto all of our state and keeps everything alive.
+            return new JittedCode(addr, m_code, m_module);
+        }
+
+        // compilation failed, cleanup any temporary state...
+        delete m_module;
+        return nullptr;
     }
 
 private:
@@ -2140,19 +2169,25 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
 #endif
     Jitter jitter(code);
     auto res = jitter.compile();
-#ifdef DEBUG_TRACE
     if (res == nullptr) {
+#ifdef DEBUG_TRACE
         printf("Compilation failure #%d\r\n", ++failCount);
-    }
 #endif
-    return res;
+        return nullptr;
+    }
+
+    g_jittedCode[res->Address] = res;
+    return res->Address;
 }
 
 extern "C" __declspec(dllexport) void JitFree(PVOID function) {
+    auto find = g_jittedCode.find(function);
+    if (find != g_jittedCode.end()) {
+        auto code = find->second;
 
+        delete code;
+    }
 }
-//VTableInfo g_iterNextVtable{ 2, { offsetof(PyObject, ob_type), offsetof(PyTypeObject, tp_iternext) } };
-
 
 class GlobalMethod {
     Method m_method;
