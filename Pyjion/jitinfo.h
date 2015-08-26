@@ -43,6 +43,7 @@
 #include <intrin.h>
 
 #include <Python.h>
+#include <utilcode.h>
 #include <frameobject.h>
 #include <opcode.h>
 
@@ -54,6 +55,7 @@
 #include <openum.h>
 
 #include "codemodel.h"
+#include "cee.h"
 
 using namespace std;
 class CorJitInfo : public ICorJitInfo {
@@ -530,35 +532,8 @@ public:
         auto method = (Method*)pResolvedToken->hMethod;
         pResult->hMethod = (CORINFO_METHOD_HANDLE)method;
 
-        if (method->m_vtableInfo == nullptr) {
-            pResult->codePointerLookup.lookupKind.needsRuntimeLookup = false;
-            // TODO: If we use IAT_VALUE we need to generate a jump stub
-            pResult->codePointerLookup.constLookup.accessType = IAT_PVALUE;
-            pResult->codePointerLookup.constLookup.addr = &method->m_addr;
-            pResult->verMethodFlags = pResult->methodFlags = CORINFO_FLG_STATIC;
-            pResult->kind = CORINFO_CALL;
-            pResult->methodFlags = CORINFO_FLG_STATIC;
-        }
-        else{
-            pResult->codePointerLookup.lookupKind.needsRuntimeLookup = true;
-            pResult->codePointerLookup.lookupKind.runtimeLookupKind = CORINFO_LOOKUP_THISOBJ;
-            pResult->codePointerLookup.runtimeLookup.testForNull = false;
-            pResult->codePointerLookup.runtimeLookup.testForFixup = false;
-            //pResult->codePointerLookup.runtimeLookup.helper = CORINFO_HELP_UNDEF;
-            //pResult->codePointerLookup.runtimeLookup.indirections = method->m_vtableInfo->indirections;
-            //pResult->codePointerLookup.runtimeLookup.offsets[0] = method->m_vtableInfo->offsets[0];
-            //pResult->codePointerLookup.runtimeLookup.offsets[1] = method->m_vtableInfo->offsets[1];
-            //pResult->codePointerLookup.runtimeLookup.offsets[2] = method->m_vtableInfo->offsets[2];
-            //pResult->codePointerLookup.runtimeLookup.offsets[3] = method->m_vtableInfo->offsets[3];
-
-            pResult->verMethodFlags = pResult->methodFlags = CORINFO_FLG_VIRTUAL;
-            pResult->kind = CORINFO_VIRTUALCALL_VTABLE;
-            pResult->methodFlags = CORINFO_FLG_VIRTUAL;
-        }
+        method->get_call_info(pResult);
         pResult->nullInstanceCheck = false;
-        pResult->sig.args = (CORINFO_ARG_LIST_HANDLE)(method->m_params.size() == 0 ? nullptr : &method->m_params[0]);
-        pResult->sig.retType = method->m_retType;
-        pResult->sig.numArgs = method->m_params.size();
         pResult->sig.callConv = CORINFO_CALLCONV_DEFAULT;
         pResult->sig.retTypeClass = nullptr;
         pResult->verSig = pResult->sig;
@@ -690,20 +665,8 @@ public:
         CORINFO_METHOD_HANDLE       ftn         /* IN */
         ) {
         //printf("getMethodAttribs\r\n");
-        auto res = (int)CORINFO_FLG_NOSECURITYWRAP;
         auto method = (Method*)ftn;
-        if (method->m_vtableInfo != nullptr) {
-            res |= CORINFO_FLG_VIRTUAL;
-        }
-        else{
-            res |= CORINFO_FLG_STATIC;
-        }
-
-        if (method->m_il.size() == 0) {
-            res |= CORINFO_FLG_NATIVE;
-        }
-
-        return res;
+        return method->get_method_attrs();
     }
 
     // sets private JIT flags, which can be, retrieved using getAttrib.

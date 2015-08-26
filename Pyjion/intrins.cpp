@@ -1612,6 +1612,73 @@ PyObject* Call0(PyObject *target) {
     return res;
 }
 
+PyObject* Call0_Function(PyObject *target, void** addr) {
+    PyObject* res;
+    if (PyFunction_Check(target)) {
+        PyObject* empty[1] = { nullptr };
+        res = fast_function(target, empty, 0);
+    }
+    else {
+        return Call0_Generic(target, addr);
+    }
+
+    Py_DECREF(target);
+    return res;
+}
+
+PyObject* Call0_Method(PyObject *target, void** addr) {
+    PyObject* res;
+    if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
+        PyObject *self = PyMethod_GET_SELF(target);
+        PyObject* func = PyMethod_GET_FUNCTION(target);
+        Py_INCREF(self);
+        Py_INCREF(func);
+        res = Call1(func, self);
+    }
+    else {
+        return Call0_Generic(target, addr);
+    }
+
+    Py_DECREF(target);
+    return res;
+}
+
+PyObject* Call0_CFunction(PyObject *target, void** addr) {
+    PyObject* res;
+    if (PyCFunction_Check(target)) {
+        res = PyCFunction_Call(target, g_emptyTuple, nullptr);
+    }
+    else {
+        return Call0_Generic(target, addr);
+    }
+
+    Py_DECREF(target);
+    return res;
+}
+
+
+PyObject* Call0_Generic(PyObject *target, void** addr) {
+    PyObject* res;
+    if (PyFunction_Check(target)) {
+        *addr = &Call0_Function;
+        return Call0_Function(target, addr);
+    }
+    else if (PyCFunction_Check(target)) {
+        *addr = Call0_CFunction;
+        return Call0_CFunction(target, addr);
+    }
+    else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
+        *addr = Call0_Method;
+        return Call0_Method(target, addr);
+    }
+    else{
+        res = PyObject_Call(target, g_emptyTuple, nullptr);
+    }
+    Py_DECREF(target);
+    return res;
+}
+
+
 PyObject* Call1(PyObject *target, PyObject* arg0) {
     PyObject* res = nullptr;
     if (PyFunction_Check(target)) {

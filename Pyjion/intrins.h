@@ -230,6 +230,8 @@ PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1);
 PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2);
 PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3);
 
+PyObject* Call0_Generic(PyObject *target, void**addr);
+
 extern PyObject* g_emptyTuple;
 
 

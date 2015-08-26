@@ -26,16 +26,64 @@
 #include "pyjit.h"
 
 #include <corjit.h>
-#include <utilcode.h>
 #include <openum.h>
 #include <frameobject.h>
 #include <opcode.h>
 
-#include "cee.h"
 #include "jitinfo.h"
 #include "codemodel.h"
 #include "ilgen.h"
 #include "intrins.h"
+
+
+
+HRESULT __stdcall GetCORSystemDirectoryInternal(__out_ecount_part_opt(cchBuffer, *pdwLength) LPWSTR pBuffer,
+    DWORD  cchBuffer,
+    __out_opt DWORD* pdwLength) {
+    printf("get cor system\n");
+    return S_OK;
+}
+
+void* __stdcall GetCLRFunction(LPCSTR functionName) {
+    if (strcmp(functionName, "EEHeapAllocInProcessHeap") == 0) {
+        return ::GlobalAlloc;
+    }
+    else if (strcmp(functionName, "EEHeapFreeInProcessHeap") == 0) {
+        return ::GlobalFree;
+    }
+    printf("get clr function %s\n", functionName);
+    return NULL;
+}
+
+CExecutionEngine g_execEngine;
+CorJitInfo g_corJitInfo(g_execEngine);
+
+IExecutionEngine* __stdcall IEE() {
+    return &g_execEngine;
+}
+
+void CeeInit() {
+    CoreClrCallbacks cccallbacks;
+    cccallbacks.m_hmodCoreCLR = (HINSTANCE)GetModuleHandleW(NULL);
+    cccallbacks.m_pfnIEE = IEE;
+    cccallbacks.m_pfnGetCORSystemDirectory = GetCORSystemDirectoryInternal;
+    cccallbacks.m_pfnGetCLRFunction = GetCLRFunction;
+
+    InitUtilcode(cccallbacks);
+    // TODO: We should re-enable contracts and handle exceptions from OOM
+    // and just fail the whole compilation if we hit that.  Right now we
+    // just leak an exception out across the JIT boundary.
+    DisableThrowCheck();
+}
+
+class InitHolder {
+public:
+    InitHolder() {
+        CeeInit();
+    }
+};
+
+InitHolder g_initHolder;
 
 //#define DEBUG_TRACE
 
@@ -99,8 +147,7 @@ struct BlockInfo {
     }
 };
 
-
-Module *g_module;
+Module g_module;
 ICorJitCompiler* g_jit;
 
 class Jitter {
@@ -137,7 +184,7 @@ class Jitter {
 
 
 public:
-    Jitter(PyCodeObject *code) : m_il(g_module, CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) }){
+    Jitter(PyCodeObject *code) : m_il(&g_module, CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) }){
         this->m_code = code;
         this->m_byteCode = (unsigned char *)((PyBytesObject*)code->co_code)->ob_sval;
         this->m_size = PyBytes_Size(code->co_code);
@@ -1249,7 +1296,18 @@ private:
                 if (kwArgCnt == 0) {
                     switch (argCnt) {
                     case 0:
+
                         m_il.emit_call(METHOD_CALL0_TOKEN);
+
+                        
+                        // TODO: Need to free this indirect dispatch method after the
+                        // users function gets freed.
+                        //{
+                        //    auto id = new IndirectDispatchMethod(g_module->m_methods[METHOD_CALL0_OPT_TOKEN]);
+                        //    m_il.push_ptr(&id->m_addr);
+                        //    g_module->m_methods[0] = id;
+                        //    m_il.emit_call(METHOD_CALL0_OPT_TOKEN);
+                        //}
                         dec_stack();
                         check_error(i, "call 0"); 
                         inc_stack();
@@ -2084,676 +2142,166 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
 
 //VTableInfo g_iterNextVtable{ 2, { offsetof(PyObject, ob_type), offsetof(PyTypeObject, tp_iternext) } };
 
-extern "C" __declspec(dllexport) void JitInit() {
-    CeeInit();
 
+class GlobalMethod {
+public:
+    GlobalMethod(int token, Method& method) {
+        g_module.m_methods[token] = method;
+    }
+};
+
+// CorInfoType returnType, std::vector<Parameter> params, void* addr
+#define GLOBAL_METHOD(token, addr, returnType, ...) \
+    GlobalMethod g ## token(token, Method(&g_module, returnType, std::vector<Parameter>{__VA_ARGS__}, addr));
+
+GLOBAL_METHOD(METHOD_ADD_TOKEN, &PyJit_Add, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_SUBSCR_TOKEN, &PyJit_Subscr, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_MULTIPLY_TOKEN, &PyJit_Multiply, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_DIVIDE_TOKEN, &PyJit_TrueDivide, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_FLOORDIVIDE_TOKEN, &PyJit_FloorDivide, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_POWER_TOKEN, &PyJit_Power, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_SUBTRACT_TOKEN, &PyJit_Subtract, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_MODULO_TOKEN, &PyJit_Modulo, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_MATRIX_MULTIPLY_TOKEN, &PyJit_MatrixMultiply, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_BINARY_LSHIFT_TOKEN, &PyJit_BinaryLShift, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_BINARY_RSHIFT_TOKEN, &PyJit_BinaryRShift, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_BINARY_AND_TOKEN, &PyJit_BinaryAnd, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_BINARY_XOR_TOKEN, &PyJit_BinaryXor, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_BINARY_OR_TOKEN, &PyJit_BinaryOr, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_PYLIST_NEW, &PyList_New, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT) );
+GLOBAL_METHOD(METHOD_STOREMAP_TOKEN, &PyJit_StoreMap, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_STORESUBSCR_TOKEN, &PyJit_StoreSubscr, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_DELETESUBSCR_TOKEN, &PyJit_DeleteSubscr, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_PYDICT_NEWPRESIZED, &_PyDict_NewPresized, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PYTUPLE_NEW, &PyTuple_New, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PYSET_NEW, &PySet_New, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_PYOBJECT_ISTRUE, &PyObject_IsTrue, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PYITER_NEXT, &PyIter_Next, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_PYCELL_GET, &PyJit_CellGet, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_RICHCMP_TOKEN, &PyJit_RichCompare, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_INT));
+GLOBAL_METHOD(METHOD_CONTAINS_TOKEN, &PyJit_Contains, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_NOTCONTAINS_TOKEN, &PyJit_NotContains, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_NEWFUNCTION_TOKEN, &PyJit_NewFunction, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_GETBUILDCLASS_TOKEN, &PyJit_BuildClass, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_UNPACK_SEQUENCE_TOKEN, &PyJit_UnpackSequence, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_UNPACK_SEQUENCEEX_TOKEN, &PyJit_UnpackSequenceEx, CORINFO_TYPE_NATIVEINT, 
+    Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_PYSET_ADD, &PySet_Add, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_CALL0_TOKEN, &Call0, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALL1_TOKEN, &Call1, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALL2_TOKEN, &Call2, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALL3_TOKEN, &Call3, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALL4_TOKEN, &Call4, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALLN_TOKEN, &PyJit_CallN, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALLNKW_TOKEN, &PyJit_CallNKW, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_STOREGLOBAL_TOKEN, &PyJit_StoreGlobal, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_DELETEGLOBAL_TOKEN, &PyJit_DeleteGlobal, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_LOADGLOBAL_TOKEN, &PyJit_LoadGlobal, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_LOADATTR_TOKEN, &PyJit_LoadAttr, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_STOREATTR_TOKEN, &PyJit_StoreAttr, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_DELETEATTR_TOKEN, &PyJit_DeleteAttr, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_LOADNAME_TOKEN, &PyJit_LoadName, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_STORENAME_TOKEN, &PyJit_StoreName, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_DELETENAME_TOKEN, &PyJit_DeleteName, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_GETITER_TOKEN, &PyJit_GetIter, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(SIG_ITERNEXT_TOKEN, &PyJit_IterNext, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+#if _DEBUG
+GLOBAL_METHOD(METHOD_DECREF_TOKEN, &PyJit_DebugDecRef, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
+#else
+GLOBAL_METHOD(METHOD_DECREF_TOKEN, &Py_DecRef, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
+#endif
+
+GLOBAL_METHOD(METHOD_PYCELL_SET_TOKEN, &PyJit_CellSet, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_SET_CLOSURE, &PyJit_SetClosure, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_BUILD_SLICE, &PyJit_BuildSlice, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+
+GLOBAL_METHOD(METHOD_UNARY_POSITIVE, &PyJit_UnaryPositive, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_UNARY_NEGATIVE, &PyJit_UnaryNegative, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_UNARY_NOT, &PyJit_UnaryNot, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_UNARY_INVERT, &PyJit_UnaryInvert, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_LIST_APPEND_TOKEN, &PyJit_ListAppend, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_SET_ADD_TOKEN, &PyJit_SetAdd, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_MAP_ADD_TOKEN, &PyJit_MapAdd, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_INPLACE_POWER_TOKEN, &PyJit_InplacePower, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_INPLACE_MULTIPLY_TOKEN, &PyJit_InplaceMultiply, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_MATRIX_MULTIPLY_TOKEN, &PyJit_InplaceMatrixMultiply, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_TRUE_DIVIDE_TOKEN, &PyJit_InplaceTrueDivide, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_FLOOR_DIVIDE_TOKEN, &PyJit_InplaceFloorDivide, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_MODULO_TOKEN, &PyJit_InplaceModulo, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_ADD_TOKEN, &PyJit_InplaceAdd, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_SUBTRACT_TOKEN, &PyJit_InplaceSubtract, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_LSHIFT_TOKEN, &PyJit_InplaceLShift, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_RSHIFT_TOKEN, &PyJit_InplaceRShift, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_AND_TOKEN, &PyJit_InplaceAnd, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_XOR_TOKEN, &PyJit_InplaceXor, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_INPLACE_OR_TOKEN, &PyJit_InplaceOr, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_PRINT_EXPR_TOKEN, &PyJit_PrintExpr, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_LOAD_CLASSDEREF_TOKEN, &PyJit_LoadClassDeref, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_PREPARE_EXCEPTION, &PyJit_PrepareException, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT),
+    Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_DO_RAISE, &PyJit_Raise, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_EH_TRACE, &PyJit_EhTrace, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT) );
+
+GLOBAL_METHOD(METHOD_COMPARE_EXCEPTIONS, &PyJit_CompareExceptions, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_UNBOUND_LOCAL, &PyJit_UnboundLocal, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PYERR_RESTORE, &PyJit_PyErrRestore, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_DEBUG_TRACE, &PyJit_DebugTrace, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) );
+
+GLOBAL_METHOD(METHOD_FUNC_SET_DEFAULTS, &PyJit_FunctionSetDefaults, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_DEBUG_DUMP_FRAME, &PyJit_DebugDumpFrame, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_PY_POPFRAME, &PyJit_PopFrame, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PY_PUSHFRAME, &PyJit_PushFrame, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_UNWIND_EH, &PyJit_UnwindEh, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PY_CHECKFUNCTIONRESULT, &PyJit_CheckFunctionResult, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PY_IMPORTNAME, &PyJit_ImportName, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PY_FANCYCALL, &PyJit_FancyCall, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT),
+    Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_PY_IMPORTFROM, &PyJit_ImportFrom, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PY_IMPORTSTAR, &PyJit_ImportStar, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PY_FUNC_SET_ANNOTATIONS, &PyJit_FunctionSetAnnotations, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PY_FUNC_SET_KW_DEFAULTS, &PyJit_FunctionSetKwDefaults, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_IS, &PyJit_Is, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_ISNOT, &PyJit_IsNot, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_GETITER_OPTIMIZED_TOKEN, &PyJit_GetIterOptimized, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(SIG_ITERNEXT_OPTIMIZED_TOKEN, &PyJit_IterNextOptimized, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_CALL0_OPT_TOKEN, &Call0_Generic, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+extern "C" __declspec(dllexport) void JitInit() {
     g_jit = getJit();
 
     g_emptyTuple = PyTuple_New(0);
-
-    g_module = new Module();
-    g_module->m_methods[METHOD_ADD_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_Add
-        );
-    g_module->m_methods[METHOD_SUBSCR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_Subscr
-        );
-    g_module->m_methods[METHOD_MULTIPLY_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_Multiply
-        );
-    g_module->m_methods[METHOD_DIVIDE_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_TrueDivide
-        );
-    g_module->m_methods[METHOD_FLOORDIVIDE_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_FloorDivide
-        );
-    g_module->m_methods[METHOD_POWER_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_Power
-        );
-    g_module->m_methods[METHOD_MODULO_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_Modulo
-        );
-    g_module->m_methods[METHOD_SUBTRACT_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_Subtract
-        );
-
-
-    g_module->m_methods[METHOD_MATRIX_MULTIPLY_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_MatrixMultiply
-        );
-    g_module->m_methods[METHOD_BINARY_LSHIFT_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_BinaryLShift
-        );
-    g_module->m_methods[METHOD_BINARY_RSHIFT_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_BinaryRShift
-        );
-    g_module->m_methods[METHOD_BINARY_AND_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_BinaryAnd
-        );
-    g_module->m_methods[METHOD_BINARY_XOR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_BinaryXor
-        );
-    g_module->m_methods[METHOD_BINARY_OR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_BinaryOr
-        );
-
-
-    g_module->m_methods[METHOD_PYLIST_NEW] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyList_New
-        );
-
-    g_module->m_methods[METHOD_STOREMAP_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_StoreMap
-        );
-    g_module->m_methods[METHOD_STORESUBSCR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_StoreSubscr
-        );
-    g_module->m_methods[METHOD_DELETESUBSCR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_DeleteSubscr
-        );
-    g_module->m_methods[METHOD_PYDICT_NEWPRESIZED] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &_PyDict_NewPresized
-        );
-    g_module->m_methods[METHOD_PYTUPLE_NEW] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyTuple_New
-        );
-    g_module->m_methods[METHOD_PYSET_NEW] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PySet_New
-        );
-    g_module->m_methods[METHOD_PYOBJECT_ISTRUE] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyObject_IsTrue
-        );
-
-    g_module->m_methods[METHOD_PYITER_NEXT] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyIter_Next
-        );
-
-    g_module->m_methods[METHOD_PYCELL_GET] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_CellGet
-        );
-
-    g_module->m_methods[METHOD_RICHCMP_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_INT) },
-        &PyJit_RichCompare
-        );
-    g_module->m_methods[METHOD_CONTAINS_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_Contains
-        );
-    g_module->m_methods[METHOD_NOTCONTAINS_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_NotContains
-        );
-
-    g_module->m_methods[METHOD_NEWFUNCTION_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_NewFunction
-        );
-
-    g_module->m_methods[METHOD_GETBUILDCLASS_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_BuildClass
-        );
-
-    g_module->m_methods[METHOD_UNPACK_SEQUENCE_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_UnpackSequence
-        );
-
-    g_module->m_methods[METHOD_UNPACK_SEQUENCEEX_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT),
-        Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_UnpackSequenceEx
-        );
-
-    g_module->m_methods[METHOD_PYSET_ADD] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PySet_Add
-        );
-    g_module->m_methods[METHOD_CALL0_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &Call0
-        );
-    g_module->m_methods[METHOD_CALL1_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &Call1
-        );
-    g_module->m_methods[METHOD_CALL2_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)  },
-        &Call2
-        );
-    g_module->m_methods[METHOD_CALL3_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)  },
-        &Call3
-        );
-    g_module->m_methods[METHOD_CALL4_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)  },
-        &Call4
-        );
-
-    g_module->m_methods[METHOD_CALLN_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_CallN
-        );
-    g_module->m_methods[METHOD_CALLNKW_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_CallNKW
-        );
-    g_module->m_methods[METHOD_STOREGLOBAL_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_StoreGlobal
-        );
-    g_module->m_methods[METHOD_DELETEGLOBAL_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_DeleteGlobal
-        );
-    g_module->m_methods[METHOD_LOADGLOBAL_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_LoadGlobal
-        );
-    g_module->m_methods[METHOD_LOADATTR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_LoadAttr
-        );
-    g_module->m_methods[METHOD_STOREATTR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_StoreAttr
-        );
-    g_module->m_methods[METHOD_DELETEATTR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_DeleteAttr
-        );
-    g_module->m_methods[METHOD_LOADNAME_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_LoadName
-        );
-    g_module->m_methods[METHOD_STORENAME_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)  },
-        &PyJit_StoreName
-        );
-    g_module->m_methods[METHOD_DELETENAME_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)  },
-        &PyJit_DeleteName
-        );
-    g_module->m_methods[METHOD_GETITER_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_GetIter
-        );
-    g_module->m_methods[SIG_ITERNEXT_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_IterNext
-        );
-    g_module->m_methods[METHOD_DECREF_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT) },
-#if _DEBUG
-        &PyJit_DebugDecRef
-#else
-        &Py_DecRef
-#endif
-        );
-    g_module->m_methods[METHOD_PYCELL_SET_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_CellSet
-        );
-    g_module->m_methods[METHOD_SET_CLOSURE] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_SetClosure
-        );
-    g_module->m_methods[METHOD_BUILD_SLICE] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_BuildSlice
-        );
-    g_module->m_methods[METHOD_UNARY_POSITIVE] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_UnaryPositive
-        );
-    g_module->m_methods[METHOD_UNARY_NEGATIVE] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_UnaryNegative
-        );
-    g_module->m_methods[METHOD_UNARY_NOT] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_UnaryNot
-        );
-
-    g_module->m_methods[METHOD_UNARY_INVERT] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_UnaryInvert
-        );
-
-    g_module->m_methods[METHOD_LIST_APPEND_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_ListAppend
-        );
-    g_module->m_methods[METHOD_SET_ADD_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_SetAdd
-        );
-
-    g_module->m_methods[METHOD_MAP_ADD_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > { Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_MapAdd
-        );
-
-    g_module->m_methods[METHOD_INPLACE_POWER_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplacePower
-        );
-
-    g_module->m_methods[METHOD_INPLACE_MULTIPLY_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceMultiply
-        );
-
-    g_module->m_methods[METHOD_INPLACE_MATRIX_MULTIPLY_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceMatrixMultiply
-        );
-
-    g_module->m_methods[METHOD_INPLACE_TRUE_DIVIDE_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceTrueDivide
-        );
-
-    g_module->m_methods[METHOD_INPLACE_FLOOR_DIVIDE_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceFloorDivide
-        );
-
-    g_module->m_methods[METHOD_INPLACE_MODULO_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceModulo
-        );
-
-    g_module->m_methods[METHOD_INPLACE_ADD_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceAdd
-        );
-
-    g_module->m_methods[METHOD_INPLACE_SUBTRACT_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceSubtract
-        );
-
-    g_module->m_methods[METHOD_INPLACE_LSHIFT_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceLShift
-        );
-
-    g_module->m_methods[METHOD_INPLACE_RSHIFT_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceRShift
-        );
-
-    g_module->m_methods[METHOD_INPLACE_AND_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceAnd
-        );
-
-    g_module->m_methods[METHOD_INPLACE_XOR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceXor
-        );
-
-    g_module->m_methods[METHOD_INPLACE_OR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_InplaceOr
-        );
-
-    g_module->m_methods[METHOD_PRINT_EXPR_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_PrintExpr
-        );
-
-    g_module->m_methods[METHOD_LOAD_CLASSDEREF_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_LoadClassDeref
-        );
-
-    g_module->m_methods[METHOD_PREPARE_EXCEPTION] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT),
-        Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)
-    },
-    &PyJit_PrepareException
-    );
-
-    g_module->m_methods[METHOD_DO_RAISE] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_Raise
-        );
-
-    g_module->m_methods[METHOD_EH_TRACE] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_EhTrace
-        );
-
-    g_module->m_methods[METHOD_COMPARE_EXCEPTIONS] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_CompareExceptions
-        );
-
-    g_module->m_methods[METHOD_UNBOUND_LOCAL] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_UnboundLocal
-        );
-
-    g_module->m_methods[METHOD_PYERR_RESTORE] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_PyErrRestore
-        );
-
-    g_module->m_methods[METHOD_DEBUG_TRACE] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_DebugTrace
-        );
-
-    g_module->m_methods[METHOD_FUNC_SET_DEFAULTS] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_FunctionSetDefaults
-        );
-
-    g_module->m_methods[METHOD_DEBUG_DUMP_FRAME] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_DebugDumpFrame
-        );
-
-    g_module->m_methods[METHOD_PY_POPFRAME] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_PopFrame
-        );
-
-    g_module->m_methods[METHOD_PY_PUSHFRAME] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) },
-        &PyJit_PushFrame
-        );
-
-    g_module->m_methods[METHOD_UNWIND_EH] = Method(
-        nullptr,
-        CORINFO_TYPE_VOID,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_UnwindEh
-        );
-
-    g_module->m_methods[METHOD_PY_CHECKFUNCTIONRESULT] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_CheckFunctionResult
-        );
-
-    g_module->m_methods[METHOD_PY_IMPORTNAME] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_ImportName
-        );
-
-
-    g_module->m_methods[METHOD_PY_FANCYCALL] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT),
-        Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_FancyCall
-        );
-
-    g_module->m_methods[METHOD_PY_IMPORTFROM] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_ImportFrom
-        );
-    g_module->m_methods[METHOD_PY_IMPORTSTAR] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_ImportStar
-        );
-    g_module->m_methods[METHOD_PY_FUNC_SET_ANNOTATIONS] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_FunctionSetAnnotations
-        );
-
-    g_module->m_methods[METHOD_PY_FUNC_SET_KW_DEFAULTS] = Method(
-        nullptr,
-        CORINFO_TYPE_INT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_FunctionSetKwDefaults
-        );
-
-    g_module->m_methods[METHOD_IS] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_Is
-        );
-    g_module->m_methods[METHOD_ISNOT] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_IsNot
-        );
-
-    g_module->m_methods[METHOD_GETITER_OPTIMIZED_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_GetIterOptimized
-        );
-
-    g_module->m_methods[SIG_ITERNEXT_OPTIMIZED_TOKEN] = Method(
-        nullptr,
-        CORINFO_TYPE_NATIVEINT,
-        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT)},
-        &PyJit_IterNextOptimized
-        );
-
-    //g_module->m_methods[SIG_ITERNEXT_TOKEN] = Method(
-    //	nullptr,
-    //	CORINFO_TYPE_NATIVEINT,
-    //	std::vector < Parameter > { },
-    //	nullptr,
-    //	&g_iterNextVtable
-    //);
 }
 
