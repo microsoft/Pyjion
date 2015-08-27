@@ -205,6 +205,7 @@ class Jitter {
     unordered_map<int, size_t> m_offsetStackDepth;
     vector<vector<Label>> m_raiseAndFree;
     UserModule* m_module;
+    unordered_map<int, bool> m_assignmentState;
 
 
 public:
@@ -447,8 +448,6 @@ private:
         m_il.emit_call(METHOD_DEBUG_TRACE);
 #endif
 
-        // TODO: We need to release any objects which are on the stack when we take an
-        // error.
         m_il.pop();
         branch_raise();
         m_il.mark_label(noErr);
@@ -536,6 +535,11 @@ private:
     }
 
     void preprocess() {
+        for (int i = 0; i < m_code->co_argcount; i++) {
+            // all parameters are initially definitely assigned
+            m_assignmentState[i] = true;
+        }
+        
         int oparg;
         for (int i = 0; i < m_size; i++) {
             auto byte = m_byteCode[i];
@@ -555,7 +559,7 @@ private:
             }
             break;
             case UNPACK_SEQUENCE:
-                // we need a buffer for the slow case, but we need 
+            {                // we need a buffer for the slow case, but we need 
                 // to avoid allocating it in loops.
                 auto sequenceTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
                 m_il.ld_i(oparg * sizeof(void*));
@@ -563,6 +567,13 @@ private:
                 m_il.st_loc(sequenceTmp);
 
                 m_sequenceLocals[i] = sequenceTmp;
+            }
+                break;
+            case DELETE_FAST:
+                if (oparg < m_code->co_argcount) {
+                    // this local is deleted, so we need to check for assignment
+                    m_assignmentState[oparg] = false;
+                }
                 break;
             }
         }
@@ -571,7 +582,7 @@ private:
     // Frees our iteration temporary variable which gets allocated when we hit
     // a FOR_ITER.  Used when we're breaking from the current loop.
     void free_iter_local() {
-        for (size_t i = m_blockStack.size() - 1; i >= 0; i--) {
+        for (size_t i = m_blockStack.size() - 1; i >= -1; i--) {
             if (m_blockStack[i].Kind == SETUP_LOOP) {
                 if (m_blockStack[i].LoopVar.is_valid()) {
                     m_il.ld_loc(m_blockStack[i].LoopVar);
@@ -1110,20 +1121,23 @@ private:
             {
                 load_local(oparg);
 
-                auto valueSet = m_il.define_label();
+                if (m_assignmentState.find(oparg) == m_assignmentState.end() ||
+                    !m_assignmentState.find(oparg)->second) {
+                    auto valueSet = m_il.define_label();
 
-                //// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
-                //// locals that are provably assigned)
-                m_il.dup();
-                m_il.load_null();
-                m_il.branch(BranchNotEqual, valueSet);
+                    //// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
+                    //// locals that are provably assigned)
+                    m_il.dup();
+                    m_il.load_null();
+                    m_il.branch(BranchNotEqual, valueSet);
 
-                m_il.pop();
-                m_il.push_ptr(PyTuple_GetItem(m_code->co_varnames, oparg));
-                m_il.emit_call(METHOD_UNBOUND_LOCAL);
-                branch_raise();
+                    m_il.pop();
+                    m_il.push_ptr(PyTuple_GetItem(m_code->co_varnames, oparg));
+                    m_il.emit_call(METHOD_UNBOUND_LOCAL);
+                    branch_raise();
 
-                m_il.mark_label(valueSet);
+                    m_il.mark_label(valueSet);
+                }
 
                 m_il.dup();
                 incref();
@@ -1332,10 +1346,6 @@ private:
                     case 0:
 
                         //m_il.emit_call(METHOD_CALL0_TOKEN);
-
-                        
-                        // TODO: Need to free this indirect dispatch method after the
-                        // users function gets freed.
                         {
                             auto id = new IndirectDispatchMethod(
                                 g_module.m_methods[METHOD_CALL0_OPT_TOKEN]
@@ -2181,6 +2191,7 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
 }
 
 extern "C" __declspec(dllexport) void JitFree(PVOID function) {
+    printf("Freeing code\r\n");
     auto find = g_jittedCode.find(function);
     if (find != g_jittedCode.end()) {
         auto code = find->second;
