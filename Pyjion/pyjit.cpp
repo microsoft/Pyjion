@@ -478,7 +478,9 @@ private:
         }
     }
 
-    void check_int_error_leave(int curIndex) {
+    // Checks to see if we have a non-zero error code on the stack, and if so,
+    // branches to the current error handler.  Consumes the error code in the process
+    void check_int_error(int curIndex) {
         auto noErr = m_il.define_label();
         m_il.ld_i4(0);
         m_il.branch(BranchEqual, noErr);
@@ -495,14 +497,6 @@ private:
         // error.
         branch_raise();
         m_il.mark_label(noErr);
-    }
-
-    // Checks to see if we have a non-zero error code on the stack, and if so,
-    // branches to the current error handler.  Consumes the error code in the process
-    void check_int_error(int curIndex) {
-        check_int_error_leave(curIndex);
-        //m_il.ld_i4(0);
-        //m_il.branch(BranchNotEqual, get_ehblock().Raise);
     }
 
     void unwind_eh(ExceptionVars& exVars) {
@@ -820,10 +814,43 @@ private:
                     inc_stack();
                     break;
                 case PyCmp_EXC_MATCH:
-                    m_il.emit_call(METHOD_COMPARE_EXCEPTIONS);
-                    dec_stack(2);
-                    check_error(i, "compare ex");
-                    inc_stack();
+                    if (m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+                        m_il.emit_call(METHOD_COMPARE_EXCEPTIONS_INT);
+                        dec_stack(2);
+
+                        i++;
+                        mark_offset_label(i);
+                        oparg = NEXTARG();
+
+                        m_il.dup();
+                        m_il.ld_i4(2);
+
+                        auto noErr = m_il.define_label();
+                        m_il.branch(BranchNotEqual, noErr);
+                        // we need to issue a leave to clear the stack as we may have
+                        // values on the stack...
+#ifdef DEBUG_TRACE
+                        char* tmp = (char*)malloc(100);
+                        sprintf_s(tmp, 100, "Error at index %d %s %s", curIndex, PyUnicode_AsUTF8(m_code->co_name), reason);
+                        m_il.push_ptr(tmp);
+                        m_il.emit_call(METHOD_DEBUG_TRACE);
+#endif
+
+                        m_il.pop();
+                        branch_raise();
+                        m_il.mark_label(noErr);
+
+                        m_il.branch(BranchFalse, getOffsetLabel(oparg));
+                        m_offsetStackDepth[oparg] = m_stackDepth;
+                    }
+                    else{
+                        // this will actually not currently be reached due to the way
+                        // CPython generates code, but is left for completeness.
+                        m_il.emit_call(METHOD_COMPARE_EXCEPTIONS);
+                        dec_stack(2);
+                        check_error(i, "compare ex");
+                        inc_stack();
+                    }
                     break;
                 default:
                     m_il.ld_i(oparg);
@@ -2345,6 +2372,7 @@ GLOBAL_METHOD(METHOD_DO_RAISE, &PyJit_Raise, CORINFO_TYPE_INT, Parameter(CORINFO
 GLOBAL_METHOD(METHOD_EH_TRACE, &PyJit_EhTrace, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT) );
 
 GLOBAL_METHOD(METHOD_COMPARE_EXCEPTIONS, &PyJit_CompareExceptions, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_COMPARE_EXCEPTIONS_INT, &PyJit_CompareExceptions_Int, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_UNBOUND_LOCAL, &PyJit_UnboundLocal, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_PYERR_RESTORE, &PyJit_PyErrRestore, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));

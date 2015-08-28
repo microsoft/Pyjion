@@ -1060,7 +1060,7 @@ public:
         CORINFO_CONTEXT_HANDLE      context,    /* IN */
         CORINFO_SIG_INFO           *sig         /* OUT */
         ) {
-        printf("findCallSiteSig\r\n");
+        //printf("findCallSiteSig\r\n");
     }
 
     virtual CORINFO_CLASS_HANDLE getTokenTypeAsHandle(

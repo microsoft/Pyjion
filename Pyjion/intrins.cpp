@@ -513,6 +513,38 @@ PyObject* PyJit_CompareExceptions(PyObject*v, PyObject* w) {
     return v;
 }
 
+// Returns 2 on an error, 1 if the exceptions match, or 0 if they don't.
+int PyJit_CompareExceptions_Int(PyObject*v, PyObject* w) {
+    if (PyTuple_Check(w)) {
+        Py_ssize_t i, length;
+        length = PyTuple_Size(w);
+        for (i = 0; i < length; i += 1) {
+            PyObject *exc = PyTuple_GET_ITEM(w, i);
+            if (!PyExceptionClass_Check(exc)) {
+                PyErr_SetString(PyExc_TypeError,
+                    CANNOT_CATCH_MSG);
+                Py_DECREF(v);
+                Py_DECREF(w);
+                return 2;
+            }
+        }
+    }
+    else {
+        if (!PyExceptionClass_Check(w)) {
+            PyErr_SetString(PyExc_TypeError,
+                CANNOT_CATCH_MSG);
+            Py_DECREF(v);
+            Py_DECREF(w);
+            return 2;
+        }
+    }
+    int res = PyErr_GivenExceptionMatches(v, w);
+    Py_DECREF(v);
+    Py_DECREF(w);
+    return res ? 1 : 0;
+}
+
+
 void PyJit_UnboundLocal(PyObject* name) {
     format_exc_check_arg(
         PyExc_UnboundLocalError,

@@ -135,6 +135,7 @@ void PyJit_UnwindEh(PyObject*exc, PyObject*val, PyObject*tb);
                          "BaseException is not allowed"
 
 PyObject* PyJit_CompareExceptions(PyObject*v, PyObject* w);
+int PyJit_CompareExceptions_Int(PyObject*v, PyObject* w);
 
 void PyJit_UnboundLocal(PyObject* name);
 
