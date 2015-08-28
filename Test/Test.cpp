@@ -109,6 +109,22 @@ void PyJitTest() {
         //    TestInput("True")
         //),
         TestCase(
+            "def f(a, b):\n    if a is b:\n        return True",
+            TestInput("True", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(1) }))
+        ),
+        TestCase(
+            "def f(a, b):\n    if a is not b:\n        return True",
+            TestInput("True", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(2) }))
+        ),
+        TestCase(
+            "def f(a, b):\n    assert a is b\n    return True",
+            TestInput("True", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(1) }))
+        ),
+        TestCase(
+            "def f(a, b):\n    assert a is b\n    return True",
+            TestInput("<NULL>", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(2) }))
+        ),
+        TestCase(
             "def f():\n    a = RefCountCheck()\n    del a\n    return finalized",
             TestInput("True")
         ),

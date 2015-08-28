@@ -771,12 +771,27 @@ private:
                 auto compareType = oparg;
                 switch (compareType) {
                 case PyCmp_IS: 
-                    m_il.emit_call(METHOD_IS);
-                    dec_stack();
-                    break;
-                case PyCmp_IS_NOT: 
-                    m_il.emit_call(METHOD_ISNOT); 
-                    dec_stack();
+                case PyCmp_IS_NOT:
+                    if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+                        m_il.emit_call((compareType == PyCmp_IS) ? METHOD_IS_BOOL : METHOD_ISNOT_BOOL);
+                        auto jmpType = m_byteCode[i + 1];
+
+                        i++;
+                        mark_offset_label(i);
+
+                        oparg = NEXTARG();
+                        m_il.branch(
+                            (jmpType == POP_JUMP_IF_TRUE) ? BranchTrue : BranchFalse, 
+                            getOffsetLabel(oparg)
+                        );
+
+                        dec_stack(2);
+                        m_offsetStackDepth[oparg] = m_stackDepth;
+                    }
+                    else{
+                        m_il.emit_call(compareType == PyCmp_IS ? METHOD_IS : METHOD_ISNOT);
+                        dec_stack();
+                    }
                     break;
                     //	// TODO: Missing dec refs here...
                     //{
@@ -2355,6 +2370,9 @@ GLOBAL_METHOD(METHOD_PY_FUNC_SET_KW_DEFAULTS, &PyJit_FunctionSetKwDefaults, CORI
 
 GLOBAL_METHOD(METHOD_IS, &PyJit_Is, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_ISNOT, &PyJit_IsNot, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_IS_BOOL, &PyJit_Is_Bool, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_ISNOT_BOOL, &PyJit_IsNot_Bool, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_GETITER_OPTIMIZED_TOKEN, &PyJit_GetIterOptimized, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(SIG_ITERNEXT_OPTIMIZED_TOKEN, &PyJit_IterNextOptimized, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));

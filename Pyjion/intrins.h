@@ -224,6 +224,9 @@ int PyJit_DeleteName(PyFrameObject* f, PyObject* name);
 PyObject* PyJit_Is(PyObject* lhs, PyObject* rhs);
 PyObject* PyJit_IsNot(PyObject* lhs, PyObject* rhs);
 
+bool PyJit_Is_Bool(PyObject* lhs, PyObject* rhs);
+bool PyJit_IsNot_Bool(PyObject* lhs, PyObject* rhs);
+
 PyObject* Call0(PyObject *target);
 PyObject* Call1(PyObject *target, PyObject* arg0);
 PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1);

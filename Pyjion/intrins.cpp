@@ -1845,6 +1845,18 @@ PyObject* PyJit_IsNot(PyObject* lhs, PyObject* rhs) {
     return res;
 }
 
+bool PyJit_Is_Bool(PyObject* lhs, PyObject* rhs) {
+    Py_DECREF(lhs);
+    Py_DECREF(rhs);
+    return lhs == rhs;
+}
+
+bool PyJit_IsNot_Bool(PyObject* lhs, PyObject* rhs) {
+    Py_DECREF(lhs);
+    Py_DECREF(rhs);
+    return lhs != rhs;
+}
+
 void PyJit_DebugDecRef(PyObject* value) {
     Py_DecRef(value);
 }
