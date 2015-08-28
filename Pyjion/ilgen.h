@@ -351,6 +351,7 @@ public:
     }
 
     void ld_loca(Local param) {
+        _ASSERTE(param.is_valid());
         ld_loca(param.m_index);
     }
 
@@ -395,6 +396,7 @@ public:
     }
 
     void ld_loca(int index) {
+        _ASSERTE(index != -1);
         if (index < 256) {
             m_il.push_back(CEE_LDLOCA_S);
             m_il.push_back(index);

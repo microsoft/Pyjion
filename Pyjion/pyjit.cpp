@@ -1629,30 +1629,37 @@ private:
                 inc_stack();
                 break;
             case GET_ITER:
-                // GET_ITER can be followed by FOR_ITER, or a CALL_FUNCTION.
-                if (m_byteCode[i + 1] == FOR_ITER) {
+                // GET_ITER can be followed by FOR_ITER, or a CALL_FUNCTION.                
+                {
+                    bool optFor = false;
                     Local loopOpt1, loopOpt2;
-                    for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != (-1); blockIndex--) {
-                        if (m_blockStack[blockIndex].Kind == SETUP_LOOP) {
-                            // save our iter variable so we can free it on break, continue, return, and
-                            // when encountering an exception.
-                            m_blockStack.data()[blockIndex].LoopOpt1 = loopOpt1 = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-                            m_blockStack.data()[blockIndex].LoopOpt2 = loopOpt2 = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-                            break;
+                    if (m_byteCode[i + 1] == FOR_ITER) {
+                        for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != (-1); blockIndex--) {
+                            if (m_blockStack[blockIndex].Kind == SETUP_LOOP) {
+                                // save our iter variable so we can free it on break, continue, return, and
+                                // when encountering an exception.
+                                m_blockStack.data()[blockIndex].LoopOpt1 = loopOpt1 = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+                                m_blockStack.data()[blockIndex].LoopOpt2 = loopOpt2 = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+                                optFor = true;
+                                break;
+                            }
                         }
                     }
-                    m_il.ld_loca(loopOpt1);
-                    m_il.ld_loca(loopOpt2);
-                    m_il.emit_call(METHOD_GETITER_OPTIMIZED_TOKEN);
-                    dec_stack();
-                    check_error(i, "getiter");
-                    inc_stack();
-                }
-                else{
-                    m_il.emit_call(METHOD_GETITER_TOKEN);
-                    dec_stack();
-                    check_error(i, "getiter");
-                    inc_stack();
+
+                    if (optFor) {
+                        m_il.ld_loca(loopOpt1);
+                        m_il.ld_loca(loopOpt2);
+                        m_il.emit_call(METHOD_GETITER_OPTIMIZED_TOKEN);
+                        dec_stack();
+                        check_error(i, "getiter");
+                        inc_stack();
+                    }
+                    else{
+                        m_il.emit_call(METHOD_GETITER_TOKEN);
+                        dec_stack();
+                        check_error(i, "getiter");
+                        inc_stack();
+                    }
                 }
                 break;
             case FOR_ITER:
@@ -2053,9 +2060,8 @@ private:
             case IMPORT_STAR:
                 load_frame();
                 m_il.emit_call(METHOD_PY_IMPORTSTAR);
-                dec_stack(2);
+                dec_stack(1);
                 check_int_error(i);
-                inc_stack();
                 break;
             case SETUP_WITH:
             case WITH_CLEANUP_START:
@@ -2164,11 +2170,7 @@ private:
 };
 
 extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
-    //if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
-    //	// TODO: Remove me, currently we can't compile encodings\aliases.py.
-    //	return nullptr;
-    //}
-#ifdef  DEBUG_TRACE
+#if  DEBUG_TRACE
     static int compileCount = 0, failCount = 0;
     printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n",
         PyUnicode_AsUTF8(code->co_name), 
@@ -2185,13 +2187,11 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
 #endif
         return nullptr;
     }
-
     g_jittedCode[res->Address] = res;
     return res->Address;
 }
 
 extern "C" __declspec(dllexport) void JitFree(PVOID function) {
-    printf("Freeing code\r\n");
     auto find = g_jittedCode.find(function);
     if (find != g_jittedCode.end()) {
         auto code = find->second;
@@ -2274,8 +2274,8 @@ GLOBAL_METHOD(METHOD_STOREATTR_TOKEN, &PyJit_StoreAttr, CORINFO_TYPE_INT, Parame
 GLOBAL_METHOD(METHOD_DELETEATTR_TOKEN, &PyJit_DeleteAttr, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_LOADNAME_TOKEN, &PyJit_LoadName, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_STORENAME_TOKEN, &PyJit_StoreName, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_DELETENAME_TOKEN, &PyJit_DeleteName, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_STORENAME_TOKEN, &PyJit_StoreName, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_DELETENAME_TOKEN, &PyJit_DeleteName, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_GETITER_TOKEN, &PyJit_GetIter, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(SIG_ITERNEXT_TOKEN, &PyJit_IterNext, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
