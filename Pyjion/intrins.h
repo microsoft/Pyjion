@@ -51,12 +51,15 @@ PyObject* PyJit_Subscr(PyObject *left, PyObject *right);
 
 PyObject* PyJit_RichCompare(PyObject *left, PyObject *right, int op);
 
-PyObject* PyJit_Contains(PyObject *left, PyObject *right);
 
 PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index);
 
 
-PyObject* PyJit_NotContains(PyObject *left, PyObject *right, int op);
+PyObject* PyJit_Contains(PyObject *left, PyObject *right);
+PyObject* PyJit_NotContains(PyObject *left, PyObject *right);
+
+int PyJit_Contains_Int(PyObject *left, PyObject *right);
+int PyJit_NotContains_Int(PyObject *left, PyObject *right);
 
 PyObject* PyJit_NewFunction(PyObject* code, PyObject* qualname, PyFrameObject* frame);
 

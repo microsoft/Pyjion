@@ -109,6 +109,19 @@ void PyJitTest() {
         //    TestInput("True")
         //),
         TestCase(
+            "def f(a, b):\n    if a in b:\n        return True\n    return False",
+            vector<TestInput>({
+                TestInput("True", vector<PyObject*>({ PyLong_FromLong(42), Incremented((PyObject*)tupleOfOne) })),
+                TestInput("False", vector<PyObject*>({ PyLong_FromLong(1), Incremented((PyObject*)tupleOfOne) }))
+        })),
+        TestCase(
+            "def f(a, b):\n    if a not in b:\n        return True\n    return False",
+            vector<TestInput>({
+                    TestInput("False", vector<PyObject*>({ PyLong_FromLong(42), Incremented((PyObject*)tupleOfOne) })),
+                    TestInput("True", vector<PyObject*>({ PyLong_FromLong(1), Incremented((PyObject*)tupleOfOne) }))
+                })
+        ),
+        TestCase(
             "def f(a, b):\n    if a is b:\n        return True",
             TestInput("True", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(1) }))
         ),

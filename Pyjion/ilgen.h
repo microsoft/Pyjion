@@ -181,6 +181,7 @@ public:
 
     void ld_i4(int i) {
         switch (i) {
+        case -1:push_back(CEE_LDC_I4_M1); break;
         case 0: push_back(CEE_LDC_I4_0); break;
         case 1: push_back(CEE_LDC_I4_1); break;
         case 2: push_back(CEE_LDC_I4_2); break;

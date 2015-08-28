@@ -626,6 +626,37 @@ private:
         m_stackDepth += size;
     }
 
+    // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
+    // If the value on the stack is -1, we branch to the current error handler.
+    // Otherwise branches based if the current value is true/false based upon the current opcode 
+    void branch_or_error(int& i) {
+        auto jmpType = m_byteCode[i + 1];
+        i++;
+        mark_offset_label(i);
+        auto oparg = NEXTARG();
+
+        m_il.dup();
+        m_il.ld_i4(-1);
+
+        auto noErr = m_il.define_label();
+        m_il.branch(BranchNotEqual, noErr);
+        // we need to issue a leave to clear the stack as we may have
+        // values on the stack...
+#ifdef DEBUG_TRACE
+        char* tmp = (char*)malloc(100);
+        sprintf_s(tmp, 100, "Error at index %d %s %s", curIndex, PyUnicode_AsUTF8(m_code->co_name), reason);
+        m_il.push_ptr(tmp);
+        m_il.emit_call(METHOD_DEBUG_TRACE);
+#endif
+
+        m_il.pop();
+        branch_raise();
+        m_il.mark_label(noErr);
+
+        m_il.branch(jmpType == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, getOffsetLabel(oparg));
+        m_offsetStackDepth[oparg] = m_stackDepth;
+    }
+
     PVOID compile_worker() {
         int oparg;
         Label ok;
@@ -761,7 +792,6 @@ private:
             break;
             case COMPARE_OP:
             {
-                // TODO: We could look at the next op, and if it's branch avoid some overhead.
                 auto compareType = oparg;
                 switch (compareType) {
                 case PyCmp_IS: 
@@ -802,46 +832,39 @@ private:
                     //}
                     //	break;
                 case PyCmp_IN:
-                    m_il.emit_call(METHOD_CONTAINS_TOKEN);
-                    dec_stack(2);
-                    check_error(i, "contains");
-                    inc_stack();
+                    if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+                        m_il.emit_call(METHOD_CONTAINS_INT_TOKEN);
+                        dec_stack(2);
+
+                        branch_or_error(i);
+                    }
+                    else{
+                        m_il.emit_call(METHOD_CONTAINS_TOKEN);
+                        dec_stack(2);
+                        check_error(i, "contains");
+                        inc_stack();
+                    }
                     break;
                 case PyCmp_NOT_IN:
-                    m_il.emit_call(METHOD_NOTCONTAINS_TOKEN);
-                    dec_stack(2);
-                    check_error(i, "not contains");
-                    inc_stack();
+                    if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+                        m_il.emit_call(METHOD_NOTCONTAINS_INT_TOKEN);
+                        dec_stack(2);
+
+                        branch_or_error(i);
+                    }
+                    else{
+                        m_il.emit_call(METHOD_NOTCONTAINS_TOKEN);
+                        dec_stack(2);
+                        check_error(i, "not contains");
+                        inc_stack();
+                    }
                     break;
                 case PyCmp_EXC_MATCH:
                     if (m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
                         m_il.emit_call(METHOD_COMPARE_EXCEPTIONS_INT);
                         dec_stack(2);
 
-                        i++;
-                        mark_offset_label(i);
-                        oparg = NEXTARG();
-
-                        m_il.dup();
-                        m_il.ld_i4(2);
-
-                        auto noErr = m_il.define_label();
-                        m_il.branch(BranchNotEqual, noErr);
-                        // we need to issue a leave to clear the stack as we may have
-                        // values on the stack...
-#ifdef DEBUG_TRACE
-                        char* tmp = (char*)malloc(100);
-                        sprintf_s(tmp, 100, "Error at index %d %s %s", curIndex, PyUnicode_AsUTF8(m_code->co_name), reason);
-                        m_il.push_ptr(tmp);
-                        m_il.emit_call(METHOD_DEBUG_TRACE);
-#endif
-
-                        m_il.pop();
-                        branch_raise();
-                        m_il.mark_label(noErr);
-
-                        m_il.branch(BranchFalse, getOffsetLabel(oparg));
-                        m_offsetStackDepth[oparg] = m_stackDepth;
+                        branch_or_error(i);
                     }
                     else{
                         // this will actually not currently be reached due to the way
@@ -2291,6 +2314,9 @@ GLOBAL_METHOD(METHOD_PYCELL_GET, &PyJit_CellGet, CORINFO_TYPE_NATIVEINT, Paramet
 GLOBAL_METHOD(METHOD_RICHCMP_TOKEN, &PyJit_RichCompare, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_INT));
 GLOBAL_METHOD(METHOD_CONTAINS_TOKEN, &PyJit_Contains, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_NOTCONTAINS_TOKEN, &PyJit_NotContains, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_CONTAINS_INT_TOKEN, &PyJit_Contains_Int, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_NOTCONTAINS_INT_TOKEN, &PyJit_NotContains_Int, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_NEWFUNCTION_TOKEN, &PyJit_NewFunction, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 

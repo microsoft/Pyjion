@@ -118,6 +118,37 @@ PyObject* PyJit_Contains(PyObject *left, PyObject *right) {
     return ret;
 }
 
+PyObject* PyJit_NotContains(PyObject *left, PyObject *right) {
+    auto res = PySequence_Contains(right, left);
+    Py_DECREF(left);
+    Py_DECREF(right);
+    if (res < 0) {
+        return nullptr;
+    }
+    auto ret = res ? Py_False : Py_True;
+    Py_INCREF(ret);
+    return ret;
+}
+
+int PyJit_Contains_Int(PyObject *left, PyObject *right) {
+    auto res = PySequence_Contains(right, left);
+    Py_DECREF(left);
+    Py_DECREF(right);
+    return res;
+}
+
+
+int PyJit_NotContains_Int(PyObject *left, PyObject *right) {
+    auto res = PySequence_Contains(right, left);
+    Py_DECREF(left);
+    Py_DECREF(right);
+    if (res < 0) {
+        return -1;
+    }
+    return res ? 0 : 1;
+}
+
+
 PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index) {
     PyObject** cells = frame->f_localsplus + frame->f_code->co_nlocals;
     PyObject *value = PyCell_GET(cells[index]);
@@ -129,19 +160,6 @@ PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index) {
         Py_INCREF(value);
     }
     return value;
-}
-
-
-PyObject* PyJit_NotContains(PyObject *left, PyObject *right, int op) {
-    auto res = PySequence_Contains(right, left);
-    Py_DECREF(left);
-    Py_DECREF(right);
-    if (res < 0) {
-        return nullptr;
-    }
-    auto ret = res ? Py_False : Py_True;
-    Py_INCREF(ret);
-    return ret;
 }
 
 PyObject* PyJit_NewFunction(PyObject* code, PyObject* qualname, PyFrameObject* frame) {
@@ -525,7 +543,7 @@ int PyJit_CompareExceptions_Int(PyObject*v, PyObject* w) {
                     CANNOT_CATCH_MSG);
                 Py_DECREF(v);
                 Py_DECREF(w);
-                return 2;
+                return -1;
             }
         }
     }
@@ -535,7 +553,7 @@ int PyJit_CompareExceptions_Int(PyObject*v, PyObject* w) {
                 CANNOT_CATCH_MSG);
             Py_DECREF(v);
             Py_DECREF(w);
-            return 2;
+            return -1;
         }
     }
     int res = PyErr_GivenExceptionMatches(v, w);
