@@ -210,6 +210,15 @@ PyObject* PyJit_UnaryNot(PyObject* value) {
     return nullptr;
 }
 
+int PyJit_UnaryNot_Int(PyObject* value) {
+    int err = PyObject_IsTrue(value);
+    Py_DECREF(value);
+    if (err < 0) {
+        return -1;
+    }
+    return err ? 0 : 1;
+}
+
 PyObject* PyJit_UnaryInvert(PyObject* value) {
     auto res = PyNumber_Invert(value);
     Py_DECREF(value);

@@ -72,6 +72,7 @@ PyObject* PyJit_UnaryPositive(PyObject* value);
 PyObject* PyJit_UnaryNegative(PyObject* value);
 
 PyObject* PyJit_UnaryNot(PyObject* value);
+int PyJit_UnaryNot_Int(PyObject* value);
 
 PyObject* PyJit_UnaryInvert(PyObject* value);
 

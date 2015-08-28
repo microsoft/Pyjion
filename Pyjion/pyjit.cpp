@@ -1523,10 +1523,18 @@ private:
                 inc_stack();
                 break;
             case UNARY_NOT: 
-                dec_stack(1);
-                m_il.emit_call(METHOD_UNARY_NOT);
-                check_error(i, "not");
-                inc_stack();
+                if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+                    dec_stack(1);
+                    m_il.emit_call(METHOD_UNARY_NOT_INT);
+
+                    branch_or_error(i);
+                }
+                else{
+                    dec_stack(1);
+                    m_il.emit_call(METHOD_UNARY_NOT);
+                    check_error(i, "not");
+                    inc_stack();
+                }
                 break;
             case UNARY_INVERT:
                 dec_stack(1);
@@ -2365,6 +2373,8 @@ GLOBAL_METHOD(METHOD_BUILD_SLICE, &PyJit_BuildSlice, CORINFO_TYPE_NATIVEINT, Par
 GLOBAL_METHOD(METHOD_UNARY_POSITIVE, &PyJit_UnaryPositive, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_UNARY_NEGATIVE, &PyJit_UnaryNegative, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_UNARY_NOT, &PyJit_UnaryNot, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_UNARY_NOT_INT, &PyJit_UnaryNot_Int, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT));
+
 GLOBAL_METHOD(METHOD_UNARY_INVERT, &PyJit_UnaryInvert, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_LIST_APPEND_TOKEN, &PyJit_ListAppend, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
