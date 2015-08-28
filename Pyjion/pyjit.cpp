@@ -2170,7 +2170,10 @@ private:
 };
 
 extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
-#if  DEBUG_TRACE
+    if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
+        return nullptr;
+    }
+#ifdef DEBUG_TRACE
     static int compileCount = 0, failCount = 0;
     printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n",
         PyUnicode_AsUTF8(code->co_name), 
