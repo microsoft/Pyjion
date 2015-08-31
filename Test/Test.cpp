@@ -652,7 +652,6 @@ void PyJitTest() {
         )
     };
 
-    typedef PyObject*(__stdcall * evalFunc)(PyFrameObject*);
 
 
     for (int i = 0; i < _countof(cases); i++) {
@@ -680,7 +679,7 @@ void PyJitTest() {
                 frame->f_localsplus[arg] = input.m_args[arg];
             }
 
-            auto res = ((evalFunc)addr)(frame);
+            auto res = addr->j_evalfunc(nullptr, frame);
 
             auto repr = PyUnicode_AsUTF8(PyObject_Repr(res));
             if (strcmp(input.m_expected, repr) != 0) {

@@ -121,7 +121,7 @@ struct JittedCode {
     }
 };
 
-unordered_map<PVOID, JittedCode*> g_jittedCode;
+unordered_map<PyJittedCode*, JittedCode*> g_jittedCode;
 
 struct ExceptionVars {
     Local PrevExc, PrevExcVal, PrevTraceback;
@@ -210,7 +210,8 @@ class Jitter {
 
 public:
     Jitter(PyCodeObject *code) : 
-        m_il(m_module = new UserModule(g_module), CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT) }){
+        m_il(m_module = new UserModule(g_module), 
+        CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) }){
         this->m_code = code;
         this->m_byteCode = (unsigned char *)((PyBytesObject*)code->co_code)->ob_sval;
         this->m_size = PyBytes_Size(code->co_code);
@@ -254,7 +255,7 @@ private:
     }
 
     void load_frame() {
-        m_il.ld_arg(0);
+        m_il.ld_arg(1);
     }
 
     void load_local(int oparg) {
@@ -657,6 +658,14 @@ private:
         m_offsetStackDepth[oparg] = m_stackDepth;
     }
 
+    void call_optimizing_function(int baseFunction) {
+        auto id = new IndirectDispatchMethod(g_module.m_methods[baseFunction]);
+        m_il.push_ptr(&id->m_addr);
+        auto token = (int)(FIRST_USER_FUNCTION_TOKEN + m_module->m_methods.size());
+        m_module->m_methods[token] = id;
+        m_il.emit_call(token);
+    }
+
     PVOID compile_worker() {
         int oparg;
         Label ok;
@@ -876,11 +885,31 @@ private:
                     }
                     break;
                 default:
-                    m_il.ld_i(oparg);
-                    m_il.emit_call(METHOD_RICHCMP_TOKEN);
-                    dec_stack(2);
-                    check_error(i, "rich cmp");
-                    inc_stack();
+                    bool generated = false;
+                    if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+                        switch (oparg) {
+                            case Py_LT:
+                            case Py_LE:
+                            case Py_EQ:
+                                call_optimizing_function(METHOD_RICHEQUALS_GENERIC_TOKEN);
+                                dec_stack(2);
+                                branch_or_error(i);
+                                generated = true;
+                                break;
+                            case Py_NE:
+                            case Py_GT:
+                            case Py_GE:
+                                break;
+                        }
+                    }
+
+                    if (!generated) {
+                        m_il.ld_i(oparg);
+                        m_il.emit_call(METHOD_RICHCMP_TOKEN);
+                        dec_stack(2);
+                        check_error(i, "rich cmp");
+                        inc_stack();
+                    }
                     break;
                 }
             }
@@ -1409,17 +1438,7 @@ private:
                 if (kwArgCnt == 0) {
                     switch (argCnt) {
                     case 0:
-
-                        //m_il.emit_call(METHOD_CALL0_TOKEN);
-                        {
-                            auto id = new IndirectDispatchMethod(
-                                g_module.m_methods[METHOD_CALL0_OPT_TOKEN]
-                            );
-                            m_il.push_ptr(&id->m_addr);
-                            auto token = (int)(FIRST_USER_FUNCTION_TOKEN + m_module->m_methods.size());
-                            m_module->m_methods[token] = id;
-                            m_il.emit_call(token);
-                        }
+                        call_optimizing_function(METHOD_CALL0_OPT_TOKEN);
                         dec_stack();
                         check_error(i, "call 0"); 
                         inc_stack();
@@ -2092,7 +2111,7 @@ private:
                     // END_FINALLY is marking the EH rethrow.  The byte code branches
                     // around this in the non-exceptional case.
                     
-                    // If we haven't seend a branch to this END_FINALLY then we have
+                    // If we haven't sent a branch to this END_FINALLY then we have
                     // a bare try/except: which handles all exceptions.  In that case
                     // we have no values to pop off, and this code will never be invoked
                     // anyway.
@@ -2101,9 +2120,6 @@ private:
                         free_iter_locals_on_exception();
                         m_il.emit_call(METHOD_PYERR_RESTORE);
                         m_il.branch(BranchAlways, get_ehblock().ReRaise);
-                    }
-                    else {
-                        printf("...");
                     }
                 }
             }
@@ -2242,7 +2258,7 @@ private:
     }
 };
 
-extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
+extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
     if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
         return nullptr;
     }
@@ -2257,17 +2273,27 @@ extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code) {
 #endif
     Jitter jitter(code);
     auto res = jitter.compile();
+
     if (res == nullptr) {
 #ifdef DEBUG_TRACE
         printf("Compilation failure #%d\r\n", ++failCount);
 #endif
         return nullptr;
     }
-    g_jittedCode[res->Address] = res;
-    return res->Address;
+
+    auto jittedCode = (PyJittedCode*)PyJittedCode_New();
+    if (jittedCode == nullptr) {
+        // OOM
+        return nullptr;
+    }
+
+    g_jittedCode[jittedCode] = res;
+    jittedCode->j_evalfunc = (Py_EvalFunc)res->Address;
+    jittedCode->j_evalstate = nullptr;
+    return jittedCode;
 }
 
-extern "C" __declspec(dllexport) void JitFree(PVOID function) {
+extern "C" __declspec(dllexport) void JitFree(PyJittedCode* function) {
     auto find = g_jittedCode.find(function);
     if (find != g_jittedCode.end()) {
         auto code = find->second;
@@ -2320,6 +2346,8 @@ GLOBAL_METHOD(METHOD_PYITER_NEXT, &PyIter_Next, CORINFO_TYPE_NATIVEINT, Paramete
 
 GLOBAL_METHOD(METHOD_PYCELL_GET, &PyJit_CellGet, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_RICHCMP_TOKEN, &PyJit_RichCompare, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_INT));
+GLOBAL_METHOD(METHOD_RICHEQUALS_GENERIC_TOKEN, &PyJit_RichEquals_Generic, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
 GLOBAL_METHOD(METHOD_CONTAINS_TOKEN, &PyJit_Contains, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_NOTCONTAINS_TOKEN, &PyJit_NotContains, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 

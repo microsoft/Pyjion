@@ -106,6 +106,84 @@ PyObject* PyJit_RichCompare(PyObject *left, PyObject *right, int op) {
     return res;
 }
 
+int PyJit_RichEquals_Str(PyObject *left, PyObject *right, void**state) {
+    int res;
+    if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+        res = PyUnicode_Compare(left, right) == 0;
+    }
+    else{
+        return PyJit_RichEquals_Generic(left, right, state);
+    }
+    
+    Py_DECREF(left);
+    Py_DECREF(right);
+    return res;
+}
+
+// taken from longobject.c:
+static int
+long_compare(PyLongObject *a, PyLongObject *b)
+{
+    Py_ssize_t sign;
+
+    if (Py_SIZE(a) != Py_SIZE(b)) {
+        sign = Py_SIZE(a) - Py_SIZE(b);
+    }
+    else {
+        Py_ssize_t i = Py_ABS(Py_SIZE(a));
+        while (--i >= 0 && a->ob_digit[i] == b->ob_digit[i])
+            ;
+        if (i < 0)
+            sign = 0;
+        else {
+            sign = (sdigit)a->ob_digit[i] - (sdigit)b->ob_digit[i];
+            if (Py_SIZE(a) < 0)
+                sign = -sign;
+        }
+    }
+    return sign < 0 ? -1 : sign > 0 ? 1 : 0;
+}
+
+int PyJit_RichEquals_Long(PyObject *left, PyObject *right, void**state) {
+    int res;
+    if (PyLong_CheckExact(left) && PyLong_CheckExact(right)) {
+        res = long_compare((PyLongObject*)left, (PyLongObject*)right) == 0;
+    }
+    else{
+        return PyJit_RichEquals_Generic(left, right, state);
+    }
+
+    Py_DECREF(left);
+    Py_DECREF(right);
+    return res;
+}
+
+
+int PyJit_RichEquals_Generic(PyObject *left, PyObject *right, void**state) {
+    if (left->ob_type == right->ob_type) {
+        if (PyUnicode_Check(left)) {
+            *state = &PyJit_RichEquals_Str;
+            return PyJit_RichEquals_Str(left, right, state);
+        }
+        else if (PyLong_CheckExact(left)) {
+            *state = &PyJit_RichEquals_Long;
+            return PyJit_RichEquals_Long(left, right, state);
+        }
+    }
+
+    // Different types, or no optimization for these types...
+    auto res = PyObject_RichCompare(left, right, Py_EQ);
+    Py_DECREF(left);
+    Py_DECREF(right);
+    if (res == nullptr) {
+        return -1;
+    }
+    int isTrue = PyObject_IsTrue(res);
+    Py_DECREF(res);
+    return isTrue;
+}
+
+
 PyObject* PyJit_Contains(PyObject *left, PyObject *right) {
     auto res = PySequence_Contains(right, left);
     Py_DECREF(left);

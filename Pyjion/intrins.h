@@ -51,6 +51,7 @@ PyObject* PyJit_Subscr(PyObject *left, PyObject *right);
 
 PyObject* PyJit_RichCompare(PyObject *left, PyObject *right, int op);
 
+int PyJit_RichEquals_Generic(PyObject *left, PyObject *right, void** addr);
 
 PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index);
 

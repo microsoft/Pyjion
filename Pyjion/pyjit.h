@@ -131,6 +131,7 @@
 #define METHOD_CONTAINS_INT_TOKEN           0x0000004F
 #define METHOD_NOTCONTAINS_INT_TOKEN        0x00000050
 #define METHOD_UNARY_NOT_INT                0x00000051
+#define METHOD_RICHEQUALS_GENERIC_TOKEN     0x00000052
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -172,7 +173,7 @@
 
 #define FIRST_USER_FUNCTION_TOKEN   0x00100000
 
-extern "C" __declspec(dllexport) PVOID JitCompile(PyCodeObject* code);
+extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code);
 extern "C" __declspec(dllexport) void JitInit();
 
 #endif
