@@ -224,9 +224,27 @@ public:
     }
 };
 
+
+struct AbsIntBlockInfo {
+    size_t BlockStart, BlockEnd;
+    bool IsLoop;
+
+    AbsIntBlockInfo() {
+    }
+
+    AbsIntBlockInfo(size_t blockStart, size_t blockEnd, bool isLoop) {
+        BlockStart = blockStart;
+        BlockEnd = blockEnd;
+        IsLoop = isLoop;
+    }
+};
+
 class AbstractInterpreter {
     // Tracks the interpreter state before each opcode
     unordered_map<size_t, InterpreterState> m_startStates;
+    unordered_map<size_t, bool> m_endFinallyIsFinally;
+    unordered_map<size_t, size_t> m_blockStarts;
+    unordered_map<size_t, AbsIntBlockInfo> m_breakTo;
     PyCodeObject* m_code;
     unsigned char *m_byteCode;
     AbstractValue* m_returnValue;
@@ -247,6 +265,7 @@ private:
     bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
     bool update_start_state(InterpreterState& newState, int index);
     char* opcode_name(int opcode);
+    void preprocess();
 };
 
 #endif

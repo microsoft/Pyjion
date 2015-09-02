@@ -27,7 +27,59 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code) : m_code(code) {
 #define NEXTARG() *(unsigned short*)&m_byteCode[curByte + 1]; curByte+= 2
 
 
+void AbstractInterpreter::preprocess() {
+    int oparg;
+    vector<bool> ehKind;
+    vector<AbsIntBlockInfo> blockStarts;
+    for (size_t curByte = 0; curByte < m_size; curByte++) {
+        auto opcodeIndex = curByte;
+        auto byte = m_byteCode[curByte];
+        if (HAS_ARG(byte)){
+            oparg = NEXTARG();
+        }
+
+        switch (byte) {
+            case SETUP_WITH: 
+                // not supported...
+                return;
+            case SETUP_LOOP:
+                blockStarts.push_back(AbsIntBlockInfo(opcodeIndex, oparg + curByte + 1, true));
+                break;
+            case POP_BLOCK:
+                {
+                    auto blockStart = blockStarts.back();
+                    blockStarts.pop_back();
+                    m_blockStarts[opcodeIndex] = blockStart.BlockStart;
+                    break;
+                }
+            case SETUP_EXCEPT: 
+                blockStarts.push_back(AbsIntBlockInfo(opcodeIndex, oparg + curByte + 1, false));
+                ehKind.push_back(false); 
+                break;
+            case SETUP_FINALLY: 
+                blockStarts.push_back(AbsIntBlockInfo(opcodeIndex, oparg + curByte + 1, false));
+                ehKind.push_back(true); 
+                break;
+            case END_FINALLY:
+                m_endFinallyIsFinally[opcodeIndex] = ehKind.back();
+                ehKind.pop_back();
+                break;
+            case BREAK_LOOP:
+                for (auto iter = blockStarts.rbegin(); iter != blockStarts.rend(); ++iter) {
+                    if (iter->IsLoop) {
+                        m_breakTo[opcodeIndex] = *iter;
+                        break;
+                    }
+                }
+                break;
+        }
+    }
+
+}
+
 bool AbstractInterpreter::interpret() {
+    preprocess();
+
     InterpreterState lastState;
     deque<int> queue;
     for (int i = 0; i < m_code->co_argcount + m_code->co_kwonlyargcount; i++) {
@@ -50,6 +102,12 @@ bool AbstractInterpreter::interpret() {
         lastState.m_locals.push_back(&Undefined);
     }
     
+    /*printf("Interpreting %s from %s line %d\r\n",
+        PyUnicode_AsUTF8(m_code->co_name),
+        PyUnicode_AsUTF8(m_code->co_filename),
+        m_code->co_firstlineno
+        );*/
+    dump();
     m_startStates[0] = lastState;
     queue.push_back(0);
     do {
@@ -321,19 +379,27 @@ bool AbstractInterpreter::interpret() {
                         int argCnt = oparg & 0xff;
                         int kwArgCnt = (oparg >> 8) & 0xff;
 
-                        lastState.m_stack.pop_back();
                         for (int i = 0; i < argCnt; i++) {
-                            lastState.m_stack.pop_back();
+                            lastState.pop();
                         }
                         for (int i = 0; i < kwArgCnt; i++) {
-                            lastState.m_stack.pop_back();
-                            lastState.m_stack.pop_back();
+                            lastState.pop();
+                            lastState.pop();
                         }
+
+                        // TODO: If the function was a known quantity we could
+                        // abstract interpret it here with the known args, and
+                        // potentially consider inlining it.
+
+                        // pop the function...
+                        lastState.pop();
+
                         lastState.m_stack.push_back(&Any);
                         break;
                     }
 
                 case CALL_FUNCTION_VAR:
+                    printf("hi\r\n");
                 case CALL_FUNCTION_KW:
                 case CALL_FUNCTION_VAR_KW:
                     {
@@ -341,6 +407,8 @@ bool AbstractInterpreter::interpret() {
                         int nk = (oparg >> 8) & 0xff;
                         int flags = (opcode - CALL_FUNCTION) & 3;
                         int n = na + 2 * nk;
+                        
+                        
 #define CALL_FLAG_VAR 1
 #define CALL_FLAG_KW 2
                         if (flags & CALL_FLAG_KW) {
@@ -356,6 +424,10 @@ bool AbstractInterpreter::interpret() {
                         for (int i = 0; i < na; i++) {
                             lastState.pop();
                         }
+
+                        // pop the function
+                        lastState.pop();
+
                         lastState.m_stack.push_back(&Any);
                         break;
                     }
@@ -497,7 +569,11 @@ bool AbstractInterpreter::interpret() {
                         break;
                     }
                 case SETUP_LOOP:
+                    break;
                 case POP_BLOCK:
+                    lastState = m_startStates[m_blockStarts[opcodeIndex]];
+                    break;
+                case POP_EXCEPT:
                     break;
                 case LOAD_BUILD_CLASS:
                     // TODO: if we know this is __builtins__.__build_class__ we can push a special value
@@ -517,23 +593,75 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     lastState.pop();
                     break;
+                case CONTINUE_LOOP:
+                    if (update_start_state(lastState, oparg)) {
+                        queue.push_back(oparg);
+                    }
+                    // Done processing this basic block, we'll need to see a branch
+                    // to the following opcodes before we'll process them.
+                    goto next;
                 case BREAK_LOOP:
-                    //if (update_start_state(lastState, oparg + curByte + 1)) {
-                    //    queue.push_back(oparg + curByte + 1);
-                    //}
+                    {
+                        auto breakTo = m_breakTo[opcodeIndex];
 
-                    //goto next;
+                        // BREAK_LOOP does an unwind block, which restores the
+                        // stack state to what it was when we entered the loop.  So
+                        // we get the start state for where the SETUP_LOOP happened
+                        // here and propagate it to where we're breaking to.
+                        if (update_start_state(m_startStates[breakTo.BlockStart], breakTo.BlockEnd)) {
+                            queue.push_back(breakTo.BlockEnd);
+                        }
 
+                        goto next;
+                    }
                 case SETUP_FINALLY:
+                    {
+                        auto finallyState = lastState;
+                        // Finally is entered with value pushed onto stack indicating reason for 
+                        // the finally running...
+                        finallyState.m_stack.push_back(&Any);
+                        if (update_start_state(finallyState, oparg + curByte + 1)) {
+                            queue.push_back(oparg + curByte + 1);
+                        }
+                    }
+                    break;
                 case SETUP_EXCEPT:
+                    {
+                        auto ehState = lastState;
+                        // Except is entered with the exception object, traceback, and exception
+                        // type.  TODO: We could type these stronger then they currently are typed
+                        ehState.m_stack.push_back(&Any);
+                        ehState.m_stack.push_back(&Any);
+                        ehState.m_stack.push_back(&Any);
+                        if (update_start_state(ehState, oparg + curByte + 1)) {
+                            queue.push_back(oparg + curByte + 1);
+                        }
+                    }
+                    break;
+                case END_FINALLY:
+                    {
+                        bool isFinally = m_endFinallyIsFinally[opcodeIndex];
+                        if (isFinally) {
+                            // single value indicating whether we're unwinding or
+                            // completed normally.
+                            lastState.pop();
+                        }
+                        else{
+                            lastState.pop();
+                            lastState.pop();
+                            lastState.pop();
+                        }
+                        break;
+                    }
                 case SETUP_WITH:
                 case YIELD_VALUE:
                     return false;
                 default:
-                    printf("Unsupported opcode: %s", opcode_name(opcode));
+                    printf("Unknown unsupported opcode: %s", opcode_name(opcode));
                     return false;
             }
             update_start_state(lastState, curByte + 1);
+            
         }
     next:;
     } while (queue.size() != 0);
@@ -648,7 +776,49 @@ void AbstractInterpreter::dump() {
         
         if (HAS_ARG(opcode)){
             int oparg = NEXTARG();
-            printf("    %-3d %-22s %d\r\n", byteIndex, opcode_name(opcode), oparg);
+            switch (opcode) {
+                case SETUP_LOOP:
+                case SETUP_EXCEPT:
+                case SETUP_FINALLY:
+                case JUMP_FORWARD:
+                case FOR_ITER:
+                    printf("    %-3d %-22s %d (to %d)\r\n", 
+                        byteIndex, 
+                        opcode_name(opcode), 
+                        oparg, 
+                        oparg + curByte + 1
+                    );
+                    break;
+                case LOAD_FAST:
+                case STORE_FAST:
+                case DELETE_FAST:
+                    printf("    %-3d %-22s %d (%s)\r\n", 
+                        byteIndex, 
+                        opcode_name(opcode), 
+                        oparg, 
+                        PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, oparg))
+                    );
+                    break;
+                case LOAD_ATTR:
+                case STORE_ATTR:
+                case DELETE_ATTR:
+                case STORE_NAME:
+                case LOAD_NAME:
+                case DELETE_NAME:
+                case LOAD_GLOBAL:
+                case STORE_GLOBAL:
+                case DELETE_GLOBAL:
+                    printf("    %-3d %-22s %d (%s)\r\n",
+                        byteIndex,
+                        opcode_name(opcode),
+                        oparg,
+                        PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg))
+                        );
+                    break;
+                default:
+                    printf("    %-3d %-22s %d\r\n", byteIndex, opcode_name(opcode), oparg);
+                    break;
+            }
         }
         else{
             printf("    %-3d %-22s\r\n", byteIndex, opcode_name(opcode));
