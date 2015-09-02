@@ -34,7 +34,7 @@
 #include "codemodel.h"
 #include "ilgen.h"
 #include "intrins.h"
-
+#include "absint.h"
 
 
 HRESULT __stdcall GetCORSystemDirectoryInternal(__out_ecount_part_opt(cchBuffer, *pdwLength) LPWSTR pBuffer,
@@ -2271,6 +2271,17 @@ extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
         ++compileCount,
         failCount);
 #endif
+    auto interp = AbstractInterpreter(code);
+    if (interp.interpret()) {
+        //interp.dump();
+    }else{
+        printf("Can't interpret %s from %s line %d\r\n",
+            PyUnicode_AsUTF8(code->co_name),
+            PyUnicode_AsUTF8(code->co_filename),
+            code->co_firstlineno
+        );
+    }
+
     Jitter jitter(code);
     auto res = jitter.compile();
 
