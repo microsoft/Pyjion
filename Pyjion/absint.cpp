@@ -26,6 +26,9 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code) : m_code(code) {
 
 #define NEXTARG() *(unsigned short*)&m_byteCode[curByte + 1]; curByte+= 2
 
+#ifdef _DEBUG
+int g_cowArrayCount;
+#endif
 
 void AbstractInterpreter::preprocess() {
     int oparg;

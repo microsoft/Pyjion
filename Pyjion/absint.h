@@ -227,6 +227,9 @@ struct AbsIntBlockInfo {
     }
 };
 
+#ifdef _DEBUG
+extern int g_cowArrayCount;
+#endif
 template<typename T> class COWArray {
     T* m_data;
     size_t m_refCount, m_size;
@@ -235,13 +238,26 @@ template<typename T> class COWArray {
         m_refCount = 1;
         m_data = data;
         m_size = size;
+#ifdef _DEBUG
+        g_cowArrayCount++;
+#endif
 
+    }
+
+    ~COWArray() {
+        delete[] m_data;
+#ifdef _DEBUG
+        g_cowArrayCount--;
+#endif
     }
 public:
     COWArray(size_t size) {
         m_size = size;
         m_refCount = 1;
         m_data = new T[size];
+#ifdef _DEBUG
+        g_cowArrayCount++;
+#endif
     }
 
     T& operator[] (const size_t n) {
@@ -256,7 +272,6 @@ public:
     void free() {
         m_refCount--;
         if (m_refCount == 0) {
-            delete[] m_data;
             delete this;
         }
     }
@@ -265,6 +280,10 @@ public:
         return m_size;
     }
 
+    // Called to replace an existing array with a new one by replacing
+    // a single value.  If there are no other references to this array
+    // we re-use the existing one.  If there are other references returns
+    // a new array and dec refs the existing one.
     COWArray* replace(size_t index, T value) {
         if (m_refCount == 1) {
             m_data[index] = value;
@@ -312,6 +331,7 @@ public:
         for (auto cur = m_startStates.begin(); cur != m_startStates.end(); cur++){
             cur->second.m_locals->free();
         }
+        _ASSERTE(g_cowArrayCount == 0);
     }
 
     bool interpret();
