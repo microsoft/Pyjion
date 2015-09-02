@@ -66,8 +66,15 @@ bool AbstractInterpreter::interpret() {
             if (HAS_ARG(opcode)){
                 oparg = NEXTARG();
             }
-
+            processOpCode:
             switch (opcode) {
+                case EXTENDED_ARG:
+                    {
+                        opcode = m_byteCode[++curByte];
+                        int bottomArg = NEXTARG();
+                        oparg = (oparg << 16) | bottomArg;
+                        goto processOpCode;
+                    }
                 case NOP: break;
                 case ROT_TWO:
                     {
@@ -180,6 +187,32 @@ bool AbstractInterpreter::interpret() {
                         // we'll continue processing after the jump with our new state...
                         break;
                     }
+                case JUMP_IF_TRUE_OR_POP:
+                    {
+                        auto curState = lastState;
+                        if (update_start_state(lastState, oparg)) {
+                            queue.push_back(oparg);
+                        }
+                        auto value = lastState.pop();
+                        if (value->is_always_true()) {
+                            // we always jump, no need to analyze the following instructions...
+                            goto next;
+                        }
+                    }
+                    break;
+                case JUMP_IF_FALSE_OR_POP:
+                    {
+                        auto curState = lastState;
+                        if (update_start_state(lastState, oparg)) {
+                            queue.push_back(oparg);
+                        }
+                        auto value = lastState.pop();
+                        if (value->is_always_false()) {
+                            // we always jump, no need to analyze the following instructions...
+                            goto next;
+                        }
+                    }
+                    break;
                 case JUMP_ABSOLUTE:
                     if (update_start_state(lastState, oparg)) {
                         queue.push_back(oparg);
@@ -196,10 +229,9 @@ bool AbstractInterpreter::interpret() {
                      goto next;
                 case RETURN_VALUE:
                     {
-                        // TODO: We need to 
                         m_returnValue = m_returnValue->merge_with(lastState.pop());
                     }
-                    break;
+                    goto next;
                 case LOAD_NAME:
                     // Used to load __name__ for a class def
                     lastState.m_stack.push_back(&Any);
@@ -274,6 +306,10 @@ bool AbstractInterpreter::interpret() {
                 case IMPORT_NAME:
                     lastState.m_stack.pop_back();
                     lastState.m_stack.pop_back();
+                    lastState.m_stack.push_back(&Any);
+                    break;
+                case IMPORT_FROM:
+                    // leave the module on the stack, and push the new value.
                     lastState.m_stack.push_back(&Any);
                     break;
                 case LOAD_CLOSURE:
@@ -368,6 +404,11 @@ bool AbstractInterpreter::interpret() {
                     }
                     lastState.m_stack.push_back(&Slice);
                     break;
+                case UNARY_POSITIVE:
+                    // TODO: Support known types
+                    lastState.pop();
+                    lastState.m_stack.push_back(&Any);
+                    break;
                 case UNARY_NOT:
                     // TODO: Always returns a bool or an error code...
                     // TODO: Known types can always return a bool
@@ -383,6 +424,16 @@ bool AbstractInterpreter::interpret() {
                     // TODO: Support known types
                     lastState.pop();
                     lastState.m_stack.push_back(&Any);
+                    break;
+                case UNPACK_EX:
+                    lastState.pop();
+                    for (int i = 0; i < oparg >> 8; i++) {
+                        lastState.m_stack.push_back(&Any);
+                    }
+                    lastState.m_stack.push_back(&List);
+                    for (int i = 0; i < oparg & 0xff; i++) {
+                        lastState.m_stack.push_back(&Any);
+                    }
                     break;
                 case UNPACK_SEQUENCE:
                     // TODO: If the sequence is a known type we could know what types we're pushing here.
@@ -405,6 +456,10 @@ bool AbstractInterpreter::interpret() {
                 case STORE_SUBSCR:
                     // TODO: Do we want to track types on store for lists?
                     lastState.pop();
+                    lastState.pop();
+                    lastState.pop();
+                    break;
+                case DELETE_SUBSCR:
                     lastState.pop();
                     lastState.pop();
                     break;
@@ -444,8 +499,36 @@ bool AbstractInterpreter::interpret() {
                 case SETUP_LOOP:
                 case POP_BLOCK:
                     break;
+                case LOAD_BUILD_CLASS:
+                    // TODO: if we know this is __builtins__.__build_class__ we can push a special value
+                    // to optimize the call.f
+                    lastState.m_stack.push_back(&Any);
+                    break;
+                case SET_ADD:
+                    // pop the value being stored off, leave set on stack
+                    lastState.pop(); 
+                    break;
+                case LIST_APPEND:
+                    // pop the value being stored off, leave list on stack
+                    lastState.pop();
+                    break;
+                case MAP_ADD:
+                    // pop the value and key being stored off, leave list on stack
+                    lastState.pop();
+                    lastState.pop();
+                    break;
+                case BREAK_LOOP:
+                    //if (update_start_state(lastState, oparg + curByte + 1)) {
+                    //    queue.push_back(oparg + curByte + 1);
+                    //}
 
+                    //goto next;
+
+                case SETUP_FINALLY:
                 case SETUP_EXCEPT:
+                case SETUP_WITH:
+                case YIELD_VALUE:
+                    return false;
                 default:
                     printf("Unsupported opcode: %s", opcode_name(opcode));
                     return false;
