@@ -212,18 +212,6 @@ class SliceValue : public AbstractValue {
     }
 };
 
-class InterpreterState {
-public:
-    vector<AbstractValue*> m_stack;
-    vector<AbstractValue*> m_locals;
-
-    AbstractValue* pop() {
-        auto res = m_stack.back();
-        m_stack.pop_back();
-        return res;
-    }
-};
-
 
 struct AbsIntBlockInfo {
     size_t BlockStart, BlockEnd;
@@ -238,6 +226,71 @@ struct AbsIntBlockInfo {
         IsLoop = isLoop;
     }
 };
+
+template<typename T> class COWArray {
+    T* m_data;
+    size_t m_refCount, m_size;
+
+    COWArray(T* data, size_t size) {
+        m_refCount = 1;
+        m_data = data;
+        m_size = size;
+
+    }
+public:
+    COWArray(size_t size) {
+        m_size = size;
+        m_refCount = 1;
+        m_data = new T[size];
+    }
+
+    T& operator[] (const size_t n) {
+        return m_data[n];
+    }
+
+    COWArray* copy(){ 
+        m_refCount++;
+        return this;
+    }
+
+    void free() {
+        m_refCount--;
+        if (m_refCount == 0) {
+            delete[] m_data;
+            delete this;
+        }
+    }
+
+    int size() {
+        return m_size;
+    }
+
+    COWArray* replace(size_t index, T value) {
+        if (m_refCount == 1) {
+            m_data[index] = value;
+            return this;
+        }
+
+        m_refCount--;
+        T* newData = new T[m_size];
+        memcpy_s(newData, m_size * sizeof(T), m_data, m_size * sizeof(T));
+        return new COWArray(newData, m_size);
+    }
+};
+
+
+class InterpreterState {
+public:
+    vector<AbstractValue*> m_stack;
+    COWArray<AbstractValue*>* m_locals;
+
+    AbstractValue* pop() {
+        auto res = m_stack.back();
+        m_stack.pop_back();
+        return res;
+    }
+};
+
 
 class AbstractInterpreter {
     // Tracks the interpreter state before each opcode
@@ -255,11 +308,17 @@ class AbstractInterpreter {
 
 public:
     AbstractInterpreter(PyCodeObject *code);
+    ~AbstractInterpreter() {
+        for (auto cur = m_startStates.begin(); cur != m_startStates.end(); cur++){
+            cur->second.m_locals->free();
+        }
+    }
 
     bool interpret();
     void dump();
 
 private:
+
     AbstractValue* to_abstract(PyObject* obj);
     bool merge_states(InterpreterState& newState, int index);
     bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);

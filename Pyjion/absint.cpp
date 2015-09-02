@@ -81,33 +81,33 @@ bool AbstractInterpreter::interpret() {
     preprocess();
 
     InterpreterState lastState;
-    deque<int> queue;
+    auto locals = new COWArray<AbstractValue*>(m_code->co_nlocals);
+    lastState.m_locals = locals;
+    int localIndex = 0;
     for (int i = 0; i < m_code->co_argcount + m_code->co_kwonlyargcount; i++) {
         // all parameters are initially definitely assigned
         // TODO: Populate this with type information from profiling...
-        lastState.m_locals.push_back(&Any);
-    }
-    int localCount = m_code->co_nlocals - (m_code->co_argcount + m_code->co_kwonlyargcount);
-    if (m_code->co_flags & CO_VARARGS) {
-        localCount--;
-        lastState.m_locals.push_back(&Tuple);
-    }
-    if (m_code->co_flags & CO_VARKEYWORDS) {
-        localCount--;
-        lastState.m_locals.push_back(&Dict);
+        (*locals)[localIndex++] = &Any;
     }
 
-    for (int i = 0; i < localCount; i++) {
-        // All locals are initially undefined
-        lastState.m_locals.push_back(&Undefined);
+    if (m_code->co_flags & CO_VARARGS) {
+        (*locals)[localIndex++] = &Tuple;
     }
-    
+    if (m_code->co_flags & CO_VARKEYWORDS) {
+        (*locals)[localIndex++] = &Dict;
+    }
+
+    for (; localIndex < m_code->co_nlocals; localIndex++) {
+        // All locals are initially undefined
+        (*locals)[localIndex++] = &Undefined;
+    }
+    deque<int> queue;
     /*printf("Interpreting %s from %s line %d\r\n",
         PyUnicode_AsUTF8(m_code->co_name),
         PyUnicode_AsUTF8(m_code->co_filename),
         m_code->co_firstlineno
         );*/
-    dump();
+    //dump();
     m_startStates[0] = lastState;
     queue.push_back(0);
     do {
@@ -166,14 +166,14 @@ bool AbstractInterpreter::interpret() {
                         break;
                     }
                 case LOAD_FAST:
-                    lastState.m_stack.push_back(lastState.m_locals[oparg]);
+                    lastState.m_stack.push_back((*lastState.m_locals)[oparg]);
                     break;
                 case STORE_FAST:
-                    lastState.m_locals.data()[oparg] = lastState.m_stack.back();
+                    lastState.m_locals = lastState.m_locals->replace(oparg, lastState.m_stack.back());
                     lastState.m_stack.pop_back();
                     break;
                 case DELETE_FAST:
-                    lastState.m_locals.data()[oparg] = &Undefined;
+                    lastState.m_locals = lastState.m_locals->replace(oparg, &Undefined);
                     break;
                 case BINARY_TRUE_DIVIDE: 
                 case BINARY_FLOOR_DIVIDE: 
@@ -399,7 +399,6 @@ bool AbstractInterpreter::interpret() {
                     }
 
                 case CALL_FUNCTION_VAR:
-                    printf("hi\r\n");
                 case CALL_FUNCTION_KW:
                 case CALL_FUNCTION_VAR_KW:
                     {
@@ -681,18 +680,18 @@ bool AbstractInterpreter::update_start_state(InterpreterState& newState, int ind
 
 bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterState& mergeTo) {
     bool changed = false;
-    if (mergeTo.m_locals.size() == 0) {
+    if (mergeTo.m_locals == nullptr) {
         // first time we assigned, or no locals...
-        mergeTo.m_locals = newState.m_locals;
-        changed |= newState.m_locals.size() != 0;
+        mergeTo.m_locals = newState.m_locals->copy();
+        changed |= newState.m_locals->size() != 0;
     }
-    else{
+    else if (mergeTo.m_locals != newState.m_locals) {
         // need to merge locals...
-        _ASSERT(mergeTo.m_locals.size() == newState.m_locals.size());
-        for (int i = 0; i < newState.m_locals.size(); i++) {
-            auto newType = mergeTo.m_locals[i]->merge_with(newState.m_locals[i]);
-            if (newType != mergeTo.m_locals[i]) {
-                mergeTo.m_locals[i] = newType;
+        _ASSERT(mergeTo.m_locals->size() == newState.m_locals->size());
+        for (int i = 0; i < newState.m_locals->size(); i++) {
+            auto newType = (*mergeTo.m_locals)[i]->merge_with((*newState.m_locals)[i]);
+            if (newType != (*mergeTo.m_locals)[i]) {
+                mergeTo.m_locals = mergeTo.m_locals->replace(i,  newType);
                 changed = true;
             }
             
@@ -762,11 +761,11 @@ void AbstractInterpreter::dump() {
         auto find = m_startStates.find(byteIndex);
         if (find != m_startStates.end()) {
             auto state = find->second;
-            for (int i = 0; i < state.m_locals.size(); i++) {
+            for (int i = 0; i < state.m_locals->size(); i++) {
                 printf(
                     "          %-20s %s\r\n",
                     PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i)),
-                    state.m_locals[i]->describe()
+                    (*state.m_locals)[i]->describe()
                     );
             }
             for (int i = 0; i < state.m_stack.size(); i++) {
