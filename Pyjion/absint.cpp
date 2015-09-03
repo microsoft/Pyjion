@@ -580,7 +580,9 @@ bool AbstractInterpreter::interpret() {
                 case SETUP_LOOP:
                     break;
                 case POP_BLOCK:
-                    lastState = m_startStates[m_blockStarts[opcodeIndex]];
+                    // Restore the stack state to what we had on entry, merge the locals.
+                    lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
+                    merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
                     break;
                 case POP_EXCEPT:
                     break;
