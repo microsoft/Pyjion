@@ -1,22 +1,32 @@
+/*
+* The MIT License (MIT)
+*
+* Copyright (c) Microsoft Corporation
+*
+* Permission is hereby granted, free of charge, to any person obtaining a
+* copy of this software and associated documentation files (the "Software"),
+* to deal in the Software without restriction, including without limitation
+* the rights to use, copy, modify, merge, publish, distribute, sublicense,
+* and/or sell copies of the Software, and to permit persons to whom the
+* Software is furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included
+* in all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+* OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+* OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+* ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+* OTHER DEALINGS IN THE SOFTWARE.
+*
+*/
+
 #include "absint.h"
 #include <opcode.h>
 #include <deque>
 #include <unordered_map>
-
-AnyValue Any;
-UndefinedValue Undefined;
-IntegerValue Integer;
-FloatValue Float;
-BoolValue Bool;
-ListValue List;
-TupleValue Tuple;
-SetValue Set;
-StringValue String;
-BytesValue Bytes;
-DictValue Dict;
-NoneValue None;
-FunctionValue Function;
-SliceValue Slice;
 
 AbstractInterpreter::AbstractInterpreter(PyCodeObject *code) : m_code(code) {
     m_byteCode = (unsigned char *)((PyBytesObject*)code->co_code)->ob_sval;
@@ -25,10 +35,6 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code) : m_code(code) {
 }
 
 #define NEXTARG() *(unsigned short*)&m_byteCode[curByte + 1]; curByte+= 2
-
-#ifdef _DEBUG
-int g_cowArrayCount;
-#endif
 
 void AbstractInterpreter::preprocess() {
     int oparg;
@@ -82,36 +88,35 @@ void AbstractInterpreter::preprocess() {
 
 bool AbstractInterpreter::interpret() {
     preprocess();
+    
+    InterpreterState lastState = InterpreterState(m_code->co_nlocals);
 
-    InterpreterState lastState;
-    auto locals = new COWArray<AbstractValue*>(m_code->co_nlocals);
-    lastState.m_locals = locals;
     int localIndex = 0;
     for (int i = 0; i < m_code->co_argcount + m_code->co_kwonlyargcount; i++) {
         // all parameters are initially definitely assigned
         // TODO: Populate this with type information from profiling...
-        (*locals)[localIndex++] = &Any;
+        lastState.replace_local(localIndex++, AbstractLocalInfo(&Any));
     }
 
     if (m_code->co_flags & CO_VARARGS) {
-        (*locals)[localIndex++] = &Tuple;
+        lastState.replace_local(localIndex++, AbstractLocalInfo(&Tuple));
     }
     if (m_code->co_flags & CO_VARKEYWORDS) {
-        (*locals)[localIndex++] = &Dict;
+        lastState.replace_local(localIndex++, AbstractLocalInfo(&Dict));
     }
 
     for (; localIndex < m_code->co_nlocals; localIndex++) {
         // All locals are initially undefined
-        (*locals)[localIndex++] = &Undefined;
+        lastState.replace_local(localIndex, AbstractLocalInfo(&Undefined, true));
     }
-    deque<int> queue;
-    /*printf("Interpreting %s from %s line %d\r\n",
-        PyUnicode_AsUTF8(m_code->co_name),
-        PyUnicode_AsUTF8(m_code->co_filename),
-        m_code->co_firstlineno
-        );*/
+    
     //dump();
-    m_startStates[0] = lastState;
+
+    update_start_state(lastState, 0);
+
+    // walk all the blocks in the code one by one, analyzing them, and enqueing any
+    // new blocks that we encounter from branches.
+    deque<size_t> queue;
     queue.push_back(0);
     do {
         int oparg;
@@ -139,9 +144,9 @@ bool AbstractInterpreter::interpret() {
                 case NOP: break;
                 case ROT_TWO:
                     {
-                        auto tmp = lastState.m_stack[lastState.m_stack.size() - 1];
-                        lastState.m_stack[lastState.m_stack.size() - 1] = lastState.m_stack[lastState.m_stack.size() - 2];
-                        lastState.m_stack[lastState.m_stack.size() - 2] = tmp;
+                        auto tmp = lastState[lastState.stack_size() - 1];
+                        lastState[lastState.stack_size() - 1] = lastState[lastState.stack_size() - 2];
+                        lastState[lastState.stack_size() - 2] = tmp;
                         break;
                     }
                 case ROT_THREE:
@@ -150,33 +155,35 @@ bool AbstractInterpreter::interpret() {
                         auto second = lastState.pop();
                         auto third = lastState.pop();
 
-                        lastState.m_stack.push_back(top);
-                        lastState.m_stack.push_back(third);
-                        lastState.m_stack.push_back(second);
+                        lastState.push(top);
+                        lastState.push(third);
+                        lastState.push(second);
                         break;
                     }
                 case POP_TOP:
-                    lastState.m_stack.pop_back();
+                    lastState.pop();
                     break;
                 case DUP_TOP:
-                    lastState.m_stack.push_back(lastState.m_stack[lastState.m_stack.size() - 1]);
+                    lastState.push(lastState[lastState.stack_size() - 1]);
                     break;
                 case DUP_TOP_TWO:{
-                        auto top = lastState.m_stack[lastState.m_stack.size() - 1];
-                        auto second = lastState.m_stack[lastState.m_stack.size() - 2];
-                        lastState.m_stack.push_back(second);
-                        lastState.m_stack.push_back(top);
+                        auto top = lastState[lastState.stack_size() - 1];
+                        auto second = lastState[lastState.stack_size() - 2];
+                        lastState.push(second);
+                        lastState.push(top);
                         break;
                     }
                 case LOAD_FAST:
-                    lastState.m_stack.push_back((*lastState.m_locals)[oparg]);
+                    lastState.push(lastState.get_local(oparg).Type);
                     break;
                 case STORE_FAST:
-                    lastState.m_locals = lastState.m_locals->replace(oparg, lastState.m_stack.back());
-                    lastState.m_stack.pop_back();
+                    {
+                        auto value = lastState.pop();
+                        lastState.replace_local(oparg, value);
+                    }
                     break;
                 case DELETE_FAST:
-                    lastState.m_locals = lastState.m_locals->replace(oparg, &Undefined);
+                    lastState.replace_local(oparg, AbstractLocalInfo(&Undefined, true));
                     break;
                 case BINARY_TRUE_DIVIDE: 
                 case BINARY_FLOOR_DIVIDE: 
@@ -207,12 +214,12 @@ bool AbstractInterpreter::interpret() {
                     {
                         auto two = lastState.pop();
                         auto one = lastState.pop();
-                        lastState.m_stack.push_back(one->binary(opcode, two));
+                        lastState.push(one->binary(opcode, two));
                     }
                     break;
 
                 case LOAD_CONST:
-                    lastState.m_stack.push_back(to_abstract(PyTuple_GetItem(m_code->co_consts, oparg)));
+                    lastState.push(to_abstract(PyTuple_GetItem(m_code->co_consts, oparg)));
                     break;
                 case POP_JUMP_IF_FALSE:
                     {
@@ -282,8 +289,8 @@ bool AbstractInterpreter::interpret() {
                     // to the following opcodes before we'll process them.
                     goto next;
                 case JUMP_FORWARD:
-                     if (update_start_state(lastState, oparg + curByte + 1)) {
-                        queue.push_back(oparg + curByte + 1);
+                     if (update_start_state(lastState, (size_t)oparg + curByte + 1)) {
+                         queue.push_back((size_t)oparg + curByte + 1);
                      }
                      // Done processing this basic block, we'll need to see a branch
                      // to the following opcodes before we'll process them.
@@ -295,50 +302,50 @@ bool AbstractInterpreter::interpret() {
                     goto next;
                 case LOAD_NAME:
                     // Used to load __name__ for a class def
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case STORE_NAME:
                     // Stores __module__, __doc__, __qualname__, as well as class/function defs sometimes
-                    lastState.m_stack.pop_back();
+                    lastState.pop();
                     break;
                 case LOAD_GLOBAL:
                     // TODO: Look in globals, then builtins, and see if we can resolve
                     // this to anything concrete.
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case STORE_GLOBAL:
-                    lastState.m_stack.pop_back();
+                    lastState.pop();
                     break;
                 case LOAD_ATTR:
                     // TODO: Add support for resolving known members of known types
-                    lastState.m_stack.pop_back();
-                    lastState.m_stack.push_back(&Any);
+                    lastState.pop();
+                    lastState.push(&Any);
                     break;
                 case STORE_ATTR:
-                    lastState.m_stack.pop_back();
-                    lastState.m_stack.pop_back();
+                    lastState.pop();
+                    lastState.pop();
                     break;
                 case DELETE_ATTR:
-                    lastState.m_stack.pop_back();
+                    lastState.pop();
                     break;
                 case BUILD_LIST:
                     for (int i = 0; i < oparg; i++) {
-                        lastState.m_stack.pop_back();
+                        lastState.pop();
                     }
-                    lastState.m_stack.push_back(&List);
+                    lastState.push(&List);
                     break;
                 case BUILD_TUPLE:
                     for (int i = 0; i < oparg; i++) {
-                        lastState.m_stack.pop_back();
+                        lastState.pop();
                     }
-                    lastState.m_stack.push_back(&Tuple);
+                    lastState.push(&Tuple);
                     break;
                 case BUILD_MAP:
                     for (int i = 0; i < oparg; i++) {
-                        lastState.m_stack.pop_back();
-                        lastState.m_stack.pop_back();
+                        lastState.pop();
+                        lastState.pop();
                     }
-                    lastState.m_stack.push_back(&Dict);
+                    lastState.push(&Dict);
                     break;
                 case COMPARE_OP:
                     switch (oparg) {
@@ -346,35 +353,35 @@ bool AbstractInterpreter::interpret() {
                         case PyCmp_IS_NOT:
                         case PyCmp_IN:
                         case PyCmp_NOT_IN:
-                            lastState.m_stack.pop_back();
-                            lastState.m_stack.pop_back();
-                            lastState.m_stack.push_back(&Bool);
+                            lastState.pop();
+                            lastState.pop();
+                            lastState.push(&Bool);
                             break;
                         case PyCmp_EXC_MATCH:
                             // TODO: Produces an error or a bool, but no way to represent that so we're conservative
-                            lastState.m_stack.pop_back();
-                            lastState.m_stack.pop_back();
-                            lastState.m_stack.push_back(&Any);
+                            lastState.pop();
+                            lastState.pop();
+                            lastState.push(&Any);
                             break;
                         default:
                             // TODO: Comparisons of known types produce bools
-                            lastState.m_stack.pop_back();
-                            lastState.m_stack.pop_back();
-                            lastState.m_stack.push_back(&Any);
+                            lastState.pop();
+                            lastState.pop();
+                            lastState.push(&Any);
                             break;
                     }
                     break;
                 case IMPORT_NAME:
-                    lastState.m_stack.pop_back();
-                    lastState.m_stack.pop_back();
-                    lastState.m_stack.push_back(&Any);
+                    lastState.pop();
+                    lastState.pop();
+                    lastState.push(&Any);
                     break;
                 case IMPORT_FROM:
                     // leave the module on the stack, and push the new value.
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case LOAD_CLOSURE:
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case CALL_FUNCTION:
                     {
@@ -397,7 +404,7 @@ bool AbstractInterpreter::interpret() {
                         // pop the function...
                         lastState.pop();
 
-                        lastState.m_stack.push_back(&Any);
+                        lastState.push(&Any);
                         break;
                     }
 
@@ -430,7 +437,7 @@ bool AbstractInterpreter::interpret() {
                         // pop the function
                         lastState.pop();
 
-                        lastState.m_stack.push_back(&Any);
+                        lastState.push(&Any);
                         break;
                     }
                 case MAKE_CLOSURE:
@@ -440,35 +447,35 @@ bool AbstractInterpreter::interpret() {
                         int kwdefaults = (oparg >> 8) & 0xff;
                         int num_annotations = (oparg >> 16) & 0x7fff;
 
-                        lastState.m_stack.pop_back(); // name
-                        lastState.m_stack.pop_back(); // code
+                        lastState.pop(); // name
+                        lastState.pop(); // code
 
                         if (opcode == MAKE_CLOSURE) {
-                            lastState.m_stack.pop_back(); // closure object
+                            lastState.pop(); // closure object
                         }
 
                         if (num_annotations > 0) {
-                            lastState.m_stack.pop_back();
+                            lastState.pop();
                             for (int i = 0; i < num_annotations - 1; i++) {
-                                lastState.m_stack.pop_back();
+                                lastState.pop();
                             }
                         }
 
                         for (int i = 0; i < kwdefaults; i++) {
-                            lastState.m_stack.pop_back();
-                            lastState.m_stack.pop_back();
+                            lastState.pop();
+                            lastState.pop();
                         }
                         for (int i = 0; i < posdefaults; i++) {
-                            lastState.m_stack.pop_back();
+                            lastState.pop();
                             
                         }
 
                         if (num_annotations == 0) {
-                            lastState.m_stack.push_back(&Function);
+                            lastState.push(&Function);
                         }
                         else{
                             // we're not sure of the type with an annotation present
-                            lastState.m_stack.push_back(&Any);
+                            lastState.push(&Any);
                         }
                         break;
                     }
@@ -476,44 +483,44 @@ bool AbstractInterpreter::interpret() {
                     for (int i = 0; i < oparg; i++) {
                         lastState.pop();
                     }
-                    lastState.m_stack.push_back(&Slice);
+                    lastState.push(&Slice);
                     break;
                 case UNARY_POSITIVE:
                     // TODO: Support known types
                     lastState.pop();
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case UNARY_NOT:
                     // TODO: Always returns a bool or an error code...
                     // TODO: Known types can always return a bool
                     lastState.pop();
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case UNARY_NEGATIVE:
                     // TODO: Support known types
                     lastState.pop();
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case UNARY_INVERT:
                     // TODO: Support known types
                     lastState.pop();
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case UNPACK_EX:
                     lastState.pop();
                     for (int i = 0; i < oparg >> 8; i++) {
-                        lastState.m_stack.push_back(&Any);
+                        lastState.push(&Any);
                     }
-                    lastState.m_stack.push_back(&List);
-                    for (int i = 0; i < oparg & 0xff; i++) {
-                        lastState.m_stack.push_back(&Any);
+                    lastState.push(&List);
+                    for (int i = 0; i < (oparg & 0xff); i++) {
+                        lastState.push(&Any);
                     }
                     break;
                 case UNPACK_SEQUENCE:
                     // TODO: If the sequence is a known type we could know what types we're pushing here.
                     lastState.pop();
                     for (int i = 0; i < oparg; i++) {
-                        lastState.m_stack.push_back(&Any);
+                        lastState.push(&Any);
                     }
                     break;
                 case RAISE_VARARGS:
@@ -525,7 +532,7 @@ bool AbstractInterpreter::interpret() {
                     // TODO: Deal with known subscription
                     lastState.pop();
                     lastState.pop();
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case STORE_SUBSCR:
                     // TODO: Do we want to track types on store for lists?
@@ -541,32 +548,32 @@ bool AbstractInterpreter::interpret() {
                     for (int i = 0; i < oparg; i++) {
                         lastState.pop();
                     }
-                    lastState.m_stack.push_back(&Set);
+                    lastState.push(&Set);
                     break;
                 case STORE_DEREF:
                     lastState.pop();
                     break;
                 case LOAD_DEREF:
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case GET_ITER:
                     // TODO: Known iterable types
                     lastState.pop();
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case FOR_ITER:
                     {
                         // For branches out with the value consumed
                         auto leaveState = lastState;
                         leaveState.pop();
-                        if (update_start_state(leaveState, oparg + curByte + 1)) {
-                            queue.push_back(oparg + curByte + 1);
+                        if (update_start_state(leaveState, (size_t)oparg + curByte + 1)) {
+                            queue.push_back((size_t)oparg + curByte + 1);
                         }
 
                         // When we compile this we don't actually leave the value on the stack,
                         // but the sequence of opcodes assumes that happens.  to keep our stack
                         // properly balanced we match what's really going on.
-                        lastState.m_stack.push_back(&Any);
+                        lastState.push(&Any);
                     
                         break;
                     }
@@ -580,7 +587,7 @@ bool AbstractInterpreter::interpret() {
                 case LOAD_BUILD_CLASS:
                     // TODO: if we know this is __builtins__.__build_class__ we can push a special value
                     // to optimize the call.f
-                    lastState.m_stack.push_back(&Any);
+                    lastState.push(&Any);
                     break;
                 case SET_ADD:
                     // pop the value being stored off, leave set on stack
@@ -621,9 +628,9 @@ bool AbstractInterpreter::interpret() {
                         auto finallyState = lastState;
                         // Finally is entered with value pushed onto stack indicating reason for 
                         // the finally running...
-                        finallyState.m_stack.push_back(&Any);
-                        if (update_start_state(finallyState, oparg + curByte + 1)) {
-                            queue.push_back(oparg + curByte + 1);
+                        finallyState.push(&Any);
+                        if (update_start_state(finallyState, (size_t)oparg + curByte + 1)) {
+                            queue.push_back((size_t)oparg + curByte + 1);
                         }
                     }
                     break;
@@ -632,11 +639,11 @@ bool AbstractInterpreter::interpret() {
                         auto ehState = lastState;
                         // Except is entered with the exception object, traceback, and exception
                         // type.  TODO: We could type these stronger then they currently are typed
-                        ehState.m_stack.push_back(&Any);
-                        ehState.m_stack.push_back(&Any);
-                        ehState.m_stack.push_back(&Any);
-                        if (update_start_state(ehState, oparg + curByte + 1)) {
-                            queue.push_back(oparg + curByte + 1);
+                        ehState.push(&Any);
+                        ehState.push(&Any);
+                        ehState.push(&Any);
+                        if (update_start_state(ehState, (size_t)oparg + curByte + 1)) {
+                            queue.push_back((size_t)oparg + curByte + 1);
                         }
                     }
                     break;
@@ -670,7 +677,7 @@ bool AbstractInterpreter::interpret() {
     return true;
 }
 
-bool AbstractInterpreter::update_start_state(InterpreterState& newState, int index) {
+bool AbstractInterpreter::update_start_state(InterpreterState& newState, size_t index) {
     auto initialState = m_startStates.find(index);
     if (initialState != m_startStates.end()) {
         return merge_states(newState, initialState->second);
@@ -683,36 +690,32 @@ bool AbstractInterpreter::update_start_state(InterpreterState& newState, int ind
 
 bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterState& mergeTo) {
     bool changed = false;
-    if (mergeTo.m_locals == nullptr) {
-        // first time we assigned, or no locals...
-        mergeTo.m_locals = newState.m_locals->copy();
-        changed |= newState.m_locals->size() != 0;
-    }
-    else if (mergeTo.m_locals != newState.m_locals) {
+    if (mergeTo.m_locals.get() != newState.m_locals.get()) {
         // need to merge locals...
-        _ASSERT(mergeTo.m_locals->size() == newState.m_locals->size());
-        for (int i = 0; i < newState.m_locals->size(); i++) {
-            auto newType = (*mergeTo.m_locals)[i]->merge_with((*newState.m_locals)[i]);
-            if (newType != (*mergeTo.m_locals)[i]) {
-                mergeTo.m_locals = mergeTo.m_locals->replace(i,  newType);
+        _ASSERT(mergeTo.local_count() == newState.local_count());
+        for (int i = 0; i < newState.local_count(); i++) {
+            auto oldType = mergeTo.get_local(i);
+            auto newType = oldType.merge_with(newState.get_local(i));
+            if (newType != oldType) {
+                mergeTo.replace_local(i, newType);
                 changed = true;
             }
             
         }
     }
 
-    if (mergeTo.m_stack.size() == 0) {
+    if (mergeTo.stack_size() == 0) {
         // first time we assigned, or empty stack...
         mergeTo.m_stack = newState.m_stack;
-        changed |= newState.m_stack.size() != 0;
+        changed |= newState.stack_size() != 0;
     }
     else{
         // need to merge the stacks...
-        _ASSERT(mergeTo.m_stack.size() == newState.m_stack.size());
-        for (int i = 0; i < newState.m_stack.size(); i++) {
-            auto newType = mergeTo.m_stack[i]->merge_with(newState.m_stack[i]);
-            if (mergeTo.m_stack[i] != newType) {
-                mergeTo.m_stack[i] = newType;
+        _ASSERT(mergeTo.stack_size() == newState.stack_size());
+        for (int i = 0; i < newState.stack_size(); i++) {
+            auto newType = mergeTo[i]->merge_with(newState[i]);
+            if (mergeTo[i] != newType) {
+                mergeTo[i] = newType;
                 changed = true;
             }
         }
@@ -757,6 +760,11 @@ AbstractValue* AbstractInterpreter::to_abstract(PyObject*value) {
 }
 
 void AbstractInterpreter::dump() {
+    printf("Dumping %s from %s line %d\r\n",
+        PyUnicode_AsUTF8(m_code->co_name),
+        PyUnicode_AsUTF8(m_code->co_filename),
+        m_code->co_firstlineno
+    );
     for (size_t curByte = 0; curByte < m_size; curByte++) {
         auto opcode = m_byteCode[curByte];
         auto byteIndex = curByte;
@@ -764,15 +772,33 @@ void AbstractInterpreter::dump() {
         auto find = m_startStates.find(byteIndex);
         if (find != m_startStates.end()) {
             auto state = find->second;
-            for (int i = 0; i < state.m_locals->size(); i++) {
-                printf(
-                    "          %-20s %s\r\n",
-                    PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i)),
-                    (*state.m_locals)[i]->describe()
+            for (int i = 0; i < state.local_count(); i++) {
+                auto local = state.get_local(i);
+                if (local.IsMaybeUndefined) {
+                    if (local.Type == &Undefined) {
+                        printf(
+                            "          %-20s UNDEFINED\r\n",
+                            PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i))
+                            );
+                    }
+                    else{
+                        printf(
+                            "          %-20s %s (maybe UNDEFINED)\r\n",
+                            PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i)),
+                            local.Type->describe()
+                        );
+                    }
+                }
+                else{
+                    printf(
+                        "          %-20s %s\r\n",
+                        PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i)),
+                        local.Type->describe()
                     );
+                }
             }
-            for (int i = 0; i < state.m_stack.size(); i++) {
-                printf("          %-20d %s\r\n", i, state.m_stack[i]->describe());
+            for (int i = 0; i < state.stack_size(); i++) {
+                printf("          %-20d %s\r\n", i, state[i]->describe());
             }
         }
         

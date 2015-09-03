@@ -20,12 +20,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="absint.cpp" />
+    <ClCompile Include="absvalue.cpp" />
     <ClCompile Include="pyjit.cpp" />
     <ClCompile Include="cee.cpp" />
     <ClCompile Include="intrins.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="absint.h" />
+    <ClInclude Include="absvalue.h" />
     <ClInclude Include="cee.h" />
     <ClInclude Include="codemodel.h" />
     <ClInclude Include="ilgen.h" />
