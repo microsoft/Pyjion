@@ -56,3 +56,4 @@
 #include <openum.h>
 
 #include "pyjit.h"
+#include "absint.h"

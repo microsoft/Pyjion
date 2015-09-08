@@ -39,3 +39,20 @@ DictValue Dict;
 NoneValue None;
 FunctionValue Function;
 SliceValue Slice;
+ComplexValue Complex;
+
+
+AbstractValue* AbstractValue::binary(int op, AbstractValue* other) {
+    return &Any;
+}
+
+AbstractValue* AbstractValue::unary(int op) {
+    return &Any;
+}
+
+AbstractValue* AbstractValue::merge_with(AbstractValue*other) {
+    if (this == other) {
+        return this;
+    }
+    return &Any;
+}

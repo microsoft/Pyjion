@@ -31,8 +31,10 @@
 
 class AbstractValue;
 class AnyValue;
+class BoolValue;
 
 extern AnyValue Any;
+extern BoolValue Bool;
 
 enum AbstractValueKind {
     AVK_Any,
@@ -49,11 +51,13 @@ enum AbstractValueKind {
     AVK_None,
     AVK_Function,
     AVK_Slice,
+    AVK_Complex
 };
 
 class AbstractValue {
 public:
     virtual AbstractValue* binary(int op, AbstractValue* other);
+    virtual AbstractValue* unary(int op);
 
     virtual bool is_always_true() {
         return false;
@@ -77,6 +81,26 @@ class AnyValue : public AbstractValue {
     }
 };
 
+
+class BoolValue : public AbstractValue {
+    virtual AbstractValueKind kind() {
+        return AVK_Bool;
+    }
+
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
+
+    virtual const char* describe() {
+        return "Bool";
+    }
+
+};
+
 class UndefinedValue : public AbstractValue {
     virtual AbstractValue* merge_with(AbstractValue*other) {
         return other;
@@ -96,16 +120,45 @@ class IntegerValue : public AbstractValue {
     virtual AbstractValue* binary(int op, AbstractValue* other) {
         if (other->kind() == AVK_Integer) {
             switch (op) {
-                case BINARY_ADD:
-                case BINARY_SUBTRACT:
-                case BINARY_MULTIPLY:
+                case BINARY_FLOOR_DIVIDE:
+                case BINARY_POWER:
                 case BINARY_MODULO:
+                case BINARY_LSHIFT:
+                case BINARY_RSHIFT:
+                case BINARY_AND:
+                case BINARY_XOR:
+                case BINARY_OR:
+                case BINARY_MULTIPLY:
+                case BINARY_SUBTRACT:
+                case BINARY_ADD:
+                case INPLACE_POWER:
+                case INPLACE_MULTIPLY:
+                case INPLACE_FLOOR_DIVIDE:
+                case INPLACE_MODULO:
+                case INPLACE_ADD:
+                case INPLACE_SUBTRACT:
+                case INPLACE_LSHIFT:
+                case INPLACE_RSHIFT:
+                case INPLACE_AND:
+                case INPLACE_XOR:
+                case INPLACE_OR:
                     return this;
             }
         }
         return &Any;
     }
 
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_POSITIVE:
+            case UNARY_NEGATIVE:
+            case UNARY_INVERT:
+                return this;
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
 
     virtual const char* describe() {
         return "Int";
@@ -119,13 +172,28 @@ class StringValue : public AbstractValue {
     virtual AbstractValue* binary(int op, AbstractValue* other) {
         if (other->kind() == AVK_String) {
             switch (op) {
+                case INPLACE_ADD:
                 case BINARY_ADD:
                     return this;
             }
         }
+        if (op == BINARY_MODULO || op == INPLACE_MODULO) {
+            // Or could be an error, but that seems ok...
+            return this;
+        }
+        else if ((op == BINARY_MULTIPLY || op == INPLACE_MULTIPLY) && other->kind() == AVK_Integer) {
+            return this;
+        }
         return &Any;
     }
 
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
 
     virtual const char* describe() {
         return "String";
@@ -134,18 +202,33 @@ class StringValue : public AbstractValue {
 
 class BytesValue : public AbstractValue {
     virtual AbstractValueKind kind() {
-        return AVK_String;
+        return AVK_Bytes;
     }
     virtual AbstractValue* binary(int op, AbstractValue* other) {
         if (other->kind() == AVK_Bytes) {
             switch (op) {
+                case INPLACE_ADD:
                 case BINARY_ADD:
                     return this;
             }
         }
+        if (op == BINARY_MODULO || op == INPLACE_MODULO) {
+            // Or could be an error, but that seems ok...
+            return this;
+        }
+        else if ((op == BINARY_MULTIPLY || op == INPLACE_MULTIPLY) && other->kind() == AVK_Integer) {
+            return this;
+        }
         return &Any;
     }
 
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
 
     virtual const char* describe() {
         return "Bytes";
@@ -156,6 +239,45 @@ class FloatValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_Float;
     }
+    virtual AbstractValue* binary(int op, AbstractValue* other) {
+        if (other->kind() == AVK_Float) {
+            switch (op) {
+                case BINARY_TRUE_DIVIDE:
+                case BINARY_FLOOR_DIVIDE:
+                case BINARY_POWER:
+                case BINARY_MODULO:
+                case BINARY_LSHIFT:
+                case BINARY_RSHIFT:
+                case BINARY_AND:
+                case BINARY_XOR:
+                case BINARY_OR:
+                case BINARY_MULTIPLY:
+                case BINARY_SUBTRACT:
+                case BINARY_ADD:
+                case INPLACE_POWER:
+                case INPLACE_MULTIPLY:
+                case INPLACE_TRUE_DIVIDE:
+                case INPLACE_FLOOR_DIVIDE:
+                case INPLACE_MODULO:
+                case INPLACE_ADD:
+                case INPLACE_SUBTRACT:
+                    return this;
+            }
+        }
+        return &Any;
+    }
+
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_POSITIVE:
+            case UNARY_NEGATIVE:
+                return this;
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
+
     virtual const char* describe() {
         return "float";
     }
@@ -163,8 +285,30 @@ class FloatValue : public AbstractValue {
 
 class TupleValue : public AbstractValue {
     virtual AbstractValueKind kind() {
-        return AVK_Float;
+        return AVK_Tuple;
     }
+    virtual AbstractValue* binary(int op, AbstractValue* other) {
+        if (op == BINARY_ADD && other->kind() == AVK_Tuple) {
+            return this;
+        }
+        else if (op == BINARY_MULTIPLY && other->kind() == AVK_Integer) {
+            return this;
+        }
+        else if (op == BINARY_SUBSCR && other->kind() == AVK_Slice) {
+            return this;
+        }
+        return &Any;
+    }
+
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
+
+
     virtual const char* describe() {
         return "tuple";
     }
@@ -174,6 +318,27 @@ class ListValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_List;
     }
+    virtual AbstractValue* binary(int op, AbstractValue* other) {
+        if (op == BINARY_ADD && other->kind() == AVK_List) {
+            return this;
+        }
+        else if (op == BINARY_MULTIPLY && other->kind() == AVK_Integer) {
+            return this;
+        }
+        else if (op == BINARY_SUBSCR && other->kind() == AVK_Slice) {
+            return this;
+        }
+        return &Any;
+    }
+
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
+
     virtual const char* describe() {
         return "list";
     }
@@ -183,6 +348,15 @@ class DictValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_Dict;
     }
+
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
+
     virtual const char* describe() {
         return "dict";
     }
@@ -192,25 +366,33 @@ class SetValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_Set;
     }
+
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
+
     virtual const char* describe() {
         return "set";
     }
-};
-
-class BoolValue : public AbstractValue {
-    virtual AbstractValueKind kind() {
-        return AVK_Bool;
-    }
-    virtual const char* describe() {
-        return "Bool";
-    }
-
 };
 
 class NoneValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_None;
     }
+
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
+
     virtual const char* describe() {
         return "None";
     }
@@ -220,6 +402,15 @@ class FunctionValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_Function;
     }
+
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
+
     virtual const char* describe() {
         return "Function";
     }
@@ -229,15 +420,71 @@ class SliceValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_Slice;
     }
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
     virtual const char* describe() {
         return "Slice";
     }
 };
 
+class ComplexValue : public AbstractValue {
+    virtual AbstractValueKind kind() {
+        return AVK_Complex;
+    }
+
+    virtual AbstractValue* binary(int op, AbstractValue* other) {
+        if (other->kind() == AVK_Complex) {
+            switch (op) {
+                case BINARY_TRUE_DIVIDE:
+                case BINARY_FLOOR_DIVIDE:
+                case BINARY_POWER:
+                case BINARY_MODULO:
+                case BINARY_LSHIFT:
+                case BINARY_RSHIFT:
+                case BINARY_AND:
+                case BINARY_XOR:
+                case BINARY_OR:
+                case BINARY_MULTIPLY:
+                case BINARY_SUBTRACT:
+                case BINARY_ADD:
+                case INPLACE_POWER:
+                case INPLACE_MULTIPLY:
+                case INPLACE_TRUE_DIVIDE:
+                case INPLACE_FLOOR_DIVIDE:
+                case INPLACE_MODULO:
+                case INPLACE_ADD:
+                case INPLACE_SUBTRACT:
+                    return this;
+            }
+        }
+        return &Any;
+    }
+
+    virtual AbstractValue* unary(int op) {
+        switch (op) {
+            case UNARY_POSITIVE:
+            case UNARY_NEGATIVE:
+                return this;
+            case UNARY_NOT:
+                return &Bool;
+        }
+        return &Any;
+    }
+
+    virtual const char* describe() {
+        return "Complex";
+    }
+};
+
+
 extern UndefinedValue Undefined;
 extern IntegerValue Integer;
 extern FloatValue Float;
-extern BoolValue Bool;
 extern ListValue List;
 extern TupleValue Tuple;
 extern SetValue Set;
@@ -247,6 +494,7 @@ extern DictValue Dict;
 extern NoneValue None;
 extern FunctionValue Function;
 extern SliceValue Slice;
+extern ComplexValue Complex;
 
 
 #endif

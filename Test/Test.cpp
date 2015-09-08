@@ -25,6 +25,7 @@
 
 #include "stdafx.h"
 #include <frameobject.h>
+#include <initializer_list>
 
 using namespace std;
 
@@ -86,14 +87,101 @@ public:
     }
 };
 
+class AIVerifier {
+public:
+    virtual void verify(AbstractInterpreter& interpreter) = 0;
+};
+
+class StackVerifier : public AIVerifier {
+    size_t m_byteCodeIndex, m_stackIndex;
+    AbstractValueKind m_kind;
+public:
+    StackVerifier(size_t byteCodeIndex, size_t stackIndex, AbstractValueKind kind) {
+        m_byteCodeIndex = byteCodeIndex;
+        m_stackIndex = stackIndex;
+        m_kind = kind;
+    }
+
+    virtual void verify(AbstractInterpreter& interpreter) {
+        auto info = interpreter.get_stack_info(m_byteCodeIndex);
+        _ASSERTE(m_kind == info[info.size() - m_stackIndex - 1].Type->kind());
+    };
+};
+
+class VariableVerifier : public AIVerifier {
+private:
+    size_t m_byteCodeIndex, m_localIndex;
+    AbstractValueKind m_kind;
+    bool m_undefined;
+public:
+    VariableVerifier(size_t byteCodeIndex, size_t localIndex, AbstractValueKind kind, bool undefined = false) {
+        m_byteCodeIndex = byteCodeIndex;
+        m_localIndex = localIndex;
+        m_undefined = undefined;
+        m_kind = kind;
+    }
+
+    virtual void verify(AbstractInterpreter& interpreter) {
+        auto local = interpreter.get_local_info(m_byteCodeIndex, m_localIndex);
+        _ASSERTE(local.IsMaybeUndefined == m_undefined);
+        _ASSERTE(local.StackInfo.Type->kind() == m_kind);
+    };
+};
+
+class ReturnVerifier : public AIVerifier {
+    AbstractValueKind m_kind;
+public:
+    ReturnVerifier(AbstractValueKind kind) {
+        m_kind = kind;
+    }
+
+    virtual void verify(AbstractInterpreter& interpreter) {
+        _ASSERTE(m_kind == interpreter.get_return_info()->kind());
+    }
+};
+
+class AITestCase {
+private:
+public:
+    const char* m_code;
+    vector<AIVerifier*> m_verifiers;
+
+    AITestCase(const char *code, AIVerifier* verifier) {
+        m_code = code;
+        m_verifiers.push_back(verifier);
+    }
+
+    AITestCase(const char *code, vector<AIVerifier*> verifiers) {
+        m_code = code;
+        m_verifiers = verifiers;
+    }
+
+    AITestCase(const char *code, std::initializer_list<AIVerifier*> list) {
+        m_code = code;
+        m_verifiers = list;
+    }
+
+    ~AITestCase() {
+        for (auto verifier : m_verifiers) {
+            delete verifier;
+        }
+    }
+
+    void verify(AbstractInterpreter& interpreter) {
+        for (auto cur : m_verifiers) {
+            cur->verify(interpreter);
+        }
+    }
+};
+
+
+
 PyObject* Incremented(PyObject*o){
     Py_INCREF(o);
     return o;
 }
 
 void PyJitTest() {
-    Py_Initialize();
-
     auto tupleOfOne = (PyTupleObject*)PyTuple_New(1);
     tupleOfOne->ob_item[0] = PyLong_FromLong(42);
 
@@ -702,12 +790,797 @@ void PyJitTest() {
         }
     }
 
-    Py_Finalize();
-    printf("Done\r\n");
+    printf("JIT tests passed\r\n");
+}
+
+void AbsIntTest() {
+    AITestCase cases[] = {
+        // Basic typing tests...
+        AITestCase(
+        "def f(): x = 1",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer, false),     // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = None",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_None, false),     // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = 'abc'",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_String, false),      // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = []",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // BUILD_LIST 0
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_List, false),      // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = {}",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // BUILD_MAP 0
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Dict, false),      // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = ()",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // BUILD_TUPLE 0
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Tuple, false),      // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = True",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Bool, false),      // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = False",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Bool, false),      // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = 1.0",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float, false),      // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = b'abc'",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Bytes, false),      // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = {1,}",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // BUILD_SET 1
+            new VariableVerifier(6, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(9, 0, AVK_Set, false),         // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): x = 3j",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex, false),     // LOAD_CONST None
+            new ReturnVerifier(AVK_None)
+        }),
+        AITestCase(
+        "def f(): return 42",
+        {
+            new ReturnVerifier(AVK_Integer),    // VC 2013 ICE's with only a single value here...
+            new ReturnVerifier(AVK_Integer)
+        }),
+        AITestCase(
+        "def f(x):\n    if x:    return 42\n    return 'abc'",
+        {
+            new ReturnVerifier(AVK_Any),    // VC 2013 ICE's with only a single value here...
+            new ReturnVerifier(AVK_Any)
+        }),
+        // We won't follow blocks following a return statement...
+        AITestCase(
+        "def f(x):\n    return 42\n    if 'abc': return 'abc'",
+        {
+            new ReturnVerifier(AVK_Integer),    // VC 2013 ICE's with only a single value here...
+            new ReturnVerifier(AVK_Integer)
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = +x",
+        {
+            new VariableVerifier(10, 1, AVK_Undefined, true),   // 10 STORE_FAST               1 (y)
+            new VariableVerifier(13, 1, AVK_Integer)            // 13 LOAD_CONST               0 (None)
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    y = +x",
+        {
+            new VariableVerifier(10, 1, AVK_Undefined, true),   // 10 STORE_FAST               1 (y)
+            new VariableVerifier(13, 1, AVK_Float)            // 13 LOAD_CONST               0 (None)
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    y = +x",
+        {
+            new VariableVerifier(10, 1, AVK_Undefined, true),   // 10 STORE_FAST               1 (y)
+            new VariableVerifier(13, 1, AVK_Complex)            // 13 LOAD_CONST               0 (None)
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = -x",
+        {
+            new VariableVerifier(10, 1, AVK_Undefined, true),   // 10 STORE_FAST               1 (y)
+            new VariableVerifier(13, 1, AVK_Integer)            // 13 LOAD_CONST               0 (None)
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    y = -x",
+        {
+            new VariableVerifier(10, 1, AVK_Undefined, true),   // 10 STORE_FAST               1 (y)
+            new VariableVerifier(13, 1, AVK_Float)            // 13 LOAD_CONST               0 (None)
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    y = -x",
+        {
+            new VariableVerifier(10, 1, AVK_Undefined, true),   // 10 STORE_FAST               1 (y)
+            new VariableVerifier(13, 1, AVK_Complex)            // 13 LOAD_CONST               0 (None)
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = ~x",
+        {
+            new VariableVerifier(10, 1, AVK_Undefined, true),   // 10 STORE_FAST               1 (y)
+            new VariableVerifier(13, 1, AVK_Integer)            // 13 LOAD_CONST               0 (None)
+        }),
+        // Basic delete 
+        AITestCase(
+        "def f():\n    x = 1\n    del x",
+        {
+            new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST
+            new VariableVerifier(6, 0, AVK_Integer, false),     // DELETE_FAST
+            new VariableVerifier(9, 0, AVK_Undefined, true),    // LOAD_CONST None
+        }),
+        // Delete / Undefined merging...
+        AITestCase(
+        "def f():\n    x = 1\n    if abc:\n        del x\n        y = 1",
+        {
+            new VariableVerifier(0,  0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(3,  0, AVK_Undefined, true),    // STORE_FAST
+            new VariableVerifier(6,  0, AVK_Integer, false),     // LOAD_GLOBAL abc
+            new VariableVerifier(12, 0, AVK_Integer, false),     // DELETE_FAST
+            new VariableVerifier(15, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(21, 0, AVK_Any, true),          // LOAD_CONST None
+        }),
+        // Type tracking / merging...
+        AITestCase(
+        "def f():\n    if abc:\n        x = 1\n    else:\n        x = 'abc'\n        y = 1",
+        {
+            new VariableVerifier(9, 0, AVK_Undefined, true),    // STORE_FAST x
+            new VariableVerifier(12, 0, AVK_Integer),           // JUMP_FORWARD
+            new VariableVerifier(18, 0, AVK_Undefined, true),   // STORE_FAST x
+            new VariableVerifier(21, 0, AVK_String),            // LOAD_CONST
+            new VariableVerifier(27, 0, AVK_Any),               // LOAD_CONST None
+        }),
+        // Binary integer operations
+        AITestCase(
+        "def f():\n    x = 1\n    y = x + 1",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = x - 1",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = x * 1",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = x % 1",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = x << 1",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = x >> 1",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = x & 1",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = x | 1",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = x ^ 1",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = x ** 2",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = x // 1",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
+        }),
+        // Integer in place binary operations
+        AITestCase(
+        "def f():\n    x = 1\n    x += 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    x -= 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    x *= 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    x %= 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    x <<= 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    x >>= 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    x &= 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    x |= 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    x ^= 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    x **= 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    x //= 1",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
+        }),
+        // Float binary operations
+        AITestCase(
+        "def f():\n    x = 1.0\n    y = x + 1.0",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    y = x - 1.0",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    y = x * 1.0",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    y = x % 1.0",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    y = x ** 2.0",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    y = x / 1.0",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    y = x // 1.0",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Float),           // STORE_FAST 1
+        }),
+        // Float in place binary operations
+        AITestCase(
+        "def f():\n    x = 1.0\n    x += 1.0",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    x -= 1.0",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    x *= 1.0",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    x %= 1.0",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    x **= 1.0",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    x /= 1.0",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Float),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 1.0\n    x //= 1.0",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Float),           // STORE_FAST 1
+        }),
+
+
+        // Complex binary operations
+        AITestCase(
+        "def f():\n    x = 3j\n    y = x + 3j",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    y = x - 3j",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    y = x * 3j",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    y = x % 3j",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    y = x ** 2j",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    y = x / 3j",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    y = x // 3j",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Complex),           // STORE_FAST 1
+        }),
+        // Complex in place binary operations
+        AITestCase(
+        "def f():\n    x = 3j\n    x += 3j",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    x -= 3j",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    x *= 3j",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    x %= 3j",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    x **= 3j",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    x /= 3j",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Complex),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 3j\n    x //= 3j",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Complex),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Complex),           // STORE_FAST 1
+        }),
+
+        // Binary String operations
+        AITestCase(
+        "def f():\n    x = 'abc'\n    y = x + 'def'",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_String),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_String),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 'abc'\n    x += 'def'",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_String),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_String),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 'abc'\n    y = x % 'def'",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_String),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_String),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 'abc'\n    y = x % 42",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_String),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_String),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 'abc'\n    x %= 'def'",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_String),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_String),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 'abc'\n    y = x * 3",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_String),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_String),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = 'abc'\n    x *= 3",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_String),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_String),           // STORE_FAST 1
+        }),
+
+        // Binary bytes operations
+        AITestCase(
+        "def f():\n    x = b'abc'\n    y = x + b'def'",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Bytes),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Bytes),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = b'abc'\n    x += b'def'",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Bytes),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Bytes),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = b'abc'\n    y = x % b'def'",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Bytes),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Bytes),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = b'abc'\n    y = x % 42",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Bytes),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Bytes),           // STORE_FAST 1
+        }), AITestCase(
+        "def f():\n    x = b'abc'\n    x %= b'def'",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Bytes),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Bytes),           // STORE_FAST 1
+        }),
+        AITestCase(
+        "def f():\n    x = b'abc'\n    y = x * 3",
+        {
+            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Bytes),            // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Bytes),           // STORE_FAST 1
+        }), 
+        AITestCase(
+        "def f():\n    x = b'abc'\n    x *= 3",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Bytes),            // LOAD_FAST 0
+            new VariableVerifier(16, 0, AVK_Bytes),           // STORE_FAST 1
+        }),
+
+        // Tuple binary operations
+        AITestCase(
+        "def f():\n    x = (1,2)\n    y = x + x",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Tuple),              // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Tuple),             // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = (1,2)\n    y = x * 3",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Tuple),              // LOAD_FAST 0
+            new VariableVerifier(16, 1, AVK_Tuple),             // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = (1,2)\n    y = x[0:1]",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(6, 0, AVK_Tuple),              // LOAD_FAST 0
+            new VariableVerifier(22, 1, AVK_Tuple),             // LOAD_CONST None
+        }),
+
+        // List binary operations
+        AITestCase(
+        "def f():\n    x = [1,2]\n    y = x + x",
+        {
+            new VariableVerifier(9, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(12, 0, AVK_List),              // LOAD_FAST 0
+            new VariableVerifier(22, 1, AVK_List),             // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = [1,2]\n    y = x * 3",
+        {
+            new VariableVerifier(9, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(12, 0, AVK_List),              // LOAD_FAST 0
+            new VariableVerifier(22, 1, AVK_List),             // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = [1,2]\n    y = x[0:1]",
+        {
+            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(12, 0, AVK_List),              // LOAD_FAST 0
+            new VariableVerifier(28, 1, AVK_List),             // LOAD_CONST None
+        }),
+
+        // Unary not
+        AITestCase(
+        "def f():\n    x = not 1",
+        {
+            new VariableVerifier(4, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(7, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = not 1.0",
+        {
+            new VariableVerifier(4, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(7, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = not True",
+        {
+            new VariableVerifier(4, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(7, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = not 3j",
+        {
+            new VariableVerifier(4, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(7, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = not ()",
+        {
+            new VariableVerifier(4, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(7, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = not []",
+        {
+            new VariableVerifier(4, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(7, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = not {3,}",
+        {
+            new VariableVerifier(7, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(10, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = not None",
+        {
+            new VariableVerifier(4, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(7, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = not 'abc'",
+        {
+            new VariableVerifier(4, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(7, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = not b'abc'",
+        {
+            new VariableVerifier(4, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(7, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+        AITestCase(
+        "def f():\n    x = not (lambda:42)",
+        {
+            new VariableVerifier(10, 0, AVK_Undefined, true),    // STORE_FAST 0
+            new VariableVerifier(13, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+    };
+    
+    for (auto& testCase : cases) {
+        auto codeObj = CompileCode(testCase.m_code);
+        printf("Testing %s\r\n", testCase.m_code);
+
+        AbstractInterpreter interpreter(codeObj);
+        if (!interpreter.interpret()) {
+            _ASSERTE(FALSE && "Failed to interprete code");
+        }
+
+        testCase.verify(interpreter);
+
+        Py_DECREF(codeObj);
+    }
 }
 
 int main() {
-    CoInitialize(NULL);
+    Py_Initialize();
     JitInit();
+
+    AbsIntTest();
+
     PyJitTest();
+
+    Py_Finalize();
 }

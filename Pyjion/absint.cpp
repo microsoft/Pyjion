@@ -34,6 +34,16 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code) : m_code(code) {
     m_returnValue = &Undefined;
 }
 
+AbstractInterpreter::~AbstractInterpreter() {
+    // clean up any dynamically allocated objects...
+    for (auto start = m_sources.begin(); start != m_sources.end(); start++) {
+        delete *start;
+    }
+    for (auto start = m_values.begin(); start != m_values.end(); start++) {
+        delete *start;
+    }
+}
+
 #define NEXTARG() *(unsigned short*)&m_byteCode[curByte + 1]; curByte+= 2
 
 void AbstractInterpreter::preprocess() {
@@ -86,9 +96,7 @@ void AbstractInterpreter::preprocess() {
 
 }
 
-bool AbstractInterpreter::interpret() {
-    preprocess();
-    
+void AbstractInterpreter::init_starting_state() {
     InterpreterState lastState = InterpreterState(m_code->co_nlocals);
 
     int localIndex = 0;
@@ -109,10 +117,16 @@ bool AbstractInterpreter::interpret() {
         // All locals are initially undefined
         lastState.replace_local(localIndex, AbstractLocalInfo(&Undefined, true));
     }
-    
-    //dump();
 
     update_start_state(lastState, 0);
+}
+
+bool AbstractInterpreter::interpret() {
+    preprocess();
+
+    init_starting_state();
+    //dump();
+
 
     // walk all the blocks in the code one by one, analyzing them, and enqueing any
     // new blocks that we encounter from branches.
@@ -123,7 +137,7 @@ bool AbstractInterpreter::interpret() {
         auto cur = queue.front();
         queue.pop_front();
         for (size_t curByte = cur; curByte < m_size; curByte++) {
-            // merge any previous state in...
+            // get our starting state when we entered this opcode
             InterpreterState lastState = m_startStates.find(curByte)->second;
 
             auto opcodeIndex = curByte;
@@ -132,6 +146,7 @@ bool AbstractInterpreter::interpret() {
             if (HAS_ARG(opcode)){
                 oparg = NEXTARG();
             }
+
             processOpCode:
             switch (opcode) {
                 case EXTENDED_ARG:
@@ -174,18 +189,26 @@ bool AbstractInterpreter::interpret() {
                         break;
                     }
                 case LOAD_FAST:
-                    lastState.push(lastState.get_local(oparg).Type);
-                    break;
+                    {
+                        auto localStore = add_local_store(oparg);
+                        auto local = lastState.get_local(oparg);
+                        auto stackInfo = local.StackInfo;
+                        stackInfo.Sources.insert(localStore);
+
+                        lastState.push(stackInfo);
+                        break;
+                    }
                 case STORE_FAST:
                     {
-                        auto value = lastState.pop();
-                        lastState.replace_local(oparg, value);
+                        auto stackInfo = lastState.pop_no_escape();
+                        lastState.replace_local(oparg, AbstractLocalInfo(stackInfo, false));
                     }
                     break;
                 case DELETE_FAST:
                     lastState.replace_local(oparg, AbstractLocalInfo(&Undefined, true));
                     break;
-                case BINARY_TRUE_DIVIDE: 
+                case BINARY_SUBSCR:
+                case BINARY_TRUE_DIVIDE:
                 case BINARY_FLOOR_DIVIDE: 
                 case BINARY_POWER: 
                 case BINARY_MODULO: 
@@ -335,11 +358,21 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&List);
                     break;
                 case BUILD_TUPLE:
-                    for (int i = 0; i < oparg; i++) {
-                        lastState.pop();
+                    {
+                        vector<AbstractStackInfo> sources;
+                        for (int i = 0; i < oparg; i++) {
+                            sources.push_back(lastState.pop_no_escape());
+                        }
+                        // TODO: Currently we don't mark the consuming portions of the tuple
+                        // as escaping until the tuple escapes.  Is that good enough?  That
+                        // means that if we have a non-escaping tuple we need to optimize
+                        // it away too, otherwise our assumptions about what's in the tuple are
+                        // broken
+                        auto tuple = new TupleSource(sources);
+                        m_sources.push_back(tuple);
+                        lastState.push(AbstractStackInfo(&Tuple, tuple));
+                        break;
                     }
-                    lastState.push(&Tuple);
-                    break;
                 case BUILD_MAP:
                     for (int i = 0; i < oparg; i++) {
                         lastState.pop();
@@ -486,26 +519,14 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Slice);
                     break;
                 case UNARY_POSITIVE:
-                    // TODO: Support known types
-                    lastState.pop();
-                    lastState.push(&Any);
-                    break;
-                case UNARY_NOT:
-                    // TODO: Always returns a bool or an error code...
-                    // TODO: Known types can always return a bool
-                    lastState.pop();
-                    lastState.push(&Any);
-                    break;
                 case UNARY_NEGATIVE:
-                    // TODO: Support known types
-                    lastState.pop();
-                    lastState.push(&Any);
-                    break;
                 case UNARY_INVERT:
-                    // TODO: Support known types
-                    lastState.pop();
-                    lastState.push(&Any);
-                    break;
+                case UNARY_NOT:
+                    {
+                        auto one = lastState.pop();
+                        lastState.push(one->unary(opcode));
+                        break;
+                    }
                 case UNPACK_EX:
                     lastState.pop();
                     for (int i = 0; i < oparg >> 8; i++) {
@@ -528,12 +549,6 @@ bool AbstractInterpreter::interpret() {
                         lastState.pop();
                     }
                     goto next;
-                case BINARY_SUBSCR:
-                    // TODO: Deal with known subscription
-                    lastState.pop();
-                    lastState.pop();
-                    lastState.push(&Any);
-                    break;
                 case STORE_SUBSCR:
                     // TODO: Do we want to track types on store for lists?
                     lastState.pop();
@@ -692,10 +707,11 @@ bool AbstractInterpreter::update_start_state(InterpreterState& newState, size_t 
 
 bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterState& mergeTo) {
     bool changed = false;
-    if (mergeTo.m_locals.get() != newState.m_locals.get()) {
+    if (mergeTo.m_locals != newState.m_locals) {
+    //    if (mergeTo.m_locals.get() != newState.m_locals.get()) {
         // need to merge locals...
         _ASSERT(mergeTo.local_count() == newState.local_count());
-        for (int i = 0; i < newState.local_count(); i++) {
+        for (size_t i = 0; i < newState.local_count(); i++) {
             auto oldType = mergeTo.get_local(i);
             auto newType = oldType.merge_with(newState.get_local(i));
             if (newType != oldType) {
@@ -714,8 +730,8 @@ bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterSt
     else{
         // need to merge the stacks...
         _ASSERT(mergeTo.stack_size() == newState.stack_size());
-        for (int i = 0; i < newState.stack_size(); i++) {
-            auto newType = mergeTo[i]->merge_with(newState[i]);
+        for (size_t i = 0; i < newState.stack_size(); i++) {
+            auto newType = mergeTo[i].merge_with(newState[i]);
             if (mergeTo[i] != newType) {
                 mergeTo[i] = newType;
                 changed = true;
@@ -756,6 +772,9 @@ AbstractValue* AbstractInterpreter::to_abstract(PyObject*value) {
     else if (PySet_Check(value)) {
         return &Set;
     }
+    else if (PyComplex_CheckExact(value)) {
+        return &Complex;
+    }
 
 
     return &Any;
@@ -774,10 +793,10 @@ void AbstractInterpreter::dump() {
         auto find = m_startStates.find(byteIndex);
         if (find != m_startStates.end()) {
             auto state = find->second;
-            for (int i = 0; i < state.local_count(); i++) {
+            for (size_t i = 0; i < state.local_count(); i++) {
                 auto local = state.get_local(i);
                 if (local.IsMaybeUndefined) {
-                    if (local.Type == &Undefined) {
+                    if (local.StackInfo.Type == &Undefined) {
                         printf(
                             "          %-20s UNDEFINED\r\n",
                             PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i))
@@ -787,20 +806,24 @@ void AbstractInterpreter::dump() {
                         printf(
                             "          %-20s %s (maybe UNDEFINED)\r\n",
                             PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i)),
-                            local.Type->describe()
+                            local.StackInfo.Type->describe()
                         );
                     }
+                    dump_sources(local.StackInfo.Sources);
                 }
                 else{
                     printf(
                         "          %-20s %s\r\n",
                         PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i)),
-                        local.Type->describe()
+                        local.StackInfo.Type->describe()
                     );
+                    dump_sources(local.StackInfo.Sources);
+                    
                 }
             }
-            for (int i = 0; i < state.stack_size(); i++) {
-                printf("          %-20d %s\r\n", i, state[i]->describe());
+            for (size_t i = 0; i < state.stack_size(); i++) {
+                printf("          %-20d %s\r\n", i, state[i].Type->describe());
+                dump_sources(state[i].Sources);
             }
         }
         
@@ -857,134 +880,168 @@ void AbstractInterpreter::dump() {
     printf("Returns %s\r\n", m_returnValue->describe());
 }
 
+void AbstractInterpreter::dump_sources(CowSet<AbstractSource*> sources) {
+    for (auto cur = sources.begin(); cur != sources.end(); cur++) {
+        printf("              Source: %s\r\n", (*cur)->describe());
+    }
+}
+
 char* AbstractInterpreter::opcode_name(int opcode) {
 #define OP_TO_STR(x)   case x: return #x;
     switch (opcode) {
         OP_TO_STR(POP_TOP)
-            OP_TO_STR(ROT_TWO)
-            OP_TO_STR(ROT_THREE)
-            OP_TO_STR(DUP_TOP)
-            OP_TO_STR(DUP_TOP_TWO)
-            OP_TO_STR(NOP)
-            OP_TO_STR(UNARY_POSITIVE)
-            OP_TO_STR(UNARY_NEGATIVE)
-            OP_TO_STR(UNARY_NOT)
-            OP_TO_STR(UNARY_INVERT)
-            OP_TO_STR(BINARY_MATRIX_MULTIPLY)
-            OP_TO_STR(INPLACE_MATRIX_MULTIPLY)
-            OP_TO_STR(BINARY_POWER)
-            OP_TO_STR(BINARY_MULTIPLY)
-            OP_TO_STR(BINARY_MODULO)
-            OP_TO_STR(BINARY_ADD)
-            OP_TO_STR(BINARY_SUBTRACT)
-            OP_TO_STR(BINARY_SUBSCR)
-            OP_TO_STR(BINARY_FLOOR_DIVIDE)
-            OP_TO_STR(BINARY_TRUE_DIVIDE)
-            OP_TO_STR(INPLACE_FLOOR_DIVIDE)
-            OP_TO_STR(INPLACE_TRUE_DIVIDE)
-            OP_TO_STR(GET_AITER)
-            OP_TO_STR(GET_ANEXT)
-            OP_TO_STR(BEFORE_ASYNC_WITH)
-            OP_TO_STR(INPLACE_ADD)
-            OP_TO_STR(INPLACE_SUBTRACT)
-            OP_TO_STR(INPLACE_MULTIPLY)
-            OP_TO_STR(INPLACE_MODULO)
-            OP_TO_STR(STORE_SUBSCR)
-            OP_TO_STR(DELETE_SUBSCR)
-            OP_TO_STR(BINARY_LSHIFT)
-            OP_TO_STR(BINARY_RSHIFT)
-            OP_TO_STR(BINARY_AND)
-            OP_TO_STR(BINARY_XOR)
-            OP_TO_STR(BINARY_OR)
-            OP_TO_STR(INPLACE_POWER)
-            OP_TO_STR(GET_ITER)
-            OP_TO_STR(PRINT_EXPR)
-            OP_TO_STR(LOAD_BUILD_CLASS)
-            OP_TO_STR(YIELD_FROM)
-            OP_TO_STR(GET_AWAITABLE)
-            OP_TO_STR(INPLACE_LSHIFT)
-            OP_TO_STR(INPLACE_RSHIFT)
-            OP_TO_STR(INPLACE_AND)
-            OP_TO_STR(INPLACE_XOR)
-            OP_TO_STR(INPLACE_OR)
-            OP_TO_STR(BREAK_LOOP)
-            OP_TO_STR(WITH_CLEANUP_START)
-            OP_TO_STR(WITH_CLEANUP_FINISH)
-            OP_TO_STR(RETURN_VALUE)
-            OP_TO_STR(IMPORT_STAR)
-            OP_TO_STR(YIELD_VALUE)
-            OP_TO_STR(POP_BLOCK)
-            OP_TO_STR(END_FINALLY)
-            OP_TO_STR(POP_EXCEPT)
-            OP_TO_STR(STORE_NAME)
-            OP_TO_STR(DELETE_NAME)
-            OP_TO_STR(UNPACK_SEQUENCE)
-            OP_TO_STR(FOR_ITER)
-            OP_TO_STR(UNPACK_EX)
-            OP_TO_STR(STORE_ATTR)
-            OP_TO_STR(DELETE_ATTR)
-            OP_TO_STR(STORE_GLOBAL)
-            OP_TO_STR(DELETE_GLOBAL)
-            OP_TO_STR(LOAD_CONST)
-            OP_TO_STR(LOAD_NAME)
-            OP_TO_STR(BUILD_TUPLE)
-            OP_TO_STR(BUILD_LIST)
-            OP_TO_STR(BUILD_SET)
-            OP_TO_STR(BUILD_MAP)
-            OP_TO_STR(LOAD_ATTR)
-            OP_TO_STR(COMPARE_OP)
-            OP_TO_STR(IMPORT_NAME)
-            OP_TO_STR(IMPORT_FROM)
-            OP_TO_STR(JUMP_FORWARD)
-            OP_TO_STR(JUMP_IF_FALSE_OR_POP)
-            OP_TO_STR(JUMP_IF_TRUE_OR_POP)
-            OP_TO_STR(JUMP_ABSOLUTE)
-            OP_TO_STR(POP_JUMP_IF_FALSE)
-            OP_TO_STR(POP_JUMP_IF_TRUE)
-            OP_TO_STR(LOAD_GLOBAL)
-            OP_TO_STR(CONTINUE_LOOP)
-            OP_TO_STR(SETUP_LOOP)
-            OP_TO_STR(SETUP_EXCEPT)
-            OP_TO_STR(SETUP_FINALLY)
-            OP_TO_STR(LOAD_FAST)
-            OP_TO_STR(STORE_FAST)
-            OP_TO_STR(DELETE_FAST)
-            OP_TO_STR(RAISE_VARARGS)
-            OP_TO_STR(CALL_FUNCTION)
-            OP_TO_STR(MAKE_FUNCTION)
-            OP_TO_STR(BUILD_SLICE)
-            OP_TO_STR(MAKE_CLOSURE)
-            OP_TO_STR(LOAD_CLOSURE)
-            OP_TO_STR(LOAD_DEREF)
-            OP_TO_STR(STORE_DEREF)
-            OP_TO_STR(DELETE_DEREF)
-            OP_TO_STR(CALL_FUNCTION_VAR)
-            OP_TO_STR(CALL_FUNCTION_KW)
-            OP_TO_STR(CALL_FUNCTION_VAR_KW)
-            OP_TO_STR(SETUP_WITH)
-            OP_TO_STR(EXTENDED_ARG)
-            OP_TO_STR(LIST_APPEND)
-            OP_TO_STR(SET_ADD)
-            OP_TO_STR(MAP_ADD)
-            OP_TO_STR(LOAD_CLASSDEREF)
-            OP_TO_STR(BUILD_LIST_UNPACK)
-            OP_TO_STR(BUILD_MAP_UNPACK)
-            OP_TO_STR(BUILD_MAP_UNPACK_WITH_CALL)
-            OP_TO_STR(BUILD_TUPLE_UNPACK)
-            OP_TO_STR(BUILD_SET_UNPACK)
-            OP_TO_STR(SETUP_ASYNC_WITH)
+        OP_TO_STR(ROT_TWO)
+        OP_TO_STR(ROT_THREE)
+        OP_TO_STR(DUP_TOP)
+        OP_TO_STR(DUP_TOP_TWO)
+        OP_TO_STR(NOP)
+        OP_TO_STR(UNARY_POSITIVE)
+        OP_TO_STR(UNARY_NEGATIVE)
+        OP_TO_STR(UNARY_NOT)
+        OP_TO_STR(UNARY_INVERT)
+        OP_TO_STR(BINARY_MATRIX_MULTIPLY)
+        OP_TO_STR(INPLACE_MATRIX_MULTIPLY)
+        OP_TO_STR(BINARY_POWER)
+        OP_TO_STR(BINARY_MULTIPLY)
+        OP_TO_STR(BINARY_MODULO)
+        OP_TO_STR(BINARY_ADD)
+        OP_TO_STR(BINARY_SUBTRACT)
+        OP_TO_STR(BINARY_SUBSCR)
+        OP_TO_STR(BINARY_FLOOR_DIVIDE)
+        OP_TO_STR(BINARY_TRUE_DIVIDE)
+        OP_TO_STR(INPLACE_FLOOR_DIVIDE)
+        OP_TO_STR(INPLACE_TRUE_DIVIDE)
+        OP_TO_STR(GET_AITER)
+        OP_TO_STR(GET_ANEXT)
+        OP_TO_STR(BEFORE_ASYNC_WITH)
+        OP_TO_STR(INPLACE_ADD)
+        OP_TO_STR(INPLACE_SUBTRACT)
+        OP_TO_STR(INPLACE_MULTIPLY)
+        OP_TO_STR(INPLACE_MODULO)
+        OP_TO_STR(STORE_SUBSCR)
+        OP_TO_STR(DELETE_SUBSCR)
+        OP_TO_STR(BINARY_LSHIFT)
+        OP_TO_STR(BINARY_RSHIFT)
+        OP_TO_STR(BINARY_AND)
+        OP_TO_STR(BINARY_XOR)
+        OP_TO_STR(BINARY_OR)
+        OP_TO_STR(INPLACE_POWER)
+        OP_TO_STR(GET_ITER)
+        OP_TO_STR(PRINT_EXPR)
+        OP_TO_STR(LOAD_BUILD_CLASS)
+        OP_TO_STR(YIELD_FROM)
+        OP_TO_STR(GET_AWAITABLE)
+        OP_TO_STR(INPLACE_LSHIFT)
+        OP_TO_STR(INPLACE_RSHIFT)
+        OP_TO_STR(INPLACE_AND)
+        OP_TO_STR(INPLACE_XOR)
+        OP_TO_STR(INPLACE_OR)
+        OP_TO_STR(BREAK_LOOP)
+        OP_TO_STR(WITH_CLEANUP_START)
+        OP_TO_STR(WITH_CLEANUP_FINISH)
+        OP_TO_STR(RETURN_VALUE)
+        OP_TO_STR(IMPORT_STAR)
+        OP_TO_STR(YIELD_VALUE)
+        OP_TO_STR(POP_BLOCK)
+        OP_TO_STR(END_FINALLY)
+        OP_TO_STR(POP_EXCEPT)
+        OP_TO_STR(STORE_NAME)
+        OP_TO_STR(DELETE_NAME)
+        OP_TO_STR(UNPACK_SEQUENCE)
+        OP_TO_STR(FOR_ITER)
+        OP_TO_STR(UNPACK_EX)
+        OP_TO_STR(STORE_ATTR)
+        OP_TO_STR(DELETE_ATTR)
+        OP_TO_STR(STORE_GLOBAL)
+        OP_TO_STR(DELETE_GLOBAL)
+        OP_TO_STR(LOAD_CONST)
+        OP_TO_STR(LOAD_NAME)
+        OP_TO_STR(BUILD_TUPLE)
+        OP_TO_STR(BUILD_LIST)
+        OP_TO_STR(BUILD_SET)
+        OP_TO_STR(BUILD_MAP)
+        OP_TO_STR(LOAD_ATTR)
+        OP_TO_STR(COMPARE_OP)
+        OP_TO_STR(IMPORT_NAME)
+        OP_TO_STR(IMPORT_FROM)
+        OP_TO_STR(JUMP_FORWARD)
+        OP_TO_STR(JUMP_IF_FALSE_OR_POP)
+        OP_TO_STR(JUMP_IF_TRUE_OR_POP)
+        OP_TO_STR(JUMP_ABSOLUTE)
+        OP_TO_STR(POP_JUMP_IF_FALSE)
+        OP_TO_STR(POP_JUMP_IF_TRUE)
+        OP_TO_STR(LOAD_GLOBAL)
+        OP_TO_STR(CONTINUE_LOOP)
+        OP_TO_STR(SETUP_LOOP)
+        OP_TO_STR(SETUP_EXCEPT)
+        OP_TO_STR(SETUP_FINALLY)
+        OP_TO_STR(LOAD_FAST)
+        OP_TO_STR(STORE_FAST)
+        OP_TO_STR(DELETE_FAST)
+        OP_TO_STR(RAISE_VARARGS)
+        OP_TO_STR(CALL_FUNCTION)
+        OP_TO_STR(MAKE_FUNCTION)
+        OP_TO_STR(BUILD_SLICE)
+        OP_TO_STR(MAKE_CLOSURE)
+        OP_TO_STR(LOAD_CLOSURE)
+        OP_TO_STR(LOAD_DEREF)
+        OP_TO_STR(STORE_DEREF)
+        OP_TO_STR(DELETE_DEREF)
+        OP_TO_STR(CALL_FUNCTION_VAR)
+        OP_TO_STR(CALL_FUNCTION_KW)
+        OP_TO_STR(CALL_FUNCTION_VAR_KW)
+        OP_TO_STR(SETUP_WITH)
+        OP_TO_STR(EXTENDED_ARG)
+        OP_TO_STR(LIST_APPEND)
+        OP_TO_STR(SET_ADD)
+        OP_TO_STR(MAP_ADD)
+        OP_TO_STR(LOAD_CLASSDEREF)
+        OP_TO_STR(BUILD_LIST_UNPACK)
+        OP_TO_STR(BUILD_MAP_UNPACK)
+        OP_TO_STR(BUILD_MAP_UNPACK_WITH_CALL)
+        OP_TO_STR(BUILD_TUPLE_UNPACK)
+        OP_TO_STR(BUILD_SET_UNPACK)
+        OP_TO_STR(SETUP_ASYNC_WITH)
     }
     return "unknown";
 }
 
 
-AbstractValue* AbstractValue::binary(int op, AbstractValue* other) {
-    return &Any;
+// Returns information about the specified local variable at a specific 
+// byte code index.
+AbstractLocalInfo AbstractInterpreter::get_local_info(size_t byteCodeIndex, size_t localIndex) {
+    return m_startStates[byteCodeIndex].get_local(localIndex);
 }
 
-AbstractValue* AbstractValue::merge_with(AbstractValue*other) {
-    if (this == other) {
-        return this;
+// Returns information about the stack at the specific byte code index.
+vector<AbstractStackInfo>& AbstractInterpreter::get_stack_info(size_t byteCodeIndex) {
+    return m_startStates[byteCodeIndex].m_stack;
+}
+
+AbstractValue* AbstractInterpreter::get_return_info() {
+    return m_returnValue;
+}
+
+bool AbstractInterpreter::has_info(size_t byteCodeIndex) {
+    return m_startStates.find(byteCodeIndex) != m_startStates.end();
+}
+
+
+LocalSource* AbstractInterpreter::add_local_store(size_t index) {
+    auto res = new LocalSource();
+    m_sources.push_back(res);
+
+    if (m_localStores.find(index) == m_localStores.end()) {
+        m_localStores[index] = vector < LocalSource* >();
     }
-    return &Any;
+
+    m_localStores[index].push_back(res);
+    return res;
+}
+
+void TupleSource::escapes() {
+    for (auto cur = m_sources.begin(); cur != m_sources.end(); cur++) {
+        (*cur).escapes();
+    }
+    m_escapes = true;
 }
