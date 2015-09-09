@@ -263,14 +263,14 @@ bool AbstractInterpreter::interpret() {
                     break;
                 case POP_JUMP_IF_FALSE:
                     {
-                        auto value = lastState.pop();
+                        auto value = lastState.pop_no_escape();
 
                         // merge our current state into the branched to location...
                         if (update_start_state(lastState, oparg)) {
                             queue.push_back(oparg);
                         }
 
-                        if (value->is_always_false()) {
+                        if (value.Value->is_always_false()) {
                             // We're always jumping, we don't need to process the following opcodes...
                             goto next;
                         }
@@ -280,14 +280,14 @@ bool AbstractInterpreter::interpret() {
                     }
                 case POP_JUMP_IF_TRUE:
                     {
-                        auto value = lastState.pop();
+                        auto value = lastState.pop_no_escape();
 
                         // merge our current state into the branched to location...
                         if (update_start_state(lastState, oparg)) {
                             queue.push_back(oparg);
                         }
 
-                        if (value->is_always_true()) {
+                        if (value.Value->is_always_true()) {
                             // We're always jumping, we don't need to process the following opcodes...
                             goto next;
                         }
@@ -301,8 +301,8 @@ bool AbstractInterpreter::interpret() {
                         if (update_start_state(lastState, oparg)) {
                             queue.push_back(oparg);
                         }
-                        auto value = lastState.pop();
-                        if (value->is_always_true()) {
+                        auto value = lastState.pop_no_escape();
+                        if (value.Value->is_always_true()) {
                             // we always jump, no need to analyze the following instructions...
                             goto next;
                         }
@@ -314,8 +314,8 @@ bool AbstractInterpreter::interpret() {
                         if (update_start_state(lastState, oparg)) {
                             queue.push_back(oparg);
                         }
-                        auto value = lastState.pop();
-                        if (value->is_always_false()) {
+                        auto value = lastState.pop_no_escape();
+                        if (value.Value->is_always_false()) {
                             // we always jump, no need to analyze the following instructions...
                             goto next;
                         }
@@ -337,7 +337,19 @@ bool AbstractInterpreter::interpret() {
                      goto next;
                 case RETURN_VALUE:
                     {
-                        m_returnValue = m_returnValue->merge_with(lastState.pop());
+                        // We don't treat returning as escaping as it would just result in a single
+                        // boxing over the lifetime of the function.
+                        auto retValue = lastState.pop_no_escape();
+
+                        // We add a a source here just so we can know if the return value
+                        // was unboxed or not, this is a little ugly...
+                        auto retSource = add_const_source(opcodeIndex, 0);
+                        
+                        if (retValue.needs_boxing()) {
+                            retSource->escapes();
+                        }
+
+                        m_returnValue = m_returnValue->merge_with(retValue.Value);
                     }
                     goto next;
                 case LOAD_NAME:
@@ -872,16 +884,14 @@ void AbstractInterpreter::dump() {
                     );
                     break;
                 case LOAD_FAST:
-                    if (m_opcodeSources.find(byteIndex) != m_opcodeSources.end()) {
-                        printf("    %-3d %-22s %d (%s) [%s]\r\n",
-                            byteIndex,
-                            opcode_name(opcode),
-                            oparg,
-                            PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, oparg)),
-                            m_opcodeSources.find(byteIndex)->second->needs_boxing() ? "BOXED" : "NON-BOXED"
-                        );
-                        break;
-                    }
+                    printf("    %-3d %-22s %d (%s) [%s]\r\n",
+                        byteIndex,
+                        opcode_name(opcode),
+                        oparg,
+                        PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, oparg)),
+                        should_box(byteIndex) ? "BOXED" : "NON-BOXED"
+                    );
+                    break;
                 case STORE_FAST:
                 case DELETE_FAST:
                     printf("    %-3d %-22s %d (%s)\r\n", 
@@ -911,25 +921,14 @@ void AbstractInterpreter::dump() {
                     {
                         auto repr = PyObject_Repr(PyTuple_GetItem(m_code->co_consts, oparg));
                         auto reprStr = PyUnicode_AsUTF8(repr);
-                        if (m_opcodeSources.find(byteIndex) != m_opcodeSources.end()) {
-                            printf(
-                                "    %-3d %-22s %d (%s) [%s]\r\n",
-                                byteIndex,
-                                opcode_name(opcode),
-                                oparg,
-                                reprStr,
-                                m_opcodeSources.find(byteIndex)->second->needs_boxing() ? "BOXED" : "NON-BOXED"
-                                );
-                        }
-                        else{
-                            printf(
-                                "    %-3d %-22s %d (%s)\r\n",
-                                byteIndex,
-                                opcode_name(opcode),
-                                oparg,
-                                reprStr
-                                );
-                        }
+                        printf(
+                            "    %-3d %-22s %d (%s) [%s]\r\n",
+                            byteIndex,
+                            opcode_name(opcode),
+                            oparg,
+                            reprStr,
+                            should_box(byteIndex) ? "BOXED" : "NON-BOXED"
+                        );
                         Py_DECREF(repr);
                         break;
                     }
@@ -943,6 +942,14 @@ void AbstractInterpreter::dump() {
         }
     }
     printf("Returns %s\r\n", m_returnValue->describe());
+}
+
+bool AbstractInterpreter::should_box(size_t opcodeIndex) {
+    auto boxInfo = m_opcodeSources.find(opcodeIndex);
+    if (boxInfo != m_opcodeSources.end()) {
+        return boxInfo->second->needs_boxing();
+    }
+    return true;
 }
 
 void AbstractInterpreter::dump_sources(AbstractSources sources) {

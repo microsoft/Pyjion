@@ -102,6 +102,10 @@ public:
     // Returns information about the stack at the specific byte code index.
     vector<AbstractValueWithSources>& get_stack_info(size_t byteCodeIndex);
 
+    // Returns true if the result of the opcode should be boxed, false if it
+    // can be maintained on the stack.
+    bool should_box(size_t opcodeIndex);
+
     AbstractValue* get_return_info();
 
     bool has_info(size_t byteCodeIndex);

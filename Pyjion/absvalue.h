@@ -137,7 +137,6 @@ public:
     }
 };
 
-
 class ConstSource : public AbstractSource {
     bool m_escapes;
 

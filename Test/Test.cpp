@@ -140,6 +140,21 @@ public:
     }
 };
 
+class BoxVerifier : public AIVerifier {
+    size_t m_byteCodeIndex;
+    bool m_shouldBox;
+
+public:
+    BoxVerifier(size_t byteCodeIndex, bool shouldBox) {
+        m_byteCodeIndex = byteCodeIndex;
+        m_shouldBox = shouldBox;
+    }
+
+    virtual void verify(AbstractInterpreter& interpreter) {
+        _ASSERTE(m_shouldBox == interpreter.should_box(m_byteCodeIndex));
+    }
+};
+
 class AITestCase {
 private:
 public:
@@ -1556,6 +1571,40 @@ void AbsIntTest() {
         {
             new VariableVerifier(10, 0, AVK_Undefined, true),    // STORE_FAST 0
             new VariableVerifier(13, 0, AVK_Bool),               // LOAD_CONST None
+        }),
+
+        // Escape tests
+        AITestCase(
+        "def f():\n    pi = 0.\n    k = 0.\n    while k < 256.:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
+        {
+            new ReturnVerifier(AVK_Float),
+            new ReturnVerifier(AVK_Float),
+            new BoxVerifier(0, false),  // LOAD_CONST 0
+            new BoxVerifier(6, false),  // LOAD_CONST 0.0
+            new BoxVerifier(15, false),  // LOAD_FAST k
+            new BoxVerifier(18, false),  // LOAD_CONST 256
+            new BoxVerifier(27, false),  // LOAD_FAST pi
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    y = 2\n    return min(x, y)",
+        {
+            new BoxVerifier(0, true),  // LOAD_CONST 1
+            new BoxVerifier(6, true),  // LOAD_CONST 2
+            new BoxVerifier(15, true),  // LOAD_FAST x
+            new BoxVerifier(18, true),  // LOAD_FAST y
+            new ReturnVerifier(AVK_Any)
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    return x",
+        {
+            new BoxVerifier(0, false),  // LOAD_CONST 1
+            new BoxVerifier(9, false)
+        }),
+        AITestCase(
+        "def f():\n    x = 1\n    return abs",
+        {
+            new BoxVerifier(0, false),  // LOAD_CONST 1
+            new BoxVerifier(9, true)
         }),
     };
     
