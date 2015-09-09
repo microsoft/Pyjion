@@ -36,11 +36,8 @@
 using namespace std;
 
 struct AbstractLocalInfo;
-struct AbstractStackInfo;
-class AbstractSource;
 struct AbsIntBlockInfo;
 class InterpreterState;
-class LocalSource;
 
 // The abstract interpreter implementation.  The abstract interpreter performs 
 // static analysis of the Python byte code to determine what types are known.
@@ -85,7 +82,7 @@ class __declspec(dllexport) AbstractInterpreter {
     // Tracks the location where each BREAK_LOOP will break to, so we can merge
     // state with the current state to the breaked location.
     unordered_map<size_t, AbsIntBlockInfo> m_breakTo;
-    unordered_map<size_t, vector<LocalSource*>> m_localStores;
+    unordered_map<size_t, AbstractSource*> m_opcodeSources;
     // all values produced during abstract interpretation, need to be freed
     vector<AbstractValue*> m_values;
     vector<AbstractSource*> m_sources;
@@ -103,7 +100,7 @@ public:
     AbstractLocalInfo get_local_info(size_t byteCodeIndex, size_t localIndex);
 
     // Returns information about the stack at the specific byte code index.
-    vector<AbstractStackInfo>& get_stack_info(size_t byteCodeIndex);
+    vector<AbstractValueWithSources>& get_stack_info(size_t byteCodeIndex);
 
     AbstractValue* get_return_info();
 
@@ -118,120 +115,13 @@ private:
     void init_starting_state();
     char* opcode_name(int opcode);
     void preprocess();
-    void dump_sources(CowSet<AbstractSource*> sources);
+    void dump_sources(AbstractSources sources);
 
-    LocalSource* add_local_store(size_t index);
+    AbstractSource* add_local_source(size_t opcodeIndex, size_t localIndex);
+    AbstractSource* add_const_source(size_t opcodeIndex, size_t localIndex);
+    AbstractSource* add_intermediate_source(size_t opcodeIndex);
 };
 
-class AbstractSource {
-public:
-    virtual void escapes() {
-    }
-
-    virtual char* describe() {
-        return "";
-    }
-};
-
-class ConstSource : public AbstractSource {
-};
-
-class LocalSource : public AbstractSource {
-    CowSet<AbstractSource*> AssignmentSources;
-    bool m_escapes;
-
-    virtual void escapes() {
-        m_escapes = true;
-    }
-
-    virtual char* describe() {
-        if (m_escapes) {
-            return "Source: Local (escapes)";
-        }
-        else{
-            return "Source: Local";
-        }
-    }
-};
-
-class TupleSource : public AbstractSource {
-    vector<AbstractStackInfo> m_sources;
-    bool m_escapes;
-public:
-    TupleSource(vector<AbstractStackInfo> sources) {
-        m_sources = sources;
-    }
-
-    virtual void escapes();
-
-    virtual char* describe() {
-        if (m_escapes) {
-            return "Source: Tuple (escapes)";
-        }
-        else{
-            return "Source: Tuple";
-        }
-    }
-};
-
-struct AbstractStackInfo {
-    AbstractValue* Type;
-    CowSet<AbstractSource*> Sources;
-
-    AbstractStackInfo(AbstractValue *type = nullptr) {
-        Type = type;
-        Sources = CowSet<AbstractSource*>();
-    }
-
-    AbstractStackInfo(AbstractValue *type, CowSet<AbstractSource*> sources) {
-        Type = type;
-        Sources = sources;
-    }
-
-    AbstractStackInfo(AbstractValue *type, AbstractSource* source) {
-        Type = type;
-        Sources = CowSet<AbstractSource*>();
-        Sources.insert(source);
-    }
-
-    void escapes() {
-        for (auto start = Sources.begin(); start != Sources.end(); start++) {
-            (*start)->escapes();
-        }
-    }
-
-    AbstractStackInfo merge_with(AbstractStackInfo other) {
-        return AbstractStackInfo(
-            Type->merge_with(other.Type),
-            Sources.combine(other.Sources)
-        );
-    }
-    bool operator== (AbstractStackInfo& other) {
-        if (Type != other.Type) {
-            return false;
-        }
-        // quick identity check...
-        if (Sources == Sources) {
-            return true;
-        }
-        // quick size check...
-        if (Sources.size() != Sources.size()) {
-            return false;
-        }
-
-        // expensive set comparison...
-        for (auto cur = other.Sources.begin(); cur != other.Sources.end(); cur++) {
-            if (Sources.find(*cur) == Sources.end()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool operator!= (AbstractStackInfo& other) {
-        return !(*this == other);
-    }
-};
 
 
 // Tracks the state of a local variable at each location in the function.
@@ -261,34 +151,36 @@ struct AbstractStackInfo {
 //      This should never happen as it means the Undefined
 //      type has leaked out in an odd way
 struct AbstractLocalInfo {
-    AbstractStackInfo StackInfo;
+    AbstractValueWithSources ValueInfo;
     bool IsMaybeUndefined;
+    /*AbstractValue *Value;
+    AbstractSources Loads, Stores;*/
 
     AbstractLocalInfo() {
-        StackInfo = AbstractStackInfo();
+        ValueInfo = AbstractValueWithSources();
         IsMaybeUndefined = true;
     }
 
-    AbstractLocalInfo(AbstractStackInfo stackInfo, bool isUndefined = false) {
-        _ASSERTE(stackInfo.Type != nullptr);
-        _ASSERTE(!(stackInfo.Type == &Undefined && !isUndefined));
-        StackInfo = stackInfo;
+    AbstractLocalInfo(AbstractValueWithSources valueInfo, bool isUndefined = false) {
+        _ASSERTE(valueInfo.Value != nullptr);
+        _ASSERTE(!(valueInfo.Value == &Undefined && !isUndefined));
+        ValueInfo = valueInfo;
         IsMaybeUndefined = isUndefined;
     }
 
     AbstractLocalInfo merge_with(AbstractLocalInfo other) {
         return AbstractLocalInfo(
-            StackInfo.merge_with(other.StackInfo),
+            ValueInfo.merge_with(other.ValueInfo),
             IsMaybeUndefined || other.IsMaybeUndefined
-            );
+        );
     }
 
     bool operator== (AbstractLocalInfo other) {
-        return other.StackInfo == StackInfo &&
+        return other.ValueInfo == ValueInfo &&
             other.IsMaybeUndefined == IsMaybeUndefined;
     }
     bool operator!= (AbstractLocalInfo other) {
-        return other.StackInfo != StackInfo ||
+        return other.ValueInfo != ValueInfo ||
             other.IsMaybeUndefined != IsMaybeUndefined;
     }
 };
@@ -308,7 +200,7 @@ struct AbstractLocalInfo {
 // them in place.  If they are shared then we will issue a copy.
 class InterpreterState {
 public:
-    vector<AbstractStackInfo> m_stack;
+    vector<AbstractValueWithSources> m_stack;
     CowVector<AbstractLocalInfo> m_locals;
 
     InterpreterState() {
@@ -334,16 +226,16 @@ public:
         auto res = m_stack.back();
         res.escapes();
         m_stack.pop_back();
-        return res.Type;
+        return res.Value;
     }
 
-    AbstractStackInfo pop_no_escape() {
+    AbstractValueWithSources pop_no_escape() {
         auto res = m_stack.back();
         m_stack.pop_back();
         return res;
     }
 
-    void push(AbstractStackInfo& value) {
+    void push(AbstractValueWithSources& value) {
         m_stack.push_back(value);
     }
 
@@ -355,7 +247,7 @@ public:
         return m_stack.size();
     }
 
-    AbstractStackInfo& operator[](const size_t index) {
+    AbstractValueWithSources& operator[](const size_t index) {
         return m_stack[index];
     }
 };

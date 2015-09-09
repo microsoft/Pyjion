@@ -36,11 +36,14 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code) : m_code(code) {
 
 AbstractInterpreter::~AbstractInterpreter() {
     // clean up any dynamically allocated objects...
-    for (auto start = m_sources.begin(); start != m_sources.end(); start++) {
-        delete *start;
+    for (auto source : m_sources) {
+        delete source;
     }
-    for (auto start = m_values.begin(); start != m_values.end(); start++) {
-        delete *start;
+    for (auto absValue : m_values) {
+        delete absValue;
+    }
+    for (auto localStore : m_opcodeSources) {
+        delete localStore.second;
     }
 }
 
@@ -166,9 +169,9 @@ bool AbstractInterpreter::interpret() {
                     }
                 case ROT_THREE:
                     {
-                        auto top = lastState.pop();
-                        auto second = lastState.pop();
-                        auto third = lastState.pop();
+                        auto top = lastState.pop_no_escape();
+                        auto second = lastState.pop_no_escape();
+                        auto third = lastState.pop_no_escape();
 
                         lastState.push(top);
                         lastState.push(third);
@@ -176,7 +179,7 @@ bool AbstractInterpreter::interpret() {
                         break;
                     }
                 case POP_TOP:
-                    lastState.pop();
+                    lastState.pop_no_escape();
                     break;
                 case DUP_TOP:
                     lastState.push(lastState[lastState.stack_size() - 1]);
@@ -188,20 +191,33 @@ bool AbstractInterpreter::interpret() {
                         lastState.push(top);
                         break;
                     }
+                case LOAD_CONST:
+                    {
+                        auto constSource = add_const_source(opcodeIndex, oparg);
+
+                        lastState.push(
+                            AbstractValueWithSources(
+                                to_abstract(PyTuple_GetItem(m_code->co_consts, oparg)),
+                                constSource
+                            )
+                        ); 
+                        break;
+                    }
                 case LOAD_FAST:
                     {
-                        auto localStore = add_local_store(oparg);
+                        auto localSource = add_local_source(opcodeIndex, oparg);
                         auto local = lastState.get_local(oparg);
-                        auto stackInfo = local.StackInfo;
-                        stackInfo.Sources.insert(localStore);
+                        
+                        auto valueInfo = local.ValueInfo;
+                        valueInfo.Sources.insert(localSource);
 
-                        lastState.push(stackInfo);
+                        lastState.push(valueInfo);
                         break;
                     }
                 case STORE_FAST:
                     {
-                        auto stackInfo = lastState.pop_no_escape();
-                        lastState.replace_local(oparg, AbstractLocalInfo(stackInfo, false));
+                        auto valueInfo = lastState.pop_no_escape();
+                        lastState.replace_local(oparg, AbstractLocalInfo(valueInfo, false));
                     }
                     break;
                 case DELETE_FAST:
@@ -235,14 +251,15 @@ bool AbstractInterpreter::interpret() {
                 case INPLACE_XOR:
                 case INPLACE_OR: 
                     {
-                        auto two = lastState.pop();
-                        auto one = lastState.pop();
-                        lastState.push(one->binary(opcode, two));
-                    }
-                    break;
+                        auto two = lastState.pop_no_escape();
+                        auto one = lastState.pop_no_escape();
+                        auto binaryRes = one.Value->binary(one.Sources, opcode, two);
 
-                case LOAD_CONST:
-                    lastState.push(to_abstract(PyTuple_GetItem(m_code->co_consts, oparg)));
+                        // create an intermediate source which will propagate changes up...
+                        auto sources = (IntermediateSource*)add_intermediate_source(opcodeIndex);
+                        sources->AssignmentSources = sources->AssignmentSources.combine(one.Sources.combine(two.Sources));
+                        lastState.push(AbstractValueWithSources(binaryRes, sources));
+                    }
                     break;
                 case POP_JUMP_IF_FALSE:
                     {
@@ -359,18 +376,21 @@ bool AbstractInterpreter::interpret() {
                     break;
                 case BUILD_TUPLE:
                     {
-                        vector<AbstractStackInfo> sources;
+                        vector<AbstractValueWithSources> sources;
                         for (int i = 0; i < oparg; i++) {
-                            sources.push_back(lastState.pop_no_escape());
+                            lastState.pop();
+                            //sources.push_back(lastState.pop_no_escape());
                         }
                         // TODO: Currently we don't mark the consuming portions of the tuple
                         // as escaping until the tuple escapes.  Is that good enough?  That
                         // means that if we have a non-escaping tuple we need to optimize
                         // it away too, otherwise our assumptions about what's in the tuple are
-                        // broken
-                        auto tuple = new TupleSource(sources);
-                        m_sources.push_back(tuple);
-                        lastState.push(AbstractStackInfo(&Tuple, tuple));
+                        // broken.
+                        // This optimization is disabled until the above comment sorted out.
+                        //auto tuple = new TupleSource(sources);
+                        //m_sources.push_back(tuple);
+                        //lastState.push(AbstractValueWithSources(&Tuple, tuple));
+                        lastState.push(&Tuple);
                         break;
                     }
                 case BUILD_MAP:
@@ -396,12 +416,16 @@ bool AbstractInterpreter::interpret() {
                             lastState.pop();
                             lastState.push(&Any);
                             break;
-                        default:
-                            // TODO: Comparisons of known types produce bools
-                            lastState.pop();
-                            lastState.pop();
-                            lastState.push(&Any);
-                            break;
+                        default:{
+                                auto two = lastState.pop_no_escape();
+                                auto one = lastState.pop_no_escape();
+                                auto binaryRes = one.Value->compare(one.Sources, oparg, two);
+                                
+                                auto sources = (IntermediateSource*)add_intermediate_source(opcodeIndex);
+                                sources->AssignmentSources = sources->AssignmentSources.combine(one.Sources.combine(two.Sources));
+                                lastState.push(AbstractValueWithSources(binaryRes, sources));
+                                break;
+                            }
                     }
                     break;
                 case IMPORT_NAME:
@@ -523,8 +547,13 @@ bool AbstractInterpreter::interpret() {
                 case UNARY_INVERT:
                 case UNARY_NOT:
                     {
-                        auto one = lastState.pop();
-                        lastState.push(one->unary(opcode));
+                        auto one = lastState.pop_no_escape();
+
+                        auto unaryRes = one.Value->unary(one.Sources, opcode);
+
+                        auto sources = (IntermediateSource*)add_intermediate_source(opcodeIndex);
+                        sources->AssignmentSources = sources->AssignmentSources.combine(one.Sources);
+                        lastState.push(AbstractValueWithSources(unaryRes, sources));
                         break;
                     }
                 case UNPACK_EX:
@@ -796,7 +825,7 @@ void AbstractInterpreter::dump() {
             for (size_t i = 0; i < state.local_count(); i++) {
                 auto local = state.get_local(i);
                 if (local.IsMaybeUndefined) {
-                    if (local.StackInfo.Type == &Undefined) {
+                    if (local.ValueInfo.Value == &Undefined) {
                         printf(
                             "          %-20s UNDEFINED\r\n",
                             PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i))
@@ -806,23 +835,23 @@ void AbstractInterpreter::dump() {
                         printf(
                             "          %-20s %s (maybe UNDEFINED)\r\n",
                             PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i)),
-                            local.StackInfo.Type->describe()
+                            local.ValueInfo.Value->describe()
                         );
                     }
-                    dump_sources(local.StackInfo.Sources);
+                    dump_sources(local.ValueInfo.Sources);
                 }
                 else{
                     printf(
                         "          %-20s %s\r\n",
                         PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i)),
-                        local.StackInfo.Type->describe()
+                        local.ValueInfo.Value->describe()
                     );
-                    dump_sources(local.StackInfo.Sources);
+                    dump_sources(local.ValueInfo.Sources);
                     
                 }
             }
             for (size_t i = 0; i < state.stack_size(); i++) {
-                printf("          %-20d %s\r\n", i, state[i].Type->describe());
+                printf("          %-20d %s\r\n", i, state[i].Value->describe());
                 dump_sources(state[i].Sources);
             }
         }
@@ -843,6 +872,16 @@ void AbstractInterpreter::dump() {
                     );
                     break;
                 case LOAD_FAST:
+                    if (m_opcodeSources.find(byteIndex) != m_opcodeSources.end()) {
+                        printf("    %-3d %-22s %d (%s) [%s]\r\n",
+                            byteIndex,
+                            opcode_name(opcode),
+                            oparg,
+                            PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, oparg)),
+                            m_opcodeSources.find(byteIndex)->second->needs_boxing() ? "BOXED" : "NON-BOXED"
+                        );
+                        break;
+                    }
                 case STORE_FAST:
                 case DELETE_FAST:
                     printf("    %-3d %-22s %d (%s)\r\n", 
@@ -868,6 +907,32 @@ void AbstractInterpreter::dump() {
                         PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg))
                         );
                     break;
+                case LOAD_CONST:
+                    {
+                        auto repr = PyObject_Repr(PyTuple_GetItem(m_code->co_consts, oparg));
+                        auto reprStr = PyUnicode_AsUTF8(repr);
+                        if (m_opcodeSources.find(byteIndex) != m_opcodeSources.end()) {
+                            printf(
+                                "    %-3d %-22s %d (%s) [%s]\r\n",
+                                byteIndex,
+                                opcode_name(opcode),
+                                oparg,
+                                reprStr,
+                                m_opcodeSources.find(byteIndex)->second->needs_boxing() ? "BOXED" : "NON-BOXED"
+                                );
+                        }
+                        else{
+                            printf(
+                                "    %-3d %-22s %d (%s)\r\n",
+                                byteIndex,
+                                opcode_name(opcode),
+                                oparg,
+                                reprStr
+                                );
+                        }
+                        Py_DECREF(repr);
+                        break;
+                    }
                 default:
                     printf("    %-3d %-22s %d\r\n", byteIndex, opcode_name(opcode), oparg);
                     break;
@@ -880,9 +945,9 @@ void AbstractInterpreter::dump() {
     printf("Returns %s\r\n", m_returnValue->describe());
 }
 
-void AbstractInterpreter::dump_sources(CowSet<AbstractSource*> sources) {
-    for (auto cur = sources.begin(); cur != sources.end(); cur++) {
-        printf("              Source: %s\r\n", (*cur)->describe());
+void AbstractInterpreter::dump_sources(AbstractSources sources) {
+    for (auto value : sources.Sources) {
+        printf("              Source: %s\r\n", value->describe());
     }
 }
 
@@ -1014,7 +1079,7 @@ AbstractLocalInfo AbstractInterpreter::get_local_info(size_t byteCodeIndex, size
 }
 
 // Returns information about the stack at the specific byte code index.
-vector<AbstractStackInfo>& AbstractInterpreter::get_stack_info(size_t byteCodeIndex) {
+vector<AbstractValueWithSources>& AbstractInterpreter::get_stack_info(size_t byteCodeIndex) {
     return m_startStates[byteCodeIndex].m_stack;
 }
 
@@ -1027,21 +1092,29 @@ bool AbstractInterpreter::has_info(size_t byteCodeIndex) {
 }
 
 
-LocalSource* AbstractInterpreter::add_local_store(size_t index) {
-    auto res = new LocalSource();
-    m_sources.push_back(res);
-
-    if (m_localStores.find(index) == m_localStores.end()) {
-        m_localStores[index] = vector < LocalSource* >();
+AbstractSource* AbstractInterpreter::add_local_source(size_t opcodeIndex, size_t localIndex) {
+    auto store = m_opcodeSources.find(opcodeIndex);
+    if (store == m_opcodeSources.end()) {
+        return m_opcodeSources[opcodeIndex] = new LocalSource();
     }
 
-    m_localStores[index].push_back(res);
-    return res;
+    return store->second;
 }
 
-void TupleSource::escapes() {
-    for (auto cur = m_sources.begin(); cur != m_sources.end(); cur++) {
-        (*cur).escapes();
+AbstractSource* AbstractInterpreter::add_const_source(size_t opcodeIndex, size_t localIndex) {
+    auto store = m_opcodeSources.find(opcodeIndex);
+    if (store == m_opcodeSources.end()) {
+        return m_opcodeSources[opcodeIndex] = new ConstSource();
     }
-    m_escapes = true;
+
+    return store->second;
+}
+
+AbstractSource* AbstractInterpreter::add_intermediate_source(size_t opcodeIndex) {
+    auto store = m_opcodeSources.find(opcodeIndex);
+    if (store == m_opcodeSources.end()) {
+        return m_opcodeSources[opcodeIndex] = new IntermediateSource();
+    }
+
+    return store->second;
 }

@@ -23,6 +23,9 @@
 *
 */
 
+#ifndef __COWVECTOR_H__
+#define __COWVECTOR_H__
+
 #include <memory>
 #include <vector>
 #include <unordered_set>
@@ -157,3 +160,5 @@ private:
 };
 
 template<typename T> shared_ptr<unordered_set<T>> CowSet<T>::s_empty;
+
+#endif

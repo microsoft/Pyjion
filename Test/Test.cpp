@@ -104,7 +104,7 @@ public:
 
     virtual void verify(AbstractInterpreter& interpreter) {
         auto info = interpreter.get_stack_info(m_byteCodeIndex);
-        _ASSERTE(m_kind == info[info.size() - m_stackIndex - 1].Type->kind());
+        _ASSERTE(m_kind == info[info.size() - m_stackIndex - 1].Value->kind());
     };
 };
 
@@ -124,7 +124,7 @@ public:
     virtual void verify(AbstractInterpreter& interpreter) {
         auto local = interpreter.get_local_info(m_byteCodeIndex, m_localIndex);
         _ASSERTE(local.IsMaybeUndefined == m_undefined);
-        _ASSERTE(local.StackInfo.Type->kind() == m_kind);
+        _ASSERTE(local.ValueInfo.Value->kind() == m_kind);
     };
 };
 
@@ -1567,6 +1567,7 @@ void AbsIntTest() {
         if (!interpreter.interpret()) {
             _ASSERTE(FALSE && "Failed to interprete code");
         }
+        interpreter.dump();
 
         testCase.verify(interpreter);
 
