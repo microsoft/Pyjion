@@ -58,7 +58,4 @@ echo %0 BuildArch BuildType where:
 echo.
 echo BuildArch can be: x64
 echo BuildType can be: Debug, Release
-echo Clean - optional argument to force a clean build.
-echo linuxmscorlib - Build mscorlib for Linux
-echo osxmscorlib - Build mscorlib for OS X
 exit /b 1
