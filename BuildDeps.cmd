@@ -18,7 +18,6 @@ goto Usage
 :ArgsDone
 
 :BuildCoreCLR
-
 pushd coreclr
 call build.cmd %__BuildArch% %__BuildType%
 IF ERRORLEVEL 1 goto Error
@@ -28,6 +27,7 @@ mkdir ..\Libs\%__BuildType%\%__BuildArch%\
 copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\jit\%__BuildType%\clrjit.lib ..\Libs\%__BuildType%\%__BuildArch%\
 copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\utilcode\dyncrt\%__BuildType%\utilcode.lib ..\Libs\%__BuildType%\%__BuildArch%\
 copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\gcinfo\%__BuildType%\gcinfo.lib ..\Libs\%__BuildType%\%__BuildArch%\
+
 :BuildPython
 cd Python\PCBuild
 
