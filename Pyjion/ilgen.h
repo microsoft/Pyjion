@@ -179,6 +179,14 @@ public:
         push_back(CEE_RET);
     }
 
+    void ld_r8(double i) {
+        push_back(CEE_LDC_R8);
+        unsigned char* value = (unsigned char*)(&i);
+        for (int i = 0; i < 8; i++) {
+            m_il.push_back(value[i]);
+        }
+    }
+
     void ld_i4(int i) {
         switch (i) {
         case -1:push_back(CEE_LDC_I4_M1); break;
@@ -302,6 +310,50 @@ public:
     void compare_eq() {
         m_il.push_back(CEE_PREFIX1);
         m_il.push_back((byte)CEE_CEQ);
+    }
+
+    void compare_ne() {
+        compare_eq();
+        ld_i4(0);
+        compare_eq();
+    }
+
+    void compare_gt() {
+        m_il.push_back(CEE_PREFIX1);
+        m_il.push_back((byte)CEE_CGT);
+    }
+
+    void compare_lt() {
+        m_il.push_back(CEE_PREFIX1);
+        m_il.push_back((byte)CEE_CLT);
+    }
+
+    void compare_ge() {
+        m_il.push_back(CEE_PREFIX1);
+        m_il.push_back((byte)CEE_CLT);
+        ld_i4(0);
+        compare_eq();
+    }
+
+    void compare_le() {
+        m_il.push_back(CEE_PREFIX1);
+        m_il.push_back((byte)CEE_CGT);
+        ld_i4(0);
+        compare_eq();
+    }
+
+    void compare_ge_float() {
+        m_il.push_back(CEE_PREFIX1);
+        m_il.push_back((byte)CEE_CLT_UN);
+        ld_i4(0);
+        compare_eq();
+    }
+
+    void compare_le_float() {
+        m_il.push_back(CEE_PREFIX1);
+        m_il.push_back((byte)CEE_CGT_UN);
+        ld_i4(0);
+        compare_eq();
     }
 
     void push_ptr(void* ptr) {
@@ -449,6 +501,22 @@ public:
 
     void add() {
         push_back(CEE_ADD);
+    }
+
+    void sub() {
+        push_back(CEE_SUB);
+    }
+
+    void div() {
+        push_back(CEE_DIV);
+    }
+
+    void mod() {
+        push_back(CEE_REM);
+    }
+
+    void mul() {
+        push_back(CEE_MUL);
     }
 
     void ld_arg(int index){

@@ -211,6 +211,120 @@ void PyJitTest() {
         //    "def f():\n    try:\n        a = RefCountCheck() + undefined\n        return 'noerr'\n    except:\n        return finalized",
         //    TestInput("True")
         //),
+        
+        // Simple optimized code test cases...
+        TestCase(
+            "def f():\n    pi = 0.\n    k = 0.\n    while k < 256.:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
+            TestInput("3.141592653589793")
+        ),
+        TestCase(
+            "def f():\n    x = 1.0\n    return x",
+            TestInput("1.0")
+        ),
+        TestCase(
+            "def f():\n    x = 1.0\n    y = 2.0\n    z = x + y\n    return z",
+            TestInput("3.0")
+        ),
+        TestCase(
+            "def f():\n    x = 1.0\n    y = 2.0\n    z = x - y\n    return z",
+            TestInput("-1.0")
+        ),
+        TestCase(
+            "def f():\n    x = 1.0\n    y = 2.0\n    z = x / y\n    return z",
+            TestInput("0.5")
+        ),
+        TestCase(
+            "def f():\n    x = 1.0\n    y = 2.0\n    z = x // y\n    return z",
+            TestInput("0.0")
+        ),
+        TestCase(
+            "def f():\n    x = 1.0\n    y = 2.0\n    z = x % y\n    return z",
+            TestInput("1.0")
+        ),
+        TestCase(
+            "def f():\n    x = 2.0\n    y = 3.0\n    z = x * y\n    return z",
+            TestInput("6.0")
+        ),
+        TestCase(
+            "def f():\n    x = 2.0\n    y = 3.0\n    z = x ** y\n    return z",
+            TestInput("8.0")
+        ),
+        TestCase(
+            "def f():\n    x = 2.0\n    y = 3.0\n    if x == y:\n        return True\n    return False",
+            TestInput("False")
+        ),
+        TestCase(
+            "def f():\n    x = 3.0\n    y = 3.0\n    if x == y:\n        return True\n    return False",
+            TestInput("True")
+        ),
+        TestCase(
+        "def f():\n    x = 2.0\n    y = 3.0\n    if x != y:\n        return True\n    return False",
+        TestInput("True")
+        ),
+        TestCase(
+        "def f():\n    x = 3.0\n    y = 3.0\n    if x != y:\n        return True\n    return False",
+        TestInput("False")
+        ),
+        TestCase(
+        "def f():\n    x = 2.0\n    y = 3.0\n    if x >= y:\n        return True\n    return False",
+        TestInput("False")
+        ),
+        TestCase(
+        "def f():\n    x = 3.0\n    y = 3.0\n    if x >= y:\n        return True\n    return False",
+        TestInput("True")
+        ),
+        TestCase(
+        "def f():\n    x = 2.0\n    y = 3.0\n    if x > y:\n        return True\n    return False",
+        TestInput("False")
+        ),
+        TestCase(
+        "def f():\n    x = 4.0\n    y = 3.0\n    if x > y:\n        return True\n    return False",
+        TestInput("True")
+        ),
+        TestCase(
+        "def f():\n    x = 3.0\n    y = 2.0\n    if x <= y:\n        return True\n    return False",
+        TestInput("False")
+        ),
+        TestCase(
+        "def f():\n    x = 3.0\n    y = 3.0\n    if x <= y:\n        return True\n    return False",
+        TestInput("True")
+        ),
+        TestCase(
+        "def f():\n    x = 3.0\n    y = 2.0\n    if x < y:\n        return True\n    return False",
+        TestInput("False")
+        ),
+        TestCase(
+        "def f():\n    x = 3.0\n    y = 4.0\n    if x < y:\n        return True\n    return False",
+        TestInput("True")
+        ),
+        TestCase(
+        "def f():\n    x = 1.0\n    y = 2.0\n    x += y\n    return x",
+        TestInput("3.0")
+        ),
+        TestCase(
+        "def f():\n    x = 1.0\n    y = 2.0\n    x -= y\n    return x",
+        TestInput("-1.0")
+        ),
+        TestCase(
+        "def f():\n    x = 1.0\n    y = 2.0\n    x /= y\n    return x",
+        TestInput("0.5")
+        ),
+        TestCase(
+        "def f():\n    x = 1.0\n    y = 2.0\n    x //= y\n    return x",
+        TestInput("0.0")
+        ),
+        TestCase(
+        "def f():\n    x = 1.0\n    y = 2.0\n    x %= y\n    return x",
+        TestInput("1.0")
+        ),
+        TestCase(
+        "def f():\n    x = 2.0\n    y = 3.0\n    x *= y\n    return x",
+        TestInput("6.0")
+        ),
+        TestCase(
+        "def f():\n    x = 2.0\n    y = 3.0\n    x **= y\n    return x",
+        TestInput("8.0")
+        ),
         TestCase(
             "def f(x):\n    if not x:\n        return True\n    return False",
             vector<TestInput>({
@@ -1606,6 +1720,84 @@ void AbsIntTest() {
             new BoxVerifier(0, false),  // LOAD_CONST 1
             new BoxVerifier(9, true)
         }),
+
+        // Locations are tracked independently...
+        AITestCase(
+        "def f():\n    if abc:\n         x = 1\n         while x < 100:\n              x += 1\n    else:\n         x = 1\n         y = 2\n         return min(x, y)",
+        {
+            new BoxVerifier(6, false),  // LOAD_CONST 1
+            new BoxVerifier(15, false),  // LOAD_FAST x
+            new BoxVerifier(18, false),  // LOAD_CONST 100
+            new BoxVerifier(21, false),  // COMPARE_OP <
+            new BoxVerifier(27, false),  // LOAD_FAST x
+            new BoxVerifier(30, false),  // LOAD_CONST 1
+            new BoxVerifier(44, true),  // LOAD_CONST 1
+            new BoxVerifier(50, true),  // LOAD_CONST 3
+            new BoxVerifier(59, true),  // LOAD_FAST x
+            new BoxVerifier(62, true),  // LOAD_FAST y
+        }),
+        AITestCase(
+        "def f():\n    if abc:\n         x = 1\n         while x < 100:\n              x += 1\n    else:\n         x = 1\n         y = 2\n         while x < y:\n            return min(x, y)",
+        {
+            new BoxVerifier(6, true),  // LOAD_CONST 1
+            new BoxVerifier(15, true),  // LOAD_FAST x
+            new BoxVerifier(18, true),  // LOAD_CONST 100
+            new BoxVerifier(21, true),  // COMPARE_OP <
+            new BoxVerifier(27, true),  // LOAD_FAST x
+            new BoxVerifier(30, true),  // LOAD_CONST 1
+            new BoxVerifier(44, true),  // LOAD_CONST 1
+            new BoxVerifier(50, true),  // LOAD_CONST 3
+            new BoxVerifier(59, true),  // LOAD_FAST x
+            new BoxVerifier(62, true),  // LOAD_FAST y
+            new BoxVerifier(65, true),  // COMPARE_OP <
+        }),
+        // Values flowing across a branch...
+        AITestCase(
+            "def f():\n    x = 1 if abc else 2",
+            {
+                new BoxVerifier(6, false),  // LOAD_CONST 1
+                new BoxVerifier(12, false),  // LOAD_CONST 2
+            }
+        ),
+        AITestCase(
+        "def f():\n    x = 1 if abc else 2.0",
+        {
+            new BoxVerifier(6, true),  // LOAD_CONST 1
+            new BoxVerifier(12, true),  // LOAD_CONST 2
+        }),
+        // Merging w/ unknown value
+        AITestCase(
+        "def f():\n    x = g()\n    x = 1",
+        {
+            new BoxVerifier(6, true),  // STORE_FAST x
+            new BoxVerifier(9, false),  // LOAD_CONST 1
+            new BoxVerifier(12, false),  // STORE_FAST x
+        }),
+        // Merging w/ deleted value...
+        AITestCase(
+        "def f():\n    x = 1\n    del x\n    x = 2",
+        {
+            new BoxVerifier(0, true),  // LOAD_CONST 1
+            new BoxVerifier(9, false),  // LOAD_CONST 2
+        }),
+        // Distinct assignments of different types...
+        AITestCase(
+        "def f():\n    x = 1\n    x += 2\n    x = 1.0\n    x += 2.0",
+        {
+            new BoxVerifier(0, false),  // LOAD_CONST 1
+            new BoxVerifier(3, false),  // STORE_FAST x
+            new BoxVerifier(6, false),  // LOAD_FAST 2
+            new BoxVerifier(9, false),  // LOAD_CONST 2
+            new BoxVerifier(12, false),  // INPLACE_ADD
+            new BoxVerifier(13, false),  // STORE_FAST x
+            new BoxVerifier(16, false),  // LOAD_CONST 1
+            new BoxVerifier(19, false),  // STORE_FAST x
+            new BoxVerifier(22, false),  // LOAD_FAST 2
+            new BoxVerifier(25, false),  // LOAD_CONST 2
+            new BoxVerifier(28, false),  // INPLACE_ADD
+            new BoxVerifier(29, false),  // STORE_FAST x
+        }
+        )
     };
     
     for (auto& testCase : cases) {

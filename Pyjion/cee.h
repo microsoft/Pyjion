@@ -53,6 +53,12 @@ using namespace std;
 class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager
 {
 public:
+    HANDLE m_codeHeap;
+
+    CExecutionEngine() {
+        m_codeHeap = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
+    }
+
     // Thread Local Storage is based on logical threads.  The underlying
     // implementation could be threads, fibers, or something more exotic.
     // Slot numbers are predefined.  This is not a general extensibility

@@ -106,6 +106,8 @@ public:
     // can be maintained on the stack.
     bool should_box(size_t opcodeIndex);
 
+    bool can_skip_lasti_update(size_t opcodeIndex);
+
     AbstractValue* get_return_info();
 
     bool has_info(size_t byteCodeIndex);
@@ -119,10 +121,14 @@ private:
     void init_starting_state();
     char* opcode_name(int opcode);
     void preprocess();
-    void dump_sources(AbstractSources sources);
+    void dump_sources(AbstractSource* sources);
+    AbstractSource* new_source(AbstractSource* source) {
+        m_sources.push_back(source);
+        return source;
+    }
 
     AbstractSource* add_local_source(size_t opcodeIndex, size_t localIndex);
-    AbstractSource* add_const_source(size_t opcodeIndex, size_t localIndex);
+    AbstractSource* add_const_source(size_t opcodeIndex, size_t constIndex);
     AbstractSource* add_intermediate_source(size_t opcodeIndex);
 };
 
