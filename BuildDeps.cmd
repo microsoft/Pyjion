@@ -1,3 +1,5 @@
+@echo off
+
 set __BuildArch=x64
 set __BuildType=debug
 
