@@ -54,7 +54,7 @@ exit /b 1
 :Usage
 echo.
 echo Usage:
-echo %0 BuildType where:
+echo %0 [BuildType] where:
 echo.
 echo BuildType can be: Debug, Release
 exit /b 1
