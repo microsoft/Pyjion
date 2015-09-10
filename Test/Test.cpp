@@ -1699,6 +1699,30 @@ void AbsIntTest() {
             new BoxVerifier(18, false),  // LOAD_CONST 256
             new BoxVerifier(27, false),  // LOAD_FAST pi
         }),
+        // Can't optimize due to float int comparison:
+        AITestCase(
+        "def f():\n    pi = 0.\n    k = 0.\n    while k < 256:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
+        {
+            new ReturnVerifier(AVK_Float),
+            new ReturnVerifier(AVK_Float),
+            new BoxVerifier(0, true),  // LOAD_CONST 0
+            new BoxVerifier(6, true),  // LOAD_CONST 0.0
+            new BoxVerifier(15, true),  // LOAD_FAST k
+            new BoxVerifier(18, true),  // LOAD_CONST 256
+            new BoxVerifier(27, true),  // LOAD_FAST pi
+        }),
+        // Can't optimize because pi is assigned an int initially
+        AITestCase(
+        "def f():\n    pi = 0\n    k = 0.\n    while k < 256.:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
+        {
+            new ReturnVerifier(AVK_Float),
+            new ReturnVerifier(AVK_Float),
+            new BoxVerifier(0, true),  // LOAD_CONST 0
+            new BoxVerifier(6, true),  // LOAD_CONST 0.0
+            new BoxVerifier(15, true),  // LOAD_FAST k
+            new BoxVerifier(18, true),  // LOAD_CONST 256
+            new BoxVerifier(27, true),  // LOAD_FAST pi
+        }),
         AITestCase(
         "def f():\n    x = 1\n    y = 2\n    return min(x, y)",
         {
