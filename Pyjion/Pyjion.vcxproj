@@ -30,6 +30,7 @@
     <ClInclude Include="absvalue.h" />
     <ClInclude Include="cee.h" />
     <ClInclude Include="codemodel.h" />
+    <ClInclude Include="cowvector.h" />
     <ClInclude Include="ilgen.h" />
     <ClInclude Include="intrins.h" />
     <ClInclude Include="jitinfo.h" />

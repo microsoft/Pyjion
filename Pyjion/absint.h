@@ -28,10 +28,10 @@
 
 #include <Python.h>
 #include <vector>
-#include <memory>
 #include <unordered_map>
 
 #include "absvalue.h"
+#include "cowvector.h"
 
 using namespace std;
 
@@ -60,7 +60,9 @@ class InterpreterState;
 //
 // Once we've processed all of the blocks of code in this manner the analysis
 // is complete.
-class AbstractInterpreter {
+
+class __declspec(dllexport) AbstractInterpreter {
+#pragma warning (disable:4251)
     // ** Results produced:
     // Tracks the interpreter state before each opcode
     unordered_map<size_t, InterpreterState> m_startStates;
@@ -80,14 +82,33 @@ class AbstractInterpreter {
     // Tracks the location where each BREAK_LOOP will break to, so we can merge
     // state with the current state to the breaked location.
     unordered_map<size_t, AbsIntBlockInfo> m_breakTo;
+    unordered_map<size_t, AbstractSource*> m_opcodeSources;
     // all values produced during abstract interpretation, need to be freed
     vector<AbstractValue*> m_values;
+    vector<AbstractSource*> m_sources;
+#pragma warning (default:4251)
 
 public:
     AbstractInterpreter(PyCodeObject *code);
+    ~AbstractInterpreter();
 
     bool interpret();
     void dump();
+
+    // Returns information about the specified local variable at a specific 
+    // byte code index.
+    AbstractLocalInfo get_local_info(size_t byteCodeIndex, size_t localIndex);
+
+    // Returns information about the stack at the specific byte code index.
+    vector<AbstractValueWithSources>& get_stack_info(size_t byteCodeIndex);
+
+    // Returns true if the result of the opcode should be boxed, false if it
+    // can be maintained on the stack.
+    bool should_box(size_t opcodeIndex);
+
+    AbstractValue* get_return_info();
+
+    bool has_info(size_t byteCodeIndex);
 
 private:
 
@@ -95,9 +116,17 @@ private:
     bool merge_states(InterpreterState& newState, int index);
     bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
     bool update_start_state(InterpreterState& newState, size_t index);
+    void init_starting_state();
     char* opcode_name(int opcode);
     void preprocess();
+    void dump_sources(AbstractSources sources);
+
+    AbstractSource* add_local_source(size_t opcodeIndex, size_t localIndex);
+    AbstractSource* add_const_source(size_t opcodeIndex, size_t localIndex);
+    AbstractSource* add_intermediate_source(size_t opcodeIndex);
 };
+
+
 
 // Tracks the state of a local variable at each location in the function.
 // Each local has a known type associated with it as well as whether or not
@@ -126,39 +155,40 @@ private:
 //      This should never happen as it means the Undefined
 //      type has leaked out in an odd way
 struct AbstractLocalInfo {
-    AbstractValue* Type;
+    AbstractValueWithSources ValueInfo;
     bool IsMaybeUndefined;
+    /*AbstractValue *Value;
+    AbstractSources Loads, Stores;*/
 
     AbstractLocalInfo() {
-        Type = nullptr;
+        ValueInfo = AbstractValueWithSources();
         IsMaybeUndefined = true;
     }
 
-    AbstractLocalInfo(AbstractValue* type, bool isUndefined = false) {
-        _ASSERTE(type != nullptr);
-        _ASSERTE(!(type == &Undefined && !isUndefined));
-        Type = type;
+    AbstractLocalInfo(AbstractValueWithSources valueInfo, bool isUndefined = false) {
+        _ASSERTE(valueInfo.Value != nullptr);
+        _ASSERTE(!(valueInfo.Value == &Undefined && !isUndefined));
+        ValueInfo = valueInfo;
         IsMaybeUndefined = isUndefined;
     }
 
     AbstractLocalInfo merge_with(AbstractLocalInfo other) {
         return AbstractLocalInfo(
-            Type->merge_with(other.Type),
+            ValueInfo.merge_with(other.ValueInfo),
             IsMaybeUndefined || other.IsMaybeUndefined
-            );
+        );
     }
 
     bool operator== (AbstractLocalInfo other) {
-        return other.Type == Type &&
+        return other.ValueInfo == ValueInfo &&
             other.IsMaybeUndefined == IsMaybeUndefined;
     }
     bool operator!= (AbstractLocalInfo other) {
-        return other.Type != Type ||
+        return other.ValueInfo != ValueInfo ||
             other.IsMaybeUndefined != IsMaybeUndefined;
     }
 };
 
-typedef shared_ptr<vector<AbstractLocalInfo>> locals_ptr;
 
 // Represents the state of the program at each opcode.  Captures the state of both
 // the Python stack and the local variables.  We store the state for each opcode in
@@ -169,45 +199,48 @@ typedef shared_ptr<vector<AbstractLocalInfo>> locals_ptr;
 // attempts at sharing because most instructions will alter the value stack.
 //
 // The locals are shared between InterpreterState's using a shared_ptr because the
-// values of locals won't change between most opcodes.  When updating a local we first
-// check if the locals are currently shared, and if not simply update them in place. 
-// If they are shared then we will issue a copy.
+// values of locals won't change between most opcodes (via CowVector).  When updating 
+// a local we first check if the locals are currently shared, and if not simply update 
+// them in place.  If they are shared then we will issue a copy.
 class InterpreterState {
 public:
-    vector<AbstractValue*> m_stack;
-    locals_ptr m_locals;
+    vector<AbstractValueWithSources> m_stack;
+    CowVector<AbstractLocalInfo> m_locals;
 
     InterpreterState() {
     }
 
     InterpreterState(int numLocals) {
-        vector<AbstractLocalInfo>* locals = new vector<AbstractLocalInfo>(numLocals);
-        m_locals = locals_ptr(locals);
+        m_locals = CowVector<AbstractLocalInfo>(numLocals);
     }
 
-    AbstractLocalInfo& get_local(int index) {
-        return (*m_locals)[index];
+    AbstractLocalInfo get_local(size_t index) {
+        return m_locals[index];
     }
 
     size_t local_count() {
-        return m_locals->size();
+        return m_locals.size();
     }
 
-    void replace_local(int index, AbstractLocalInfo value) {
-        _ASSERTE(value.Type != nullptr);
-        if (m_locals.unique()) {
-            (*m_locals)[index] = value;
-        }
-        else{
-            m_locals = locals_ptr(new vector<AbstractLocalInfo>(*m_locals));
-            (*m_locals)[index] = value;
-        }
+    void replace_local(size_t index, AbstractLocalInfo value) {
+        m_locals.replace(index, value);
     }
 
     AbstractValue* pop() {
         auto res = m_stack.back();
+        res.escapes();
+        m_stack.pop_back();
+        return res.Value;
+    }
+
+    AbstractValueWithSources pop_no_escape() {
+        auto res = m_stack.back();
         m_stack.pop_back();
         return res;
+    }
+
+    void push(AbstractValueWithSources& value) {
+        m_stack.push_back(value);
     }
 
     void push(AbstractValue* value) {
@@ -218,7 +251,7 @@ public:
         return m_stack.size();
     }
 
-    AbstractValue*& operator[](const size_t index) {
+    AbstractValueWithSources& operator[](const size_t index) {
         return m_stack[index];
     }
 };

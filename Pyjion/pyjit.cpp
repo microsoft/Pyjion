@@ -206,10 +206,12 @@ class Jitter {
     vector<vector<Label>> m_raiseAndFree;
     UserModule* m_module;
     unordered_map<int, bool> m_assignmentState;
+    AbstractInterpreter m_interp;
 
 
 public:
     Jitter(PyCodeObject *code) : 
+        m_interp(code),
         m_il(m_module = new UserModule(g_module), 
         CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) }){
         this->m_code = code;
@@ -218,14 +220,18 @@ public:
     }
 
     JittedCode* compile() {
+        bool interpreted = m_interp.interpret();
         preprocess();
         auto addr = compile_worker();
         if (addr != nullptr) {
+            _ASSERTE(interpreted); // the interpreter should support the same code we do
+
             // compilation succeeded, return a new JittedCode object which
             // holds onto all of our state and keeps everything alive.
             return new JittedCode(addr, m_code, m_module);
         }
 
+        _ASSERTE(!interpreted); // the interpreter should support the same code we do
         // compilation failed, cleanup any temporary state...
         delete m_module;
         return nullptr;
@@ -888,14 +894,14 @@ private:
                     bool generated = false;
                     if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
                         switch (oparg) {
-                            case Py_LT:
-                            case Py_LE:
                             case Py_EQ:
                                 call_optimizing_function(METHOD_RICHEQUALS_GENERIC_TOKEN);
                                 dec_stack(2);
                                 branch_or_error(i);
                                 generated = true;
                                 break;
+                            case Py_LT:
+                            case Py_LE:
                             case Py_NE:
                             case Py_GT:
                             case Py_GE:
@@ -2271,16 +2277,6 @@ extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
         ++compileCount,
         failCount);
 #endif
-    auto interp = AbstractInterpreter(code);
-    if (interp.interpret()) {
-        //interp.dump();
-    }else{
-        printf("Can't interpret %s from %s line %d\r\n",
-            PyUnicode_AsUTF8(code->co_name),
-            PyUnicode_AsUTF8(code->co_filename),
-            code->co_firstlineno
-        );
-    }
 
     Jitter jitter(code);
     auto res = jitter.compile();
