@@ -162,7 +162,7 @@ index 7addb23..cbc9dd4 100644
      }
  
 -    // pointer to virtual table = [REG_CALL_THIS + offs]
-+    // pointer to virtual table = [REG_CALL_THIS + offs]	
++    // pointer to virtual table = [REG_CALL_THIS + offs]
      GenTree* result = Ind(Offset(local, VPTR_OFFS));
  
      // Get hold of the vtable offset (note: this might be expensive)
