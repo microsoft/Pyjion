@@ -86,6 +86,9 @@ public:
 
 InitHolder g_initHolder;
 
+#define STACK_KIND_OBJECT true
+#define STACK_KIND_VALUE  false
+
 //#define DEBUG_TRACE
 
 #define LD_FIELDA(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); 
@@ -181,8 +184,13 @@ class Jitter {
     // byte code offset.
     unordered_map<int, Label> m_offsetLabels;
     // Tracks the depth of the Python stack
-    size_t m_stackDepth, m_blockIds;
-    unordered_map<int, size_t> m_offsetStackDepth;
+    size_t m_blockIds;
+    // Tracks the current depth of the stack,  as well as if we have an object reference that needs to be freed.
+    // True (STACK_KIND_OBJECT) if we have an object, false (STACK_KIND_VALUE) if we don't
+    vector<bool> m_stack;
+    // Tracks the state of the stack when we perform a branch.  We copy the existing state to the map and
+    // reload it when we begin processing at the stack.
+    unordered_map<int, vector<bool>> m_offsetStack;
     vector<vector<Label>> m_raiseAndFree;
     UserModule* m_module;
     unordered_map<int, bool> m_assignmentState;
@@ -457,17 +465,36 @@ private:
     void branch_raise() {
         auto ehBlock = get_ehblock();
 
-        if (m_stackDepth == 0) {
+        // clear any non-object values from the stack...
+        size_t count = m_stack.size();
+        
+        for (size_t i = m_stack.size(); i-- > 0;) {
+            if (m_stack[i] == STACK_KIND_VALUE) {
+                count--;
+                m_il.pop();
+            }
+            else{
+                break;
+            }
+        }
+        
+        if (count == 0) {
             m_il.branch(BranchAlways, ehBlock.Raise);
         }
         else{
+            // We don't currently expect to have stacks w/ mixed value and object types...
+            // If we hit this then we need to support cleaning those up too.
+            for (auto value : m_stack) {
+                _ASSERTE(value != STACK_KIND_VALUE);
+            }
+
             auto& labels = getRaiseAndFreeLabels(ehBlock.BlockId);
 
-            for (size_t i = labels.size(); i < m_stackDepth; i++) {
+            for (size_t i = labels.size(); i < count; i++) {
                 labels.push_back(m_il.define_label());
             }
 
-            m_il.branch(BranchAlways, labels[m_stackDepth - 1]);
+            m_il.branch(BranchAlways, labels[count - 1]);
         }
     }
 
@@ -611,12 +638,16 @@ private:
     }
 
     void dec_stack(int size = 1) {
-        _ASSERTE(m_stackDepth >= size);
-        m_stackDepth -= size;
+        _ASSERTE(m_stack.size() >= size);
+        for (int i = 0; i < size; i++) {
+            m_stack.pop_back();
+        }
     }
 
-    void inc_stack(int size = 1) {
-        m_stackDepth += size;
+    void inc_stack(int size = 1, bool kind = STACK_KIND_OBJECT) {
+        for (int i = 0; i < size; i++) {
+            m_stack.push_back(kind);
+        }
     }
 
     // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
@@ -647,7 +678,7 @@ private:
         m_il.mark_label(noErr);
 
         m_il.branch(jmpType == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, getOffsetLabel(oparg));
-        m_offsetStackDepth[oparg] = m_stackDepth;
+        m_offsetStack[oparg] = m_stack;
     }
 
     // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
@@ -659,7 +690,7 @@ private:
         auto oparg = NEXTARG();
 
         m_il.branch(jmpType == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, getOffsetLabel(oparg));
-        m_offsetStackDepth[oparg] = m_stackDepth;
+        m_offsetStack[oparg] = m_stack;
     }
 
     void call_optimizing_function(int baseFunction) {
@@ -715,9 +746,9 @@ private:
                 mark_offset_label(i);
             }
 
-            auto curStackDepth = m_offsetStackDepth.find(i);
-            if (curStackDepth != m_offsetStackDepth.end()) {
-                m_stackDepth = curStackDepth->second;
+            auto curStackDepth = m_offsetStack.find(i);
+            if (curStackDepth != m_offsetStack.end()) {
+                m_stack = curStackDepth->second;
             }
 
             // update f_lasti
@@ -887,12 +918,12 @@ private:
                 break;
             case JUMP_ABSOLUTE:
             {
-                m_offsetStackDepth[oparg] = m_stackDepth;
+                m_offsetStack[oparg] = m_stack;
                 m_il.branch(BranchAlways, getOffsetLabel(oparg));
                 break;
             }
             case JUMP_FORWARD:
-                m_offsetStackDepth[oparg + i + 1] = m_stackDepth;
+                m_offsetStack[oparg + i + 1] = m_stack;
                 m_il.branch(BranchAlways, getOffsetLabel(oparg + i + 1));
                 break;
             case JUMP_IF_FALSE_OR_POP:
@@ -924,7 +955,7 @@ private:
                 m_il.mark_label(willJump);
 
                 m_il.ld_loc(tmp);	// load the value back onto the stack
-                m_offsetStackDepth[oparg] = m_stackDepth;
+                m_offsetStack[oparg] = m_stack;
                 m_il.branch(BranchAlways, getOffsetLabel(oparg));
 
                 m_il.mark_label(noJump);
@@ -968,7 +999,7 @@ private:
                 m_il.mark_label(noJump);
                 decref();
                 dec_stack();
-                m_offsetStackDepth[oparg] = m_stackDepth;
+                m_offsetStack[oparg] = m_stack;
             }
             break;
             case LOAD_NAME:
@@ -1625,7 +1656,7 @@ private:
                 
                 // Logically this value is on the Python stack, but we've 
                 // taken it off and won't need to free it.
-                m_offsetStackDepth[i + oparg + 1] = m_stackDepth;
+                m_offsetStack[i + oparg + 1] = m_stack;
                 
                 m_il.mark_label(processValue);
                 inc_stack();
@@ -1717,7 +1748,11 @@ private:
                 m_blockStack.push_back(blockInfo);
                 m_allHandlers.push_back(blockInfo);
                 m_ehInfo.push_back(EhInfo(false));
-                m_offsetStackDepth[oparg + i + 1] = m_stackDepth + 3;
+                vector<bool> newStack = m_stack;
+                for (int j = 0; j < 3; j++) {
+                    newStack.push_back(STACK_KIND_OBJECT);
+                }
+                m_offsetStack[oparg + i + 1] = newStack;
             }
             break;
             case SETUP_FINALLY: {
@@ -1899,7 +1934,7 @@ private:
                     // a bare try/except: which handles all exceptions.  In that case
                     // we have no values to pop off, and this code will never be invoked
                     // anyway.
-                    if (m_offsetStackDepth.find(i) != m_offsetStackDepth.end()) {
+                    if (m_offsetStack.find(i) != m_offsetStack.end()) {
                         dec_stack(3);
                         free_iter_locals_on_exception();
                         m_il.emit_call(METHOD_PYERR_RESTORE);
@@ -2062,13 +2097,17 @@ private:
             auto stackInfo = m_interp.get_stack_info(opcodeIndex);
             auto stackValue = stackInfo[stackInfo.size() - 1];
             // We only optimize floats so far...
+
             if (stackValue.Value->kind() == AVK_Float) {
+                _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
+
                 m_il.st_loc(get_optimized_local(local, stackValue.Value->kind()));
                 dec_stack();
                 return;
             }
         }
 
+        _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT);
         // TODO: Move locals out of the Python frame object and into real locals
         load_local(local);
         decref();
@@ -2093,7 +2132,7 @@ private:
         if (!m_interp.should_box(opcodeIndex)) {
             if (PyFloat_CheckExact(constValue)) {
                 m_il.ld_r8(PyFloat_AsDouble(constValue));
-                inc_stack();
+                inc_stack(1, STACK_KIND_VALUE);
                 return;
             }
         }
@@ -2109,6 +2148,8 @@ private:
             auto stackInfo = m_interp.get_stack_info(opcodeIndex);
             // We only optimize floats so far...
             if (stackInfo[stackInfo.size() - 1].Value->kind() == AVK_Float) {
+                _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
+
                 // we need to convert the returned floating point value back into a boxed float.
                 m_il.emit_call(METHOD_FLOAT_FROM_DOUBLE);
             }
@@ -2179,7 +2220,7 @@ private:
                         );
 
                     dec_stack(2);
-                    m_offsetStackDepth[oparg] = m_stackDepth;
+                    m_offsetStack[oparg] = m_stack;
                 }
                 else{
                     m_il.emit_call(compareType == PyCmp_IS ? METHOD_IS : METHOD_ISNOT);
@@ -2250,6 +2291,9 @@ private:
                     // We only optimize floats so far...
                     if (stackInfo[stackInfo.size() - 1].Value->kind() == AVK_Float &&
                         stackInfo[stackInfo.size() - 2].Value->kind() == AVK_Float) {
+                        _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
+                        _ASSERTE(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
+
                         // TODO: If we know we're followed by the pop jump we could combine
                         // and do a single branch comparison.
                         switch (compareType) {
@@ -2260,15 +2304,15 @@ private:
                             case Py_GT: m_il.compare_gt(); break;
                             case Py_GE: m_il.compare_ge_float(); break;
                         }
-                        dec_stack(1); // popped 2, pushed 1
+                        dec_stack(2); // popped 2, pushed 1
 
                         if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
-                            dec_stack(1);
                             branch(i);
                         }
                         else{
                             // push Python bool onto the stack
                             m_il.emit_call(METHOD_BOOL_FROM_LONG);
+                            inc_stack(1);
                         }
                         return;
                     }
@@ -2311,7 +2355,7 @@ private:
             // We only optimize floats so far...
             if (kind == AVK_Float) {
                 m_il.ld_loc(get_optimized_local(local, kind));
-                inc_stack();
+                inc_stack(1, STACK_KIND_VALUE);
                 return;
             }
         }
@@ -2351,13 +2395,32 @@ private:
 
             // Currently we only optimize floating point numbers..
             if (one.Value->kind() == AVK_Float && two.Value->kind() == AVK_Float) {
+                _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
+                _ASSERTE(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
+
                 dec_stack(2);
                 
                 switch (opcode) {
                     case BINARY_ADD: 
                     case INPLACE_ADD: m_il.add(); break;
                     case INPLACE_TRUE_DIVIDE:
-                    case BINARY_TRUE_DIVIDE: m_il.div(); break;
+                    case BINARY_TRUE_DIVIDE:
+                        {
+                            m_il.dup();
+                            m_il.ld_r8(0);
+                            auto noErr = m_il.define_label();
+                            m_il.compare_eq();
+                            m_il.branch(BranchFalse, noErr);
+                            // Move the stack depth down to zero (we already did the decstack above)
+                            m_il.pop();
+                            m_il.pop();
+                            m_il.emit_call(METHOD_FLOAT_ZERO_DIV);
+                            branch_raise();
+
+                            m_il.mark_label(noErr);
+                            m_il.div();
+                            break;
+                        }
                     case INPLACE_MODULO:
                     case BINARY_MODULO: 
                         // TODO: We should be able to generate a mod and provide the JIT
@@ -2377,7 +2440,7 @@ private:
                     case INPLACE_FLOOR_DIVIDE: m_il.div(); m_il.emit_call(METHOD_FLOAT_FLOOR_TOKEN); break;
 
                 }
-                inc_stack();
+                inc_stack(1, STACK_KIND_VALUE);
                 return;
             }
         }
@@ -2647,6 +2710,8 @@ GLOBAL_METHOD(METHOD_FLOAT_FLOOR_TOKEN, static_cast<double(*)(double)>(floor), C
 GLOBAL_METHOD(METHOD_FLOAT_MODULUS_TOKEN, static_cast<double(*)(double, double)>(fmod), CORINFO_TYPE_DOUBLE, Parameter(CORINFO_TYPE_DOUBLE), Parameter(CORINFO_TYPE_DOUBLE));
 GLOBAL_METHOD(METHOD_FLOAT_FROM_DOUBLE, PyFloat_FromDouble, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_DOUBLE));
 GLOBAL_METHOD(METHOD_BOOL_FROM_LONG, PyBool_FromLong, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_INT));
+
+GLOBAL_METHOD(METHOD_FLOAT_ZERO_DIV, PyJit_FloatDivideByZero, CORINFO_TYPE_VOID);
 
 extern "C" __declspec(dllexport) void JitInit() {
     g_jit = getJit();

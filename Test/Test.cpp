@@ -214,10 +214,6 @@ void PyJitTest() {
         
         // Simple optimized code test cases...
         TestCase(
-            "def f():\n    pi = 0.\n    k = 0.\n    while k < 256.:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
-            TestInput("3.141592653589793")
-        ),
-        TestCase(
             "def f():\n    x = 1.0\n    return x",
             TestInput("1.0")
         ),
@@ -324,6 +320,21 @@ void PyJitTest() {
         TestCase(
         "def f():\n    x = 2.0\n    y = 3.0\n    x **= y\n    return x",
         TestInput("8.0")
+        ),
+        // fully optimized complex code
+        TestCase(
+        "def f():\n    pi = 0.\n    k = 0.\n    while k < 256.:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
+        TestInput("3.141592653589793")
+        ),
+        // division error handling code gen with value on the stack
+        TestCase(
+        "def f():\n    x = 1.0\n    y = 2.0\n    z = 3.0\n    return x + y / z",
+        TestInput("1.6666666666666665")
+        ),
+        // division by zero error case
+        TestCase(
+        "def f():\n    x = 1\n    y = 0\n    try:\n        return x / y\n    except:\n        return 42",
+        TestInput("42")
         ),
         TestCase(
             "def f(x):\n    if not x:\n        return True\n    return False",
@@ -1692,7 +1703,6 @@ void AbsIntTest() {
         "def f():\n    pi = 0.\n    k = 0.\n    while k < 256.:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
         {
             new ReturnVerifier(AVK_Float),
-            new ReturnVerifier(AVK_Float),
             new BoxVerifier(0, false),  // LOAD_CONST 0
             new BoxVerifier(6, false),  // LOAD_CONST 0.0
             new BoxVerifier(15, false),  // LOAD_FAST k
@@ -1704,7 +1714,6 @@ void AbsIntTest() {
         "def f():\n    pi = 0.\n    k = 0.\n    while k < 256:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
         {
             new ReturnVerifier(AVK_Float),
-            new ReturnVerifier(AVK_Float),
             new BoxVerifier(0, true),  // LOAD_CONST 0
             new BoxVerifier(6, true),  // LOAD_CONST 0.0
             new BoxVerifier(15, true),  // LOAD_FAST k
@@ -1715,8 +1724,7 @@ void AbsIntTest() {
         AITestCase(
         "def f():\n    pi = 0\n    k = 0.\n    while k < 256.:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
         {
-            new ReturnVerifier(AVK_Float),
-            new ReturnVerifier(AVK_Float),
+            new ReturnVerifier(AVK_Any),
             new BoxVerifier(0, true),  // LOAD_CONST 0
             new BoxVerifier(6, true),  // LOAD_CONST 0.0
             new BoxVerifier(15, true),  // LOAD_FAST k

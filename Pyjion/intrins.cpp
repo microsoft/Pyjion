@@ -1997,3 +1997,7 @@ bool PyJit_IsNot_Bool(PyObject* lhs, PyObject* rhs) {
 void PyJit_DebugDecRef(PyObject* value) {
     Py_DecRef(value);
 }
+
+void PyJit_FloatDivideByZero() {
+    PyErr_SetString(PyExc_ZeroDivisionError, "float division by zero");
+}

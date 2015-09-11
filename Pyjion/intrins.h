@@ -245,4 +245,6 @@ extern PyObject* g_emptyTuple;
 
 
 void PyJit_DebugDecRef(PyObject* value);
+
+void PyJit_FloatDivideByZero();
 #endif
