@@ -58,14 +58,36 @@
 #include "cee.h"
 
 using namespace std;
+
 class CorJitInfo : public ICorJitInfo {
-private:
-    HANDLE m_codeHeap;
     CExecutionEngine& m_executionEngine;
+    void* m_codeAddr;
+    void* m_dataAddr;
+    PyCodeObject *m_code;
+    UserModule* m_module;
 
 public:
-    CorJitInfo(CExecutionEngine& executionEngine) : m_executionEngine(executionEngine) {
-        m_codeHeap = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
+
+    CorJitInfo(CExecutionEngine& executionEngine, PyCodeObject* code, UserModule* module) : m_executionEngine(executionEngine) {
+        m_codeAddr = m_dataAddr = nullptr;
+        m_code = code;
+        m_module = module;
+    }
+
+    ~CorJitInfo() {
+        if (m_codeAddr != nullptr) {
+            freeMem(m_codeAddr);
+        }
+        if (m_dataAddr != nullptr) {
+            ::GlobalFree(m_dataAddr);
+        }
+        if (m_module != nullptr) {
+            delete m_module;
+        }
+    }
+
+    void* get_code_addr(){
+        return m_codeAddr;
     }
 
     /* ICorJitInfo */
@@ -74,7 +96,7 @@ public:
     }
 
     void freeMem(PVOID code) {
-        HeapFree(m_codeHeap, 0, code);
+        HeapFree(m_executionEngine.m_codeHeap, 0, code);
     }
 
     virtual void allocMem(
@@ -90,8 +112,12 @@ public:
         //printf("allocMem\r\n");
         // TODO: Alignment?
         //printf("Code size: %d\r\n", hotCodeSize);
-        auto code = HeapAlloc(m_codeHeap, 0, hotCodeSize);
-        *hotCodeBlock = code;
+        auto code = HeapAlloc(m_executionEngine.m_codeHeap, 0, hotCodeSize);
+        *hotCodeBlock = m_codeAddr = code;
+        if (roDataSize != 0) {
+            // TODO: This mem needs to be freed...
+            *roDataBlock = m_dataAddr = GlobalAlloc(0, roDataSize);
+        }
     }
 
     virtual void reserveUnwindInfo(
@@ -339,6 +365,9 @@ public:
         switch (ftnNum) {
         case CORINFO_HELP_THROW: return &ThrowFunc;
         case CORINFO_HELP_FAIL_FAST: return &FailFast;
+        case CORINFO_HELP_DBLREM: 
+            auto res = (double(*)(double, double))&fmod;
+            return res;
         }
         printf("unknown getHelperFtn\r\n");
         return NULL;

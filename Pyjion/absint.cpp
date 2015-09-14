@@ -42,9 +42,6 @@ AbstractInterpreter::~AbstractInterpreter() {
     for (auto absValue : m_values) {
         delete absValue;
     }
-    for (auto localStore : m_opcodeSources) {
-        delete localStore.second;
-    }
 }
 
 #define NEXTARG() *(unsigned short*)&m_byteCode[curByte + 1]; curByte+= 2
@@ -208,19 +205,22 @@ bool AbstractInterpreter::interpret() {
                         auto localSource = add_local_source(opcodeIndex, oparg);
                         auto local = lastState.get_local(oparg);
                         
-                        auto valueInfo = local.ValueInfo;
-                        valueInfo.Sources.insert(localSource);
-
-                        lastState.push(valueInfo);
+                        local.ValueInfo.Sources = AbstractSource::combine(localSource, local.ValueInfo.Sources);
+                        
+                        lastState.push(local.ValueInfo);
                         break;
                     }
                 case STORE_FAST:
                     {
                         auto valueInfo = lastState.pop_no_escape();
+                        m_opcodeSources[opcodeIndex] = valueInfo.Sources;
                         lastState.replace_local(oparg, AbstractLocalInfo(valueInfo, false));
                     }
                     break;
                 case DELETE_FAST:
+                    // We need to box any previous stores so we can delete them...  Otherwise
+                    // we won't know if we should raise an unbound local error
+                    lastState.get_local(oparg).ValueInfo.escapes();
                     lastState.replace_local(oparg, AbstractLocalInfo(&Undefined, true));
                     break;
                 case BINARY_SUBSCR:
@@ -256,8 +256,12 @@ bool AbstractInterpreter::interpret() {
                         auto binaryRes = one.Value->binary(one.Sources, opcode, two);
 
                         // create an intermediate source which will propagate changes up...
-                        auto sources = (IntermediateSource*)add_intermediate_source(opcodeIndex);
-                        sources->AssignmentSources = sources->AssignmentSources.combine(one.Sources.combine(two.Sources));
+                        auto sources = add_intermediate_source(opcodeIndex);
+                        AbstractSource::combine(
+                            AbstractSource::combine(one.Sources, two.Sources),
+                            sources
+                        );
+
                         lastState.push(AbstractValueWithSources(binaryRes, sources));
                     }
                     break;
@@ -433,8 +437,11 @@ bool AbstractInterpreter::interpret() {
                                 auto one = lastState.pop_no_escape();
                                 auto binaryRes = one.Value->compare(one.Sources, oparg, two);
                                 
-                                auto sources = (IntermediateSource*)add_intermediate_source(opcodeIndex);
-                                sources->AssignmentSources = sources->AssignmentSources.combine(one.Sources.combine(two.Sources));
+                                auto sources = add_intermediate_source(opcodeIndex);
+                                AbstractSource::combine(
+                                    AbstractSource::combine(one.Sources, two.Sources),
+                                    sources
+                                    );
                                 lastState.push(AbstractValueWithSources(binaryRes, sources));
                                 break;
                             }
@@ -563,8 +570,12 @@ bool AbstractInterpreter::interpret() {
 
                         auto unaryRes = one.Value->unary(one.Sources, opcode);
 
-                        auto sources = (IntermediateSource*)add_intermediate_source(opcodeIndex);
-                        sources->AssignmentSources = sources->AssignmentSources.combine(one.Sources);
+                        auto sources = add_intermediate_source(opcodeIndex);
+                        AbstractSource::combine(
+                            one.Sources, 
+                            sources
+                        );
+
                         lastState.push(AbstractValueWithSources(unaryRes, sources));
                         break;
                     }
@@ -636,9 +647,9 @@ bool AbstractInterpreter::interpret() {
                 case SETUP_LOOP:
                     break;
                 case POP_BLOCK:
-                    // Restore the stack state to what we had on entry, merge the locals.
+                    // Restore the stack state to what we had on entry
                     lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
-                    merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
+                    //merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
                     break;
                 case POP_EXCEPT:
                     break;
@@ -756,6 +767,9 @@ bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterSt
             auto oldType = mergeTo.get_local(i);
             auto newType = oldType.merge_with(newState.get_local(i));
             if (newType != oldType) {
+                if (oldType.ValueInfo.needs_boxing()) {
+                    newType.ValueInfo.escapes();
+                }
                 mergeTo.replace_local(i, newType);
                 changed = true;
             }
@@ -947,14 +961,56 @@ void AbstractInterpreter::dump() {
 bool AbstractInterpreter::should_box(size_t opcodeIndex) {
     auto boxInfo = m_opcodeSources.find(opcodeIndex);
     if (boxInfo != m_opcodeSources.end()) {
+        if (boxInfo->second == nullptr) {
+            return true;
+        }
         return boxInfo->second->needs_boxing();
     }
     return true;
 }
 
-void AbstractInterpreter::dump_sources(AbstractSources sources) {
-    for (auto value : sources.Sources) {
-        printf("              Source: %s\r\n", value->describe());
+bool AbstractInterpreter::can_skip_lasti_update(size_t opcodeIndex) {
+    switch (m_byteCode[opcodeIndex]) {
+        case BINARY_TRUE_DIVIDE:
+        case BINARY_FLOOR_DIVIDE:
+        case BINARY_POWER:
+        case BINARY_MODULO:
+        case BINARY_MATRIX_MULTIPLY:
+        case BINARY_LSHIFT:
+        case BINARY_RSHIFT:
+        case BINARY_AND:
+        case BINARY_XOR:
+        case BINARY_OR:
+        case BINARY_MULTIPLY:
+        case BINARY_SUBTRACT:
+        case BINARY_ADD:
+        case INPLACE_POWER:
+        case INPLACE_MULTIPLY:
+        case INPLACE_MATRIX_MULTIPLY:
+        case INPLACE_TRUE_DIVIDE:
+        case INPLACE_FLOOR_DIVIDE:
+        case INPLACE_MODULO:
+        case INPLACE_ADD:
+        case INPLACE_SUBTRACT:
+        case INPLACE_LSHIFT:
+        case INPLACE_RSHIFT:
+        case INPLACE_AND:
+        case INPLACE_XOR:
+        case INPLACE_OR:
+        case COMPARE_OP:
+        case LOAD_FAST:
+            return !should_box(opcodeIndex);
+    }
+
+    return false;
+
+}
+
+void AbstractInterpreter::dump_sources(AbstractSource* sources) {
+    if (sources != nullptr) {
+        for (auto value : sources->Sources->Sources) {
+            printf("              %s (%p)\r\n", value->describe(), value);
+        }
     }
 }
 
@@ -1102,16 +1158,16 @@ bool AbstractInterpreter::has_info(size_t byteCodeIndex) {
 AbstractSource* AbstractInterpreter::add_local_source(size_t opcodeIndex, size_t localIndex) {
     auto store = m_opcodeSources.find(opcodeIndex);
     if (store == m_opcodeSources.end()) {
-        return m_opcodeSources[opcodeIndex] = new LocalSource();
+        return m_opcodeSources[opcodeIndex] = new_source(new LocalSource());
     }
 
     return store->second;
 }
 
-AbstractSource* AbstractInterpreter::add_const_source(size_t opcodeIndex, size_t localIndex) {
+AbstractSource* AbstractInterpreter::add_const_source(size_t opcodeIndex, size_t constIndex) {
     auto store = m_opcodeSources.find(opcodeIndex);
     if (store == m_opcodeSources.end()) {
-        return m_opcodeSources[opcodeIndex] = new ConstSource();
+        return m_opcodeSources[opcodeIndex] = new_source(new ConstSource());
     }
 
     return store->second;
@@ -1120,7 +1176,7 @@ AbstractSource* AbstractInterpreter::add_const_source(size_t opcodeIndex, size_t
 AbstractSource* AbstractInterpreter::add_intermediate_source(size_t opcodeIndex) {
     auto store = m_opcodeSources.find(opcodeIndex);
     if (store == m_opcodeSources.end()) {
-        return m_opcodeSources[opcodeIndex] = new IntermediateSource();
+        return m_opcodeSources[opcodeIndex] = new_source(new IntermediateSource());
     }
 
     return store->second;

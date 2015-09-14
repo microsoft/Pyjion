@@ -41,21 +41,29 @@ FunctionValue Function;
 SliceValue Slice;
 ComplexValue Complex;
 
+AbstractSource::AbstractSource() {
+    Sources = shared_ptr<AbstractSources>(new AbstractSources());
+    Sources->Sources.insert(this);
+}
 
-AbstractValue* AbstractValue::binary(AbstractSources& selfSources, int op, AbstractValueWithSources& other) {
-    selfSources.escapes();
+AbstractValue* AbstractValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
+    if (selfSources != nullptr) {
+        selfSources->escapes();
+    }
     other.escapes();
 
     return &Any;
 }
 
-AbstractValue* AbstractValue::unary(AbstractSources& selfSources, int op) {
-    selfSources.escapes();
+AbstractValue* AbstractValue::unary(AbstractSource* selfSources, int op) {
+    if (selfSources != nullptr) {
+        selfSources->escapes();
+    }
     return &Any;
 }
 
-AbstractValue* AbstractValue::compare(AbstractSources& selfSources, int op, AbstractValueWithSources& other) {
-    if (is_known_type(kind()) && is_known_type(other.Value->kind())) {
+AbstractValue* AbstractValue::compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
+    if (is_known_type(kind()) && is_known_type(other.Value->kind()) && kind() == other.Value->kind()) {
         // We know all of the known types don't have fancy rich comparison
         // operations and will return true/false.  This is in contrast to
         // user defined types which can override the rich comparison methods
@@ -63,7 +71,9 @@ AbstractValue* AbstractValue::compare(AbstractSources& selfSources, int op, Abst
         return &Bool;
     }
 
-    selfSources.escapes();
+    if (selfSources != nullptr) {
+        selfSources->escapes();
+    }
     other.escapes();
     return &Any;
 }
@@ -75,6 +85,64 @@ AbstractValue* AbstractValue::merge_with(AbstractValue*other) {
     return &Any;
 }
 
+void AbstractSource::escapes() {
+    if (Sources) {
+        Sources->m_escapes = true;
+    }
+}
+
+bool AbstractSource::needs_boxing() {
+    if (Sources) {
+        return Sources->m_escapes;
+    }
+    return true;
+}
+
+AbstractSource* AbstractSource::combine(AbstractSource* one, AbstractSource* two) {
+    if (one == two) {
+        return one;
+    }
+    if (one != nullptr) {
+        if (two != nullptr) {
+            if (one->Sources.get() == two->Sources.get()) {
+                return one;
+            }
+
+            // link the sources...
+            if (one->Sources->Sources.size() > two->Sources->Sources.size()) {
+                for (auto source : two->Sources->Sources) {
+                    one->Sources->Sources.insert(source);
+                    if (source != two) {
+                        source->Sources = one->Sources;
+                    }
+                }
+                two->Sources = one->Sources;
+                return one;
+            }
+            else{
+                for (auto source : one->Sources->Sources) {
+                    two->Sources->Sources.insert(source);
+                    if (source != one) {
+                        source->Sources = two->Sources;
+                    }
+                }
+                one->Sources = two->Sources;
+                return two;
+            }
+        }
+        else{
+            // merging with an unknown source...
+            one->escapes();
+            return one;
+        }
+    }
+    else if(two != nullptr) {
+        // merging with an unknown source...
+        two->escapes();
+        return two;
+    }
+    return nullptr;
+}
 /*
 void TupleSource::escapes() {
     for (auto cur = m_sources.begin(); cur != m_sources.end(); cur++) {
@@ -82,89 +150,3 @@ void TupleSource::escapes() {
     }
     m_escapes = true;
 }*/
-
-void AbstractSources::escapes() {
-    for (auto value : Sources) {
-        value->escapes();
-    }
-}
-
-bool AbstractSources::needs_boxing() {
-    for (auto value : Sources) {
-        if (value->needs_boxing()) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool AbstractSources::contains(AbstractSource* source) {
-    for (auto cur : Sources) {
-        if (cur->contains(source)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void AbstractSources::insert(AbstractSource* source) {
-    // Once we're unknown we don't need to insert...
-    if (Sources != *UnknownSource::set()) {
-        
-        Sources.insert(source);
-    }
-    else{
-        // but we do need to mark this source as escaping...
-        source->escapes();
-    }
-}
-
-AbstractSources AbstractSources::combine(AbstractSources other) {
-    if (this->Sources == *UnknownSource::set()) {
-        other.escapes();
-        return *this;
-    }
-    else if (other.Sources == *UnknownSource::set()) {
-        this->escapes();
-        return other;
-    }
-
-    if (needs_boxing()) {
-        // we escape and are operating against other, so we'll need boxing too
-        other.escapes();
-        return AbstractSources(*UnknownSource::set());
-    }
-    else if (other.needs_boxing()) {
-        // other escapes, and it's operating against us, so we'll need boxing too
-        escapes();
-        return AbstractSources(*UnknownSource::set());
-    }
-    return AbstractSources(Sources.combine(other.Sources));
-}
-
-bool AbstractSources::operator== (AbstractSources& other) {
-    // quick identity check...
-    if (Sources == other.Sources) {
-        return true;
-    }
-    // quick size check...
-    if (Sources.size() != other.Sources.size()) {
-        return false;
-    }
-
-    // expensive set comparison...
-    for (auto cur = other.Sources.begin(); cur != other.Sources.end(); cur++) {
-        if (Sources.find(*cur) == Sources.end()) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool AbstractSources::operator != (AbstractSources& other) {
-    return !(*this == other);
-}
-
-
-UnknownSource UnknownSource::g_unknownSource;
-CowSet<AbstractSource*>* UnknownSource::g_unknownSourceSet;

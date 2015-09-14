@@ -82,124 +82,55 @@ static bool is_known_type(AbstractValueKind kind) {
 
 class AbstractSource {
 public:
-    virtual void escapes() {
-    }
+    shared_ptr<AbstractSources> Sources;
     
-    virtual bool needs_boxing() {
-        return true;
+    AbstractSource();
+
+    void escapes();
+
+    bool needs_boxing();
+
+    virtual char* describe() {
+        return "unknown source";
     }
 
-    virtual bool contains(AbstractSource* source) {
-        return source == this;
-    }
-
-    virtual char* describe() = 0;
+    static AbstractSource* combine(AbstractSource* one, AbstractSource*two);
 };
 
 struct AbstractSources {
-    CowSet<AbstractSource*> Sources;
-
-    AbstractSources() {
-        Sources = CowSet<AbstractSource*>();
-    }
-
-    AbstractSources(CowSet<AbstractSource*> sources) {
-        Sources = sources;
-    }
-
-    void escapes();
-    bool needs_boxing();
-    bool contains(AbstractSource* source);
-    void insert(AbstractSource* source);
-    AbstractSources combine(AbstractSources other);
-    bool operator== (AbstractSources& other);
-    bool operator!= (AbstractSources& other);
-};
-
-class UnknownSource : public AbstractSource {
-    static UnknownSource g_unknownSource;
-    static CowSet<AbstractSource*>* g_unknownSourceSet;
-
-    UnknownSource() {
-    }
-
-public:
-    static CowSet<AbstractSource*>* set() {
-        if (g_unknownSourceSet == nullptr) {
-            g_unknownSourceSet = new CowSet<AbstractSource*>();
-            g_unknownSourceSet->insert(&g_unknownSource);
-        }
-        return g_unknownSourceSet;
-    }
-
-    virtual char* describe() {
-        return "Source: Unknown";
-    }
-};
-
-class ConstSource : public AbstractSource {
+    unordered_set<AbstractSource*> Sources;
     bool m_escapes;
 
-public:
-    ConstSource() {
+    AbstractSources() {
+        Sources = unordered_set<AbstractSource*>();
         m_escapes = false;
     }
-
-    virtual void escapes() {
+    void escapes() {
         m_escapes = true;
     }
 
-    virtual bool needs_boxing() {
+    bool needs_boxing() {
         return m_escapes;
     }
 
+};
+
+class ConstSource : public AbstractSource {
+public:
     virtual char* describe() {
-        if (m_escapes) {
+        if (needs_boxing()) {
             return "Source: Const (escapes)";
         }
         else{
             return "Source: Const";
         }
     }
-
 };
 
-class DependentSource : public AbstractSource {
-public:
-    AbstractSources AssignmentSources;
-    bool m_escapes;
-
-public:
-    DependentSource() {
-        m_escapes = false;
-        AssignmentSources = AbstractSources();
-    }
-
-    virtual void combine(AbstractSources sources) {
-        AssignmentSources = AssignmentSources.combine(sources);
-    }
-
-    virtual void escapes() {
-        if (!m_escapes) {
-            m_escapes = true;
-            AssignmentSources.escapes();
-        }
-    }
-
-    virtual bool needs_boxing() {
-        return m_escapes;
-    }
-
-    virtual bool contains(AbstractSource* source) {
-        return AssignmentSources.contains(source);
-    }
-
-};
-
-class LocalSource : public DependentSource {
+class LocalSource : public AbstractSource  {
 public:
     virtual char* describe() {
-        if (m_escapes) {
+        if (needs_boxing()) {
             return "Source: Local (escapes)";
         }
         else{
@@ -208,10 +139,10 @@ public:
     }
 };
 
-class IntermediateSource : public DependentSource {
+class IntermediateSource : public AbstractSource  {
 public:
     virtual char* describe() {
-        if (m_escapes) {
+        if (needs_boxing()) {
             return "Source: Intermediate (escapes)";
         }
         else{
@@ -244,9 +175,9 @@ public:
 
 class AbstractValue {
 public:
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op);
-    virtual AbstractValue* binary(AbstractSources& selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* compare(AbstractSources& selfSources, int op, AbstractValueWithSources& other);
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
+    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
+    virtual AbstractValue* compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
 
     virtual bool is_always_true() {
         return false;
@@ -264,45 +195,63 @@ public:
 
 struct AbstractValueWithSources {
     AbstractValue* Value;
-    AbstractSources Sources;
+    AbstractSource* Sources;
 
     AbstractValueWithSources(AbstractValue *type = nullptr) {
         Value = type;
-        Sources = AbstractSources(*UnknownSource::set());
-    }
-
-    AbstractValueWithSources(AbstractValue *type, AbstractSources sources) {
-        Value = type;
-        Sources = sources;
+        Sources = nullptr;
     }
 
     AbstractValueWithSources(AbstractValue *type, AbstractSource* source) {
         Value = type;
-        Sources = AbstractSources();
-        Sources.Sources.insert(source);
+        Sources = source;
     }
 
     void escapes() {
-        Sources.escapes();
+        if (Sources != nullptr) {
+            Sources->escapes();
+        }
     }
 
     bool needs_boxing() {
-        return Sources.needs_boxing();
+        if (Sources != nullptr) {
+            return Sources->needs_boxing();
+        }
+        return true;
     }
 
     AbstractValueWithSources merge_with(AbstractValueWithSources other) {
+        // TODO: Is defining a new source at the merge point better?
+        
+        auto newValue = Value->merge_with(other.Value);
+        if ((newValue->kind() != Value->kind() && Value->kind() != AVK_Undefined) ||
+            (newValue->kind() != other.Value->kind() && other.Value->kind() != AVK_Undefined)) {
+            if (Sources != nullptr) {
+                Sources->escapes();
+            }
+            if (other.Sources != nullptr) {
+                other.Sources->escapes();
+            }
+        }
         return AbstractValueWithSources(
             Value->merge_with(other.Value),
-            Sources.combine(other.Sources)
+            AbstractSource::combine(Sources, other.Sources)
         );
     }
-
+    
     bool operator== (AbstractValueWithSources& other) {
         if (Value != other.Value) {
             return false;
         }
 
-        return Sources == other.Sources;
+        if (Sources == nullptr) {
+            return other.Sources == nullptr;
+        }
+        else if (other.Sources == nullptr) {
+            return false;
+        }
+
+        return Sources->Sources.get() == other.Sources->Sources.get();
     }
 
     bool operator!= (AbstractValueWithSources& other) {
@@ -332,7 +281,7 @@ class BoolValue : public AbstractValue {
         return &Any;
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_NOT:
                 return &Bool;
@@ -362,7 +311,7 @@ class IntegerValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_Integer;
     }
-    virtual AbstractValue* binary(AbstractSources& selfSources, int op, AbstractValueWithSources& other) {
+    virtual AbstractValue* binary(AbstractSource*selfSources, int op, AbstractValueWithSources& other) {
         if (other.Value->kind() == AVK_Integer) {
             switch (op) {
                 case BINARY_FLOOR_DIVIDE:
@@ -394,7 +343,7 @@ class IntegerValue : public AbstractValue {
         return AbstractValue::binary(selfSources, op, other);
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_POSITIVE:
             case UNARY_NEGATIVE:
@@ -415,7 +364,7 @@ class StringValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_String;
     }
-    virtual AbstractValue* binary(AbstractSources& selfSources, int op, AbstractValueWithSources& other) {
+    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
         if (other.Value->kind() == AVK_String) {
             switch (op) {
                 case INPLACE_ADD:
@@ -433,7 +382,7 @@ class StringValue : public AbstractValue {
         return AbstractValue::binary(selfSources, op, other);
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_NOT:
                 return &Bool;
@@ -450,7 +399,7 @@ class BytesValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_Bytes;
     }
-    virtual AbstractValue* binary(AbstractSources& selfSources, int op, AbstractValueWithSources& other) {
+    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
         if (other.Value->kind() == AVK_Bytes) {
             switch (op) {
                 case INPLACE_ADD:
@@ -468,7 +417,7 @@ class BytesValue : public AbstractValue {
         return AbstractValue::binary(selfSources, op, other);
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_NOT:
                 return &Bool;
@@ -485,7 +434,7 @@ class FloatValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_Float;
     }
-    virtual AbstractValue* binary(AbstractSources& selfSources, int op, AbstractValueWithSources& other) {
+    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
         if (other.Value->kind() == AVK_Float) {
             switch (op) {
                 case BINARY_TRUE_DIVIDE:
@@ -513,7 +462,7 @@ class FloatValue : public AbstractValue {
         return AbstractValue::binary(selfSources, op, other);
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_POSITIVE:
             case UNARY_NEGATIVE:
@@ -533,7 +482,7 @@ class TupleValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_Tuple;
     }
-    virtual AbstractValue* binary(AbstractSources& selfSources, int op, AbstractValueWithSources& other) {
+    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
         if (op == BINARY_ADD && other.Value->kind() == AVK_Tuple) {
             return this;
         }
@@ -546,7 +495,7 @@ class TupleValue : public AbstractValue {
         return AbstractValue::binary(selfSources, op, other);
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_NOT:
                 return &Bool;
@@ -564,7 +513,7 @@ class ListValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_List;
     }
-    virtual AbstractValue* binary(AbstractSources& selfSources, int op, AbstractValueWithSources& other) {
+    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
         if (op == BINARY_ADD && other.Value->kind() == AVK_List) {
             return this;
         }
@@ -577,7 +526,7 @@ class ListValue : public AbstractValue {
         return AbstractValue::binary(selfSources, op, other);
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_NOT:
                 return &Bool;
@@ -595,7 +544,7 @@ class DictValue : public AbstractValue {
         return AVK_Dict;
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_NOT:
                 return &Bool;
@@ -613,7 +562,7 @@ class SetValue : public AbstractValue {
         return AVK_Set;
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_NOT:
                 return &Bool;
@@ -631,7 +580,7 @@ class NoneValue : public AbstractValue {
         return AVK_None;
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_NOT:
                 return &Bool;
@@ -649,7 +598,7 @@ class FunctionValue : public AbstractValue {
         return AVK_Function;
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_NOT:
                 return &Bool;
@@ -666,7 +615,7 @@ class SliceValue : public AbstractValue {
     virtual AbstractValueKind kind() {
         return AVK_Slice;
     }
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_NOT:
                 return &Bool;
@@ -683,7 +632,7 @@ class ComplexValue : public AbstractValue {
         return AVK_Complex;
     }
 
-    virtual AbstractValue* binary(AbstractSources& selfSources, int op, AbstractValueWithSources& other) {
+    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
         if (other.Value->kind() == AVK_Complex) {
             switch (op) {
                 case BINARY_TRUE_DIVIDE:
@@ -711,7 +660,7 @@ class ComplexValue : public AbstractValue {
         return AbstractValue::binary(selfSources, op, other);
     }
 
-    virtual AbstractValue* unary(AbstractSources& selfSources, int op) {
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op) {
         switch (op) {
             case UNARY_POSITIVE:
             case UNARY_NEGATIVE:
