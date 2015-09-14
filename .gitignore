@@ -4,6 +4,7 @@ Libs/
 Pyjion/x64/
 Test/x64/
 ipch/
+x64/
 .vs/
 *.opensdf
 *.sdf
