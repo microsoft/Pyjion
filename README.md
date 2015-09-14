@@ -1,6 +1,6 @@
 # Pyjion
 
-## Pre-Reqs
+## Pre-Reqs (all of which need to be reachable on your PATH)
 * For CPython
   * [Mercurial](https://mercurial.selenic.com/)
   * [TortoiseSVN](http://tortoisesvn.net/) (required to get external dependencies)
@@ -17,7 +17,7 @@ This will use git to download CoreCLR and hg to download Python.  It will also p
 
 ### Run `BuildDeps.cmd`
 
-This will build CoreCLR and Python (the Python build might fail for you based upon external dependency issues...)
+This will build CoreCLR and Python.
 
 ### Running
 * For a debug build
