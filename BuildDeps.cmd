@@ -33,7 +33,7 @@ cd Python\PCBuild
 
 call get_externals.bat
 IF ERRORLEVEL 1 goto Error
-call .\build.bat -c %__BuildType% -p %__BuildArch__%
+call .\build.bat -c %__BuildType% -p %__BuildArch%
 IF ERRORLEVEL 1 goto Error
 
 if /i "%__BuildArch%" == "x64" set arch=amd64
