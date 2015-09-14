@@ -19,13 +19,22 @@ This will use git to download CoreCLR and hg to download Python.  It will also p
 
 This will build CoreCLR and Python.
 
+### Building
+* From Visual Studio
+  1. Open the `pyjion.sln` file
+  2. Build the solution
+
+### Testing
+* From Visual Studio
+  1. Copy `Python\PCbuild\amd64\python36_d.dll` to `x64\Debug\`
+  2. Set the `Test` solution as the StartUp project
+  3. Run the solution (i.e., press F5)
+
 ### Running
-* For a debug build
-  1. Copy the file `Pyjion\x64\Debug\pyjit.dll`
-  2. Launch `python_d.exe`
-* For a release build
-  1. Copy the file `Pyjion\x64\Release\pyjit.dll`
-  2. Launch `python.exe`
+1. Copy `pyjit.dll` to `Python\PCbuild\amd64\'
+  - For a debug build, copy the file `x64\Debug\pyjit_d.dll`
+  - For a release build, copy the file `x64\Release\pyjit.dll`
+2. Go into the `Python\` directory and launch `python.bat`
 
 
 ### Known Issues
