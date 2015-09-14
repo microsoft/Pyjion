@@ -13,11 +13,11 @@
 
 ### Run `GetDeps.bat`
 
-This will use git to download CoreCLR and hg to download Python.  It will also patch Python to have JIT support.
+This will use git to download [CoreCLR](https://github.com/dotnet/coreclr) and hg to download [Python](https://hg.python.org/cpython).  It will also patch Python to have JIT support and CoreCLR to disable COM support.
 
 ### Run `BuildDeps.cmd`
 
-This will build CoreCLR and Python (the Python build might fail for you based upon external dependency issues...)
+This will build CoreCLR and Python. If the Python build fails, then check that you have the necessary [build dependencies](https://docs.python.org/devguide/setup.html#build-dependencies).
 
 ### Running
 * For a debug build
