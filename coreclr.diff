@@ -1,43 +1,33 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 9b2786f..5e8ed95 100644
+index e490c43..3d76b83 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -397,12 +397,12 @@ add_definitions(-DFEATURE_BCL_FORMATTING)
+@@ -523,7 +523,7 @@ add_definitions(-DFEATURE_ASYNC_IO)
+ add_definitions(-DFEATURE_BCL_FORMATTING)
  add_definitions(-DFEATURE_COLLECTIBLE_TYPES)
  
- if(WIN32)
--    add_definitions(-DFEATURE_CLASSIC_COMINTEROP)
--    add_definitions(-DFEATURE_APPX)
--    add_definitions(-DFEATURE_COMINTEROP)
--    add_definitions(-DFEATURE_COMINTEROP_APARTMENT_SUPPORT)
--    add_definitions(-DFEATURE_COMINTEROP_UNMANAGED_ACTIVATION)
--    add_definitions(-DFEATURE_COMINTEROP_WINRT_MANAGED_ACTIVATION)
-+#    add_definitions(-DFEATURE_CLASSIC_COMINTEROP)
-+#    add_definitions(-DFEATURE_APPX)
-+#    add_definitions(-DFEATURE_COMINTEROP)
-+#    add_definitions(-DFEATURE_COMINTEROP_APARTMENT_SUPPORT)
-+#    add_definitions(-DFEATURE_COMINTEROP_UNMANAGED_ACTIVATION)
-+#    add_definitions(-DFEATURE_COMINTEROP_WINRT_MANAGED_ACTIVATION)
- endif(WIN32)
- 
- add_definitions(-DFEATURE_ICASTABLE)
+-if(WIN32)
++if(FALSE)
+     add_definitions(-DFEATURE_CLASSIC_COMINTEROP)
+     add_definitions(-DFEATURE_APPX)
+     add_definitions(-DFEATURE_COMINTEROP)
 diff --git a/build.cmd b/build.cmd
-index a50cbdd..a674485 100644
+index f5f1d59..8374585 100644
 --- a/build.cmd
 +++ b/build.cmd
-@@ -138,8 +138,8 @@ goto :eof
+@@ -172,8 +172,8 @@ exit /b 1
  REM Build CoreCLR
  :BuildCoreCLR
  set "__CoreCLRBuildLog=%__LogsDir%\CoreCLR_%__BuildOS%__%__BuildArch%__%__BuildType%.log"
--%_msbuildexe% "%__IntermediatesDir%\install.vcxproj" %__MSBCleanBuildArgs% /nologo /maxcpucount /nodeReuse:false /p:Configuration=%__BuildType% /p:Platform=%__BuildArch% /fileloggerparameters:Verbosity=diag;LogFile="%__CoreCLRBuildLog%"
+-%_msbuildexe% "%__IntermediatesDir%\install.vcxproj" %__MSBCleanBuildArgs% /nologo /maxcpucount /nodeReuse:false /p:Configuration=%__BuildType% /p:Platform=%__BuildArch% /fileloggerparameters:Verbosity=normal;LogFile="%__CoreCLRBuildLog%"
 -IF NOT ERRORLEVEL 1 goto PerformMScorlibBuild
-+%_msbuildexe% "%__IntermediatesDir%\install.vcxproj" %__MSBCleanBuildArgs% /nologo /maxcpucount /nodeReuse:false /p:Configuration=%__BuildType% /p:Platform=%__BuildArch% /fileloggerparameters:Verbosity=diag;LogFile="%__CoreCLRBuildLog%" /p:FeatureCominterop=false
++%_msbuildexe% "%__IntermediatesDir%\install.vcxproj" %__MSBCleanBuildArgs% /nologo /maxcpucount /nodeReuse:false /p:Configuration=%__BuildType% /p:Platform=%__BuildArch% /fileloggerparameters:Verbosity=normal;LogFile="%__CoreCLRBuildLog%" /p:FeatureCominterop=false
 +IF NOT ERRORLEVEL 1 goto SuccessfulBuild
  echo Native component build failed. Refer !__CoreCLRBuildLog! for details.
- goto :eof
+ exit /b 1
  
 diff --git a/clr.coreclr.props b/clr.coreclr.props
-index da1b681..9b1d808 100644
+index b47de7b..5165fbf 100644
 --- a/clr.coreclr.props
 +++ b/clr.coreclr.props
 @@ -10,7 +10,7 @@
@@ -67,7 +57,7 @@ index da1b681..9b1d808 100644
      <FeatureHostAssemblyResolver>true</FeatureHostAssemblyResolver>
      <FeatureLazyCOWPages Condition="('$(TargetArch)' == 'i386') or ('$(TargetArch)' == 'arm')">true</FeatureLazyCOWPages>
 diff --git a/clr.defines.targets b/clr.defines.targets
-index 0a64d55..5f5dce8 100644
+index 87ec8ac..7c738e4 100644
 --- a/clr.defines.targets
 +++ b/clr.defines.targets
 @@ -18,7 +18,7 @@
@@ -93,46 +83,34 @@ index 84dd6cf..14e6a09 100644
      <FeatureCominteropManagedActivation>true</FeatureCominteropManagedActivation>
      <FeatureCominteropRegistration>true</FeatureCominteropRegistration>
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 95a9640..4774595 100644
+index ded1a95..1e58913 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -23,22 +23,22 @@ endif(CLR_CMAKE_PLATFORM_UNIX)
+@@ -38,21 +38,10 @@ endif(CLR_CMAKE_PLATFORM_UNIX)
  
  add_subdirectory(utilcode)
  add_subdirectory(gcinfo)
 -add_subdirectory(coreclr)
-+#add_subdirectory(coreclr)
  add_subdirectory(jit)
 -add_subdirectory(vm)
 -add_subdirectory(md)
 -add_subdirectory(debug)
-+#add_subdirectory(vm)
-+#add_subdirectory(md)
-+#add_subdirectory(debug)
  add_subdirectory(inc)
 -add_subdirectory(strongname)
 -add_subdirectory(binder)
 -add_subdirectory(classlibnative)
 -add_subdirectory(dlls)
 -add_subdirectory(ToolBox)
+-add_subdirectory(tools)
 -add_subdirectory(unwinder)
-+#add_subdirectory(strongname)
-+#add_subdirectory(binder)
-+#add_subdirectory(classlibnative)
-+#add_subdirectory(dlls)
-+#add_subdirectory(ToolBox)
-+#add_subdirectory(unwinder)
  
- if(WIN32)
--  add_subdirectory(ipcman)
--  add_subdirectory(tools)
-+#  add_subdirectory(ipcman)
-+#  add_subdirectory(tools)
+-if(WIN32)
++if(FALSE)
+   add_subdirectory(ipcman)
  endif(WIN32)
  
- if(CLR_CMAKE_PLATFORM_UNIX)
 diff --git a/src/inc/utilcode.h b/src/inc/utilcode.h
-index 9fa52ab..df5865e 100644
+index 364b4e1..47b985d 100644
 --- a/src/inc/utilcode.h
 +++ b/src/inc/utilcode.h
 @@ -9,6 +9,8 @@
@@ -153,21 +131,8 @@ index 9702da3..f0d6c77 100644
  //
  // Copyright (c) Microsoft. All rights reserved.
  // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-diff --git a/src/jit/lower.cpp b/src/jit/lower.cpp
-index 7addb23..cbc9dd4 100644
---- a/src/jit/lower.cpp
-+++ b/src/jit/lower.cpp
-@@ -2602,7 +2602,7 @@ GenTree* Lowering::LowerVirtualVtableCall(GenTreeCall* call)
-         local = new(comp, GT_LCL_VAR) GenTreeLclVar(GT_LCL_VAR, thisPtr->TypeGet(), lclNum, BAD_IL_OFFSET);   
-     }
- 
--    // pointer to virtual table = [REG_CALL_THIS + offs]
-+    // pointer to virtual table = [REG_CALL_THIS + offs]
-     GenTree* result = Ind(Offset(local, VPTR_OFFS));
- 
-     // Get hold of the vtable offset (note: this might be expensive)
 diff --git a/src/utilcode/CMakeLists.txt b/src/utilcode/CMakeLists.txt
-index 4f5020e..e84416d 100644
+index 0db79c1..32a6793 100644
 --- a/src/utilcode/CMakeLists.txt
 +++ b/src/utilcode/CMakeLists.txt
 @@ -74,7 +74,6 @@ set(UTILCODE_SOURCES
@@ -179,7 +144,7 @@ index 4f5020e..e84416d 100644
      downlevel.cpp
      loadrc.cpp
 diff --git a/src/utilcode/util.cpp b/src/utilcode/util.cpp
-index ee115c7..d2f29f3 100644
+index 3bc6f73..05e2dc9 100644
 --- a/src/utilcode/util.cpp
 +++ b/src/utilcode/util.cpp
 @@ -212,6 +212,7 @@ typedef HRESULT __stdcall DLLGETCLASSOBJECT(REFCLSID rclsid,
