@@ -42,7 +42,7 @@
 #include <intrin.h>
 
 #include <vector>
-#include <hash_map>
+#include <unordered_map>
 
 #include <corjit.h>
 
@@ -53,7 +53,7 @@ class BaseMethod;
 
 class Module {
 public:
-    hash_map<int, BaseMethod*> m_methods;
+    unordered_map<int, BaseMethod*> m_methods;
     Module() {
     }
 
