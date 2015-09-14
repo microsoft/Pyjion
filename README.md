@@ -13,7 +13,7 @@
 
 ### Run `GetDeps.bat`
 
-This will use git to download CoreCLR and hg to download Python.  It will also patch Python to have JIT support and CoreCLR to disable COM support.
+This will use git to download [CoreCLR](https://github.com/dotnet/coreclr) and hg to download [Python](https://hg.python.org/cpython).  It will also patch Python to have JIT support and CoreCLR to disable COM support.
 
 ### Run `BuildDeps.cmd`
 
