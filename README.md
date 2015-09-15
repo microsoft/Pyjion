@@ -23,10 +23,14 @@ Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Pyth
   2. Build the solution
 
 ### Testing
-* From Visual Studio
-  1. Copy `Python\PCbuild\amd64\python36_d.dll` to `x64\Debug\`
-  2. Set the `Test` solution as the StartUp project
-  3. Run the solution (i.e., press F5)
+1. Copy `Python\PCbuild\amd64\python36_d.dll` to `x64\Debug\`
+2. Copy `Python\Lib\` to `x64\Debug\`
+3. Run the tests
+  * From Visual Studio
+    4. Set the `Test` solution as the StartUp project
+    5. Run the solution (i.e., press F5)
+  * From Powershell
+    4. Run `x64\Debug\Test.exe`
 
 ### Running
 1. Copy `pyjit.dll` to `Python\PCbuild\amd64\'
