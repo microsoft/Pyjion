@@ -31,5 +31,5 @@ REM # Apply changes to integrate JIT support into CPython
 
 echo Applying changes to enable JIT support...
 pushd Python
-hg import --no-commit ..\python.diff 
+hg import --no-commit ..\python.diff
 popd
