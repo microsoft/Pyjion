@@ -33,9 +33,7 @@ Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Pyth
     4. Run `x64\Debug\Test.exe`
 
 ### Running
-1. Copy `pyjit.dll` to `Python\PCbuild\amd64\'
-  - For a debug build, copy the file `x64\Debug\pyjit_d.dll`
-  - For a release build, copy the file `x64\Release\pyjit.dll`
+1. Copy `x64\Debug\pyjit.dll` to `Python\PCbuild\amd64\'
 2. Go into the `Python\` directory and launch `python.bat`
 
 
