@@ -1,0 +1,166 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e490c43..3d76b83 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -523,7 +523,7 @@ add_definitions(-DFEATURE_ASYNC_IO)
+ add_definitions(-DFEATURE_BCL_FORMATTING)
+ add_definitions(-DFEATURE_COLLECTIBLE_TYPES)
+ 
+-if(WIN32)
++if(FALSE)
+     add_definitions(-DFEATURE_CLASSIC_COMINTEROP)
+     add_definitions(-DFEATURE_APPX)
+     add_definitions(-DFEATURE_COMINTEROP)
+diff --git a/build.cmd b/build.cmd
+index f5f1d59..8374585 100644
+--- a/build.cmd
++++ b/build.cmd
+@@ -172,8 +172,8 @@ exit /b 1
+ REM Build CoreCLR
+ :BuildCoreCLR
+ set "__CoreCLRBuildLog=%__LogsDir%\CoreCLR_%__BuildOS%__%__BuildArch%__%__BuildType%.log"
+-%_msbuildexe% "%__IntermediatesDir%\install.vcxproj" %__MSBCleanBuildArgs% /nologo /maxcpucount /nodeReuse:false /p:Configuration=%__BuildType% /p:Platform=%__BuildArch% /fileloggerparameters:Verbosity=normal;LogFile="%__CoreCLRBuildLog%"
+-IF NOT ERRORLEVEL 1 goto PerformMScorlibBuild
++%_msbuildexe% "%__IntermediatesDir%\install.vcxproj" %__MSBCleanBuildArgs% /nologo /maxcpucount /nodeReuse:false /p:Configuration=%__BuildType% /p:Platform=%__BuildArch% /fileloggerparameters:Verbosity=normal;LogFile="%__CoreCLRBuildLog%" /p:FeatureCominterop=false
++IF NOT ERRORLEVEL 1 goto SuccessfulBuild
+ echo Native component build failed. Refer !__CoreCLRBuildLog! for details.
+ exit /b 1
+ 
+diff --git a/clr.coreclr.props b/clr.coreclr.props
+index b47de7b..5165fbf 100644
+--- a/clr.coreclr.props
++++ b/clr.coreclr.props
+@@ -10,7 +10,7 @@
+     <FeatureStubsAsIL Condition="'$(TargetArch)' == 'arm64'">true</FeatureStubsAsIL>
+     <FeatureBclFormatting>true</FeatureBclFormatting>
+     <FeatureCollectibleTypes>true</FeatureCollectibleTypes>
+-    <FeatureCominteropApartmentSupport>true</FeatureCominteropApartmentSupport>
++    <FeatureCominteropApartmentSupport>false</FeatureCominteropApartmentSupport>
+     <FeatureCoreclr>true</FeatureCoreclr>
+     <FeatureCorruptingExceptions>true</FeatureCorruptingExceptions>
+     <FeatureDbiDebugging>true</FeatureDbiDebugging>
+@@ -57,12 +57,12 @@
+     <FeatureReadyToRun Condition="'$(TargetArch)'!='arm64'">true</FeatureReadyToRun>
+ 
+     <FeatureCoreSystem>true</FeatureCoreSystem>
+-    <FeatureClassicCominterop>true</FeatureClassicCominterop>
++    <FeatureClassicCominterop>false</FeatureClassicCominterop>
+     <FeatureLegacySurface>true</FeatureLegacySurface>
+-    <FeatureCominterop>true</FeatureCominterop>
++    <FeatureCominterop>false</FeatureCominterop>
+     <FeatureICastable>true</FeatureICastable>
+-    <FeatureCominteropUnmanagedActivation>true</FeatureCominteropUnmanagedActivation>
+-    <FeatureCominteropWinRTManagedActivation>true</FeatureCominteropWinRTManagedActivation>
++    <FeatureCominteropUnmanagedActivation>false</FeatureCominteropUnmanagedActivation>
++    <FeatureCominteropWinRTManagedActivation>false</FeatureCominteropWinRTManagedActivation>
+     <FeatureCrypto>true</FeatureCrypto>
+     <FeatureHostAssemblyResolver>true</FeatureHostAssemblyResolver>
+     <FeatureLazyCOWPages Condition="('$(TargetArch)' == 'i386') or ('$(TargetArch)' == 'arm')">true</FeatureLazyCOWPages>
+diff --git a/clr.defines.targets b/clr.defines.targets
+index 87ec8ac..7c738e4 100644
+--- a/clr.defines.targets
++++ b/clr.defines.targets
+@@ -18,7 +18,7 @@
+         <CDefines Condition="'$(FeatureTraceLogging)' == 'true'">$(CDefines);FEATURE_TRACELOGGING</CDefines>
+         <CDefines Condition="'$(FeatureCodepagesFile)' == 'true'">$(CDefines);FEATURE_CODEPAGES_FILE</CDefines>
+         <CDefines Condition="'$(FeatureCollectibleTypes)' == 'true'">$(CDefines);FEATURE_COLLECTIBLE_TYPES</CDefines>
+-        <CDefines Condition="'$(FeatureCominterop)' == 'true'">$(CDefines);FEATURE_COMINTEROP</CDefines>
++<!--        <CDefines Condition="'$(FeatureCominterop)' == 'true'">$(CDefines);FEATURE_COMINTEROP</CDefines> -->
+         <CDefines Condition="'$(FeatureICastable)' == 'true'">$(CDefines);FEATURE_ICASTABLE</CDefines>
+         <CDefines Condition="'$(FeatureCominteropApartmentSupport)' == 'true'">$(CDefines);FEATURE_COMINTEROP_APARTMENT_SUPPORT</CDefines>
+         <CDefines Condition="'$(FeatureCominteropManagedActivation)' == 'true'">$(CDefines);FEATURE_COMINTEROP_MANAGED_ACTIVATION</CDefines>
+diff --git a/clr.desktop.props b/clr.desktop.props
+index 84dd6cf..14e6a09 100644
+--- a/clr.desktop.props
++++ b/clr.desktop.props
+@@ -19,7 +19,7 @@
+     <FeatureClickonce>true</FeatureClickonce>
+     <FeatureCodepagesFile>true</FeatureCodepagesFile>
+     <FeatureCollectibleTypes>true</FeatureCollectibleTypes>
+-    <FeatureCominterop>true</FeatureCominterop>
++    <FeatureCominterop>false</FeatureCominterop>
+     <FeatureCominteropApartmentSupport>true</FeatureCominteropApartmentSupport>
+     <FeatureCominteropManagedActivation>true</FeatureCominteropManagedActivation>
+     <FeatureCominteropRegistration>true</FeatureCominteropRegistration>
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index ded1a95..1e58913 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -38,21 +38,10 @@ endif(CLR_CMAKE_PLATFORM_UNIX)
+ 
+ add_subdirectory(utilcode)
+ add_subdirectory(gcinfo)
+-add_subdirectory(coreclr)
+ add_subdirectory(jit)
+-add_subdirectory(vm)
+-add_subdirectory(md)
+-add_subdirectory(debug)
+ add_subdirectory(inc)
+-add_subdirectory(strongname)
+-add_subdirectory(binder)
+-add_subdirectory(classlibnative)
+-add_subdirectory(dlls)
+-add_subdirectory(ToolBox)
+-add_subdirectory(tools)
+-add_subdirectory(unwinder)
+ 
+-if(WIN32)
++if(FALSE)
+   add_subdirectory(ipcman)
+ endif(WIN32)
+ 
+diff --git a/src/inc/utilcode.h b/src/inc/utilcode.h
+index 364b4e1..47b985d 100644
+--- a/src/inc/utilcode.h
++++ b/src/inc/utilcode.h
+@@ -9,6 +9,8 @@
+ //
+ //*****************************************************************************
+ 
++#define SetErrorInfo __DoNotUseSetErrorInfo
++
+ #ifndef __UtilCode_h__
+ #define __UtilCode_h__
+ 
+diff --git a/src/jit/jit.h b/src/jit/jit.h
+index 9702da3..f0d6c77 100644
+--- a/src/jit/jit.h
++++ b/src/jit/jit.h
+@@ -1,3 +1,4 @@
++
+ //
+ // Copyright (c) Microsoft. All rights reserved.
+ // Licensed under the MIT license. See LICENSE file in the project root for full license information.
+diff --git a/src/utilcode/CMakeLists.txt b/src/utilcode/CMakeLists.txt
+index 0db79c1..32a6793 100644
+--- a/src/utilcode/CMakeLists.txt
++++ b/src/utilcode/CMakeLists.txt
+@@ -74,7 +74,6 @@ set(UTILCODE_SOURCES
+ # of UTILCODE_SOURCES above after fixing compiler errors.
+ if(WIN32)
+   list(APPEND UTILCODE_SOURCES 
+-    appxutil.cpp
+     dlwrap.cpp
+     downlevel.cpp
+     loadrc.cpp
+diff --git a/src/utilcode/util.cpp b/src/utilcode/util.cpp
+index 3bc6f73..05e2dc9 100644
+--- a/src/utilcode/util.cpp
++++ b/src/utilcode/util.cpp
+@@ -212,6 +212,7 @@ typedef HRESULT __stdcall DLLGETCLASSOBJECT(REFCLSID rclsid,
+ EXTERN_C const IID _IID_IClassFactory = 
+     {0x00000001, 0x0000, 0x0000, {0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}};
+ 
++#if FEATURE_COMINTEROP
+ // ----------------------------------------------------------------------------
+ // FakeCoCreateInstanceEx
+ // 
+@@ -374,7 +375,7 @@ HRESULT FakeCoCallDllGetClassObject(REFCLSID       rclsid,
+ 
+     return hr;
+ }
+-
++#endif
+ #if USE_UPPER_ADDRESS
+ static BYTE * s_CodeMinAddr;        // Preferred region to allocate the code in.
+ static BYTE * s_CodeMaxAddr;
