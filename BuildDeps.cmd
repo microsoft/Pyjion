@@ -21,19 +21,19 @@ goto Usage
 pushd coreclr
 call build.cmd %__BuildArch% %__BuildType%
 IF ERRORLEVEL 1 goto Error
-popd
 
 mkdir ..\Libs\%__BuildType%\%__BuildArch%\
-copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\jit\%__BuildType%\clrjit.lib ..\Libs\%__BuildType%\%__BuildArch%\
+copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\jit\dll\%__BuildType%\clrjit.lib ..\Libs\%__BuildType%\%__BuildArch%\
 copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\utilcode\dyncrt\%__BuildType%\utilcode.lib ..\Libs\%__BuildType%\%__BuildArch%\
-copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\gcinfo\%__BuildType%\gcinfo.lib ..\Libs\%__BuildType%\%__BuildArch%\
+copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\gcinfo\lib\%__BuildType%\gcinfo.lib ..\Libs\%__BuildType%\%__BuildArch%\
+popd
 
 :BuildPython
-cd Python\PCBuild
+pushd Python\PCBuild
 
 call get_externals.bat
 IF ERRORLEVEL 1 goto Error
-call .\build.bat -c %__BuildType% -p %__BuildArch__%
+call .\build.bat -c %__BuildType% -p %__BuildArch%
 IF ERRORLEVEL 1 goto Error
 
 if /i "%__BuildArch%" == "x64" set arch=amd64
@@ -41,7 +41,7 @@ set SUFFIX=
 if /i "%__BuildType%" == "Debug" set SUFFIX=_d
 
 copy %arch%\python36%SUFFIX%.lib ..\..\Libs\%__BuildType%\%__BuildArch%\
-
+popd
 
 :Done
 echo All built...

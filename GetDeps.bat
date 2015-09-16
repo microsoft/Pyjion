@@ -10,7 +10,7 @@ REM ########################################################
 REM # Clone CoreCLR code base
 git clone https://github.com/dotnet/coreclr CoreCLR
 pushd CoreCLR
-git reset --hard f1d4fb9741887eefcf35981fe6c8d4807b1a5f7d
+git reset --hard 98c63c1612b2635a40d9a719c1505e0ad4bef08a
 
 REM ########################################################
 REM # Apply changes to disable COM interop support
@@ -31,5 +31,5 @@ REM # Apply changes to integrate JIT support into CPython
 
 echo Applying changes to enable JIT support...
 pushd Python
-hg import --no-commit ..\python.diff 
+hg import --no-commit ..\python.diff
 popd

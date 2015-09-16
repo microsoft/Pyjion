@@ -1,7 +1,7 @@
 Pyjion - A JIT for Python based upon CoreCLR
 =======
 
-## Pre-Reqs
+## Pre-Reqs (all of which need to be reachable on your PATH)
 * For CPython
   * [Mercurial](https://mercurial.selenic.com/)
   * [TortoiseSVN](http://tortoisesvn.net/) (required to get external dependencies)
@@ -12,21 +12,30 @@ Pyjion - A JIT for Python based upon CoreCLR
 
 ## Getting Started
 
-### Run `GetDeps.bat`
+### Download dependencies
+Run `GetDeps.bat` to use git to download [CoreCLR](https://github.com/dotnet/coreclr) and hg to download [Python](https://hg.python.org/cpython).  It will also patch Python to have JIT support and CoreCLR to disable COM support.
 
-This will use git to download CoreCLR and hg to download Python.  It will also patch Python to have JIT support.
+### Build Dependencies
+Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Python's dependencies).
 
-### Run `BuildDeps.cmd`
+### Building
+* From Visual Studio
+  1. Open the `pyjion.sln` file
+  2. Build the solution
 
-This will build CoreCLR and Python (the Python build might fail for you based upon external dependency issues...)
+### Testing
+1. Copy `Python\PCbuild\amd64\python36_d.dll` to `x64\Debug\`
+2. Copy `Python\Lib\` to `x64\Debug\`
+3. Run the tests
+  * From Visual Studio
+    4. Set the `Test` solution as the StartUp project
+    5. Run the solution (i.e., press F5)
+  * From Powershell
+    4. Run `x64\Debug\Test.exe`
 
 ### Running
-* For a debug build
-  1. Copy the file `Pyjion\x64\Debug\pyjit.dll`
-  2. Launch `python_d.exe`
-* For a release build
-  1. Copy the file `Pyjion\x64\Release\pyjit.dll`
-  2. Launch `python.exe`
+1. Copy `x64\Debug\pyjit.dll` to `Python\PCbuild\amd64\'
+2. Go into the `Python\` directory and launch `python.bat`
 
 
 ### Known Issues
