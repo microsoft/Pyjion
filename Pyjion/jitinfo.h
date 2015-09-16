@@ -48,7 +48,7 @@
 #include <opcode.h>
 
 #include <vector>
-#include <hash_map>
+#include <unordered_map>
 
 #include <corjit.h>
 #include <utilcode.h>
@@ -86,7 +86,7 @@ public:
         }
     }
 
-    void* get_code_addr(){
+    void* get_code_addr() {
         return m_codeAddr;
     }
 
@@ -689,6 +689,14 @@ public:
     }
 
     /* ICorStaticInfo */
+	virtual bool getSystemVAmd64PassStructInRegisterDescriptor(
+		/* IN */    CORINFO_CLASS_HANDLE        structHnd,
+		/* OUT */   SYSTEMV_AMD64_CORINFO_STRUCT_REG_PASSING_DESCRIPTOR* structPassInRegDescPtr
+		) {
+		assert(false);
+		return false;
+	}
+
     // return flags (defined above, CORINFO_FLG_PUBLIC ...)
     virtual DWORD getMethodAttribs(
         CORINFO_METHOD_HANDLE       ftn         /* IN */
