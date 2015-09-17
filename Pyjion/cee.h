@@ -50,8 +50,7 @@
 
 using namespace std;
 
-class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager
-{
+class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager {
 public:
     HANDLE m_codeHeap;
 

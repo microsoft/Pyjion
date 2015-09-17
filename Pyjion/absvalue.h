@@ -83,7 +83,7 @@ static bool is_known_type(AbstractValueKind kind) {
 class AbstractSource {
 public:
     shared_ptr<AbstractSources> Sources;
-    
+
     AbstractSource();
 
     void escapes();
@@ -121,31 +121,31 @@ public:
         if (needs_boxing()) {
             return "Source: Const (escapes)";
         }
-        else{
+        else {
             return "Source: Const";
         }
     }
 };
 
-class LocalSource : public AbstractSource  {
+class LocalSource : public AbstractSource {
 public:
     virtual char* describe() {
         if (needs_boxing()) {
             return "Source: Local (escapes)";
         }
-        else{
+        else {
             return "Source: Local";
         }
     }
 };
 
-class IntermediateSource : public AbstractSource  {
+class IntermediateSource : public AbstractSource {
 public:
     virtual char* describe() {
         if (needs_boxing()) {
             return "Source: Intermediate (escapes)";
         }
-        else{
+        else {
             return "Source: Intermediate";
         }
     }
@@ -222,7 +222,7 @@ struct AbstractValueWithSources {
 
     AbstractValueWithSources merge_with(AbstractValueWithSources other) {
         // TODO: Is defining a new source at the merge point better?
-        
+
         auto newValue = Value->merge_with(other.Value);
         if ((newValue->kind() != Value->kind() && Value->kind() != AVK_Undefined) ||
             (newValue->kind() != other.Value->kind() && other.Value->kind() != AVK_Undefined)) {
@@ -236,9 +236,9 @@ struct AbstractValueWithSources {
         return AbstractValueWithSources(
             Value->merge_with(other.Value),
             AbstractSource::combine(Sources, other.Sources)
-        );
+            );
     }
-    
+
     bool operator== (AbstractValueWithSources& other) {
         if (Value != other.Value) {
             return false;

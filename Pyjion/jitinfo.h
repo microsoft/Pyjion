@@ -221,54 +221,54 @@ public:
         ) {
         //printf("recordRelocation\r\n");
         switch (fRelocType) {
-        case IMAGE_REL_BASED_DIR64:
-            *((UINT64 *)((BYTE *)location + slotNum)) = (UINT64)target;
-            break;
+            case IMAGE_REL_BASED_DIR64:
+                *((UINT64 *)((BYTE *)location + slotNum)) = (UINT64)target;
+                break;
 #ifdef _TARGET_AMD64_
-        case IMAGE_REL_BASED_REL32:
-        {
-            target = (BYTE *)target + addlDelta;
+            case IMAGE_REL_BASED_REL32:
+                {
+                    target = (BYTE *)target + addlDelta;
 
-            INT32 * fixupLocation = (INT32 *)((BYTE *)location + slotNum);
-            BYTE * baseAddr = (BYTE *)fixupLocation + sizeof(INT32);
+                    INT32 * fixupLocation = (INT32 *)((BYTE *)location + slotNum);
+                    BYTE * baseAddr = (BYTE *)fixupLocation + sizeof(INT32);
 
-            INT64 delta = (INT64)((BYTE *)target - baseAddr);
+                    INT64 delta = (INT64)((BYTE *)target - baseAddr);
 
-            //
-            // Do we need to insert a jump stub to make the source reach the target?
-            //
-            // Note that we cannot stress insertion of jump stub by inserting it unconditionally. JIT records the relocations 
-            // for intra-module jumps and calls. It does not expect the register used by the jump stub to be trashed.
-            //
-            //if (!FitsInI4(delta))
-            //{
-            //	if (m_fAllowRel32)
-            //	{
-            //		//
-            //		// When m_fAllowRel32 == TRUE, the JIT will use REL32s for both data addresses and direct code targets.
-            //		// Since we cannot tell what the relocation is for, we have to defensively retry.
-            //		//
-            //		m_fRel32Overflow = TRUE;
-            //		delta = 0;
-            //	}
-            //	else
-            //	{
-            //		//
-            //		// When m_fAllowRel32 == FALSE, the JIT will use a REL32s for direct code targets only.
-            //		// Use jump stub.
-            //		// 
-            //		delta = rel32UsingJumpStub(fixupLocation, (PCODE)target, m_pMethodBeingCompiled);
-            //	}
-            //}
+                    //
+                    // Do we need to insert a jump stub to make the source reach the target?
+                    //
+                    // Note that we cannot stress insertion of jump stub by inserting it unconditionally. JIT records the relocations 
+                    // for intra-module jumps and calls. It does not expect the register used by the jump stub to be trashed.
+                    //
+                    //if (!FitsInI4(delta))
+                    //{
+                    //	if (m_fAllowRel32)
+                    //	{
+                    //		//
+                    //		// When m_fAllowRel32 == TRUE, the JIT will use REL32s for both data addresses and direct code targets.
+                    //		// Since we cannot tell what the relocation is for, we have to defensively retry.
+                    //		//
+                    //		m_fRel32Overflow = TRUE;
+                    //		delta = 0;
+                    //	}
+                    //	else
+                    //	{
+                    //		//
+                    //		// When m_fAllowRel32 == FALSE, the JIT will use a REL32s for direct code targets only.
+                    //		// Use jump stub.
+                    //		// 
+                    //		delta = rel32UsingJumpStub(fixupLocation, (PCODE)target, m_pMethodBeingCompiled);
+                    //	}
+                    //}
 
-            // Write the 32-bits pc-relative delta into location
-            *fixupLocation = (INT32)delta;
-        }
-        break;
+                    // Write the 32-bits pc-relative delta into location
+                    *fixupLocation = (INT32)delta;
+                }
+                break;
 #endif // _TARGET_AMD64_
 
-        default:
-            printf("!!!!!!!!!!!!!! unsupported reloc type\r\n");
+            default:
+                printf("!!!!!!!!!!!!!! unsupported reloc type\r\n");
         }
     }
 
@@ -363,11 +363,11 @@ public:
         void                  **ppIndirection = NULL
         ) {
         switch (ftnNum) {
-        case CORINFO_HELP_THROW: return &ThrowFunc;
-        case CORINFO_HELP_FAIL_FAST: return &FailFast;
-        case CORINFO_HELP_DBLREM: 
-            auto res = (double(*)(double, double))&fmod;
-            return res;
+            case CORINFO_HELP_THROW: return &ThrowFunc;
+            case CORINFO_HELP_FAIL_FAST: return &FailFast;
+            case CORINFO_HELP_DBLREM:
+                auto res = (double(*)(double, double))&fmod;
+                return res;
         }
         printf("unknown getHelperFtn\r\n");
         return NULL;
@@ -689,13 +689,13 @@ public:
     }
 
     /* ICorStaticInfo */
-	virtual bool getSystemVAmd64PassStructInRegisterDescriptor(
-		/* IN */    CORINFO_CLASS_HANDLE        structHnd,
-		/* OUT */   SYSTEMV_AMD64_CORINFO_STRUCT_REG_PASSING_DESCRIPTOR* structPassInRegDescPtr
-		) {
-		assert(false);
-		return false;
-	}
+    virtual bool getSystemVAmd64PassStructInRegisterDescriptor(
+        /* IN */    CORINFO_CLASS_HANDLE        structHnd,
+        /* OUT */   SYSTEMV_AMD64_CORINFO_STRUCT_REG_PASSING_DESCRIPTOR* structPassInRegDescPtr
+        ) {
+        assert(false);
+        return false;
+    }
 
     // return flags (defined above, CORINFO_FLG_PUBLIC ...)
     virtual DWORD getMethodAttribs(
@@ -1560,7 +1560,7 @@ public:
         CORINFO_METHOD_HANDLE   callerHandle,
         CORINFO_HELPER_DESC    *pAccessHelper /* If canAccessMethod returns something other
                                               than ALLOWED, then this is filled in. */
-                                              ) {
+        ) {
         printf("canAccessClass\r\n");
         return CORINFO_ACCESS_ALLOWED;
     }

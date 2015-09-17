@@ -53,12 +53,12 @@ void AbstractInterpreter::preprocess() {
     for (size_t curByte = 0; curByte < m_size; curByte++) {
         auto opcodeIndex = curByte;
         auto byte = m_byteCode[curByte];
-        if (HAS_ARG(byte)){
+        if (HAS_ARG(byte)) {
             oparg = NEXTARG();
         }
 
         switch (byte) {
-            case SETUP_WITH: 
+            case SETUP_WITH:
                 // not supported...
                 return;
             case SETUP_LOOP:
@@ -71,13 +71,13 @@ void AbstractInterpreter::preprocess() {
                     m_blockStarts[opcodeIndex] = blockStart.BlockStart;
                     break;
                 }
-            case SETUP_EXCEPT: 
+            case SETUP_EXCEPT:
                 blockStarts.push_back(AbsIntBlockInfo(opcodeIndex, oparg + curByte + 1, false));
-                ehKind.push_back(false); 
+                ehKind.push_back(false);
                 break;
-            case SETUP_FINALLY: 
+            case SETUP_FINALLY:
                 blockStarts.push_back(AbsIntBlockInfo(opcodeIndex, oparg + curByte + 1, false));
-                ehKind.push_back(true); 
+                ehKind.push_back(true);
                 break;
             case END_FINALLY:
                 m_endFinallyIsFinally[opcodeIndex] = ehKind.back();
@@ -143,11 +143,11 @@ bool AbstractInterpreter::interpret() {
             auto opcodeIndex = curByte;
 
             auto opcode = m_byteCode[curByte];
-            if (HAS_ARG(opcode)){
+            if (HAS_ARG(opcode)) {
                 oparg = NEXTARG();
             }
 
-            processOpCode:
+        processOpCode:
             switch (opcode) {
                 case EXTENDED_ARG:
                     {
@@ -181,7 +181,8 @@ bool AbstractInterpreter::interpret() {
                 case DUP_TOP:
                     lastState.push(lastState[lastState.stack_size() - 1]);
                     break;
-                case DUP_TOP_TWO:{
+                case DUP_TOP_TWO:
+                    {
                         auto top = lastState[lastState.stack_size() - 1];
                         auto second = lastState[lastState.stack_size() - 2];
                         lastState.push(second);
@@ -196,17 +197,17 @@ bool AbstractInterpreter::interpret() {
                             AbstractValueWithSources(
                                 to_abstract(PyTuple_GetItem(m_code->co_consts, oparg)),
                                 constSource
-                            )
-                        ); 
+                                )
+                            );
                         break;
                     }
                 case LOAD_FAST:
                     {
                         auto localSource = add_local_source(opcodeIndex, oparg);
                         auto local = lastState.get_local(oparg);
-                        
+
                         local.ValueInfo.Sources = AbstractSource::combine(localSource, local.ValueInfo.Sources);
-                        
+
                         lastState.push(local.ValueInfo);
                         break;
                     }
@@ -225,31 +226,31 @@ bool AbstractInterpreter::interpret() {
                     break;
                 case BINARY_SUBSCR:
                 case BINARY_TRUE_DIVIDE:
-                case BINARY_FLOOR_DIVIDE: 
-                case BINARY_POWER: 
-                case BINARY_MODULO: 
-                case BINARY_MATRIX_MULTIPLY: 
-                case BINARY_LSHIFT: 
-                case BINARY_RSHIFT: 
-                case BINARY_AND: 
-                case BINARY_XOR: 
-                case BINARY_OR: 
-                case BINARY_MULTIPLY: 
-                case BINARY_SUBTRACT: 
+                case BINARY_FLOOR_DIVIDE:
+                case BINARY_POWER:
+                case BINARY_MODULO:
+                case BINARY_MATRIX_MULTIPLY:
+                case BINARY_LSHIFT:
+                case BINARY_RSHIFT:
+                case BINARY_AND:
+                case BINARY_XOR:
+                case BINARY_OR:
+                case BINARY_MULTIPLY:
+                case BINARY_SUBTRACT:
                 case BINARY_ADD:
-                case INPLACE_POWER: 
-                case INPLACE_MULTIPLY: 
-                case INPLACE_MATRIX_MULTIPLY: 
-                case INPLACE_TRUE_DIVIDE: 
-                case INPLACE_FLOOR_DIVIDE: 
-                case INPLACE_MODULO: 
+                case INPLACE_POWER:
+                case INPLACE_MULTIPLY:
+                case INPLACE_MATRIX_MULTIPLY:
+                case INPLACE_TRUE_DIVIDE:
+                case INPLACE_FLOOR_DIVIDE:
+                case INPLACE_MODULO:
                 case INPLACE_ADD:
-                case INPLACE_SUBTRACT: 
-                case INPLACE_LSHIFT: 
+                case INPLACE_SUBTRACT:
+                case INPLACE_LSHIFT:
                 case INPLACE_RSHIFT:
-                case INPLACE_AND: 
+                case INPLACE_AND:
                 case INPLACE_XOR:
-                case INPLACE_OR: 
+                case INPLACE_OR:
                     {
                         auto two = lastState.pop_no_escape();
                         auto one = lastState.pop_no_escape();
@@ -260,7 +261,7 @@ bool AbstractInterpreter::interpret() {
                         AbstractSource::combine(
                             AbstractSource::combine(one.Sources, two.Sources),
                             sources
-                        );
+                            );
 
                         lastState.push(AbstractValueWithSources(binaryRes, sources));
                     }
@@ -333,12 +334,12 @@ bool AbstractInterpreter::interpret() {
                     // to the following opcodes before we'll process them.
                     goto next;
                 case JUMP_FORWARD:
-                     if (update_start_state(lastState, (size_t)oparg + curByte + 1)) {
-                         queue.push_back((size_t)oparg + curByte + 1);
-                     }
-                     // Done processing this basic block, we'll need to see a branch
-                     // to the following opcodes before we'll process them.
-                     goto next;
+                    if (update_start_state(lastState, (size_t)oparg + curByte + 1)) {
+                        queue.push_back((size_t)oparg + curByte + 1);
+                    }
+                    // Done processing this basic block, we'll need to see a branch
+                    // to the following opcodes before we'll process them.
+                    goto next;
                 case RETURN_VALUE:
                     {
                         // We don't treat returning as escaping as it would just result in a single
@@ -348,7 +349,7 @@ bool AbstractInterpreter::interpret() {
                         // We add a a source here just so we can know if the return value
                         // was unboxed or not, this is a little ugly...
                         auto retSource = add_const_source(opcodeIndex, 0);
-                        
+
                         if (retValue.needs_boxing()) {
                             retSource->escapes();
                         }
@@ -432,11 +433,12 @@ bool AbstractInterpreter::interpret() {
                             lastState.pop();
                             lastState.push(&Any);
                             break;
-                        default:{
+                        default:
+                            {
                                 auto two = lastState.pop_no_escape();
                                 auto one = lastState.pop_no_escape();
                                 auto binaryRes = one.Value->compare(one.Sources, oparg, two);
-                                
+
                                 auto sources = add_intermediate_source(opcodeIndex);
                                 AbstractSource::combine(
                                     AbstractSource::combine(one.Sources, two.Sources),
@@ -492,8 +494,8 @@ bool AbstractInterpreter::interpret() {
                         int nk = (oparg >> 8) & 0xff;
                         int flags = (opcode - CALL_FUNCTION) & 3;
                         int n = na + 2 * nk;
-                        
-                        
+
+
 #define CALL_FLAG_VAR 1
 #define CALL_FLAG_KW 2
                         if (flags & CALL_FLAG_KW) {
@@ -543,13 +545,13 @@ bool AbstractInterpreter::interpret() {
                         }
                         for (int i = 0; i < posdefaults; i++) {
                             lastState.pop();
-                            
+
                         }
 
                         if (num_annotations == 0) {
                             lastState.push(&Function);
                         }
-                        else{
+                        else {
                             // we're not sure of the type with an annotation present
                             lastState.push(&Any);
                         }
@@ -572,9 +574,9 @@ bool AbstractInterpreter::interpret() {
 
                         auto sources = add_intermediate_source(opcodeIndex);
                         AbstractSource::combine(
-                            one.Sources, 
+                            one.Sources,
                             sources
-                        );
+                            );
 
                         lastState.push(AbstractValueWithSources(unaryRes, sources));
                         break;
@@ -641,7 +643,7 @@ bool AbstractInterpreter::interpret() {
                         // but the sequence of opcodes assumes that happens.  to keep our stack
                         // properly balanced we match what's really going on.
                         lastState.push(&Any);
-                    
+
                         break;
                     }
                 case SETUP_LOOP:
@@ -660,7 +662,7 @@ bool AbstractInterpreter::interpret() {
                     break;
                 case SET_ADD:
                     // pop the value being stored off, leave set on stack
-                    lastState.pop(); 
+                    lastState.pop();
                     break;
                 case LIST_APPEND:
                     // pop the value being stored off, leave list on stack
@@ -724,7 +726,7 @@ bool AbstractInterpreter::interpret() {
                             // completed normally.
                             lastState.pop();
                         }
-                        else{
+                        else {
                             lastState.pop();
                             lastState.pop();
                             lastState.pop();
@@ -739,7 +741,7 @@ bool AbstractInterpreter::interpret() {
                     return false;
             }
             update_start_state(lastState, curByte + 1);
-            
+
         }
     next:;
     } while (queue.size() != 0);
@@ -751,7 +753,7 @@ bool AbstractInterpreter::update_start_state(InterpreterState& newState, size_t 
     if (initialState != m_startStates.end()) {
         return merge_states(newState, initialState->second);
     }
-    else{
+    else {
         m_startStates[index] = newState;
         return true;
     }
@@ -760,8 +762,8 @@ bool AbstractInterpreter::update_start_state(InterpreterState& newState, size_t 
 bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterState& mergeTo) {
     bool changed = false;
     if (mergeTo.m_locals != newState.m_locals) {
-    //    if (mergeTo.m_locals.get() != newState.m_locals.get()) {
-        // need to merge locals...
+        //    if (mergeTo.m_locals.get() != newState.m_locals.get()) {
+            // need to merge locals...
         _ASSERT(mergeTo.local_count() == newState.local_count());
         for (size_t i = 0; i < newState.local_count(); i++) {
             auto oldType = mergeTo.get_local(i);
@@ -773,7 +775,7 @@ bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterSt
                 mergeTo.replace_local(i, newType);
                 changed = true;
             }
-            
+
         }
     }
 
@@ -782,7 +784,7 @@ bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterSt
         mergeTo.m_stack = newState.m_stack;
         changed |= newState.stack_size() != 0;
     }
-    else{
+    else {
         // need to merge the stacks...
         _ASSERT(mergeTo.stack_size() == newState.stack_size());
         for (size_t i = 0; i < newState.stack_size(); i++) {
@@ -840,11 +842,11 @@ void AbstractInterpreter::dump() {
         PyUnicode_AsUTF8(m_code->co_name),
         PyUnicode_AsUTF8(m_code->co_filename),
         m_code->co_firstlineno
-    );
+        );
     for (size_t curByte = 0; curByte < m_size; curByte++) {
         auto opcode = m_byteCode[curByte];
         auto byteIndex = curByte;
-        
+
         auto find = m_startStates.find(byteIndex);
         if (find != m_startStates.end()) {
             auto state = find->second;
@@ -857,23 +859,23 @@ void AbstractInterpreter::dump() {
                             PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i))
                             );
                     }
-                    else{
+                    else {
                         printf(
                             "          %-20s %s (maybe UNDEFINED)\r\n",
                             PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i)),
                             local.ValueInfo.Value->describe()
-                        );
+                            );
                     }
                     dump_sources(local.ValueInfo.Sources);
                 }
-                else{
+                else {
                     printf(
                         "          %-20s %s\r\n",
                         PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, i)),
                         local.ValueInfo.Value->describe()
-                    );
+                        );
                     dump_sources(local.ValueInfo.Sources);
-                    
+
                 }
             }
             for (size_t i = 0; i < state.stack_size(); i++) {
@@ -881,8 +883,8 @@ void AbstractInterpreter::dump() {
                 dump_sources(state[i].Sources);
             }
         }
-        
-        if (HAS_ARG(opcode)){
+
+        if (HAS_ARG(opcode)) {
             int oparg = NEXTARG();
             switch (opcode) {
                 case SETUP_LOOP:
@@ -890,12 +892,12 @@ void AbstractInterpreter::dump() {
                 case SETUP_FINALLY:
                 case JUMP_FORWARD:
                 case FOR_ITER:
-                    printf("    %-3d %-22s %d (to %d)\r\n", 
-                        byteIndex, 
-                        opcode_name(opcode), 
-                        oparg, 
+                    printf("    %-3d %-22s %d (to %d)\r\n",
+                        byteIndex,
+                        opcode_name(opcode),
+                        oparg,
                         oparg + curByte + 1
-                    );
+                        );
                     break;
                 case LOAD_FAST:
                     printf("    %-3d %-22s %d (%s) [%s]\r\n",
@@ -904,16 +906,16 @@ void AbstractInterpreter::dump() {
                         oparg,
                         PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, oparg)),
                         should_box(byteIndex) ? "BOXED" : "NON-BOXED"
-                    );
+                        );
                     break;
                 case STORE_FAST:
                 case DELETE_FAST:
-                    printf("    %-3d %-22s %d (%s)\r\n", 
-                        byteIndex, 
-                        opcode_name(opcode), 
-                        oparg, 
+                    printf("    %-3d %-22s %d (%s)\r\n",
+                        byteIndex,
+                        opcode_name(opcode),
+                        oparg,
                         PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, oparg))
-                    );
+                        );
                     break;
                 case LOAD_ATTR:
                 case STORE_ATTR:
@@ -942,7 +944,7 @@ void AbstractInterpreter::dump() {
                             oparg,
                             reprStr,
                             should_box(byteIndex) ? "BOXED" : "NON-BOXED"
-                        );
+                            );
                         Py_DECREF(repr);
                         break;
                     }
@@ -951,7 +953,7 @@ void AbstractInterpreter::dump() {
                     break;
             }
         }
-        else{
+        else {
             printf("    %-3d %-22s\r\n", byteIndex, opcode_name(opcode));
         }
     }
@@ -1018,118 +1020,118 @@ char* AbstractInterpreter::opcode_name(int opcode) {
 #define OP_TO_STR(x)   case x: return #x;
     switch (opcode) {
         OP_TO_STR(POP_TOP)
-        OP_TO_STR(ROT_TWO)
-        OP_TO_STR(ROT_THREE)
-        OP_TO_STR(DUP_TOP)
-        OP_TO_STR(DUP_TOP_TWO)
-        OP_TO_STR(NOP)
-        OP_TO_STR(UNARY_POSITIVE)
-        OP_TO_STR(UNARY_NEGATIVE)
-        OP_TO_STR(UNARY_NOT)
-        OP_TO_STR(UNARY_INVERT)
-        OP_TO_STR(BINARY_MATRIX_MULTIPLY)
-        OP_TO_STR(INPLACE_MATRIX_MULTIPLY)
-        OP_TO_STR(BINARY_POWER)
-        OP_TO_STR(BINARY_MULTIPLY)
-        OP_TO_STR(BINARY_MODULO)
-        OP_TO_STR(BINARY_ADD)
-        OP_TO_STR(BINARY_SUBTRACT)
-        OP_TO_STR(BINARY_SUBSCR)
-        OP_TO_STR(BINARY_FLOOR_DIVIDE)
-        OP_TO_STR(BINARY_TRUE_DIVIDE)
-        OP_TO_STR(INPLACE_FLOOR_DIVIDE)
-        OP_TO_STR(INPLACE_TRUE_DIVIDE)
-        OP_TO_STR(GET_AITER)
-        OP_TO_STR(GET_ANEXT)
-        OP_TO_STR(BEFORE_ASYNC_WITH)
-        OP_TO_STR(INPLACE_ADD)
-        OP_TO_STR(INPLACE_SUBTRACT)
-        OP_TO_STR(INPLACE_MULTIPLY)
-        OP_TO_STR(INPLACE_MODULO)
-        OP_TO_STR(STORE_SUBSCR)
-        OP_TO_STR(DELETE_SUBSCR)
-        OP_TO_STR(BINARY_LSHIFT)
-        OP_TO_STR(BINARY_RSHIFT)
-        OP_TO_STR(BINARY_AND)
-        OP_TO_STR(BINARY_XOR)
-        OP_TO_STR(BINARY_OR)
-        OP_TO_STR(INPLACE_POWER)
-        OP_TO_STR(GET_ITER)
-        OP_TO_STR(PRINT_EXPR)
-        OP_TO_STR(LOAD_BUILD_CLASS)
-        OP_TO_STR(YIELD_FROM)
-        OP_TO_STR(GET_AWAITABLE)
-        OP_TO_STR(INPLACE_LSHIFT)
-        OP_TO_STR(INPLACE_RSHIFT)
-        OP_TO_STR(INPLACE_AND)
-        OP_TO_STR(INPLACE_XOR)
-        OP_TO_STR(INPLACE_OR)
-        OP_TO_STR(BREAK_LOOP)
-        OP_TO_STR(WITH_CLEANUP_START)
-        OP_TO_STR(WITH_CLEANUP_FINISH)
-        OP_TO_STR(RETURN_VALUE)
-        OP_TO_STR(IMPORT_STAR)
-        OP_TO_STR(YIELD_VALUE)
-        OP_TO_STR(POP_BLOCK)
-        OP_TO_STR(END_FINALLY)
-        OP_TO_STR(POP_EXCEPT)
-        OP_TO_STR(STORE_NAME)
-        OP_TO_STR(DELETE_NAME)
-        OP_TO_STR(UNPACK_SEQUENCE)
-        OP_TO_STR(FOR_ITER)
-        OP_TO_STR(UNPACK_EX)
-        OP_TO_STR(STORE_ATTR)
-        OP_TO_STR(DELETE_ATTR)
-        OP_TO_STR(STORE_GLOBAL)
-        OP_TO_STR(DELETE_GLOBAL)
-        OP_TO_STR(LOAD_CONST)
-        OP_TO_STR(LOAD_NAME)
-        OP_TO_STR(BUILD_TUPLE)
-        OP_TO_STR(BUILD_LIST)
-        OP_TO_STR(BUILD_SET)
-        OP_TO_STR(BUILD_MAP)
-        OP_TO_STR(LOAD_ATTR)
-        OP_TO_STR(COMPARE_OP)
-        OP_TO_STR(IMPORT_NAME)
-        OP_TO_STR(IMPORT_FROM)
-        OP_TO_STR(JUMP_FORWARD)
-        OP_TO_STR(JUMP_IF_FALSE_OR_POP)
-        OP_TO_STR(JUMP_IF_TRUE_OR_POP)
-        OP_TO_STR(JUMP_ABSOLUTE)
-        OP_TO_STR(POP_JUMP_IF_FALSE)
-        OP_TO_STR(POP_JUMP_IF_TRUE)
-        OP_TO_STR(LOAD_GLOBAL)
-        OP_TO_STR(CONTINUE_LOOP)
-        OP_TO_STR(SETUP_LOOP)
-        OP_TO_STR(SETUP_EXCEPT)
-        OP_TO_STR(SETUP_FINALLY)
-        OP_TO_STR(LOAD_FAST)
-        OP_TO_STR(STORE_FAST)
-        OP_TO_STR(DELETE_FAST)
-        OP_TO_STR(RAISE_VARARGS)
-        OP_TO_STR(CALL_FUNCTION)
-        OP_TO_STR(MAKE_FUNCTION)
-        OP_TO_STR(BUILD_SLICE)
-        OP_TO_STR(MAKE_CLOSURE)
-        OP_TO_STR(LOAD_CLOSURE)
-        OP_TO_STR(LOAD_DEREF)
-        OP_TO_STR(STORE_DEREF)
-        OP_TO_STR(DELETE_DEREF)
-        OP_TO_STR(CALL_FUNCTION_VAR)
-        OP_TO_STR(CALL_FUNCTION_KW)
-        OP_TO_STR(CALL_FUNCTION_VAR_KW)
-        OP_TO_STR(SETUP_WITH)
-        OP_TO_STR(EXTENDED_ARG)
-        OP_TO_STR(LIST_APPEND)
-        OP_TO_STR(SET_ADD)
-        OP_TO_STR(MAP_ADD)
-        OP_TO_STR(LOAD_CLASSDEREF)
-        OP_TO_STR(BUILD_LIST_UNPACK)
-        OP_TO_STR(BUILD_MAP_UNPACK)
-        OP_TO_STR(BUILD_MAP_UNPACK_WITH_CALL)
-        OP_TO_STR(BUILD_TUPLE_UNPACK)
-        OP_TO_STR(BUILD_SET_UNPACK)
-        OP_TO_STR(SETUP_ASYNC_WITH)
+            OP_TO_STR(ROT_TWO)
+            OP_TO_STR(ROT_THREE)
+            OP_TO_STR(DUP_TOP)
+            OP_TO_STR(DUP_TOP_TWO)
+            OP_TO_STR(NOP)
+            OP_TO_STR(UNARY_POSITIVE)
+            OP_TO_STR(UNARY_NEGATIVE)
+            OP_TO_STR(UNARY_NOT)
+            OP_TO_STR(UNARY_INVERT)
+            OP_TO_STR(BINARY_MATRIX_MULTIPLY)
+            OP_TO_STR(INPLACE_MATRIX_MULTIPLY)
+            OP_TO_STR(BINARY_POWER)
+            OP_TO_STR(BINARY_MULTIPLY)
+            OP_TO_STR(BINARY_MODULO)
+            OP_TO_STR(BINARY_ADD)
+            OP_TO_STR(BINARY_SUBTRACT)
+            OP_TO_STR(BINARY_SUBSCR)
+            OP_TO_STR(BINARY_FLOOR_DIVIDE)
+            OP_TO_STR(BINARY_TRUE_DIVIDE)
+            OP_TO_STR(INPLACE_FLOOR_DIVIDE)
+            OP_TO_STR(INPLACE_TRUE_DIVIDE)
+            OP_TO_STR(GET_AITER)
+            OP_TO_STR(GET_ANEXT)
+            OP_TO_STR(BEFORE_ASYNC_WITH)
+            OP_TO_STR(INPLACE_ADD)
+            OP_TO_STR(INPLACE_SUBTRACT)
+            OP_TO_STR(INPLACE_MULTIPLY)
+            OP_TO_STR(INPLACE_MODULO)
+            OP_TO_STR(STORE_SUBSCR)
+            OP_TO_STR(DELETE_SUBSCR)
+            OP_TO_STR(BINARY_LSHIFT)
+            OP_TO_STR(BINARY_RSHIFT)
+            OP_TO_STR(BINARY_AND)
+            OP_TO_STR(BINARY_XOR)
+            OP_TO_STR(BINARY_OR)
+            OP_TO_STR(INPLACE_POWER)
+            OP_TO_STR(GET_ITER)
+            OP_TO_STR(PRINT_EXPR)
+            OP_TO_STR(LOAD_BUILD_CLASS)
+            OP_TO_STR(YIELD_FROM)
+            OP_TO_STR(GET_AWAITABLE)
+            OP_TO_STR(INPLACE_LSHIFT)
+            OP_TO_STR(INPLACE_RSHIFT)
+            OP_TO_STR(INPLACE_AND)
+            OP_TO_STR(INPLACE_XOR)
+            OP_TO_STR(INPLACE_OR)
+            OP_TO_STR(BREAK_LOOP)
+            OP_TO_STR(WITH_CLEANUP_START)
+            OP_TO_STR(WITH_CLEANUP_FINISH)
+            OP_TO_STR(RETURN_VALUE)
+            OP_TO_STR(IMPORT_STAR)
+            OP_TO_STR(YIELD_VALUE)
+            OP_TO_STR(POP_BLOCK)
+            OP_TO_STR(END_FINALLY)
+            OP_TO_STR(POP_EXCEPT)
+            OP_TO_STR(STORE_NAME)
+            OP_TO_STR(DELETE_NAME)
+            OP_TO_STR(UNPACK_SEQUENCE)
+            OP_TO_STR(FOR_ITER)
+            OP_TO_STR(UNPACK_EX)
+            OP_TO_STR(STORE_ATTR)
+            OP_TO_STR(DELETE_ATTR)
+            OP_TO_STR(STORE_GLOBAL)
+            OP_TO_STR(DELETE_GLOBAL)
+            OP_TO_STR(LOAD_CONST)
+            OP_TO_STR(LOAD_NAME)
+            OP_TO_STR(BUILD_TUPLE)
+            OP_TO_STR(BUILD_LIST)
+            OP_TO_STR(BUILD_SET)
+            OP_TO_STR(BUILD_MAP)
+            OP_TO_STR(LOAD_ATTR)
+            OP_TO_STR(COMPARE_OP)
+            OP_TO_STR(IMPORT_NAME)
+            OP_TO_STR(IMPORT_FROM)
+            OP_TO_STR(JUMP_FORWARD)
+            OP_TO_STR(JUMP_IF_FALSE_OR_POP)
+            OP_TO_STR(JUMP_IF_TRUE_OR_POP)
+            OP_TO_STR(JUMP_ABSOLUTE)
+            OP_TO_STR(POP_JUMP_IF_FALSE)
+            OP_TO_STR(POP_JUMP_IF_TRUE)
+            OP_TO_STR(LOAD_GLOBAL)
+            OP_TO_STR(CONTINUE_LOOP)
+            OP_TO_STR(SETUP_LOOP)
+            OP_TO_STR(SETUP_EXCEPT)
+            OP_TO_STR(SETUP_FINALLY)
+            OP_TO_STR(LOAD_FAST)
+            OP_TO_STR(STORE_FAST)
+            OP_TO_STR(DELETE_FAST)
+            OP_TO_STR(RAISE_VARARGS)
+            OP_TO_STR(CALL_FUNCTION)
+            OP_TO_STR(MAKE_FUNCTION)
+            OP_TO_STR(BUILD_SLICE)
+            OP_TO_STR(MAKE_CLOSURE)
+            OP_TO_STR(LOAD_CLOSURE)
+            OP_TO_STR(LOAD_DEREF)
+            OP_TO_STR(STORE_DEREF)
+            OP_TO_STR(DELETE_DEREF)
+            OP_TO_STR(CALL_FUNCTION_VAR)
+            OP_TO_STR(CALL_FUNCTION_KW)
+            OP_TO_STR(CALL_FUNCTION_VAR_KW)
+            OP_TO_STR(SETUP_WITH)
+            OP_TO_STR(EXTENDED_ARG)
+            OP_TO_STR(LIST_APPEND)
+            OP_TO_STR(SET_ADD)
+            OP_TO_STR(MAP_ADD)
+            OP_TO_STR(LOAD_CLASSDEREF)
+            OP_TO_STR(BUILD_LIST_UNPACK)
+            OP_TO_STR(BUILD_MAP_UNPACK)
+            OP_TO_STR(BUILD_MAP_UNPACK_WITH_CALL)
+            OP_TO_STR(BUILD_TUPLE_UNPACK)
+            OP_TO_STR(BUILD_SET_UNPACK)
+            OP_TO_STR(SETUP_ASYNC_WITH)
     }
     return "unknown";
 }

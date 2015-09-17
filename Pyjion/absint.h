@@ -182,7 +182,7 @@ struct AbstractLocalInfo {
         return AbstractLocalInfo(
             ValueInfo.merge_with(other.ValueInfo),
             IsMaybeUndefined || other.IsMaybeUndefined
-        );
+            );
     }
 
     bool operator== (AbstractLocalInfo other) {
