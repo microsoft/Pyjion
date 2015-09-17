@@ -110,7 +110,7 @@ template<typename T> class CowSet : public CowData<unordered_set<T>> {
     static shared_ptr<unordered_set<T>> s_empty;
 public:
     CowSet() : CowData(get_empty()) {
-        
+
     }
 
     iterator find(const key_type& k) {

@@ -40,8 +40,7 @@ PyObject* g_emptyTuple;
     " in enclosing scope"
 
 static void
-format_exc_check_arg(PyObject *exc, const char *format_str, PyObject *obj)
-{
+format_exc_check_arg(PyObject *exc, const char *format_str, PyObject *obj) {
     const char *obj_str;
 
     if (!obj)
@@ -55,8 +54,7 @@ format_exc_check_arg(PyObject *exc, const char *format_str, PyObject *obj)
 }
 
 static void
-format_exc_unbound(PyCodeObject *co, int oparg)
-{
+format_exc_unbound(PyCodeObject *co, int oparg) {
     PyObject *name;
     /* Don't stomp existing exception */
     if (PyErr_Occurred())
@@ -111,10 +109,10 @@ int PyJit_RichEquals_Str(PyObject *left, PyObject *right, void**state) {
     if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
         res = PyUnicode_Compare(left, right) == 0;
     }
-    else{
+    else {
         return PyJit_RichEquals_Generic(left, right, state);
     }
-    
+
     Py_DECREF(left);
     Py_DECREF(right);
     return res;
@@ -122,8 +120,7 @@ int PyJit_RichEquals_Str(PyObject *left, PyObject *right, void**state) {
 
 // taken from longobject.c:
 static int
-long_compare(PyLongObject *a, PyLongObject *b)
-{
+long_compare(PyLongObject *a, PyLongObject *b) {
     Py_ssize_t sign;
 
     if (Py_SIZE(a) != Py_SIZE(b)) {
@@ -149,7 +146,7 @@ int PyJit_RichEquals_Long(PyObject *left, PyObject *right, void**state) {
     if (PyLong_CheckExact(left) && PyLong_CheckExact(right)) {
         res = long_compare((PyLongObject*)left, (PyLongObject*)right) == 0;
     }
-    else{
+    else {
         return PyJit_RichEquals_Generic(left, right, state);
     }
 
@@ -234,7 +231,7 @@ PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index) {
     if (value == nullptr) {
         format_exc_unbound(frame->f_code, (int)index);
     }
-    else{
+    else {
         Py_INCREF(value);
     }
     return value;
@@ -466,7 +463,7 @@ PyObject* PyJit_InplaceAdd(PyObject *left, PyObject *right) {
         PyUnicode_Append(&left, right);
         res = left;
     }
-    else{
+    else {
         res = PyNumber_InPlaceAdd(left, right);
         Py_DECREF(left);
     }
@@ -689,19 +686,19 @@ PyObject* PyJit_ImportName(PyObject*level, PyObject*from, PyObject* name, PyFram
     Py_INCREF(func);
     if (PyLong_AsLong(level) != -1 || PyErr_Occurred())
         args = PyTuple_Pack(5,
-        name,
-        f->f_globals,
-        f->f_locals == NULL ?
-    Py_None : f->f_locals,
-              from,
-              level);
+            name,
+            f->f_globals,
+            f->f_locals == NULL ?
+            Py_None : f->f_locals,
+            from,
+            level);
     else
         args = PyTuple_Pack(4,
-        name,
-        f->f_globals,
-        f->f_locals == NULL ?
-    Py_None : f->f_locals,
-              from);
+            name,
+            f->f_globals,
+            f->f_locals == NULL ?
+            Py_None : f->f_locals,
+            from);
     Py_DECREF(level);
     Py_DECREF(from);
     if (args == NULL) {
@@ -746,8 +743,7 @@ PyObject* PyJit_ImportFrom(PyObject*v, PyObject* name) {
 }
 
 static int
-import_all_from(PyObject *locals, PyObject *v)
-{
+import_all_from(PyObject *locals, PyObject *v) {
     _Py_IDENTIFIER(__all__);
     _Py_IDENTIFIER(__dict__);
     PyObject *all = _PyObject_GetAttrId(v, &PyId___all__);
@@ -820,8 +816,7 @@ import_all_from(PyObject *locals, PyObject *v)
         if (skip_leading_underscores &&
             PyUnicode_Check(name) &&
             PyUnicode_READY(name) != -1 &&
-            PyUnicode_READ_CHAR(name, 0) == '_')
-        {
+            PyUnicode_READ_CHAR(name, 0) == '_') {
             Py_DECREF(name);
             continue;
         }
@@ -918,7 +913,7 @@ PyObject* PyJit_FancyCall(PyObject* func, PyObject*args, PyObject*kwargs, PyObje
             args = stararg;
             stararg = nullptr;
         }
-        else{
+        else {
             args = PyTuple_New(0);
         }
     }
@@ -968,11 +963,11 @@ void PyJit_DebugDumpFrame(PyFrameObject* frame) {
             if (local->ob_type != nullptr) {
                 printf("Arg %d %s\r\n", i, local->ob_type->tp_name);
             }
-            else{
+            else {
                 printf("Null local type?");
             }
         }
-        else{
+        else {
             printf("Null local?");
         }
     }
@@ -1062,8 +1057,7 @@ void PyJit_EhTrace(PyFrameObject *f) {
     //}
 }
 
-int PyJit_Raise(PyObject *exc, PyObject *cause)
-{
+int PyJit_Raise(PyObject *exc, PyObject *cause) {
     PyObject *type = NULL, *value = NULL;
 
     if (exc == NULL) {
@@ -1264,8 +1258,7 @@ PyObject* PyJit_LoadGlobal(PyFrameObject* f, PyObject* name) {
         }
         Py_INCREF(v);
     }
-    else
-    {
+    else {
         /* Slow-path if globals or builtins is not a dict */
         auto asciiName = PyUnicode_AsUTF8(name);
         v = PyObject_GetItem(f->f_globals, name);
@@ -1274,11 +1267,11 @@ PyObject* PyJit_LoadGlobal(PyFrameObject* f, PyObject* name) {
             if (v == NULL) {
                 if (PyErr_ExceptionMatches(PyExc_KeyError))
                     format_exc_check_arg(
-                    PyExc_NameError,
-                    NAME_ERROR_MSG, name);
+                        PyExc_NameError,
+                        NAME_ERROR_MSG, name);
                 return nullptr;
             }
-            else{
+            else {
                 PyErr_Clear();
             }
         }
@@ -1405,7 +1398,7 @@ PyObject* PyJit_BuildClass(PyFrameObject *f) {
 
 // Returns: the address for the 1st set of items, the constructed list, and the
 // address where the remainder live.
-PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSize, PyObject** tempStorage, PyObject** listRes, PyObject*** remainder){
+PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSize, PyObject** tempStorage, PyObject** listRes, PyObject*** remainder) {
     if (PyTuple_CheckExact(seq) && ((size_t)PyTuple_GET_SIZE(seq)) >= (leftSize + rightSize)) {
         auto listSize = PyTuple_GET_SIZE(seq) - (leftSize + rightSize);
         auto list = (PyListObject*)PyList_New(listSize);
@@ -1478,7 +1471,7 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
                 "(expected %d)", leftSize);
             goto Error;
         }
-        else{
+        else {
 
             auto l = PySequence_List(it);
             if (l == NULL)
@@ -1520,7 +1513,7 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
 // is stored.  If this is a type we can just grab the array from it returns
 // the array.  Otherwise we unpack the sequence into tempStorage which was
 // allocated on the stack when we entered the generated method body.
-PyObject** PyJit_UnpackSequence(PyObject* seq, size_t size, PyObject** tempStorage){
+PyObject** PyJit_UnpackSequence(PyObject* seq, size_t size, PyObject** tempStorage) {
     if (PyTuple_CheckExact(seq) && PyTuple_GET_SIZE(seq) == size) {
         PyObject** res = ((PyTupleObject *)seq)->ob_item;
         for (int i = 0; i < size; i++) {
@@ -1535,7 +1528,7 @@ PyObject** PyJit_UnpackSequence(PyObject* seq, size_t size, PyObject** tempStora
         }
         return res;
     }
-    else{
+    else {
         return PyJit_UnpackSequenceEx(seq, size, 0, tempStorage, nullptr, nullptr);
     }
 }
@@ -1561,7 +1554,7 @@ const char * ObjInfo(PyObject *obj) {
     else if (obj->ob_type != nullptr) {
         return obj->ob_type->tp_name;
     }
-    else{
+    else {
         return "<null type>";
     }
 }
@@ -1618,8 +1611,8 @@ PyObject* PyJit_LoadName(PyFrameObject* f, PyObject* name) {
                 if (v == NULL) {
                     if (PyErr_ExceptionMatches(PyExc_KeyError))
                         format_exc_check_arg(
-                        PyExc_NameError,
-                        NAME_ERROR_MSG, name);
+                            PyExc_NameError,
+                            NAME_ERROR_MSG, name);
                     return nullptr;
                 }
             }
@@ -1663,8 +1656,7 @@ int PyJit_DeleteName(PyFrameObject* f, PyObject* name) {
 }
 
 static PyObject *
-fast_function(PyObject *func, PyObject **pp_stack, int n)
-{
+fast_function(PyObject *func, PyObject **pp_stack, int n) {
     PyCodeObject *co = (PyCodeObject *)PyFunction_GET_CODE(func);
     PyObject *globals = PyFunction_GET_GLOBALS(func);
     PyObject *argdefs = PyFunction_GET_DEFAULTS(func);
@@ -1742,7 +1734,7 @@ PyObject* Call0(PyObject *target) {
         Py_INCREF(func);
         res = Call1(func, self);
     }
-    else{
+    else {
         res = PyObject_Call(target, g_emptyTuple, nullptr);
     }
     Py_DECREF(target);
@@ -1808,7 +1800,7 @@ PyObject* Call0_Generic(PyObject *target, void** addr) {
         *addr = Call0_Method;
         return Call0_Method(target, addr);
     }
-    else{
+    else {
         res = PyObject_Call(target, g_emptyTuple, nullptr);
     }
     Py_DECREF(target);
@@ -1823,7 +1815,8 @@ PyObject* Call1(PyObject *target, PyObject* arg0) {
         res = fast_function(target, stack, 1);
         Py_DECREF(arg0);
         goto error;
-    } else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
+    }
+    else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
         PyObject *self = PyMethod_GET_SELF(target);
         PyObject* func = PyMethod_GET_FUNCTION(target);
         Py_INCREF(self);
@@ -1842,7 +1835,7 @@ PyObject* Call1(PyObject *target, PyObject* arg0) {
     if (PyCFunction_Check(target)) {
         res = PyCFunction_Call(target, args, nullptr);
     }
-    else{
+    else {
         res = PyObject_Call(target, args, nullptr);
     }
     Py_DECREF(args);
@@ -1881,7 +1874,7 @@ PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1) {
     if (PyCFunction_Check(target)) {
         res = PyCFunction_Call(target, args, nullptr);
     }
-    else{
+    else {
         res = PyObject_Call(target, args, nullptr);
     }
     Py_DECREF(args);
@@ -1899,7 +1892,8 @@ PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
         Py_DECREF(arg1);
         Py_DECREF(arg2);
         goto error;
-    } else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
+    }
+    else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
         PyObject *self = PyMethod_GET_SELF(target);
         PyObject* func = PyMethod_GET_FUNCTION(target);
         Py_INCREF(self);
@@ -1921,7 +1915,7 @@ PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
     if (PyCFunction_Check(target)) {
         res = PyCFunction_Call(target, args, nullptr);
     }
-    else{
+    else {
         res = PyObject_Call(target, args, nullptr);
     }
     Py_DECREF(args);
@@ -1957,7 +1951,7 @@ PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
     if (PyCFunction_Check(target)) {
         res = PyCFunction_Call(target, args, nullptr);
     }
-    else{
+    else {
         res = PyObject_Call(target, args, nullptr);
     }
     Py_DECREF(args);

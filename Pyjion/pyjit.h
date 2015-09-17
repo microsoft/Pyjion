@@ -48,7 +48,7 @@
 
 #include <Python.h>
 
-// binary operator helpers
+ // binary operator helpers
 #define METHOD_ADD_TOKEN					0x00000000
 #define METHOD_MULTIPLY_TOKEN				0x00000001
 #define METHOD_SUBTRACT_TOKEN				0x00000002

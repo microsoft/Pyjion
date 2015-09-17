@@ -137,7 +137,7 @@ public:
             m_freedLocals[param.m_type] = vector<Local>();
             localList = &(m_freedLocals.find(param.m_type)->second);
         }
-        else{
+        else {
             localList = &(existing->second);
         }
 #if _DEBUG
@@ -170,7 +170,7 @@ public:
         }
     }
 
-    void localloc(){
+    void localloc() {
         push_back(CEE_PREFIX1);
         push_back((byte)CEE_LOCALLOC);
     }
@@ -189,26 +189,26 @@ public:
 
     void ld_i4(int i) {
         switch (i) {
-        case -1:push_back(CEE_LDC_I4_M1); break;
-        case 0: push_back(CEE_LDC_I4_0); break;
-        case 1: push_back(CEE_LDC_I4_1); break;
-        case 2: push_back(CEE_LDC_I4_2); break;
-        case 3: push_back(CEE_LDC_I4_3); break;
-        case 4: push_back(CEE_LDC_I4_4); break;
-        case 5: push_back(CEE_LDC_I4_5); break;
-        case 6: push_back(CEE_LDC_I4_6); break;
-        case 7: push_back(CEE_LDC_I4_7); break;
-        default:
-            if (i < 256) {
-                push_back(CEE_LDC_I4_S);
-                m_il.push_back(i);
+            case -1:push_back(CEE_LDC_I4_M1); break;
+            case 0: push_back(CEE_LDC_I4_0); break;
+            case 1: push_back(CEE_LDC_I4_1); break;
+            case 2: push_back(CEE_LDC_I4_2); break;
+            case 3: push_back(CEE_LDC_I4_3); break;
+            case 4: push_back(CEE_LDC_I4_4); break;
+            case 5: push_back(CEE_LDC_I4_5); break;
+            case 6: push_back(CEE_LDC_I4_6); break;
+            case 7: push_back(CEE_LDC_I4_7); break;
+            default:
+                if (i < 256) {
+                    push_back(CEE_LDC_I4_S);
+                    m_il.push_back(i);
 
-            }
-            else{
-                m_il.push_back(CEE_LDC_I4);
-                m_il.push_back((byte)CEE_STLOC);
-                emit_int(i);
-            }
+                }
+                else {
+                    m_il.push_back(CEE_LDC_I4);
+                    m_il.push_back((byte)CEE_STLOC);
+                    emit_int(i);
+                }
         }
     }
 
@@ -221,7 +221,7 @@ public:
         push_back(CEE_STIND_I);
     }
 
-    void ld_ind_i(){
+    void ld_ind_i() {
         push_back(CEE_LDIND_I);
     }
 
@@ -229,7 +229,7 @@ public:
         push_back(CEE_STIND_I4);
     }
 
-    void ld_ind_i4(){
+    void ld_ind_i4() {
         push_back(CEE_LDIND_I4);
     }
 
@@ -245,7 +245,7 @@ public:
             info->m_branchOffsets.push_back((int)m_il.size() + 1);
             branch(branchType, 0xFFFF);
         }
-        else{
+        else {
             branch(branchType, (int)(info->m_location - m_il.size()));
         }
     }
@@ -253,47 +253,47 @@ public:
     void branch(BranchType branchType, int offset) {
         if ((offset - 2) <= 128 && (offset - 2) >= -127) {
             switch (branchType) {
-            case BranchLeave:
-                m_il.push_back(CEE_LEAVE_S);
-                break;
-            case BranchAlways:
-                m_il.push_back(CEE_BR_S);
-                break;
-            case BranchTrue:
-                m_il.push_back(CEE_BRTRUE_S);
-                break;
-            case BranchFalse:
-                m_il.push_back(CEE_BRFALSE_S);
-                break;
-            case BranchEqual:
-                m_il.push_back(CEE_BEQ_S);
-                break;
-            case BranchNotEqual:
-                m_il.push_back(CEE_BNE_UN_S);
-                break;
+                case BranchLeave:
+                    m_il.push_back(CEE_LEAVE_S);
+                    break;
+                case BranchAlways:
+                    m_il.push_back(CEE_BR_S);
+                    break;
+                case BranchTrue:
+                    m_il.push_back(CEE_BRTRUE_S);
+                    break;
+                case BranchFalse:
+                    m_il.push_back(CEE_BRFALSE_S);
+                    break;
+                case BranchEqual:
+                    m_il.push_back(CEE_BEQ_S);
+                    break;
+                case BranchNotEqual:
+                    m_il.push_back(CEE_BNE_UN_S);
+                    break;
             }
             m_il.push_back((byte)offset - 2);
         }
-        else{
+        else {
             switch (branchType) {
-            case BranchLeave:
-                m_il.push_back(CEE_LEAVE);
-                break;
-            case BranchAlways:
-                m_il.push_back(CEE_BR);
-                break;
-            case BranchTrue:
-                m_il.push_back(CEE_BRTRUE);
-                break;
-            case BranchFalse:
-                m_il.push_back(CEE_BRFALSE);
-                break;
-            case BranchEqual:
-                m_il.push_back(CEE_BEQ);
-                break;
-            case BranchNotEqual:
-                m_il.push_back(CEE_BNE_UN);
-                break;
+                case BranchLeave:
+                    m_il.push_back(CEE_LEAVE);
+                    break;
+                case BranchAlways:
+                    m_il.push_back(CEE_BR);
+                    break;
+                case BranchTrue:
+                    m_il.push_back(CEE_BRTRUE);
+                    break;
+                case BranchFalse:
+                    m_il.push_back(CEE_BRFALSE);
+                    break;
+                case BranchEqual:
+                    m_il.push_back(CEE_BEQ);
+                    break;
+                case BranchNotEqual:
+                    m_il.push_back(CEE_BNE_UN);
+                    break;
             }
             emit_int(offset - 5);
         }
@@ -362,7 +362,7 @@ public:
         if ((value & 0xFFFFFFFF) == value) {
             ld_i((int)value);
         }
-        else{
+        else {
             m_il.push_back(CEE_LDC_I8);
             m_il.push_back(value & 0xff);
             m_il.push_back((value >> 8) & 0xff);
@@ -410,41 +410,41 @@ public:
 
     void st_loc(int index) {
         switch (index) {
-        case 0: m_il.push_back(CEE_STLOC_0); break;
-        case 1: m_il.push_back(CEE_STLOC_1); break;
-        case 2: m_il.push_back(CEE_STLOC_2); break;
-        case 3: m_il.push_back(CEE_STLOC_3); break;
-        default:
-            if (index < 256) {
-                m_il.push_back(CEE_STLOC_S);
-                m_il.push_back(index);
-            }
-            else{
-                m_il.push_back(CEE_PREFIX1);
-                m_il.push_back((byte)CEE_STLOC);
-                m_il.push_back(index & 0xff);
-                m_il.push_back((index >> 8) & 0xff);
-            }
+            case 0: m_il.push_back(CEE_STLOC_0); break;
+            case 1: m_il.push_back(CEE_STLOC_1); break;
+            case 2: m_il.push_back(CEE_STLOC_2); break;
+            case 3: m_il.push_back(CEE_STLOC_3); break;
+            default:
+                if (index < 256) {
+                    m_il.push_back(CEE_STLOC_S);
+                    m_il.push_back(index);
+                }
+                else {
+                    m_il.push_back(CEE_PREFIX1);
+                    m_il.push_back((byte)CEE_STLOC);
+                    m_il.push_back(index & 0xff);
+                    m_il.push_back((index >> 8) & 0xff);
+                }
         }
     }
 
     void ld_loc(int index) {
         switch (index) {
-        case 0: m_il.push_back(CEE_LDLOC_0); break;
-        case 1: m_il.push_back(CEE_LDLOC_1); break;
-        case 2: m_il.push_back(CEE_LDLOC_2); break;
-        case 3: m_il.push_back(CEE_LDLOC_3); break;
-        default:
-            if (index < 256) {
-                m_il.push_back(CEE_LDLOC_S);
-                m_il.push_back(index);
-            }
-            else{
-                m_il.push_back(CEE_PREFIX1);
-                m_il.push_back((byte)CEE_LDLOC);
-                m_il.push_back(index & 0xff);
-                m_il.push_back((index >> 8) & 0xff);
-            }
+            case 0: m_il.push_back(CEE_LDLOC_0); break;
+            case 1: m_il.push_back(CEE_LDLOC_1); break;
+            case 2: m_il.push_back(CEE_LDLOC_2); break;
+            case 3: m_il.push_back(CEE_LDLOC_3); break;
+            default:
+                if (index < 256) {
+                    m_il.push_back(CEE_LDLOC_S);
+                    m_il.push_back(index);
+                }
+                else {
+                    m_il.push_back(CEE_PREFIX1);
+                    m_il.push_back((byte)CEE_LDLOC);
+                    m_il.push_back(index & 0xff);
+                    m_il.push_back((index >> 8) & 0xff);
+                }
         }
     }
 
@@ -454,7 +454,7 @@ public:
             m_il.push_back(CEE_LDLOCA_S);
             m_il.push_back(index);
         }
-        else{
+        else {
             m_il.push_back(CEE_PREFIX1);
             m_il.push_back((byte)CEE_LDLOCA);
             m_il.push_back(index & 0xff);
@@ -519,25 +519,25 @@ public:
         push_back(CEE_MUL);
     }
 
-    void ld_arg(int index){
+    void ld_arg(int index) {
         switch (index) {
-        case 0: push_back(CEE_LDARG_0); break;
-        case 1: push_back(CEE_LDARG_1); break;
-        case 2: push_back(CEE_LDARG_2); break;
-        case 3: push_back(CEE_LDARG_3); break;
-        default:
-            if (index < 256) {
-                push_back(CEE_LDARG_3);
-                m_il.push_back(index);
-            }
-            else{
-                m_il.push_back(CEE_PREFIX1);
-                m_il.push_back((byte)CEE_LDARG);
-                m_il.push_back(index & 0xff);
-                m_il.push_back((index >> 8) & 0xff);
-            }
+            case 0: push_back(CEE_LDARG_0); break;
+            case 1: push_back(CEE_LDARG_1); break;
+            case 2: push_back(CEE_LDARG_2); break;
+            case 3: push_back(CEE_LDARG_3); break;
+            default:
+                if (index < 256) {
+                    push_back(CEE_LDARG_3);
+                    m_il.push_back(index);
+                }
+                else {
+                    m_il.push_back(CEE_PREFIX1);
+                    m_il.push_back((byte)CEE_LDARG);
+                    m_il.push_back(index & 0xff);
+                    m_il.push_back((index >> 8) & 0xff);
+                }
 
-            break;
+                break;
         }
     }
 private:

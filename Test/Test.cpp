@@ -191,7 +191,7 @@ public:
 
 
 
-PyObject* Incremented(PyObject*o){
+PyObject* Incremented(PyObject*o) {
     Py_INCREF(o);
     return o;
 }
@@ -211,7 +211,7 @@ void PyJitTest() {
         //    "def f():\n    try:\n        a = RefCountCheck() + undefined\n        return 'noerr'\n    except:\n        return finalized",
         //    TestInput("True")
         //),
-        
+
         // Simple optimized code test cases...
         TestCase(
             "def f():\n    x = 1.0\n    return x",
@@ -920,7 +920,7 @@ void PyJitTest() {
             if (res != nullptr) {
                 _ASSERT(!PyErr_Occurred());
             }
-            else{
+            else {
                 _ASSERT(PyErr_Occurred());
                 PyErr_Clear();
             }
@@ -1575,7 +1575,7 @@ void AbsIntTest() {
             new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
             new VariableVerifier(6, 0, AVK_Bytes),            // LOAD_FAST 0
             new VariableVerifier(16, 1, AVK_Bytes),           // STORE_FAST 1
-        }), 
+        }),
         AITestCase(
         "def f():\n    x = b'abc'\n    x *= 3",
         {
@@ -1831,7 +1831,7 @@ void AbsIntTest() {
         }
         )
     };
-    
+
     for (auto& testCase : cases) {
         auto codeObj = CompileCode(testCase.m_code);
         printf("Testing %s\r\n", testCase.m_code);
