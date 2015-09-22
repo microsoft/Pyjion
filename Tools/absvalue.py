@@ -139,7 +139,7 @@ def binary(type_, other_type, operations):
     type_example = known_types[type_].example
     other_type_example = known_types[other_type].example
     operation_return_types = {}
-    for opcode, operation in binary_operations.items():
+    for opcode, operation in operations.items():
         try:
             result_type = type(operation(type_example, other_type_example))
         except (TypeError, IndexError, KeyError):
