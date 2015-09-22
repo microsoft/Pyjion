@@ -365,6 +365,11 @@ bool AbstractInterpreter::interpret() {
                     // Stores __module__, __doc__, __qualname__, as well as class/function defs sometimes
                     lastState.pop();
                     break;
+                case DELETE_NAME:
+                    break;
+                case LOAD_CLASSDEREF:
+                    lastState.push(&Any);
+                    break;
                 case LOAD_GLOBAL:
                     // TODO: Look in globals, then builtins, and see if we can resolve
                     // this to anything concrete.
