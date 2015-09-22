@@ -3,6 +3,8 @@ CoreCLR/
 Libs/
 Pyjion/x64/
 Test/x64/
+Tools/*.h
+Tools/*.cpp
 ipch/
 x64/
 .vs/

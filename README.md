@@ -2,12 +2,12 @@ Pyjion - A JIT for Python based upon CoreCLR
 =======
 
 ## Pre-Reqs (all of which need to be reachable on your PATH)
-* For CPython
-  * [Mercurial](https://mercurial.selenic.com/)
-  * [TortoiseSVN](http://tortoisesvn.net/) (required to get external dependencies)
 * For CoreCLR
   * [Git](http://www.git-scm.com/)
   * [CMake](http://www.cmake.org/)
+* For CPython
+  * Git
+  * [TortoiseSVN](http://tortoisesvn.net/) (required to get external dependencies)
 * [Visual Studio](https://www.visualstudio.com/)
 
 ## Getting Started
@@ -32,6 +32,8 @@ Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Pyth
     5. Run the solution (i.e., press F5)
   * From Powershell
     4. Run `x64\Debug\Test.exe`
+
+If the output window closes and return an exit code of 0 then the tests passed.
 
 ### Running
 1. Copy `x64\Debug\pyjit.dll` to `Python\PCbuild\amd64\'
