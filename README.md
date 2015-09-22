@@ -2,12 +2,12 @@ Pyjion - A JIT for Python based upon CoreCLR
 =======
 
 ## Pre-Reqs (all of which need to be reachable on your PATH)
-* For CPython
-  * [Mercurial](https://mercurial.selenic.com/)
-  * [TortoiseSVN](http://tortoisesvn.net/) (required to get external dependencies)
 * For CoreCLR
   * [Git](http://www.git-scm.com/)
   * [CMake](http://www.cmake.org/)
+* For CPython
+  * Git
+  * [TortoiseSVN](http://tortoisesvn.net/) (required to get external dependencies)
 * [Visual Studio](https://www.visualstudio.com/)
 
 ## Getting Started

@@ -16,7 +16,6 @@ REM ########################################################
 REM # Apply changes to disable COM interop support
 
 echo Disabling COM interop support...
-
 git apply ..\coreclr.diff
 popd
 
@@ -24,12 +23,13 @@ REM ########################################################
 REM # Clone CPython code base
 
 echo Getting CPython...
-hg clone -r 96609 https://hg.python.org/cpython/ Python
+git clone https://github.com/python/cpython.git Python
+pushd Python
+git reset --hard efe0e11c78f890146375f1d4cbed4b513cdffa3c
 
 REM ########################################################
 REM # Apply changes to integrate JIT support into CPython
 
 echo Applying changes to enable JIT support...
-pushd Python
-hg import --no-commit ..\python.diff
+git apply ..\python.diff
 popd
