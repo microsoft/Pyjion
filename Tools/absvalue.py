@@ -4,6 +4,7 @@ import operator
 import pathlib
 import types
 
+
 forward_declaration = """
 class {avk_name}Value : public AbstractValue {{
     virtual AbstractValueKind kind();
@@ -13,6 +14,7 @@ class {avk_name}Value : public AbstractValue {{
     virtual const char* describe();
 }};
 """
+
 
 class_definition = """
 AbstractValueKind {avk_name}Value::kind() {{
