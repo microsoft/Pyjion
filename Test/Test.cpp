@@ -212,6 +212,14 @@ void PyJitTest() {
         //    TestInput("True")
         //),
 
+        TestCase(
+            "def f():\n    try:\n        min(1,2)\n    finally:\n        try:\n            min(1,2)\n        except EnvironmentError:\n            pass\n    return 1",
+            TestInput("1")
+            ),
+        TestCase(
+            "def f():\n    try:\n        min(1,2)\n    finally:\n        try:\n            min(1,2)\n        finally:\n            pass\n    return 1",
+            TestInput("1")
+            ),
         // Simple optimized code test cases...
         TestCase(
             "def f():\n    x = 1.0\n    return x",
