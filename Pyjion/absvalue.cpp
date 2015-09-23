@@ -156,13 +156,6 @@ AbstractValueKind BoolValue::kind() {
     return AVK_Bool;
 }
 
-AbstractValue* BoolValue::compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (other.Value->kind() == AVK_Bool) {
-        return &Bool;
-    }
-    return AbstractValue::compare(selfSources, op, other);
-}
-
 AbstractValue* BoolValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
     case UNARY_NOT:

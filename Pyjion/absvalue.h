@@ -278,7 +278,6 @@ class UndefinedValue : public AbstractValue {
 class BoolValue : public AbstractValue {
     virtual AbstractValueKind kind();
     virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual AbstractValue* compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual const char* describe();
 };
 
