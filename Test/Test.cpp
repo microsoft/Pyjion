@@ -2020,7 +2020,8 @@ void AbsIntTest() {
                 new VariableVerifier(12, 1, AVK_String),            // y assigned
                 new VariableVerifier(22, 0, AVK_String)             // x assigned in-place
             }
-        ),// Bool/tuple
+        ),
+        // Bool/tuple
         AITestCase(
             "def f():\n    x = True\n    y = ()\n    z = x * y",
             {
@@ -2042,6 +2043,43 @@ void AbsIntTest() {
                 new VariableVerifier(22, 0, AVK_Tuple)              // x assigned in-place
             }
         ),
+        // Bool unary operations
+        AITestCase(
+            "def f():\n    x = True\n    y = not x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Bool),               // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Bool)               // y assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = True\n    y = ~ x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Bool),               // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Integer)            // y assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = True\n    y = - x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Bool),               // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Integer)            // y assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = True\n    y = + x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Bool),               // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Integer)            // y assigned
+            }
+        ), 
         
         // Complex binary operations
         // Complex/bool
