@@ -10,7 +10,6 @@ class {avk_name}Value : public AbstractValue {{
     virtual AbstractValueKind kind();
     virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual AbstractValue* compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual const char* describe();
 }};
 """
@@ -30,12 +29,6 @@ AbstractValue* {avk_name}Value::binary(AbstractSource* selfSources, int op, Abst
 AbstractValue* {avk_name}Value::unary(AbstractSource* selfSources, int op) {{
 {unary_return_types}
     return AbstractValue::unary(selfSources, op);
-}}
-
-AbstractValue* {avk_name}Value::compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {{
-    auto other_kind = other.Value->kind();
-{compare_return_types}
-    return AbstractValue::compare(selfSources, op, other);
 }}
 
 const char* {avk_name}Value::describe() {{
@@ -123,20 +116,6 @@ binary_operations = {
     'INPLACE_OR': operator.ior,
 }
 
-compare_operations = {
-    'PyCmp_LT': operator.lt,
-    'PyCmp_LE': operator.le,
-    'PyCmp_GT': operator.gt,
-    'PyCmp_GE': operator.ge,
-    'PyCmp_IN': lambda x, y: x in y,
-    'PyCmp_NOT_IN': lambda x, y: x not in y,
-    # Universally defined.
-    #'PyCmp_EQ': operator.eq,
-    #'PyCmp_NE': operator.ne,
-    # Can't be overridden.
-    #'PyCmp_IS': operator.is_,
-    #'PyCmp_IS_NOT': operator.is_not,
-}
 
 def binary(type_, other_type, operations):
     """Calculate the return types for all binary operations (including in-place)."""
@@ -187,29 +166,28 @@ def format_binary_opcodes(type_, other_type, return_types, *, indent, position):
     return '\n'.join(output)
 
 
-def main():
+def main(type_name):
+    for type_, type_detail in known_types.items():
+        if type_detail.description == type_name:
+            break
+    else:
+        raise SystemExit('unrecognized type: {}'.format(type_name))
     directory = pathlib.Path(__file__).parent
     with open(str(directory/'absvalue.h'), 'w') as file:
-        for type_detail in sorted(known_types.values(), key=lambda x: x.avk_name):
-            file.write(forward_declaration.format(avk_name=type_detail.avk_name))
+        file.write(forward_declaration.format(avk_name=type_detail.avk_name))
 
     with open(str(directory/'absvalue.cpp'), 'w') as file:
-        for type_, type_detail in sorted(known_types.items(), key=lambda pair: pair[1].avk_name):
-            unary_return_types = unary(type_)
-            unary_opcodes = format_unary_opcodes(type_, unary_return_types, indent='        ')
-            binary_opcodes_list = []
-            compare_opcodes_list = []
-            for position, other_type in enumerate(sorted(known_types, key=lambda x: known_types[x].avk_name)):
-                binary_return_types = binary(type_, other_type, binary_operations)
-                opcode_if = format_binary_opcodes(type_, other_type, binary_return_types, indent='    ', position=position)
-                if opcode_if:
-                    binary_opcodes_list.append(opcode_if)
-                compare_return_types = binary(type_, other_type, compare_operations)
-                opcode_if = format_binary_opcodes(type_, other_type, compare_return_types, indent='    ', position=position)
-                if opcode_if:
-                    compare_opcodes_list.append(opcode_if)
-            file.write(class_definition.format(binary_return_types='\n'.join(binary_opcodes_list), unary_return_types=unary_opcodes,
-                                               compare_return_types='\n'.join(compare_opcodes_list), **type_detail.__dict__))
+        unary_return_types = unary(type_)
+        unary_opcodes = format_unary_opcodes(type_, unary_return_types, indent='        ')
+        binary_opcodes_list = []
+        compare_opcodes_list = []
+        for position, other_type in enumerate(sorted(known_types, key=lambda x: known_types[x].avk_name)):
+            binary_return_types = binary(type_, other_type, binary_operations)
+            opcode_if = format_binary_opcodes(type_, other_type, binary_return_types, indent='    ', position=position)
+            if opcode_if:
+                binary_opcodes_list.append(opcode_if)
+        file.write(class_definition.format(binary_return_types='\n'.join(binary_opcodes_list), unary_return_types=unary_opcodes,
+                                            compare_return_types='\n'.join(compare_opcodes_list), **type_detail.__dict__))
 
 
 def test():
@@ -222,4 +200,5 @@ def test():
 
 
 if __name__ == '__main__':
-    main()
+    import sys
+    main(sys.argv[1])
