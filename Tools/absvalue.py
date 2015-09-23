@@ -126,14 +126,16 @@ binary_operations = {
 compare_operations = {
     'PyCmp_LT': operator.lt,
     'PyCmp_LE': operator.le,
-    'PyCmp_EQ': operator.eq,
-    'PyCmp_NE': operator.ne,
     'PyCmp_GT': operator.gt,
     'PyCmp_GE': operator.ge,
     'PyCmp_IN': lambda x, y: x in y,
     'PyCmp_NOT_IN': lambda x, y: x not in y,
-    'PyCmp_IS': operator.is_,
-    'PyCmp_IS_NOT': operator.is_not,
+    # Universally defined.
+    #'PyCmp_EQ': operator.eq,
+    #'PyCmp_NE': operator.ne,
+    # Can't be overridden.
+    #'PyCmp_IS': operator.is_,
+    #'PyCmp_IS_NOT': operator.is_not,
 }
 
 def binary(type_, other_type, operations):
