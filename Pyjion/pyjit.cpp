@@ -137,11 +137,13 @@ struct BlockInfo {
     size_t BlockId;
     ExceptionVars ExVars;
     Local LoopVar, LoopOpt1, LoopOpt2;
+    vector<bool> Stack;
 
     BlockInfo() {
     }
 
-    BlockInfo(size_t blockId, Label raise, Label reraise, Label errorTarget, int endOffset, int kind, int flags = 0, int continueOffset = 0) {
+    BlockInfo(vector<bool> stack, size_t blockId, Label raise, Label reraise, Label errorTarget, int endOffset, int kind, int flags = 0, int continueOffset = 0) {
+        Stack = stack;
         BlockId = blockId;
         Raise = raise;
         ReRaise = reraise;
@@ -216,6 +218,9 @@ public:
         preprocess();
         auto addr = compile_worker();
         if (addr != nullptr) {
+            if (!interpreted) {
+                m_interp.dump();
+            }
             _ASSERTE(interpreted); // the interpreter should support the same code we do
 
             // compilation succeeded, return a new CorJitInfo object which
@@ -464,11 +469,14 @@ private:
 
     void branch_raise() {
         auto ehBlock = get_ehblock();
+        
+        auto& entry_stack = ehBlock.Stack;
 
-        // clear any non-object values from the stack...
-        size_t count = m_stack.size();
-
-        for (size_t i = m_stack.size(); i-- > 0;) {
+        // clear any non-object values from the stack up
+        // to the stack that owned the block when we entered.
+        size_t count = m_stack.size() - entry_stack.size();
+        
+        for (size_t i = m_stack.size(); i-- > entry_stack.size();) {
             if (m_stack[i] == STACK_KIND_VALUE) {
                 count--;
                 m_il.pop();
@@ -495,6 +503,17 @@ private:
             }
 
             m_il.branch(BranchAlways, labels[count - 1]);
+        }
+    }
+
+    void clean_stack_for_reraise() {
+        auto ehBlock = get_ehblock();
+
+        auto& entry_stack = ehBlock.Stack;
+        size_t count = m_stack.size() - entry_stack.size();
+
+        for (size_t i = m_stack.size(); i-- > entry_stack.size();) {
+            decref();
         }
     }
 
@@ -725,7 +744,7 @@ private:
         load_frame();
         m_il.emit_call(METHOD_PY_PUSHFRAME);
 
-        m_blockStack.push_back(BlockInfo(m_blockIds++, raiseLabel, reraiseLabel, Label(), -1, NOP));
+        m_blockStack.push_back(BlockInfo(vector<bool>(), m_blockIds++, raiseLabel, reraiseLabel, Label(), -1, NOP));
 
         auto tb = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
         auto ehVal = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
@@ -837,6 +856,7 @@ private:
                     // offset is relative to end of current instruction
                     m_blockStack.push_back(
                         BlockInfo(
+                            m_stack,
                             m_blockStack.back().BlockId,
                             m_blockStack.back().Raise,
                             m_blockStack.back().ReRaise,
@@ -1739,7 +1759,7 @@ private:
                 case SETUP_EXCEPT:
                     {
                         auto handlerLabel = getOffsetLabel(oparg + i + 1);
-                        auto blockInfo = BlockInfo(m_blockIds++, m_il.define_label(), m_il.define_label(), handlerLabel, oparg + i + 1, SETUP_EXCEPT);
+                        auto blockInfo = BlockInfo(m_stack, m_blockIds++, m_il.define_label(), m_il.define_label(), handlerLabel, oparg + i + 1, SETUP_EXCEPT);
                         blockInfo.ExVars = ExceptionVars(
                             m_il.define_local_no_cache(Parameter(CORINFO_TYPE_NATIVEINT)),
                             m_il.define_local_no_cache(Parameter(CORINFO_TYPE_NATIVEINT)),
@@ -1758,7 +1778,7 @@ private:
                 case SETUP_FINALLY:
                     {
                         auto handlerLabel = getOffsetLabel(oparg + i + 1);
-                        auto blockInfo = BlockInfo(m_blockIds++, m_il.define_label(), m_il.define_label(), handlerLabel, oparg + i + 1, SETUP_FINALLY);
+                        auto blockInfo = BlockInfo(m_stack, m_blockIds++, m_il.define_label(), m_il.define_label(), handlerLabel, oparg + i + 1, SETUP_FINALLY);
                         blockInfo.ExVars = ExceptionVars(
                             m_il.define_local_no_cache(Parameter(CORINFO_TYPE_NATIVEINT)),
                             m_il.define_local_no_cache(Parameter(CORINFO_TYPE_NATIVEINT)),
@@ -1799,6 +1819,7 @@ private:
                             // dispatch to all of the previous locations...
                             auto back = m_blockStack.back();
                             auto newBlock = BlockInfo(
+                                back.Stack,
                                 back.BlockId,
                                 back.Raise,		// if we take a nested exception this is where we go to...
                                 back.ReRaise,
@@ -1918,6 +1939,11 @@ private:
                             m_il.ld_loc(ehVal);
                             m_il.ld_loc(finallyReason);
                             m_il.emit_call(METHOD_PYERR_RESTORE);
+
+                            auto ehBlock = get_ehblock();
+
+                            clean_stack_for_reraise();
+
                             m_il.branch(BranchAlways, get_ehblock().ReRaise);
 
                             m_il.mark_label(noException);
@@ -1940,6 +1966,9 @@ private:
                                 dec_stack(3);
                                 free_iter_locals_on_exception();
                                 m_il.emit_call(METHOD_PYERR_RESTORE);
+
+                                clean_stack_for_reraise();
+
                                 m_il.branch(BranchAlways, get_ehblock().ReRaise);
                             }
                         }
@@ -2094,7 +2123,6 @@ private:
     }
 
     void store_fast(int local, int opcodeIndex) {
-        auto localInfo = m_interp.get_local_info(opcodeIndex, local);
         if (!m_interp.should_box(opcodeIndex)) {
             auto stackInfo = m_interp.get_stack_info(opcodeIndex);
             auto stackValue = stackInfo[stackInfo.size() - 1];
