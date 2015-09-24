@@ -2224,6 +2224,16 @@ void AbsIntTest() {
                 new VariableVerifier(22, 0, AVK_Bytes)              // x assigned in-place
             }
         ),
+        // Bytes/slice
+        AITestCase(
+            "def f():\n    x = b'a'\n    y = x[:]",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Bytes),              // x assigned
+                new VariableVerifier(19, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(22, 1, AVK_Bytes),             // y assigned
+            }
+        ),
 
         // Complex binary operations
         // Complex/bool
