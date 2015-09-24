@@ -2665,6 +2665,17 @@ void AbsIntTest() {
             }
         ),
 
+        // Dict unary operations
+        AITestCase(
+            "def f():\n    x = {}\n    y = not x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Dict),               // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Bool)               // y assigned
+            }
+        ),
+
         // Binary String operations
         AITestCase(
         "def f():\n    x = 'abc'\n    y = x + 'def'",
