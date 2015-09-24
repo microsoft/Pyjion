@@ -3227,6 +3227,34 @@ void AbsIntTest() {
                 new VariableVerifier(22, 0, AVK_Float)              // x assigned in-place
             }
         ),
+        // Float unary operations
+        AITestCase(
+            "def f():\n    x = 3.14\n    y = not x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Float),              // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Bool)               // y assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = 3.14\n    y = -x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Float),              // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Float)              // y assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = 3.14\n    y = +x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Float),              // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Float)              // y assigned
+            }
+        ),
 
         // Binary String operations
         AITestCase(
