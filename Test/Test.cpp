@@ -2054,7 +2054,7 @@ void AbsIntTest() {
             }
         ),
         AITestCase(
-            "def f():\n    x = True\n    y = ~ x",
+            "def f():\n    x = True\n    y = ~x",
             {
                 new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
                 new VariableVerifier(6, 0, AVK_Bool),               // x assigned
@@ -2063,7 +2063,7 @@ void AbsIntTest() {
             }
         ),
         AITestCase(
-            "def f():\n    x = True\n    y = - x",
+            "def f():\n    x = True\n    y = -x",
             {
                 new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
                 new VariableVerifier(6, 0, AVK_Bool),               // x assigned
@@ -2072,7 +2072,7 @@ void AbsIntTest() {
             }
         ),
         AITestCase(
-            "def f():\n    x = True\n    y = + x",
+            "def f():\n    x = True\n    y = +x",
             {
                 new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
                 new VariableVerifier(6, 0, AVK_Bool),               // x assigned
@@ -2254,6 +2254,16 @@ void AbsIntTest() {
                 new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
                 new VariableVerifier(12, 1, AVK_Tuple),             // y assigned
                 new VariableVerifier(22, 0, AVK_Bytes)              // x assigned in-place
+            }
+        ),
+        // Bytes unary operations
+        AITestCase(
+            "def f():\n    x = b'a'\n    y = not x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Bytes),              // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Bool)               // y assigned
             }
         ),
 
