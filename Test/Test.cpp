@@ -2104,6 +2104,49 @@ void AbsIntTest() {
                 new VariableVerifier(22, 0, AVK_Bytes)              // x assigned in-place
             }
         ),
+        // Bytes/bytes
+        AITestCase(
+            "def f():\n    x = b'a'\n    y = b'a'\n    z = x + y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Bytes),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bytes),             // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Bytes),             // z assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = b'a'\n    y = b'a'\n    z = x % y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Bytes),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bytes),             // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Bytes),             // z assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = b'a'\n    y = b'a'\n    x += y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Bytes),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bytes),             // y assigned
+                new VariableVerifier(22, 0, AVK_Bytes)              // x assigned in-place
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = b'a'\n    y = b'a'\n    x %= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Bytes),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bytes),             // y assigned
+                new VariableVerifier(22, 0, AVK_Bytes)              // x assigned in-place
+            }
+        ),
 
         // Complex binary operations
         // Complex/bool
