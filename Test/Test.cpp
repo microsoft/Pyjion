@@ -1126,162 +1126,262 @@ void AbsIntTest() {
             new VariableVerifier(21, 0, AVK_String),            // LOAD_CONST
             new VariableVerifier(27, 0, AVK_Any),               // LOAD_CONST None
         }),
-        // Binary integer operations
+
+        // Int binary operations
+        // Int/bool
         AITestCase(
-        "def f():\n    x = 1\n    y = x + 1",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x / y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Float),             // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    y = x - 1",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    x /= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Float)              // x assigned in-place
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    y = x * 1",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x + y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    y = x % 1",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x & y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    y = x << 1",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x // y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    y = x >> 1",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x << y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    y = x & 1",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x % y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    y = x | 1",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x * y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    y = x ^ 1",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x | y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    y = x ** 2",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x ** y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    y = x // 1",
-        {
-            new VariableVerifier(3, 1, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Integer),           // STORE_FAST 1
-        }),
-        // Integer in place binary operations
+            "def f():\n    x = 42\n    y = True\n    z = x >> y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x += 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x - y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x -= 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    z = x ^ y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Integer),           // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x *= 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    x += y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x %= 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    x &= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x <<= 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    x //= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x >>= 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    x <<= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x &= 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    x %= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x |= 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    x *= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x ^= 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    x |= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x **= 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    x *= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
         AITestCase(
-        "def f():\n    x = 1\n    x //= 1",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Integer),            // LOAD_FAST 0
-            new VariableVerifier(16, 0, AVK_Integer),           // STORE_FAST 1
-        }),
+            "def f():\n    x = 42\n    y = True\n    x >>= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = 42\n    y = True\n    x -= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = 42\n    y = True\n    x ^= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Integer)            // x assigned in-place
+            }
+        ),
+
         // Float binary operations
         AITestCase(
         "def f():\n    x = 1.0\n    y = x + 1.0",
