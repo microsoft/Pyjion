@@ -22,22 +22,20 @@ Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Pyth
 * From Visual Studio
   1. Open the `pyjion.sln` file
   2. Build the solution
+* Run `CopyFiles.bat` to copy files to key locations
 
 ### Testing
-1. Copy `Python\PCbuild\amd64\python36_d.dll` to `x64\Debug\`
-2. Copy `Python\Lib\` to `x64\Debug\`
-3. Run the tests
-  * From Visual Studio
-    4. Set the `Test` solution as the StartUp project
-    5. Run the solution (i.e., press F5)
-  * From Powershell
-    4. Run `x64\Debug\Test.exe`
+* From Visual Studio
+  4. Set the `Test` solution as the StartUp project
+  5. Run the solution (i.e., press F5)
+* From Powershell
+  4. Run `x64\Debug\Test.exe`
 
 If the output window closes and return an exit code of 0 then the tests passed.
 
 ### Running
-1. Copy `x64\Debug\pyjit.dll` to `Python\PCbuild\amd64\'
-2. Go into the `Python\` directory and launch `python.bat`
+1. Copy `x64\Debug\pyjit.dll` to `Python\PCbuild\amd64\' (initially done by `CopyFiles.bat`, so only do as necessary after rebuilding Pyjion)
+2. Go into the `Python` directory and launch `python.bat`
 
 
 ### Known Issues
