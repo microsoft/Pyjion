@@ -1449,7 +1449,7 @@ void AbsIntTest() {
             }
         ),
         AITestCase(
-            "def f():\n    x = 42\n    y = 3j\n    z = x // y",
+            "def f():\n    x = 42\n    y = 3j\n    z = x / y",
             {
                 new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
                 new VariableVerifier(6, 0, AVK_Integer),            // x assigned
@@ -1500,7 +1500,7 @@ void AbsIntTest() {
             }
         ),
         AITestCase(
-            "def f():\n    x = 42\n    y = 3j\n    x //= y",
+            "def f():\n    x = 42\n    y = 3j\n    x /= y",
             {
                 new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
                 new VariableVerifier(6, 0, AVK_Integer),            // x assigned
