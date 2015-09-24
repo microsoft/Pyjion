@@ -188,6 +188,7 @@ def main(type_name):
                 binary_opcodes_list.append(opcode_if)
         file.write(class_definition.format(binary_return_types='\n'.join(binary_opcodes_list), unary_return_types=unary_opcodes,
                                             compare_return_types='\n'.join(compare_opcodes_list), **type_detail.__dict__))
+    print('NOTE: check operations that require specific formatting (e.g., `"%s" % (4,)` or `b"a"[0]`)')
 
 
 def test():
