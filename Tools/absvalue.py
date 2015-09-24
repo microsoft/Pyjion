@@ -52,6 +52,7 @@ known_types = {
     bytes: type_details(b'a', 'Bytes'),
     complex: type_details(2+3j, 'Complex'),
     dict: type_details({0: 1}, 'Dict'),
+    # ellipsis doesn't provide any operations, so no need to infer anything.
     float: type_details(3.14, 'Float'),
     type(function_): type_details(function_, 'Function'),
     int: type_details(42, 'Integer', 'int'),
@@ -62,7 +63,6 @@ known_types = {
     str: type_details('a', 'String', 'str'),
     tuple: type_details((4,), 'Tuple'),
 }
-
 
 unary_operations = {
     'UNARY_POSITIVE': operator.pos,
@@ -166,12 +166,14 @@ def format_binary_opcodes(type_, other_type, return_types, *, indent, position):
     return '\n'.join(output)
 
 
+valid_names = ', '.join(sorted(x.description for x in known_types.values()))
+
 def main(type_name):
     for type_, type_detail in known_types.items():
         if type_detail.description == type_name:
             break
     else:
-        raise SystemExit('unrecognized type: {}'.format(type_name))
+        raise SystemExit('unrecognized type: {}\nAcceptable types are {}'.format(type_name, valid_names))
     directory = pathlib.Path(__file__).parent
     with open(str(directory/'absvalue.h'), 'w') as file:
         file.write(forward_declaration.format(avk_name=type_detail.avk_name))
@@ -188,6 +190,7 @@ def main(type_name):
                 binary_opcodes_list.append(opcode_if)
         file.write(class_definition.format(binary_return_types='\n'.join(binary_opcodes_list), unary_return_types=unary_opcodes,
                                             compare_return_types='\n'.join(compare_opcodes_list), **type_detail.__dict__))
+    print('NOTE: check operations that require specific formatting (e.g., `"%s" % (4,)` or `b"a"[0]`)')
 
 
 def test():
@@ -201,4 +204,6 @@ def test():
 
 if __name__ == '__main__':
     import sys
+    if len(sys.argv[1:]) != 1:
+        raise SystemExit('only 1 argument expected, not {}\nAcceptable argument can be one of {}'.format(len(sys.argv[1:]), valid_names))
     main(sys.argv[1])
