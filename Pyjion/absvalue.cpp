@@ -169,7 +169,13 @@ AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractVa
                 return this;
             case BINARY_TRUE_DIVIDE:
             case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
                 return &Float;
+            }
             case BINARY_ADD:
             case BINARY_FLOOR_DIVIDE:
             case BINARY_LSHIFT:
@@ -227,7 +233,13 @@ AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractVa
             case INPLACE_POWER:
             case INPLACE_SUBTRACT:
             case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
                 return &Float;
+            }
         }
     }
     else if (other_kind == AVK_Integer) {
@@ -237,7 +249,13 @@ AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractVa
                 return this;
             case BINARY_TRUE_DIVIDE:
             case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
                 return &Float;
+            }
             case BINARY_ADD:
             case BINARY_AND:
             case BINARY_FLOOR_DIVIDE:
@@ -471,7 +489,13 @@ AbstractValue* IntegerValue::binary(AbstractSource* selfSources, int op, Abstrac
         switch (op) {
             case BINARY_TRUE_DIVIDE:
             case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
                 return &Float;
+            }
             case BINARY_ADD:
             case BINARY_AND:
             case BINARY_FLOOR_DIVIDE:
@@ -535,14 +559,26 @@ AbstractValue* IntegerValue::binary(AbstractSource* selfSources, int op, Abstrac
             case INPLACE_POWER:
             case INPLACE_SUBTRACT:
             case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
                 return &Float;
+            }
         }
     }
     else if (other_kind == AVK_Integer) {
         switch (op) {
             case BINARY_TRUE_DIVIDE:
             case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
                 return &Float;
+            }
             case BINARY_ADD:
             case BINARY_AND:
             case BINARY_FLOOR_DIVIDE:
