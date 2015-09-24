@@ -1987,6 +1987,43 @@ void AbsIntTest() {
                 new VariableVerifier(22, 0, AVK_Tuple)              // x assigned in-place
             }
         ),
+        // Int unary operations
+        AITestCase(
+            "def f():\n    x = 42\n    y = not x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Bool)               // y assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = 42\n    y = ~x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Integer)            // y assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = 42\n    y = -x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Integer)            // y assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = 42\n    y = +x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Integer),            // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Integer)            // y assigned
+            }
+        ),
 
         // Float binary operations
         AITestCase(
