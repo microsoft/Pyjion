@@ -318,7 +318,9 @@ AbstractValue* BytesValue::binary(AbstractSource* selfSources, int op, AbstractV
     else if (other_kind == AVK_Bytes) {
         switch (op) {
             case BINARY_ADD:
+            case BINARY_MODULO:
             case INPLACE_ADD:
+            case INPLACE_MODULO:
                 return this;
         }
     }
