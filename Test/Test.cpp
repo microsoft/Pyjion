@@ -1096,7 +1096,7 @@ void AbsIntTest() {
             new VariableVerifier(10, 1, AVK_Undefined, true),   // 10 STORE_FAST               1 (y)
             new VariableVerifier(13, 1, AVK_Integer)            // 13 LOAD_CONST               0 (None)
         }),
-        // Basic delete 
+        // Basic delete
         AITestCase(
         "def f():\n    x = 1\n    del x",
         {
@@ -1382,7 +1382,7 @@ void AbsIntTest() {
             new VariableVerifier(6, 0, AVK_Float),            // LOAD_FAST 0
             new VariableVerifier(16, 0, AVK_Float),           // STORE_FAST 1
         }),
-        
+
         // Boolean binary operations
         // Bool/bool
         AITestCase(
@@ -2079,8 +2079,8 @@ void AbsIntTest() {
                 new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
                 new VariableVerifier(13, 1, AVK_Integer)            // y assigned
             }
-        ), 
-        
+        ),
+
         // Complex binary operations
         // Complex/bool
         AITestCase(
@@ -2474,6 +2474,17 @@ void AbsIntTest() {
             {
                 new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
                 new VariableVerifier(6, 0, AVK_Complex),            // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Bool)               // y assigned
+            }
+        ),
+
+        // Dict unary operations
+        AITestCase(
+            "def f():\n    x = {}\n    y = not x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Dict),               // x assigned
                 new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
                 new VariableVerifier(13, 1, AVK_Bool)               // y assigned
             }
