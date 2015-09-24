@@ -282,6 +282,20 @@ class BoolValue : public AbstractValue {
     virtual const char* describe();
 };
 
+class BytesValue : public AbstractValue {
+    virtual AbstractValueKind kind();
+    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
+    virtual const char* describe();
+};
+
+class ComplexValue : public AbstractValue {
+    virtual AbstractValueKind kind();
+    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
+    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
+    virtual const char* describe();
+};
+
 class IntegerValue : public AbstractValue {
     virtual AbstractValueKind kind();
     virtual AbstractValue* binary(AbstractSource*selfSources, int op, AbstractValueWithSources& other);
@@ -290,13 +304,6 @@ class IntegerValue : public AbstractValue {
 };
 
 class StringValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
-};
-
-class BytesValue : public AbstractValue {
     virtual AbstractValueKind kind();
     virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual AbstractValue* unary(AbstractSource* selfSources, int op);
@@ -350,13 +357,6 @@ class FunctionValue : public AbstractValue {
 
 class SliceValue : public AbstractValue {
     virtual AbstractValueKind kind();
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
-};
-
-class ComplexValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual AbstractValue* unary(AbstractSource* selfSources, int op);
     virtual const char* describe();
 };
