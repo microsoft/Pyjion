@@ -909,7 +909,7 @@ AbstractValueKind SetValue::kind() {
 
 AbstractValue* SetValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
     auto other_kind = other.Value->kind();
-    else if (other_kind == AVK_Set) {
+    if (other_kind == AVK_Set) {
         switch (op) {
             case BINARY_AND:
             case BINARY_OR:
