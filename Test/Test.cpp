@@ -4107,6 +4107,17 @@ void AbsIntTest() {
                 new VariableVerifier(22, 0, AVK_List)               // x assigned in-place
             }
         ),
+        // List/dict
+        AITestCase(
+            "def f():\n    x = []\n    y = {}\n    x += y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_List),               // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Dict),              // y assigned
+                new VariableVerifier(22, 0, AVK_List)               // x assigned in-place
+            }
+        ),
 
         // Unary not
         AITestCase(
