@@ -169,7 +169,13 @@ AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractVa
                 return this;
             case BINARY_TRUE_DIVIDE:
             case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
                 return &Float;
+            }
             case BINARY_ADD:
             case BINARY_FLOOR_DIVIDE:
             case BINARY_LSHIFT:
@@ -227,7 +233,13 @@ AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractVa
             case INPLACE_POWER:
             case INPLACE_SUBTRACT:
             case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
                 return &Float;
+            }
         }
     }
     else if (other_kind == AVK_Integer) {
@@ -237,7 +249,13 @@ AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractVa
                 return this;
             case BINARY_TRUE_DIVIDE:
             case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
                 return &Float;
+            }
             case BINARY_ADD:
             case BINARY_AND:
             case BINARY_FLOOR_DIVIDE:
@@ -465,52 +483,165 @@ AbstractValueKind IntegerValue::kind() {
     return AVK_Integer;
 }
 
-AbstractValue* IntegerValue::binary(AbstractSource*selfSources, int op, AbstractValueWithSources& other) {
-    if (other.Value->kind() == AVK_Integer) {
+AbstractValue* IntegerValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
         switch (op) {
-        case BINARY_FLOOR_DIVIDE:
-        case BINARY_POWER:
-        case BINARY_MODULO:
-        case BINARY_LSHIFT:
-        case BINARY_RSHIFT:
-        case BINARY_AND:
-        case BINARY_XOR:
-        case BINARY_OR:
-        case BINARY_MULTIPLY:
-        case BINARY_SUBTRACT:
-        case BINARY_ADD:
-        case INPLACE_POWER:
-        case INPLACE_MULTIPLY:
-        case INPLACE_FLOOR_DIVIDE:
-        case INPLACE_MODULO:
-        case INPLACE_ADD:
-        case INPLACE_SUBTRACT:
-        case INPLACE_LSHIFT:
-        case INPLACE_RSHIFT:
-        case INPLACE_AND:
-        case INPLACE_XOR:
-        case INPLACE_OR:
-            return this;
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
+                return &Float;
+            }
+            case BINARY_ADD:
+            case BINARY_AND:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_LSHIFT:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_OR:
+            case BINARY_POWER:
+            case BINARY_RSHIFT:
+            case BINARY_SUBTRACT:
+            case BINARY_XOR:
+            case INPLACE_ADD:
+            case INPLACE_AND:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_LSHIFT:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_OR:
+            case INPLACE_POWER:
+            case INPLACE_RSHIFT:
+            case INPLACE_SUBTRACT:
+            case INPLACE_XOR:
+                return this;
         }
     }
-
+    else if (other_kind == AVK_Bytes) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &Bytes;
+        }
+    }
+    else if (other_kind == AVK_Complex) {
+        switch (op) {
+            case BINARY_ADD:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return &Complex;
+        }
+    }
+    else if (other_kind == AVK_Float) {
+        switch (op) {
+            case BINARY_ADD:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
+                return &Float;
+            }
+        }
+    }
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
+                return &Float;
+            }
+            case BINARY_ADD:
+            case BINARY_AND:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_LSHIFT:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_OR:
+            case BINARY_POWER:
+            case BINARY_RSHIFT:
+            case BINARY_SUBTRACT:
+            case BINARY_XOR:
+            case INPLACE_ADD:
+            case INPLACE_AND:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_LSHIFT:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_OR:
+            case INPLACE_POWER:
+            case INPLACE_RSHIFT:
+            case INPLACE_SUBTRACT:
+            case INPLACE_XOR:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_List) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &List;
+        }
+    }
+    else if (other_kind == AVK_String) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &String;
+        }
+    }
+    else if (other_kind == AVK_Tuple) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &Tuple;
+        }
+    }
     return AbstractValue::binary(selfSources, op, other);
 }
 
 AbstractValue* IntegerValue::unary(AbstractSource* selfSources, int op) {
-    switch (op) {
-    case UNARY_POSITIVE:
-    case UNARY_NEGATIVE:
-    case UNARY_INVERT:
-        return this;
-    case UNARY_NOT:
-        return &Bool;
-    }
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+            case UNARY_INVERT:
+            case UNARY_NEGATIVE:
+            case UNARY_POSITIVE:
+                return this;
+        }
     return AbstractValue::unary(selfSources, op);
 }
 
 const char* IntegerValue::describe() {
-    return "Int";
+    return "int";
 }
 
 // StringValue methods
