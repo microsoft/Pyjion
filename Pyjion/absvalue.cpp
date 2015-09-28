@@ -907,10 +907,28 @@ AbstractValueKind SetValue::kind() {
     return AVK_Set;
 }
 
+AbstractValue* SetValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
+    auto other_kind = other.Value->kind();
+    else if (other_kind == AVK_Set) {
+        switch (op) {
+            case BINARY_AND:
+            case BINARY_OR:
+            case BINARY_SUBTRACT:
+            case BINARY_XOR:
+            case INPLACE_AND:
+            case INPLACE_OR:
+            case INPLACE_SUBTRACT:
+            case INPLACE_XOR:
+                return this;
+        }
+    }
+    return AbstractValue::binary(selfSources, op, other);
+}
+
 AbstractValue* SetValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
+        case UNARY_NOT:
+            return &Bool;
     }
     return AbstractValue::unary(selfSources, op);
 }
