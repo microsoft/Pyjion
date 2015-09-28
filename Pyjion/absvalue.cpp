@@ -901,7 +901,7 @@ AbstractValue* FunctionValue::unary(AbstractSource* selfSources, int op) {
 }
 
 const char* FunctionValue::describe() {
-    return "Function";
+    return "function";
 }
 
 // SliceValue methods
