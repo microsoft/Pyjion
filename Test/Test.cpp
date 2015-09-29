@@ -4095,6 +4095,16 @@ void AbsIntTest() {
                 new VariableVerifier(22, 0, AVK_Tuple)              // x assigned in-place
             }
         ),
+        // Tuple/slice
+        AITestCase(
+            "def f():\n    x = ()\n    y = x[1:2:3]",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(22, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(25, 1, AVK_Tuple),             // y assigned
+            }
+        ),
 
         // List binary operations
         // List/bool
