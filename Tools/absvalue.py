@@ -183,11 +183,13 @@ def main(type_name):
         unary_opcodes = format_unary_opcodes(type_, unary_return_types, indent='        ')
         binary_opcodes_list = []
         compare_opcodes_list = []
-        for position, other_type in enumerate(sorted(known_types, key=lambda x: known_types[x].avk_name)):
+        branches = 0
+        for other_type in sorted(known_types, key=lambda x: known_types[x].avk_name):
             binary_return_types = binary(type_, other_type, binary_operations)
-            opcode_if = format_binary_opcodes(type_, other_type, binary_return_types, indent='    ', position=position)
+            opcode_if = format_binary_opcodes(type_, other_type, binary_return_types, indent='    ', position=branches)
             if opcode_if:
                 binary_opcodes_list.append(opcode_if)
+                branches += 1
         file.write(class_definition.format(binary_return_types='\n'.join(binary_opcodes_list), unary_return_types=unary_opcodes,
                                             compare_return_types='\n'.join(compare_opcodes_list), **type_detail.__dict__))
     print('NOTE: check operations that require specific formatting (e.g., `"%s" % (4,)` or `b"a"[0]`)')
