@@ -965,5 +965,5 @@ AbstractValue* SliceValue::unary(AbstractSource* selfSources, int op) {
     return AbstractValue::unary(selfSources, op);
 }
 const char* SliceValue::describe() {
-    return "Slice";
+    return "slice";
 }
