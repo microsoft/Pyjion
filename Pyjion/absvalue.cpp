@@ -650,33 +650,53 @@ AbstractValueKind StringValue::kind() {
 }
 
 AbstractValue* StringValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (other.Value->kind() == AVK_String) {
+    // String interpolation always returns a `str` (when successful).
+    if (op == BINARY_MODULO || op == INPLACE_MODULO) {
+        return this;
+    }
+
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
         switch (op) {
-        case INPLACE_ADD:
-        case BINARY_ADD:
-            return this;
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return this;
         }
     }
-    if (op == BINARY_MODULO || op == INPLACE_MODULO) {
-        // Or could be an error, but that seems ok...
-        return this;
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case BINARY_SUBSCR:
+            case INPLACE_MULTIPLY:
+                return this;
+        }
     }
-    else if ((op == BINARY_MULTIPLY || op == INPLACE_MULTIPLY) && other.Value->kind() == AVK_Integer) {
-        return this;
+    else if (other_kind == AVK_Slice) {
+        switch (op) {
+            case BINARY_SUBSCR:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_String) {
+        switch (op) {
+            case BINARY_ADD:
+            case INPLACE_ADD:
+                return this;
+        }
     }
     return AbstractValue::binary(selfSources, op, other);
 }
 
 AbstractValue* StringValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
+        case UNARY_NOT:
+            return &Bool;
     }
     return AbstractValue::unary(selfSources, op);
 }
 
 const char* StringValue::describe() {
-    return "String";
+    return "str";
 }
 
 // FloatValue methods
