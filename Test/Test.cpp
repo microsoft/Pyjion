@@ -4051,27 +4051,28 @@ void AbsIntTest() {
         }),
 
         // Tuple binary operations
+        // Tuple/bool
         AITestCase(
-        "def f():\n    x = (1,2)\n    y = x + x",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Tuple),              // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Tuple),             // LOAD_CONST None
-        }),
+            "def f():\n    x = ()\n    y = True\n    z = x * y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Tuple),             // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = (1,2)\n    y = x * 3",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Tuple),              // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Tuple),             // LOAD_CONST None
-        }),
-        AITestCase(
-        "def f():\n    x = (1,2)\n    y = x[0:1]",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Tuple),              // LOAD_FAST 0
-            new VariableVerifier(22, 1, AVK_Tuple),             // LOAD_CONST None
-        }),
+            "def f():\n    x = ()\n    y = True\n    x *= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Tuple)              // x assigned in-place
+            }
+        ),
 
         // List binary operations
         // List/bool
