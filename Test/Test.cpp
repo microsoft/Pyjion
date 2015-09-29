@@ -4087,6 +4087,28 @@ void AbsIntTest() {
                 new VariableVerifier(22, 0, AVK_String)             // x assigned in-place
             }
         ),
+        // Str/dict
+        AITestCase(
+            "def f():\n    x = ''\n    y = {}\n    z = x % y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_String),             // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Dict),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_String),            // z assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = ''\n    y = {}\n    x %= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_String),             // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Dict),              // y assigned
+                new VariableVerifier(22, 0, AVK_String)             // x assigned in-place
+            }
+        ),
 
         // Tuple binary operations
         AITestCase(
