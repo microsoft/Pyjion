@@ -802,22 +802,41 @@ AbstractValueKind TupleValue::kind() {
 }
 
 AbstractValue* TupleValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (op == BINARY_ADD && other.Value->kind() == AVK_Tuple) {
-        return this;
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return this;
+        }
     }
-    else if (op == BINARY_MULTIPLY && other.Value->kind() == AVK_Integer) {
-        return this;
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return this;
+        }
     }
-    else if (op == BINARY_SUBSCR && other.Value->kind() == AVK_Slice) {
-        return this;
+    else if (other_kind == AVK_Slice) {
+        switch (op) {
+            case BINARY_SUBSCR:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Tuple) {
+        switch (op) {
+            case BINARY_ADD:
+            case INPLACE_ADD:
+                return this;
+        }
     }
     return AbstractValue::binary(selfSources, op, other);
 }
 
 AbstractValue* TupleValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
+        case UNARY_NOT:
+            return &Bool;
     }
     return AbstractValue::unary(selfSources, op);
 }

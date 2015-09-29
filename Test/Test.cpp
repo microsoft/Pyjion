@@ -4339,27 +4339,93 @@ void AbsIntTest() {
 
 
         // Tuple binary operations
+        // Tuple/bool
         AITestCase(
-        "def f():\n    x = (1,2)\n    y = x + x",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Tuple),              // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Tuple),             // LOAD_CONST None
-        }),
+            "def f():\n    x = ()\n    y = True\n    z = x * y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Tuple),             // z assigned
+            }
+        ),
         AITestCase(
-        "def f():\n    x = (1,2)\n    y = x * 3",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Tuple),              // LOAD_FAST 0
-            new VariableVerifier(16, 1, AVK_Tuple),             // LOAD_CONST None
-        }),
+            "def f():\n    x = ()\n    y = True\n    x *= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Bool),              // y assigned
+                new VariableVerifier(22, 0, AVK_Tuple)              // x assigned in-place
+            }
+        ),
+        // Tuple/int
         AITestCase(
-        "def f():\n    x = (1,2)\n    y = x[0:1]",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-            new VariableVerifier(6, 0, AVK_Tuple),              // LOAD_FAST 0
-            new VariableVerifier(22, 1, AVK_Tuple),             // LOAD_CONST None
-        }),
+            "def f():\n    x = ()\n    y = 42\n    z = x * y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Integer),           // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Tuple),             // z assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = ()\n    y = 42\n    x *= y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Integer),           // y assigned
+                new VariableVerifier(22, 0, AVK_Tuple)              // x assigned in-place
+            }
+        ),
+        // Tuple/slice
+        AITestCase(
+            "def f():\n    x = ()\n    y = x[1:2:3]",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(22, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(25, 1, AVK_Tuple),             // y assigned
+            }
+        ),
+        // Tuple/tuple
+        // Tuple/bool
+        AITestCase(
+            "def f():\n    x = ()\n    y = ()\n    z = x + y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Tuple),             // y assigned
+                new VariableVerifier(19, 2, AVK_Undefined, true),   // z not assigned yet
+                new VariableVerifier(22, 2, AVK_Tuple),             // z assigned
+            }
+        ),
+        AITestCase(
+            "def f():\n    x = ()\n    y = ()\n    x += y",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(9, 1, AVK_Undefined, true),    // y not assigned yet
+                new VariableVerifier(12, 1, AVK_Tuple),             // y assigned
+                new VariableVerifier(22, 0, AVK_Tuple)              // x assigned in-place
+            }
+        ),
+        // Tuple unary operations
+        AITestCase(
+            "def f():\n    x = ()\n    y = not x",
+            {
+                new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
+                new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
+                new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
+                new VariableVerifier(13, 1, AVK_Bool)               // y assigned
+            }
+        ),
 
         // List binary operations
         // List/bool
