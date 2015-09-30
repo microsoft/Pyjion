@@ -156,111 +156,167 @@ AbstractValueKind BoolValue::kind() {
     return AVK_Bool;
 }
 
-AbstractValue* BoolValue::compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (other.Value->kind() == AVK_Bool) {
-        return &Bool;
+AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
+        switch (op) {
+            case BINARY_AND:
+            case BINARY_OR:
+            case BINARY_XOR:
+            case INPLACE_AND:
+            case INPLACE_OR:
+            case INPLACE_XOR:
+                return this;
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
+                return &Float;
+            }
+            case BINARY_ADD:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_LSHIFT:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_RSHIFT:
+            case BINARY_SUBTRACT:
+            case INPLACE_ADD:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_LSHIFT:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_RSHIFT:
+            case INPLACE_SUBTRACT:
+                return &Integer;
+        }
     }
-    return AbstractValue::compare(selfSources, op, other);
+    else if (other_kind == AVK_Bytes) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &Bytes;
+        }
+    }
+    else if (other_kind == AVK_Complex) {
+        switch (op) {
+            case BINARY_ADD:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return &Complex;
+        }
+    }
+    else if (other_kind == AVK_Float) {
+        switch (op) {
+            case BINARY_ADD:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
+                return &Float;
+            }
+        }
+    }
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+            case BINARY_MODULO:
+            case INPLACE_MODULO:
+                return this;
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
+                return &Float;
+            }
+            case BINARY_ADD:
+            case BINARY_AND:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_LSHIFT:
+            case BINARY_MULTIPLY:
+            case BINARY_OR:
+            case BINARY_POWER:
+            case BINARY_RSHIFT:
+            case BINARY_SUBTRACT:
+            case BINARY_XOR:
+            case INPLACE_ADD:
+            case INPLACE_AND:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_LSHIFT:
+            case INPLACE_MULTIPLY:
+            case INPLACE_OR:
+            case INPLACE_POWER:
+            case INPLACE_RSHIFT:
+            case INPLACE_SUBTRACT:
+            case INPLACE_XOR:
+                return &Integer;
+        }
+    }
+    else if (other_kind == AVK_List) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &List;
+        }
+    }
+    else if (other_kind == AVK_String) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &String;
+        }
+    }
+    else if (other_kind == AVK_Tuple) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &Tuple;
+        }
+    }
+    return AbstractValue::binary(selfSources, op, other);
 }
 
 AbstractValue* BoolValue::unary(AbstractSource* selfSources, int op) {
-    switch (op) {
-    case UNARY_NOT:
-        return &Bool;
-    }
+        switch (op) {
+            case UNARY_NOT:
+                return this;
+            case UNARY_INVERT:
+            case UNARY_NEGATIVE:
+            case UNARY_POSITIVE:
+                return &Integer;
+        }
     return AbstractValue::unary(selfSources, op);
 }
 
 const char* BoolValue::describe() {
-    return "Bool";
-}
-
-// IntegerValue methods
-AbstractValueKind IntegerValue::kind() {
-    return AVK_Integer;
-}
-
-AbstractValue* IntegerValue::binary(AbstractSource*selfSources, int op, AbstractValueWithSources& other) {
-    if (other.Value->kind() == AVK_Integer) {
-        switch (op) {
-        case BINARY_FLOOR_DIVIDE:
-        case BINARY_POWER:
-        case BINARY_MODULO:
-        case BINARY_LSHIFT:
-        case BINARY_RSHIFT:
-        case BINARY_AND:
-        case BINARY_XOR:
-        case BINARY_OR:
-        case BINARY_MULTIPLY:
-        case BINARY_SUBTRACT:
-        case BINARY_ADD:
-        case INPLACE_POWER:
-        case INPLACE_MULTIPLY:
-        case INPLACE_FLOOR_DIVIDE:
-        case INPLACE_MODULO:
-        case INPLACE_ADD:
-        case INPLACE_SUBTRACT:
-        case INPLACE_LSHIFT:
-        case INPLACE_RSHIFT:
-        case INPLACE_AND:
-        case INPLACE_XOR:
-        case INPLACE_OR:
-            return this;
-        }
-    }
-
-    return AbstractValue::binary(selfSources, op, other);
-}
-
-AbstractValue* IntegerValue::unary(AbstractSource* selfSources, int op) {
-    switch (op) {
-    case UNARY_POSITIVE:
-    case UNARY_NEGATIVE:
-    case UNARY_INVERT:
-        return this;
-    case UNARY_NOT:
-        return &Bool;
-    }
-    return AbstractValue::unary(selfSources, op);
-}
-
-const char* IntegerValue::describe() {
-    return "Int";
-}
-
-// StringValue methods
-AbstractValueKind StringValue::kind() {
-    return AVK_String;
-}
-
-AbstractValue* StringValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (other.Value->kind() == AVK_String) {
-        switch (op) {
-        case INPLACE_ADD:
-        case BINARY_ADD:
-            return this;
-        }
-    }
-    if (op == BINARY_MODULO || op == INPLACE_MODULO) {
-        // Or could be an error, but that seems ok...
-        return this;
-    }
-    else if ((op == BINARY_MULTIPLY || op == INPLACE_MULTIPLY) && other.Value->kind() == AVK_Integer) {
-        return this;
-    }
-    return AbstractValue::binary(selfSources, op, other);
-}
-
-AbstractValue* StringValue::unary(AbstractSource* selfSources, int op) {
-    switch (op) {
-    case UNARY_NOT:
-        return &Bool;
-    }
-    return AbstractValue::unary(selfSources, op);
-}
-
-const char* StringValue::describe() {
-    return "String";
+    return "bool";
 }
 
 // BytesValue methods
@@ -269,75 +325,470 @@ AbstractValueKind BytesValue::kind() {
 }
 
 AbstractValue* BytesValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (other.Value->kind() == AVK_Bytes) {
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
         switch (op) {
-        case INPLACE_ADD:
-        case BINARY_ADD:
-            return this;
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return this;
         }
     }
-    if (op == BINARY_MODULO || op == INPLACE_MODULO) {
-        // Or could be an error, but that seems ok...
-        return this;
+    else if (other_kind == AVK_Bytes) {
+        switch (op) {
+            case BINARY_ADD:
+            case BINARY_MODULO:
+            case INPLACE_ADD:
+            case INPLACE_MODULO:
+                return this;
+        }
     }
-    else if ((op == BINARY_MULTIPLY || op == INPLACE_MULTIPLY) && other.Value->kind() == AVK_Integer) {
-        return this;
+    else if (other_kind == AVK_Dict) {
+        switch (op) {
+            case BINARY_MODULO:
+            case INPLACE_MODULO:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return this;
+            case BINARY_SUBSCR:
+                return &Integer;
+        }
+    }
+    else if (other_kind == AVK_List) {
+        switch (op) {
+            case BINARY_MODULO:
+            case INPLACE_MODULO:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Slice) {
+        switch (op) {
+            case BINARY_SUBSCR:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Tuple) {
+        switch (op) {
+            case BINARY_MODULO:
+            case INPLACE_MODULO:
+                return this;
+        }
     }
     return AbstractValue::binary(selfSources, op, other);
 }
 
 AbstractValue* BytesValue::unary(AbstractSource* selfSources, int op) {
-    switch (op) {
-    case UNARY_NOT:
-        return &Bool;
-    }
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+        }
     return AbstractValue::unary(selfSources, op);
 }
 
 const char* BytesValue::describe() {
-    return "Bytes";
+    return "bytes";
+}
+
+// ComplexValue methods
+AbstractValueKind ComplexValue::kind() {
+    return AVK_Complex;
+}
+
+AbstractValue* ComplexValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
+        switch (op) {
+        case BINARY_ADD:
+        case BINARY_MULTIPLY:
+        case BINARY_POWER:
+        case BINARY_SUBTRACT:
+        case BINARY_TRUE_DIVIDE:
+        case INPLACE_ADD:
+        case INPLACE_MULTIPLY:
+        case INPLACE_POWER:
+        case INPLACE_SUBTRACT:
+        case INPLACE_TRUE_DIVIDE:
+            return this;
+        }
+    }
+    else if (other_kind == AVK_Complex) {
+        switch (op) {
+        case BINARY_ADD:
+        case BINARY_MULTIPLY:
+        case BINARY_POWER:
+        case BINARY_SUBTRACT:
+        case BINARY_TRUE_DIVIDE:
+        case INPLACE_ADD:
+        case INPLACE_MULTIPLY:
+        case INPLACE_POWER:
+        case INPLACE_SUBTRACT:
+        case INPLACE_TRUE_DIVIDE:
+            return this;
+        }
+    }
+    else if (other_kind == AVK_Float) {
+        switch (op) {
+        case BINARY_ADD:
+        case BINARY_MULTIPLY:
+        case BINARY_POWER:
+        case BINARY_SUBTRACT:
+        case BINARY_TRUE_DIVIDE:
+        case INPLACE_ADD:
+        case INPLACE_MULTIPLY:
+        case INPLACE_POWER:
+        case INPLACE_SUBTRACT:
+        case INPLACE_TRUE_DIVIDE:
+            return this;
+        }
+    }
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+        case BINARY_ADD:
+        case BINARY_MULTIPLY:
+        case BINARY_POWER:
+        case BINARY_SUBTRACT:
+        case BINARY_TRUE_DIVIDE:
+        case INPLACE_ADD:
+        case INPLACE_MULTIPLY:
+        case INPLACE_POWER:
+        case INPLACE_SUBTRACT:
+        case INPLACE_TRUE_DIVIDE:
+            return this;
+        }
+    }
+    return AbstractValue::binary(selfSources, op, other);
+}
+
+AbstractValue* ComplexValue::unary(AbstractSource* selfSources, int op) {
+    switch (op) {
+    case UNARY_NOT:
+        return &Bool;
+    case UNARY_NEGATIVE:
+    case UNARY_POSITIVE:
+        return this;
+    }
+    return AbstractValue::unary(selfSources, op);
+}
+
+const char* ComplexValue::describe() {
+    return "complex";
+}
+
+// IntegerValue methods
+AbstractValueKind IntegerValue::kind() {
+    return AVK_Integer;
+}
+
+AbstractValue* IntegerValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
+        switch (op) {
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
+                return &Float;
+            }
+            case BINARY_ADD:
+            case BINARY_AND:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_LSHIFT:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_OR:
+            case BINARY_POWER:
+            case BINARY_RSHIFT:
+            case BINARY_SUBTRACT:
+            case BINARY_XOR:
+            case INPLACE_ADD:
+            case INPLACE_AND:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_LSHIFT:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_OR:
+            case INPLACE_POWER:
+            case INPLACE_RSHIFT:
+            case INPLACE_SUBTRACT:
+            case INPLACE_XOR:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Bytes) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &Bytes;
+        }
+    }
+    else if (other_kind == AVK_Complex) {
+        switch (op) {
+            case BINARY_ADD:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return &Complex;
+        }
+    }
+    else if (other_kind == AVK_Float) {
+        switch (op) {
+            case BINARY_ADD:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
+                return &Float;
+            }
+        }
+    }
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_TRUE_DIVIDE:
+            {
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+	            }
+	            other.escapes();
+                return &Float;
+            }
+            case BINARY_ADD:
+            case BINARY_AND:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_LSHIFT:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_OR:
+            case BINARY_POWER:
+            case BINARY_RSHIFT:
+            case BINARY_SUBTRACT:
+            case BINARY_XOR:
+            case INPLACE_ADD:
+            case INPLACE_AND:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_LSHIFT:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_OR:
+            case INPLACE_POWER:
+            case INPLACE_RSHIFT:
+            case INPLACE_SUBTRACT:
+            case INPLACE_XOR:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_List) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &List;
+        }
+    }
+    else if (other_kind == AVK_String) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &String;
+        }
+    }
+    else if (other_kind == AVK_Tuple) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return &Tuple;
+        }
+    }
+    return AbstractValue::binary(selfSources, op, other);
+}
+
+AbstractValue* IntegerValue::unary(AbstractSource* selfSources, int op) {
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+            case UNARY_INVERT:
+            case UNARY_NEGATIVE:
+            case UNARY_POSITIVE:
+                return this;
+        }
+    return AbstractValue::unary(selfSources, op);
+}
+
+const char* IntegerValue::describe() {
+    return "int";
+}
+
+// StringValue methods
+AbstractValueKind StringValue::kind() {
+    return AVK_String;
+}
+
+AbstractValue* StringValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
+    // String interpolation always returns a `str` (when successful).
+    if (op == BINARY_MODULO || op == INPLACE_MODULO) {
+        return this;
+    }
+
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case BINARY_SUBSCR:
+            case INPLACE_MULTIPLY:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Slice) {
+        switch (op) {
+            case BINARY_SUBSCR:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_String) {
+        switch (op) {
+            case BINARY_ADD:
+            case INPLACE_ADD:
+                return this;
+        }
+    }
+    return AbstractValue::binary(selfSources, op, other);
+}
+
+AbstractValue* StringValue::unary(AbstractSource* selfSources, int op) {
+    switch (op) {
+        case UNARY_NOT:
+            return &Bool;
+    }
+    return AbstractValue::unary(selfSources, op);
+}
+
+const char* StringValue::describe() {
+    return "str";
 }
 
 // FloatValue methods
 AbstractValueKind FloatValue::kind() {
     return AVK_Float;
 }
+
 AbstractValue* FloatValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (other.Value->kind() == AVK_Float) {
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
         switch (op) {
-        case BINARY_TRUE_DIVIDE:
-        case BINARY_FLOOR_DIVIDE:
-        case BINARY_POWER:
-        case BINARY_MODULO:
-        case BINARY_LSHIFT:
-        case BINARY_RSHIFT:
-        case BINARY_AND:
-        case BINARY_XOR:
-        case BINARY_OR:
-        case BINARY_MULTIPLY:
-        case BINARY_SUBTRACT:
-        case BINARY_ADD:
-        case INPLACE_POWER:
-        case INPLACE_MULTIPLY:
-        case INPLACE_TRUE_DIVIDE:
-        case INPLACE_FLOOR_DIVIDE:
-        case INPLACE_MODULO:
-        case INPLACE_ADD:
-        case INPLACE_SUBTRACT:
-            return this;
+            case BINARY_ADD:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Complex) {
+        switch (op) {
+            case BINARY_ADD:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return &Complex;
+        }
+    }
+    else if (other_kind == AVK_Float) {
+        switch (op) {
+            case BINARY_ADD:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+            case BINARY_ADD:
+            case BINARY_FLOOR_DIVIDE:
+            case BINARY_MODULO:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_FLOOR_DIVIDE:
+            case INPLACE_MODULO:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return this;
         }
     }
     return AbstractValue::binary(selfSources, op, other);
 }
 
 AbstractValue* FloatValue::unary(AbstractSource* selfSources, int op) {
-    switch (op) {
-    case UNARY_POSITIVE:
-    case UNARY_NEGATIVE:
-        return this;
-    case UNARY_NOT:
-        return &Bool;
-    }
+        switch (op) {
+            case UNARY_NOT:
+                return &Bool;
+            case UNARY_NEGATIVE:
+            case UNARY_POSITIVE:
+                return this;
+        }
     return AbstractValue::unary(selfSources, op);
 }
 
@@ -351,22 +802,41 @@ AbstractValueKind TupleValue::kind() {
 }
 
 AbstractValue* TupleValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (op == BINARY_ADD && other.Value->kind() == AVK_Tuple) {
-        return this;
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return this;
+        }
     }
-    else if (op == BINARY_MULTIPLY && other.Value->kind() == AVK_Integer) {
-        return this;
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return this;
+        }
     }
-    else if (op == BINARY_SUBSCR && other.Value->kind() == AVK_Slice) {
-        return this;
+    else if (other_kind == AVK_Slice) {
+        switch (op) {
+            case BINARY_SUBSCR:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Tuple) {
+        switch (op) {
+            case BINARY_ADD:
+            case INPLACE_ADD:
+                return this;
+        }
     }
     return AbstractValue::binary(selfSources, op, other);
 }
 
 AbstractValue* TupleValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
+        case UNARY_NOT:
+            return &Bool;
     }
     return AbstractValue::unary(selfSources, op);
 }
@@ -381,22 +851,71 @@ AbstractValueKind ListValue::kind() {
 }
 
 AbstractValue* ListValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (op == BINARY_ADD && other.Value->kind() == AVK_List) {
-        return this;
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Bool) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return this;
+        }
     }
-    else if (op == BINARY_MULTIPLY && other.Value->kind() == AVK_Integer) {
-        return this;
+    else if (other_kind == AVK_Bytes) {
+        switch (op) {
+            case INPLACE_ADD:
+                return this;
+        }
     }
-    else if (op == BINARY_SUBSCR && other.Value->kind() == AVK_Slice) {
-        return this;
+    else if (other_kind == AVK_Dict) {
+        switch (op) {
+            case INPLACE_ADD:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Integer) {
+        switch (op) {
+            case BINARY_MULTIPLY:
+            case INPLACE_MULTIPLY:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_List) {
+        switch (op) {
+            case BINARY_ADD:
+            case INPLACE_ADD:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Set) {
+        switch (op) {
+            case INPLACE_ADD:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Slice) {
+        switch (op) {
+            case BINARY_SUBSCR:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_String) {
+        switch (op) {
+            case INPLACE_ADD:
+                return this;
+        }
+    }
+    else if (other_kind == AVK_Tuple) {
+        switch (op) {
+            case INPLACE_ADD:
+                return this;
+        }
     }
     return AbstractValue::binary(selfSources, op, other);
 }
 
 AbstractValue* ListValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
+        case UNARY_NOT:
+            return &Bool;
     }
     return AbstractValue::unary(selfSources, op);
 }
@@ -427,10 +946,28 @@ AbstractValueKind SetValue::kind() {
     return AVK_Set;
 }
 
+AbstractValue* SetValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
+    auto other_kind = other.Value->kind();
+    if (other_kind == AVK_Set) {
+        switch (op) {
+            case BINARY_AND:
+            case BINARY_OR:
+            case BINARY_SUBTRACT:
+            case BINARY_XOR:
+            case INPLACE_AND:
+            case INPLACE_OR:
+            case INPLACE_SUBTRACT:
+            case INPLACE_XOR:
+                return this;
+        }
+    }
+    return AbstractValue::binary(selfSources, op, other);
+}
+
 AbstractValue* SetValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
+        case UNARY_NOT:
+            return &Bool;
     }
     return AbstractValue::unary(selfSources, op);
 }
@@ -470,7 +1007,7 @@ AbstractValue* FunctionValue::unary(AbstractSource* selfSources, int op) {
 }
 
 const char* FunctionValue::describe() {
-    return "Function";
+    return "function";
 }
 
 // SliceValue methods
@@ -485,53 +1022,5 @@ AbstractValue* SliceValue::unary(AbstractSource* selfSources, int op) {
     return AbstractValue::unary(selfSources, op);
 }
 const char* SliceValue::describe() {
-    return "Slice";
-}
-
-// ComplexValue methods
-AbstractValueKind ComplexValue::kind() {
-    return AVK_Complex;
-}
-
-AbstractValue* ComplexValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (other.Value->kind() == AVK_Complex) {
-        switch (op) {
-        case BINARY_TRUE_DIVIDE:
-        case BINARY_FLOOR_DIVIDE:
-        case BINARY_POWER:
-        case BINARY_MODULO:
-        case BINARY_LSHIFT:
-        case BINARY_RSHIFT:
-        case BINARY_AND:
-        case BINARY_XOR:
-        case BINARY_OR:
-        case BINARY_MULTIPLY:
-        case BINARY_SUBTRACT:
-        case BINARY_ADD:
-        case INPLACE_POWER:
-        case INPLACE_MULTIPLY:
-        case INPLACE_TRUE_DIVIDE:
-        case INPLACE_FLOOR_DIVIDE:
-        case INPLACE_MODULO:
-        case INPLACE_ADD:
-        case INPLACE_SUBTRACT:
-            return this;
-        }
-    }
-    return AbstractValue::binary(selfSources, op, other);
-}
-
-AbstractValue* ComplexValue::unary(AbstractSource* selfSources, int op) {
-    switch (op) {
-    case UNARY_POSITIVE:
-    case UNARY_NEGATIVE:
-        return this;
-    case UNARY_NOT:
-        return &Bool;
-    }
-    return AbstractValue::unary(selfSources, op);
-}
-
-const char* ComplexValue::describe() {
-    return "Complex";
+    return "slice";
 }

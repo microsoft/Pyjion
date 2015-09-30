@@ -10,7 +10,6 @@ class {avk_name}Value : public AbstractValue {{
     virtual AbstractValueKind kind();
     virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual AbstractValue* compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual const char* describe();
 }};
 """
@@ -30,12 +29,6 @@ AbstractValue* {avk_name}Value::binary(AbstractSource* selfSources, int op, Abst
 AbstractValue* {avk_name}Value::unary(AbstractSource* selfSources, int op) {{
 {unary_return_types}
     return AbstractValue::unary(selfSources, op);
-}}
-
-AbstractValue* {avk_name}Value::compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {{
-    auto other_kind = other.Value->kind();
-{compare_return_types}
-    return AbstractValue::compare(selfSources, op, other);
 }}
 
 const char* {avk_name}Value::describe() {{
@@ -59,6 +52,7 @@ known_types = {
     bytes: type_details(b'a', 'Bytes'),
     complex: type_details(2+3j, 'Complex'),
     dict: type_details({0: 1}, 'Dict'),
+    # ellipsis doesn't provide any operations, so no need to infer anything.
     float: type_details(3.14, 'Float'),
     type(function_): type_details(function_, 'Function'),
     int: type_details(42, 'Integer', 'int'),
@@ -69,7 +63,6 @@ known_types = {
     str: type_details('a', 'String', 'str'),
     tuple: type_details((4,), 'Tuple'),
 }
-
 
 unary_operations = {
     'UNARY_POSITIVE': operator.pos,
@@ -123,18 +116,6 @@ binary_operations = {
     'INPLACE_OR': operator.ior,
 }
 
-compare_operations = {
-    'PyCmp_LT': operator.lt,
-    'PyCmp_LE': operator.le,
-    'PyCmp_EQ': operator.eq,
-    'PyCmp_NE': operator.ne,
-    'PyCmp_GT': operator.gt,
-    'PyCmp_GE': operator.ge,
-    'PyCmp_IN': lambda x, y: x in y,
-    'PyCmp_NOT_IN': lambda x, y: x not in y,
-    'PyCmp_IS': operator.is_,
-    'PyCmp_IS_NOT': operator.is_not,
-}
 
 def binary(type_, other_type, operations):
     """Calculate the return types for all binary operations (including in-place)."""
@@ -185,29 +166,33 @@ def format_binary_opcodes(type_, other_type, return_types, *, indent, position):
     return '\n'.join(output)
 
 
-def main():
+valid_names = ', '.join(sorted(x.description for x in known_types.values()))
+
+def main(type_name):
+    for type_, type_detail in known_types.items():
+        if type_detail.description == type_name:
+            break
+    else:
+        raise SystemExit('unrecognized type: {}\nAcceptable types are {}'.format(type_name, valid_names))
     directory = pathlib.Path(__file__).parent
     with open(str(directory/'absvalue.h'), 'w') as file:
-        for type_detail in sorted(known_types.values(), key=lambda x: x.avk_name):
-            file.write(forward_declaration.format(avk_name=type_detail.avk_name))
+        file.write(forward_declaration.format(avk_name=type_detail.avk_name))
 
     with open(str(directory/'absvalue.cpp'), 'w') as file:
-        for type_, type_detail in sorted(known_types.items(), key=lambda pair: pair[1].avk_name):
-            unary_return_types = unary(type_)
-            unary_opcodes = format_unary_opcodes(type_, unary_return_types, indent='        ')
-            binary_opcodes_list = []
-            compare_opcodes_list = []
-            for position, other_type in enumerate(sorted(known_types, key=lambda x: known_types[x].avk_name)):
-                binary_return_types = binary(type_, other_type, binary_operations)
-                opcode_if = format_binary_opcodes(type_, other_type, binary_return_types, indent='    ', position=position)
-                if opcode_if:
-                    binary_opcodes_list.append(opcode_if)
-                compare_return_types = binary(type_, other_type, compare_operations)
-                opcode_if = format_binary_opcodes(type_, other_type, compare_return_types, indent='    ', position=position)
-                if opcode_if:
-                    compare_opcodes_list.append(opcode_if)
-            file.write(class_definition.format(binary_return_types='\n'.join(binary_opcodes_list), unary_return_types=unary_opcodes,
-                                               compare_return_types='\n'.join(compare_opcodes_list), **type_detail.__dict__))
+        unary_return_types = unary(type_)
+        unary_opcodes = format_unary_opcodes(type_, unary_return_types, indent='        ')
+        binary_opcodes_list = []
+        compare_opcodes_list = []
+        branches = 0
+        for other_type in sorted(known_types, key=lambda x: known_types[x].avk_name):
+            binary_return_types = binary(type_, other_type, binary_operations)
+            opcode_if = format_binary_opcodes(type_, other_type, binary_return_types, indent='    ', position=branches)
+            if opcode_if:
+                binary_opcodes_list.append(opcode_if)
+                branches += 1
+        file.write(class_definition.format(binary_return_types='\n'.join(binary_opcodes_list), unary_return_types=unary_opcodes,
+                                            compare_return_types='\n'.join(compare_opcodes_list), **type_detail.__dict__))
+    print('NOTE: check operations that require specific formatting (e.g., `"%s" % (4,)` or `b"a"[0]`)')
 
 
 def test():
@@ -220,4 +205,7 @@ def test():
 
 
 if __name__ == '__main__':
-    main()
+    import sys
+    if len(sys.argv[1:]) != 1:
+        raise SystemExit('only 1 argument expected, not {}\nAcceptable argument can be one of {}'.format(len(sys.argv[1:]), valid_names))
+    main(sys.argv[1])
