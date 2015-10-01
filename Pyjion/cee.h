@@ -52,10 +52,11 @@ using namespace std;
 
 class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager {
 public:
-    HANDLE m_codeHeap;
+    HANDLE m_codeHeap, m_heap;
 
     CExecutionEngine() {
         m_codeHeap = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
+        m_heap = HeapCreate(0, 0, 0);
     }
 
     // Thread Local Storage is based on logical threads.  The underlying
@@ -264,7 +265,7 @@ public:
     }
 
     HANDLE ClrGetProcessHeap() {
-        return ::GetProcessHeap();
+        return m_heap;
     }
 
     HANDLE ClrHeapCreate(

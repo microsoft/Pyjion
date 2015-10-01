@@ -44,18 +44,27 @@ HRESULT __stdcall GetCORSystemDirectoryInternal(__out_ecount_part_opt(cchBuffer,
     return S_OK;
 }
 
+CExecutionEngine g_execEngine;
+
+bool EEHeapFreeInProcessHeap(DWORD dwFlags, LPVOID lpMem) {
+    return ::HeapFree(g_execEngine.ClrGetProcessHeap(), dwFlags, lpMem);
+}
+
+LPVOID EEHeapAllocInProcessHeap(DWORD dwFlags, SIZE_T dwBytes) {
+    return ::HeapAlloc(g_execEngine.ClrGetProcessHeap(), dwFlags, dwBytes);    
+}
+
 void* __stdcall GetCLRFunction(LPCSTR functionName) {
     if (strcmp(functionName, "EEHeapAllocInProcessHeap") == 0) {
-        return ::GlobalAlloc;
+        return ::EEHeapAllocInProcessHeap;
     }
     else if (strcmp(functionName, "EEHeapFreeInProcessHeap") == 0) {
-        return ::GlobalFree;
+        return ::EEHeapFreeInProcessHeap;
     }
     printf("get clr function %s\n", functionName);
     return NULL;
 }
 
-CExecutionEngine g_execEngine;
 
 IExecutionEngine* __stdcall IEE() {
     return &g_execEngine;
@@ -2548,6 +2557,7 @@ extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
     auto jittedCode = (PyJittedCode*)PyJittedCode_New();
     if (jittedCode == nullptr) {
         // OOM
+        delete res;
         return nullptr;
     }
 
@@ -2563,6 +2573,7 @@ extern "C" __declspec(dllexport) void JitFree(PyJittedCode* function) {
         auto code = find->second;
 
         delete code;
+        g_jittedCode.erase(function);
     }
 }
 
