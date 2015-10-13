@@ -13,7 +13,7 @@ Pyjion - A JIT for Python based upon CoreCLR
 ## Getting Started
 
 ### Download dependencies
-Run `GetDeps.bat` to use git to download [CoreCLR](https://github.com/dotnet/coreclr) and hg to download [Python](https://hg.python.org/cpython).  It will also patch Python to have JIT support and CoreCLR to disable COM support.
+Run `GetDeps.bat` to use git to download [CoreCLR](https://github.com/dotnet/coreclr) and [Python](https://github.com/python/cpython).  It will also patch Python to have JIT support and CoreCLR to disable COM support.
 
 ### Build Dependencies
 Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Python's dependencies).
