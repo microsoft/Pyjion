@@ -34,7 +34,7 @@ Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Pyth
 If the output window closes and return an exit code of 0 then the tests passed.
 
 ### Running
-1. Copy `x64\Debug\pyjit.dll` to `Python\PCbuild\amd64\' (initially done by `CopyFiles.bat`, so only do as necessary after rebuilding Pyjion)
+1. Copy `x64\Debug\pyjit.dll` to `Python\PCbuild\amd64\` (initially done by `CopyFiles.bat`, so only do as necessary after rebuilding Pyjion)
 2. Go into the `Python` directory and launch `python.bat`
 
 
