@@ -886,7 +886,7 @@ void AbstractInterpreter::dump() {
                 }
             }
             for (size_t i = 0; i < state.stack_size(); i++) {
-                printf("          %-20d %s\r\n", i, state[i].Value->describe());
+                printf("          %-20Id %s\r\n", i, state[i].Value->describe());
                 dump_sources(state[i].Sources);
             }
         }
@@ -899,7 +899,7 @@ void AbstractInterpreter::dump() {
                 case SETUP_FINALLY:
                 case JUMP_FORWARD:
                 case FOR_ITER:
-                    printf("    %-3d %-22s %d (to %d)\r\n",
+                    printf("    %-3Id %-22s %d (to %Id)\r\n",
                         byteIndex,
                         opcode_name(opcode),
                         oparg,
@@ -907,7 +907,7 @@ void AbstractInterpreter::dump() {
                         );
                     break;
                 case LOAD_FAST:
-                    printf("    %-3d %-22s %d (%s) [%s]\r\n",
+                    printf("    %-3Id %-22s %d (%s) [%s]\r\n",
                         byteIndex,
                         opcode_name(opcode),
                         oparg,
@@ -917,7 +917,7 @@ void AbstractInterpreter::dump() {
                     break;
                 case STORE_FAST:
                 case DELETE_FAST:
-                    printf("    %-3d %-22s %d (%s)\r\n",
+                    printf("    %-3Id %-22s %d (%s)\r\n",
                         byteIndex,
                         opcode_name(opcode),
                         oparg,
@@ -933,7 +933,7 @@ void AbstractInterpreter::dump() {
                 case LOAD_GLOBAL:
                 case STORE_GLOBAL:
                 case DELETE_GLOBAL:
-                    printf("    %-3d %-22s %d (%s)\r\n",
+                    printf("    %-3Id %-22s %d (%s)\r\n",
                         byteIndex,
                         opcode_name(opcode),
                         oparg,
@@ -945,7 +945,7 @@ void AbstractInterpreter::dump() {
                         auto repr = PyObject_Repr(PyTuple_GetItem(m_code->co_consts, oparg));
                         auto reprStr = PyUnicode_AsUTF8(repr);
                         printf(
-                            "    %-3d %-22s %d (%s) [%s]\r\n",
+                            "    %-3Id %-22s %d (%s) [%s]\r\n",
                             byteIndex,
                             opcode_name(opcode),
                             oparg,
@@ -956,12 +956,12 @@ void AbstractInterpreter::dump() {
                         break;
                     }
                 default:
-                    printf("    %-3d %-22s %d\r\n", byteIndex, opcode_name(opcode), oparg);
+                    printf("    %-3Id %-22s %d\r\n", byteIndex, opcode_name(opcode), oparg);
                     break;
             }
         }
         else {
-            printf("    %-3d %-22s\r\n", byteIndex, opcode_name(opcode));
+            printf("    %-3Id %-22s\r\n", byteIndex, opcode_name(opcode));
         }
     }
     printf("Returns %s\r\n", m_returnValue->describe());
