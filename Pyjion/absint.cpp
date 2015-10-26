@@ -742,7 +742,9 @@ bool AbstractInterpreter::interpret() {
                 case YIELD_VALUE:
                     return false;
                 default:
+#ifdef _DEBUG
                     printf("Unknown unsupported opcode: %s", opcode_name(opcode));
+#endif
                     return false;
             }
             update_start_state(lastState, curByte + 1);
