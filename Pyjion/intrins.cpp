@@ -158,7 +158,7 @@ int PyJit_RichEquals_Long(PyObject *left, PyObject *right, void**state) {
 
 int PyJit_RichEquals_Generic(PyObject *left, PyObject *right, void**state) {
     if (left->ob_type == right->ob_type) {
-        if (PyUnicode_Check(left)) {
+        if (PyUnicode_CheckExact(left)) {
             *state = &PyJit_RichEquals_Str;
             return PyJit_RichEquals_Str(left, right, state);
         }
