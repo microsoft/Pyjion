@@ -268,6 +268,22 @@ void PyJitTest() {
             TestInput("True")
         ),
         TestCase(
+            "def f():\n    x = 'a'\n    y = 'b'\n    if x == y:\n        return True\n    return False",
+            TestInput("False")
+        ),
+        TestCase(
+            "def f():\n    x = 'a'\n    y = 'a'\n    if x == y:\n        return True\n    return False",
+            TestInput("True")
+        ),
+        TestCase(
+            "def f():\n    class Foo(str): pass\n    x = Foo(1)\n    y = Foo(2)\n    if x == y:        return True\n    return False",
+            TestInput("False")
+        ),
+        TestCase(
+            "def f():\n    class Foo(str): pass\n    x = Foo(1)\n    y = Foo(1)\n    if x == y:        return True\n    return False",
+            TestInput("True")
+        ),
+        TestCase(
         "def f():\n    x = 2.0\n    y = 3.0\n    if x != y:\n        return True\n    return False",
         TestInput("True")
         ),
