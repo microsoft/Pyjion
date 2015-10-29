@@ -48,40 +48,9 @@
 #include <openum.h>
 
 #include "codemodel.h"
+#include "compdata.h"
 
 using namespace std;
-
-enum BranchType {
-    BranchAlways,
-    BranchTrue,
-    BranchFalse,
-    BranchEqual,
-    BranchNotEqual,
-    BranchLeave,
-};
-
-
-class Local {
-public:
-    int m_index;
-
-    Local(int index = -1) {
-        m_index = index;
-    }
-
-    bool is_valid() {
-        return m_index != -1;
-    }
-};
-
-class Label {
-public:
-    int m_index;
-
-    Label(int index = -1) {
-        m_index = index;
-    }
-};
 
 class LabelInfo {
 public:
@@ -233,13 +202,7 @@ public:
         push_back(CEE_LDIND_I4);
     }
 
-    void ld_i(int i) {
-        m_il.push_back(CEE_LDC_I4);
-        emit_int(i);
-        m_il.push_back(CEE_CONV_I);
-    }
-
-    void branch(BranchType branchType, Label label) {
+	void branch(BranchType branchType, Label label) {
         auto info = &m_labels[label.m_index];
         if (info->m_location == -1) {
             info->m_branchOffsets.push_back((int)m_il.size() + 1);
@@ -356,7 +319,17 @@ public:
         compare_eq();
     }
 
-    void push_ptr(void* ptr) {
+	void ld_i(int i) {
+		m_il.push_back(CEE_LDC_I4);
+		emit_int(i);
+		m_il.push_back(CEE_CONV_I);
+	}
+
+	void ld_i(size_t i) {
+		ld_i((void*)i);
+	}
+
+	void ld_i(void* ptr) {
         size_t value = (size_t)ptr;
 #ifdef _TARGET_AMD64_
         if ((value & 0xFFFFFFFF) == value) {

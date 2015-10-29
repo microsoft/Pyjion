@@ -56,10 +56,11 @@
 
 #include "codemodel.h"
 #include "cee.h"
+#include "compdata.h"
 
 using namespace std;
 
-class CorJitInfo : public ICorJitInfo {
+class CorJitInfo : public ICorJitInfo, public JittedCode {
     CExecutionEngine& m_executionEngine;
     void* m_codeAddr;
     void* m_dataAddr;
