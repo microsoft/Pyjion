@@ -32,6 +32,7 @@
 
 #include "absvalue.h"
 #include "cowvector.h"
+#include "ipycomp.h"
 
 using namespace std;
 
@@ -61,6 +62,64 @@ class InterpreterState;
 // Once we've processed all of the blocks of code in this manner the analysis
 // is complete.
 
+#define STACK_KIND_OBJECT true
+#define STACK_KIND_VALUE  false
+
+#define BLOCK_CONTINUES 0x01
+#define BLOCK_RETURNS	0x02
+#define BLOCK_BREAKS	0x04
+
+
+struct ExceptionVars {
+	Local PrevExc, PrevExcVal, PrevTraceback;
+
+	ExceptionVars() {
+	}
+
+	ExceptionVars(Local prevExc, Local prevExcVal, Local prevTraceback) {
+		PrevExc = prevExc;
+		PrevExcVal = prevExcVal;
+		PrevTraceback = prevTraceback;
+	}
+};
+
+struct EhInfo {
+	bool IsFinally;
+	int Flags;
+
+	EhInfo(bool isFinally) {
+		IsFinally = isFinally;
+		Flags = 0;
+	}
+};
+
+struct BlockInfo {
+	Label Raise,		// our raise stub label, prepares the exception
+		ReRaise,		// our re-raise stub label, prepares the exception w/o traceback update
+		ErrorTarget;	// the actual label for the handler
+	int EndOffset, Kind, Flags, ContinueOffset;
+	size_t BlockId;
+	ExceptionVars ExVars;
+	Local LoopVar; //, LoopOpt1, LoopOpt2;
+	vector<bool> Stack;
+
+	BlockInfo() {
+	}
+
+	BlockInfo(vector<bool> stack, size_t blockId, Label raise, Label reraise, Label errorTarget, int endOffset, int kind, int flags = 0, int continueOffset = 0) {
+		Stack = stack;
+		BlockId = blockId;
+		Raise = raise;
+		ReRaise = reraise;
+		ErrorTarget = errorTarget;
+		EndOffset = endOffset;
+		Kind = kind;
+		Flags = flags;
+		ContinueOffset = continueOffset;
+	}
+};
+
+
 class __declspec(dllexport) AbstractInterpreter {
 #pragma warning (disable:4251)
     // ** Results produced:
@@ -86,13 +145,50 @@ class __declspec(dllexport) AbstractInterpreter {
     // all values produced during abstract interpretation, need to be freed
     vector<AbstractValue*> m_values;
     vector<AbstractSource*> m_sources;
+	IPythonCompiler* m_comp;
+	// m_blockStack is like Python's f_blockstack which lives on the frame object, except we only maintain
+	// it at compile time.  Blocks are pushed onto the stack when we enter a loop, the start of a try block,
+	// or into a finally or exception handler.  Blocks are popped as we leave those protected regions.
+	// When we pop a block associated with a try body we transform it into the correct block for the handler
+	vector<BlockInfo> m_blockStack;
+	// All of the exception handlers defined in the method.  After generating the method we'll generate helper
+	// targets which dispatch to each of the handlers.
+	vector<BlockInfo> m_allHandlers;
+	// Tracks the state for the handler block, used for END_FINALLY processing.  We push these with a SETUP_EXCEPT/
+	// SETUP_FINALLY, update them when we hit the POP_EXCEPT so we have information about the try body, and then
+	// finally pop them when we hit the SETUP_FINALLY.  These are independent from the block stack because they only
+	// contain information about exceptions, and don't change as we transition from the body of the try to the body
+	// of the handler.
+	vector<EhInfo> m_ehInfo;
+	// Labels that map from a Python byte code offset to an ilgen label.  This allows us to branch to any
+	// byte code offset.
+	unordered_map<int, Label> m_offsetLabels;
+	// Tracks the depth of the Python stack
+	size_t m_blockIds;
+	// Tracks the current depth of the stack,  as well as if we have an object reference that needs to be freed.
+	// True (STACK_KIND_OBJECT) if we have an object, false (STACK_KIND_VALUE) if we don't
+	vector<bool> m_stack;
+	// Tracks the state of the stack when we perform a branch.  We copy the existing state to the map and
+	// reload it when we begin processing at the stack.
+	unordered_map<int, vector<bool>> m_offsetStack;
+	vector<vector<Label>> m_raiseAndFree;
+	Label m_retLabel;
+	Local m_retValue;
+	// Stores information for a stack allocated local used for sequence unpacking.  We need to allocate
+	// one of these when we enter the method, and we use it if we don't have a sequence we can efficiently
+	// unpack.
+	unordered_map<int, Local> m_sequenceLocals;
+	unordered_map<int, bool> m_assignmentState;
+	unordered_map<int, unordered_map<AbstractValueKind, Local>> m_optLocals;
+
 #pragma warning (default:4251)
 
 public:
-    AbstractInterpreter(PyCodeObject *code);
+    AbstractInterpreter(PyCodeObject *code, IPythonCompiler* compiler);
     ~AbstractInterpreter();
 
-    bool interpret();
+	JittedCode* compile();
+	bool interpret();
     void dump();
 
     // Returns information about the specified local variable at a specific 
@@ -130,6 +226,83 @@ private:
     AbstractSource* add_local_source(size_t opcodeIndex, size_t localIndex);
     AbstractSource* add_const_source(size_t opcodeIndex, size_t constIndex);
     AbstractSource* add_intermediate_source(size_t opcodeIndex);
+
+	void make_function(int posdefaults, int kwdefaults, int num_anotations, bool isClosure);
+	void fancy_call(int na, int nk, int flags);
+	bool can_skip_lasti_update(int opcodeIndex);
+	void build_tuple(size_t argCnt);
+	void build_list(size_t argCnt);
+	void build_set(size_t argCnt);
+
+	void unpack_ex(size_t size, int opcode);
+
+	void build_map(size_t argCnt);
+
+	Label getOffsetLabel(int jumpTo);
+	void for_iter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo);
+
+	// Checks to see if we have a null value as the last value on our stack
+	// indicating an error, and if so, branches to our current error handler.
+	void error_check(int curIndex, const char* reason);
+	void error_check();
+	void int_error_check();
+
+	vector<Label>& getRaiseAndFreeLabels(size_t blockId);
+
+	void branch_raise();
+
+	void clean_stack_for_reraise();
+	// Checks to see if we have a non-zero error code on the stack, and if so,
+	// branches to the current error handler.  Consumes the error code in the process
+	void int_error_check(int curIndex);
+
+	void unwind_eh(ExceptionVars& exVars);
+
+	BlockInfo get_ehblock();
+
+	void mark_offset_label(int index);
+
+	// Frees our iteration temporary variable which gets allocated when we hit
+	// a FOR_ITER.  Used when we're breaking from the current loop.
+	void free_iter_local();
+
+	void jump_absolute(int index);
+
+	// Frees all of the iteration variables in a range. Used when we're
+	// going to branch to a finally through multiple loops.
+	void free_all_iter_locals(size_t to = 0);
+
+	// Frees all of our iteration variables.  Used when we're unwinding the function
+	// on an exception.
+	void free_iter_locals_on_exception();
+
+	void dec_stack(size_t size = 1);
+
+	void inc_stack(size_t size = 1, bool kind = STACK_KIND_OBJECT);
+
+	// Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
+	// If the value on the stack is -1, we branch to the current error handler.
+	// Otherwise branches based if the current value is true/false based upon the current opcode 
+	void branch_or_error(int& i);
+
+	// Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
+	// Branches based if the current value is true/false based upon the current opcode 
+	void branch(int& i);
+	void compare_op(int compareType, int& i, int opcodeIndex);
+	JittedCode* compile_worker();
+
+
+	void store_fast(int local, int opcodeIndex);
+
+	void load_const(int constIndex, int opcodeIndex);
+
+	void return_value(int opcodeIndex);
+
+	void load_fast(int local, int opcodeIndex);
+	void load_fast_worker(int local, bool checkUnbound);
+	void unpack_sequence(size_t size, int opcode);
+	Local get_optimized_local(int index, AbstractValueKind kind);
+	void pop_except();
 };
 
 

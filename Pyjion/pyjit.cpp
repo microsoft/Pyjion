@@ -32,7 +32,7 @@ extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
     if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
         return nullptr;
     }
-//#ifdef DEBUG_TRACE
+#ifdef DEBUG_TRACE
     static int compileCount = 0, failCount = 0;
     printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n",
         PyUnicode_AsUTF8(code->co_name),
@@ -40,10 +40,11 @@ extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
         code->co_firstlineno,
         ++compileCount,
         failCount);
-//#endif
+#endif
 
     PythonCompiler jitter(code);
-    auto res = jitter.compile();
+	AbstractInterpreter interp(code, &jitter);
+    auto res = interp.compile();
 
     if (res == nullptr) {
 #ifdef DEBUG_TRACE

@@ -48,7 +48,7 @@
 #include <openum.h>
 
 #include "codemodel.h"
-#include "compdata.h"
+#include "ipycomp.h"
 
 using namespace std;
 

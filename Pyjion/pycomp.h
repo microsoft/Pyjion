@@ -52,7 +52,6 @@
 #include "ilgen.h"
 #include "intrins.h"
 #include "absint.h"
-#include "compdata.h"
 
 // binary operator helpers
 #define METHOD_ADD_TOKEN					0x00000000
@@ -140,7 +139,7 @@
 #define METHOD_RICHEQUALS_GENERIC_TOKEN     0x00000052
 #define METHOD_FLOAT_FROM_DOUBLE            0x00000053
 #define METHOD_BOOL_FROM_LONG               0x00000054
-#define METHOD_FLOAT_ZERO_DIV               0x00000055
+#define METHOD_PYERR_SETSTRING              0x00000055
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -186,117 +185,26 @@
 
 #define FIRST_USER_FUNCTION_TOKEN   0x00100000
 
-#define STACK_KIND_OBJECT true
-#define STACK_KIND_VALUE  false
-
 #define LD_FIELDA(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); 
 #define LD_FIELD(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); m_il.ld_ind_i();
 #define ST_FIELD(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); m_il.st_ind_i();
 
-#define BLOCK_CONTINUES 0x01
-#define BLOCK_RETURNS	0x02
-#define BLOCK_BREAKS	0x04
 
 #define NEXTARG() *(unsigned short*)&m_byteCode[i + 1]; i+= 2
 
 extern ICorJitCompiler* g_jit;
-
-struct ExceptionVars {
-    Local PrevExc, PrevExcVal, PrevTraceback;
-
-    ExceptionVars() {
-    }
-
-    ExceptionVars(Local prevExc, Local prevExcVal, Local prevTraceback) {
-        PrevExc = prevExc;
-        PrevExcVal = prevExcVal;
-        PrevTraceback = prevTraceback;
-    }
-};
-
-struct EhInfo {
-    bool IsFinally;
-    int Flags;
-
-    EhInfo(bool isFinally) {
-        IsFinally = isFinally;
-        Flags = 0;
-    }
-};
-
-struct BlockInfo {
-    Label Raise,		// our raise stub label, prepares the exception
-        ReRaise,		// our re-raise stub label, prepares the exception w/o traceback update
-        ErrorTarget;	// the actual label for the handler
-    int EndOffset, Kind, Flags, ContinueOffset;
-    size_t BlockId;
-    ExceptionVars ExVars;
-    Local LoopVar; //, LoopOpt1, LoopOpt2;
-    vector<bool> Stack;
-
-    BlockInfo() {
-    }
-
-    BlockInfo(vector<bool> stack, size_t blockId, Label raise, Label reraise, Label errorTarget, int endOffset, int kind, int flags = 0, int continueOffset = 0) {
-        Stack = stack;
-        BlockId = blockId;
-        Raise = raise;
-        ReRaise = reraise;
-        ErrorTarget = errorTarget;
-        EndOffset = endOffset;
-        Kind = kind;
-        Flags = flags;
-        ContinueOffset = continueOffset;
-    }
-};
-
 class PythonCompiler : public IPythonCompiler {
     PyCodeObject *m_code;
     // pre-calculate some information...
     ILGenerator m_il;
-    // Stores information for a stack allocated local used for sequence unpacking.  We need to allocate
-    // one of these when we enter the method, and we use it if we don't have a sequence we can efficiently
-    // unpack.
-    unordered_map<int, Local> m_sequenceLocals;
     unsigned char *m_byteCode;
     size_t m_size;
-    // m_blockStack is like Python's f_blockstack which lives on the frame object, except we only maintain
-    // it at compile time.  Blocks are pushed onto the stack when we enter a loop, the start of a try block,
-    // or into a finally or exception handler.  Blocks are popped as we leave those protected regions.
-    // When we pop a block associated with a try body we transform it into the correct block for the handler
-    vector<BlockInfo> m_blockStack;
-    // All of the exception handlers defined in the method.  After generating the method we'll generate helper
-    // targets which dispatch to each of the handlers.
-    vector<BlockInfo> m_allHandlers;
-    // Tracks the state for the handler block, used for END_FINALLY processing.  We push these with a SETUP_EXCEPT/
-    // SETUP_FINALLY, update them when we hit the POP_EXCEPT so we have information about the try body, and then
-    // finally pop them when we hit the SETUP_FINALLY.  These are independent from the block stack because they only
-    // contain information about exceptions, and don't change as we transition from the body of the try to the body
-    // of the handler.
-    vector<EhInfo> m_ehInfo;
-    // Labels that map from a Python byte code offset to an ilgen label.  This allows us to branch to any
-    // byte code offset.
-    unordered_map<int, Label> m_offsetLabels;
-    // Tracks the depth of the Python stack
-    size_t m_blockIds;
-    // Tracks the current depth of the stack,  as well as if we have an object reference that needs to be freed.
-    // True (STACK_KIND_OBJECT) if we have an object, false (STACK_KIND_VALUE) if we don't
-    vector<bool> m_stack;
-    // Tracks the state of the stack when we perform a branch.  We copy the existing state to the map and
-    // reload it when we begin processing at the stack.
-    unordered_map<int, vector<bool>> m_offsetStack;
-    vector<vector<Label>> m_raiseAndFree;
     UserModule* m_module;
-    unordered_map<int, bool> m_assignmentState;
-    unordered_map<int, unordered_map<AbstractValueKind, Local>> m_optLocals;
-    AbstractInterpreter m_interp;
-    Local m_retValue, m_tb, m_ehVal, m_excType;
+    Local m_tb, m_ehVal, m_excType;
 	Local m_lasti;
-    Label m_retLabel;
 
 public:
     PythonCompiler(PyCodeObject *code);
-	JittedCode* compile();
 
     virtual void emit_rot_two();
 
@@ -308,9 +216,8 @@ public:
 
     virtual void emit_dup_top_two();
 
-    virtual void emit_compare_op(int compare);
-    virtual void emit_jump_if_or_pop(bool isTrue, int index);
-    virtual void emit_pop_jump_if(bool isTrue, int index);
+    virtual void emit_jump_if_or_pop(bool isTrue, Label target);
+    virtual void emit_pop_jump_if(bool isTrue, Label target);
     virtual void emit_load_name(PyObject* name);
 
 	virtual void emit_push_frame();
@@ -323,7 +230,7 @@ public:
 	virtual void emit_check_function_result();
 
 	virtual void emit_ret();
-
+	
     virtual void emit_store_name(PyObject* name);
     virtual void emit_delete_name(PyObject* name);
     virtual void emit_store_attr(PyObject* name);
@@ -346,9 +253,7 @@ public:
 
 	virtual void emit_new_dict(size_t size);
 
-    virtual void emit_build_map(size_t size);
     virtual void emit_build_slice();
-    virtual void emit_build_set(size_t size);
 
     virtual void emit_store_subscr();
     virtual void emit_delete_subscr();
@@ -363,77 +268,77 @@ public:
     virtual void emit_import_from(PyObject* name);
     virtual void emit_import_star();
 
-    void emit_pop_except();
-    void emit_load_build_class();
+    virtual void emit_load_build_class();
 
-	void emit_unpack_sequence(Local sequence, Local sequenceStorage, Label success, size_t size);
-	void emit_load_array(int index);
+	virtual void emit_unpack_sequence(Local sequence, Local sequenceStorage, Label success, size_t size);
+	virtual void emit_load_array(int index);
 
-    void unpack_sequence(size_t size, int opcode);
-    void emit_unpack_ex(Local sequence, size_t leftSize, size_t rightSize, Local sequenceStorage, Local list, Local remainder);
+    virtual void emit_unpack_ex(Local sequence, size_t leftSize, size_t rightSize, Local sequenceStorage, Local list, Local remainder);
 
-    void emit_fancy_call();
+    virtual void emit_fancy_call();
 	// Emits a call for the specified argument count.  If the compiler
 	// can't emit a call with this number of args then it returns false,
 	// and emit_call_with_tuple is used to call with a variable sized
 	// tuple instead.
-	bool emit_call(size_t argCnt);
-	void emit_call_with_tuple();
-	void emit_call(size_t argCnt, size_t kwArgCnt);
+	virtual bool emit_call(size_t argCnt);
+	virtual void emit_call_with_tuple();
+	virtual void emit_call_with_kws();
 
-	void emit_new_function();
-	void emit_set_closure();
-	void emit_set_annotations();
-	void emit_set_kw_defaults();
-	void emit_set_defaults();
+	virtual void emit_new_function();
+	virtual void emit_set_closure();
+	virtual void emit_set_annotations();
+	virtual void emit_set_kw_defaults();
+	virtual void emit_set_defaults();
 
-    void emit_load_deref(int index);
-    void emit_store_deref(int index);
-    void emit_delete_deref(int index);
-    void emit_load_closure(int index);
+    virtual void emit_load_deref(int index);
+    virtual void emit_store_deref(int index);
+    virtual void emit_delete_deref(int index);
+    virtual void emit_load_closure(int index);
 
-	Local emit_spill();
-	void emit_store_local(Local local);
-	void emit_load_local(Local local, bool free = true);
-	Local emit_define_local(bool cache = true);
-	void emit_free_local(Local local);
-	Local emit_allocate_stack_array(size_t elements);
+	virtual Local emit_spill();
+	virtual void emit_store_local(Local local);
+	
+	virtual void emit_load_local(Local local);
+	virtual void emit_load_and_free_local(Local local);
+	virtual Local emit_define_local(bool cache);
+	virtual Local emit_define_local(LocalKind kind = LK_Pointer);
+	virtual void emit_free_local(Local local);
+	virtual Local emit_allocate_stack_array(size_t elements);
 
-    void emit_set_add();
-    void emit_map_add();
-    void emit_list_append();
+    virtual void emit_set_add();
+    virtual void emit_map_add();
+    virtual void emit_list_append();
 
-    void emit_raise_varargs();
+    virtual void emit_raise_varargs();
 
-	void emit_null();
+	virtual void emit_null();
 
-    void emit_print_expr();
-    void emit_load_classderef(int index);
-    void emit_getiter();
+    virtual void emit_print_expr();
+    virtual void emit_load_classderef(int index);
+    virtual void emit_getiter();
     //void emit_getiter_opt();
-	void emit_for_next(Label processValue, Local iterValue);
+	virtual void emit_for_next(Label processValue, Local iterValue);
     
-    void emit_binary_float(int opcode);
-    void emit_binary_object(int opcode);
+    virtual void emit_binary_float(int opcode);
+    virtual void emit_binary_object(int opcode);
     
-    void emit_in_int();
-    void emit_in();
-    void emit_not_in_int();
-    void emit_not_in();
+    virtual void emit_in_int();
+    virtual void emit_in();
+    virtual void emit_not_in_int();
+    virtual void emit_not_in();
 
-    void emit_is_int(bool isNot);
+    virtual void emit_is_int(bool isNot);
 
-    void emit_is(bool isNot);
+    virtual void emit_is(bool isNot);
 
-    void emit_compare_object(int compareType);
-    void emit_compare_float(int compareType);
-    bool emit_compare_object_ret_bool(int compareType);
+    virtual void emit_compare_object(int compareType);
+    virtual void emit_compare_float(int compareType);
+    virtual bool emit_compare_object_ret_bool(int compareType);
 
-	void emit_store_float(int local);
-	void emit_store_fast(int local);
+	virtual void emit_store_fast(int local);
 
-	void emit_load_fast(int local, bool checkUnbound);
-	void emit_load_float(int local);
+	virtual void emit_unbound_local_check(int local, Label success);
+	virtual void emit_load_fast(int local);
 
 	virtual Label emit_define_label();
 	virtual void emit_mark_label(Label label);
@@ -442,11 +347,15 @@ public:
 
 	virtual void emit_int(int value);
 	virtual void emit_float(double value);
+	virtual void emit_ptr(void *value);
 	virtual void emit_py_object(PyObject* value);
 
+	virtual void emit_clear_eh();
+	virtual void emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback);
 	virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback, bool includeTbAndValue);
 	virtual void emit_restore_err();
 	virtual void emit_restore_err(Local finallyReason);
+	virtual void emit_pyerr_setstring(PyObject* exception, const char*msg);
 
 	virtual void emit_compare_exceptions();
 	virtual void emit_compare_exceptions_int();
@@ -460,98 +369,17 @@ public:
 	virtual void emit_box_bool();
 
 	virtual JittedCode* emit_compile();
-
 	
 private:
-	void make_function(int posdefaults, int kwdefaults, int num_anotations, bool isClosure);
-	void fancy_call(int na, int nk, int flags);
-	bool can_skip_lasti_update(int opcodeIndex);
     void load_frame();
 
     void load_local(int oparg);
     void incref();
-
     void decref();
-
-    void build_tuple(size_t argCnt);
-    void build_list(size_t argCnt);
-	void build_set(size_t argCnt);
-
-	void unpack_ex(size_t size, int opcode);
-
-    void build_map(size_t argCnt);
-
-    Label getOffsetLabel(int jumpTo);
-	void for_iter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo);
-
-    // Checks to see if we have a null value as the last value on our stack
-    // indicating an error, and if so, branches to our current error handler.
-    void emit_error_check(int curIndex, const char* reason);
-    void emit_error_check();
-    void emit_int_error_check();
-
-    vector<Label>& getRaiseAndFreeLabels(size_t blockId);
-
-    void branch_raise();
-
-    void clean_stack_for_reraise();
-    // Checks to see if we have a non-zero error code on the stack, and if so,
-    // branches to the current error handler.  Consumes the error code in the process
-    void emit_int_error_check(int curIndex);
-
-    void unwind_eh(ExceptionVars& exVars);
-
-    BlockInfo get_ehblock();
-
-    void mark_offset_label(int index);
-
-    void preprocess();
-
-    // Frees our iteration temporary variable which gets allocated when we hit
-    // a FOR_ITER.  Used when we're breaking from the current loop.
-    void free_iter_local();
-
-	void jump_absolute(int index);
-
-    // Frees all of the iteration variables in a range. Used when we're
-    // going to branch to a finally through multiple loops.
-    void free_all_iter_locals(size_t to = 0);
-
-    // Frees all of our iteration variables.  Used when we're unwinding the function
-    // on an exception.
-    void free_iter_locals_on_exception();
-
-    void dec_stack(size_t size = 1);
-
-    void inc_stack(size_t size = 1, bool kind = STACK_KIND_OBJECT);
-
-    // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
-    // If the value on the stack is -1, we branch to the current error handler.
-    // Otherwise branches based if the current value is true/false based upon the current opcode 
-    void branch_or_error(int& i);
-
-    // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
-    // Branches based if the current value is true/false based upon the current opcode 
-    void branch(int& i);
-
+	
     void call_optimizing_function(int baseFunction);
 
-
-    CorInfoType to_clr_type(AbstractValueKind kind);
-
-    Local get_optimized_local(int index, AbstractValueKind kind);
-
-    void store_fast(int local, int opcodeIndex);
-
-    void load_const(int constIndex, int opcodeIndex);
-
-    void return_value(int opcodeIndex);
-
-    void compare_op(int compareType, int& i, int opcodeIndex);
-
-    void load_fast(int local, int opcodeIndex);
-
-    JittedCode* compile_worker();
+    CorInfoType to_clr_type(LocalKind kind);
 };
 
 #endif

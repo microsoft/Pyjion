@@ -92,17 +92,14 @@ Module g_module;
 ICorJitCompiler* g_jit;
 
 PythonCompiler::PythonCompiler(PyCodeObject *code) :
-    m_interp(code),
     m_il(m_module = new UserModule(g_module),
         CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) }) {
     this->m_code = code;
     this->m_byteCode = (unsigned char *)((PyBytesObject*)code->co_code)->ob_sval;
     this->m_size = PyBytes_Size(code->co_code);
-    m_retValue = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
     m_tb = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
     m_ehVal = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
     m_excType = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-    m_retLabel = m_il.define_label();
 	m_lasti = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 }
 
@@ -169,35 +166,6 @@ void PythonCompiler::decref() {
 
 
 
-void PythonCompiler::unwind_eh(ExceptionVars& exVars) {
-    m_il.ld_loc(exVars.PrevExc);
-    m_il.ld_loc(exVars.PrevExcVal);
-    m_il.ld_loc(exVars.PrevTraceback);
-    m_il.emit_call(METHOD_UNWIND_EH);
-}
-
-BlockInfo PythonCompiler::get_ehblock() {
-    for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
-        if (m_blockStack[i].Kind != SETUP_LOOP) {
-            return m_blockStack.data()[i];
-        }
-    }
-    assert(FALSE);
-    return BlockInfo();
-}
-
-void PythonCompiler::mark_offset_label(int index) {
-    auto existingLabel = m_offsetLabels.find(index);
-    if (existingLabel != m_offsetLabels.end()) {
-        m_il.mark_label(existingLabel->second);
-    }
-    else {
-        auto label = m_il.define_label();
-        m_offsetLabels[index] = label;
-        m_il.mark_label(label);
-    }
-}
-
 Local PythonCompiler::emit_allocate_stack_array(size_t bytes) {
 	auto sequenceTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 	m_il.ld_i(bytes);
@@ -206,83 +174,38 @@ Local PythonCompiler::emit_allocate_stack_array(size_t bytes) {
 	return sequenceTmp;
 }
 
-void PythonCompiler::preprocess() {
-    for (int i = 0; i < m_code->co_argcount; i++) {
-        // all parameters are initially definitely assigned
-        m_assignmentState[i] = true;
-    }
-
-    int oparg;
-    for (int i = 0; i < m_size; i++) {
-        auto byte = m_byteCode[i];
-        if (HAS_ARG(byte)) {
-            oparg = NEXTARG();
-        }
-
-        switch (byte) {
-            case UNPACK_EX:
-                m_sequenceLocals[i] = emit_allocate_stack_array(((oparg & 0xFF) + (oparg >> 8)) * sizeof(void*));
-                break;
-            case UNPACK_SEQUENCE:
-				// we need a buffer for the slow case, but we need 
-				// to avoid allocating it in loops.
-				m_sequenceLocals[i] = emit_allocate_stack_array(oparg * sizeof(void*));
-                break;
-            case DELETE_FAST:
-                if (oparg < m_code->co_argcount) {
-                    // this local is deleted, so we need to check for assignment
-                    m_assignmentState[oparg] = false;
-                }
-                break;
-        }
-    }
-}
-
 
 /************************************************************************
  * Compiler interface implementation
  */
 
+void PythonCompiler::emit_unbound_local_check(int local, Label success) {
+	//// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
+	//// locals that are provably assigned)
+	m_il.dup();
+	m_il.load_null();
+	m_il.branch(BranchNotEqual, success);
 
-void PythonCompiler::emit_load_fast(int local, bool checkUnbound) {
+	m_il.pop();
+	m_il.ld_i(PyTuple_GetItem(m_code->co_varnames, local));
+	m_il.emit_call(METHOD_UNBOUND_LOCAL);
+}
+
+void PythonCompiler::emit_load_fast(int local) {
 	load_local(local);
-
-	if (checkUnbound) {
-		auto valueSet = m_il.define_label();
-
-		//// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
-		//// locals that are provably assigned)
-		m_il.dup();
-		m_il.load_null();
-		m_il.branch(BranchNotEqual, valueSet);
-
-		m_il.pop();
-		m_il.ld_i(PyTuple_GetItem(m_code->co_varnames, local));
-		m_il.emit_call(METHOD_UNBOUND_LOCAL);
-		branch_raise();
-
-		m_il.mark_label(valueSet);
-	}
-
 	m_il.dup();
 	incref();
 }
 
-void PythonCompiler::emit_load_float(int local) {
-	m_il.ld_loc(get_optimized_local(local, AVK_Float));
+CorInfoType PythonCompiler::to_clr_type(LocalKind kind) {
+	switch (kind) {
+	case LK_Float: return CORINFO_TYPE_DOUBLE;
+	case LK_Int: return CORINFO_TYPE_INT;
+	case LK_Bool: return CORINFO_TYPE_BOOL;
+	}
+	return CORINFO_TYPE_NATIVEINT;
 }
 
-Local PythonCompiler::get_optimized_local(int index, AbstractValueKind kind) {
-
-	if (m_optLocals.find(index) == m_optLocals.end()) {
-		m_optLocals[index] = unordered_map<AbstractValueKind, Local>();
-	}
-	auto& map = m_optLocals.find(index)->second;
-	if (map.find(kind) == map.end()) {
-		return map[kind] = m_il.define_local(Parameter(to_clr_type(kind)));
-	}
-	return map.find(kind)->second;
-}
 
 void PythonCompiler::emit_store_fast(int local) {
 	// TODO: Move locals out of the Python frame object and into real locals
@@ -301,10 +224,6 @@ void PythonCompiler::emit_store_fast(int local) {
 	m_il.st_ind_i();
 
 	m_il.free_local(valueTmp);
-}
-
-void PythonCompiler::emit_store_float(int local) {
-	m_il.st_loc(get_optimized_local(local, AVK_Float));
 }
 
 void PythonCompiler::emit_rot_two() {
@@ -368,10 +287,6 @@ void PythonCompiler::emit_dup_top_two() {
 
     m_il.free_local(top);
     m_il.free_local(second);
-}
-
-void PythonCompiler::emit_compare_op(int opcode) {
-
 }
 
 void PythonCompiler::emit_new_list(size_t argCnt) {
@@ -461,7 +376,7 @@ void PythonCompiler::emit_dict_store() {
 	m_il.emit_call(METHOD_STOREMAP_TOKEN);
 }
 
-void PythonCompiler::emit_jump_if_or_pop(bool isTrue, int index) {
+void PythonCompiler::emit_jump_if_or_pop(bool isTrue, Label target) {
     auto tmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
     m_il.st_loc(tmp);
 
@@ -489,7 +404,7 @@ void PythonCompiler::emit_jump_if_or_pop(bool isTrue, int index) {
 
     m_il.ld_loc(tmp);	// load the value back onto the stack
 
-    m_il.branch(BranchAlways, getOffsetLabel(index));
+    m_il.branch(BranchAlways, target);
 
     m_il.mark_label(noJump);
 
@@ -500,7 +415,7 @@ void PythonCompiler::emit_jump_if_or_pop(bool isTrue, int index) {
     m_il.free_local(tmp);
 }
 
-void PythonCompiler::emit_pop_jump_if(bool isTrue, int index) {
+void PythonCompiler::emit_pop_jump_if(bool isTrue, Label target) {
     auto noJump = m_il.define_label();
     auto willJump = m_il.define_label();
     // fast checks for true/false...
@@ -524,7 +439,7 @@ void PythonCompiler::emit_pop_jump_if(bool isTrue, int index) {
     m_il.mark_label(willJump);
     decref();
 
-    m_il.branch(BranchAlways, getOffsetLabel(index));
+    m_il.branch(BranchAlways, target);
 
     m_il.mark_label(noJump);
     decref();
@@ -582,18 +497,8 @@ void PythonCompiler::emit_load_global(PyObject* name) {
     m_il.emit_call(METHOD_LOADGLOBAL_TOKEN);
 }
 
-void PythonCompiler::emit_delete_fast(int index, PyObject* name) {
-    load_local(index);
-    m_il.load_null();
-    auto valueSet = m_il.define_label();
-
-    m_il.branch(BranchNotEqual, valueSet);
-    m_il.ld_i(name);
-    m_il.emit_call(METHOD_UNBOUND_LOCAL);
-    branch_raise();
-
-    m_il.mark_label(valueSet);
-    load_local(index);
+void PythonCompiler::emit_delete_fast(int index, PyObject* name) {    
+	load_local(index);
     decref();
     load_frame();
     m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + index * sizeof(size_t));
@@ -638,10 +543,6 @@ void PythonCompiler::emit_tuple_store(size_t argCnt) {
 	m_il.free_local(tupleTmp);
 }
 
-void PythonCompiler::emit_build_map(size_t size) {
-    build_map(size);
-}
-
 void PythonCompiler::emit_store_subscr() {
     // stack is value, container, index
     m_il.emit_call(METHOD_STORESUBSCR_TOKEN);
@@ -654,10 +555,6 @@ void PythonCompiler::emit_delete_subscr() {
 
 void PythonCompiler::emit_build_slice() {
     m_il.emit_call(METHOD_BUILD_SLICE);
-}
-
-void PythonCompiler::emit_build_set(size_t size) {
-    build_set(size);
 }
 
 void PythonCompiler::emit_unary_positive() {
@@ -697,18 +594,11 @@ void PythonCompiler::emit_import_star() {
     m_il.emit_call(METHOD_PY_IMPORTSTAR);
 }
 
-void PythonCompiler::emit_pop_except() {
+void PythonCompiler::emit_clear_eh() {
     // we made it to the end of an EH block w/o throwing,
     // clear the exception.
     m_il.load_null();
     m_il.st_loc(m_ehVal);
-    auto block = m_blockStack.back();
-    //m_blockStack.pop_back();
-    unwind_eh(block.ExVars);
-#ifdef DEBUG_TRACE
-    m_il.ld_i("Exception cleared");
-    m_il.emit_call(METHOD_DEBUG_TRACE);
-#endif
 }
 
 void PythonCompiler::emit_load_build_class() {
@@ -736,6 +626,10 @@ void PythonCompiler::emit_load_array(int index) {
 	m_il.ld_i((index * sizeof(size_t)));
 	m_il.add();
 	m_il.ld_ind_i();
+}
+
+Local PythonCompiler::emit_define_local(LocalKind kind) {
+	return m_il.define_local(Parameter(to_clr_type(kind)));
 }
 
 Local PythonCompiler::emit_define_local(bool cache) {
@@ -784,19 +678,10 @@ void PythonCompiler::call_optimizing_function(int baseFunction) {
 	m_il.emit_call(token);
 }
 
-void PythonCompiler::emit_call(size_t argCnt, size_t kwArgCnt) {
+void PythonCompiler::emit_call_with_kws() {
     // Optimize for # of calls, and various call types...
     // Function is last thing on the stack...
-
-    // target + args popped, result pushed
-    build_map(kwArgCnt);
-    auto map = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-    m_il.st_loc(map);
-
-    build_tuple(argCnt);
-    m_il.ld_loc(map);
     m_il.emit_call(METHOD_CALLNKW_TOKEN);
-	m_il.free_local(map);
 }
 
 void PythonCompiler::emit_store_local(Local local) {
@@ -809,11 +694,13 @@ Local PythonCompiler::emit_spill() {
 	return tmp;
 }
 
-void PythonCompiler::emit_load_local(Local local, bool free) {
+void PythonCompiler::emit_load_and_free_local(Local local) {
 	m_il.ld_loc(local);
-	if (free) {
-		m_il.free_local(local);
-	}
+	m_il.free_local(local);
+}
+
+void PythonCompiler::emit_load_local(Local local) {
+	m_il.ld_loc(local);
 }
 
 void PythonCompiler::emit_pop() {
@@ -856,6 +743,19 @@ void PythonCompiler::emit_restore_err(Local finallyReason) {
 	m_il.emit_call(METHOD_PYERR_RESTORE);
 }
 
+void PythonCompiler::emit_pyerr_setstring(PyObject* exception, const char*msg) {
+	emit_ptr(exception);
+	emit_ptr((void*)msg);
+	m_il.emit_call(METHOD_PYERR_SETSTRING);
+}
+
+void PythonCompiler::emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback) {
+	m_il.ld_loc(prevExc);
+	m_il.ld_loc(prevExcVal);
+	m_il.ld_loc(prevTraceback);
+	m_il.emit_call(METHOD_UNWIND_EH);
+}
+
 void PythonCompiler::emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback, bool includeTbAndValue) {
 	m_il.ld_loca(m_excType);
 	m_il.ld_loca(m_ehVal);
@@ -879,6 +779,10 @@ void PythonCompiler::emit_int(int value) {
 
 void PythonCompiler::emit_float(double value) {
 	m_il.ld_r8(value);
+}
+
+void PythonCompiler::emit_ptr(void* value) {
+	m_il.ld_i(value);
 }
 
 void PythonCompiler::emit_py_object(PyObject *value) {
@@ -1051,23 +955,7 @@ void PythonCompiler::emit_binary_float(int opcode) {
         case BINARY_ADD:
         case INPLACE_ADD: m_il.add(); break;
         case INPLACE_TRUE_DIVIDE:
-        case BINARY_TRUE_DIVIDE:
-            {
-                m_il.dup();
-                m_il.ld_r8(0);
-                auto noErr = m_il.define_label();
-                m_il.compare_eq();
-                m_il.branch(BranchFalse, noErr);
-                // Move the stack depth down to zero (we already did the decstack above)
-                m_il.pop();
-                m_il.pop();
-                m_il.emit_call(METHOD_FLOAT_ZERO_DIV);
-                branch_raise();
-
-                m_il.mark_label(noErr);
-                m_il.div();
-                break;
-            }
+        case BINARY_TRUE_DIVIDE: m_il.div(); break;
         case INPLACE_MODULO:
         case BINARY_MODULO:
             // TODO: We should be able to generate a mod and provide the JIT
@@ -1196,8 +1084,6 @@ JittedCode* PythonCompiler::emit_compile() {
 /************************************************************************
 * End Compiler interface implementation
 */
-
-#include "temp.h"
 
 class GlobalMethod {
     Method m_method;
@@ -1374,5 +1260,5 @@ GLOBAL_METHOD(METHOD_FLOAT_MODULUS_TOKEN, static_cast<double(*)(double, double)>
 GLOBAL_METHOD(METHOD_FLOAT_FROM_DOUBLE, PyFloat_FromDouble, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_DOUBLE));
 GLOBAL_METHOD(METHOD_BOOL_FROM_LONG, PyBool_FromLong, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_INT));
 
-GLOBAL_METHOD(METHOD_FLOAT_ZERO_DIV, PyJit_FloatDivideByZero, CORINFO_TYPE_VOID);
+GLOBAL_METHOD(METHOD_PYERR_SETSTRING, PyErr_SetString, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_INT), Parameter(CORINFO_TYPE_INT));
 

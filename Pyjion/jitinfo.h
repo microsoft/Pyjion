@@ -56,7 +56,7 @@
 
 #include "codemodel.h"
 #include "cee.h"
-#include "compdata.h"
+#include "ipycomp.h"
 
 using namespace std;
 

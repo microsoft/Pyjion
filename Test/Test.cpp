@@ -4874,7 +4874,7 @@ void AbsIntTest() {
         auto codeObj = CompileCode(testCase.m_code);
         printf("Testing %s\r\n", testCase.m_code);
 
-        AbstractInterpreter interpreter(codeObj);
+        AbstractInterpreter interpreter(codeObj, nullptr);
         if (!interpreter.interpret()) {
             _ASSERTE(FALSE && "Failed to interprete code");
         }
