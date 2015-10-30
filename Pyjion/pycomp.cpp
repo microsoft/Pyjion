@@ -153,6 +153,7 @@ void PythonCompiler::incref() {
 
 void PythonCompiler::decref() {
     m_il.emit_call(METHOD_DECREF_TOKEN);
+	// It might be nice to inline this at some point:
     //LD_FIELDA(PyObject, ob_refcnt);
     //m_il.push_back(CEE_DUP);
     //m_il.push_back(CEE_LDIND_I4);
@@ -302,7 +303,7 @@ void PythonCompiler::emit_list_store(size_t argCnt) {
 	m_il.dup();
 	m_il.st_loc(listTmp);
 
-	// load the address of the tuple item...
+	// load the address of the list item...
 	m_il.ld_i(offsetof(PyListObject, ob_item));
 	m_il.add();
 	m_il.ld_ind_i();
@@ -313,7 +314,7 @@ void PythonCompiler::emit_list_store(size_t argCnt) {
 		// save the argument into a temporary...
 		m_il.st_loc(valueTmp);
 
-		// load the address of the tuple item...
+		// load the address of the list item...
 		m_il.ld_loc(listItems);
 		m_il.ld_i(arg * sizeof(size_t));
 		m_il.add();
@@ -376,22 +377,24 @@ void PythonCompiler::emit_dict_store() {
 	m_il.emit_call(METHOD_STOREMAP_TOKEN);
 }
 
+// Tests if a value is True/False and branches if it is
+void PythonCompiler::test_bool_and_branch(Local value, bool isTrue, Label target) {
+	m_il.ld_loc(value);
+	m_il.ld_i(isTrue ? Py_False : Py_True);
+	m_il.compare_eq();
+	m_il.branch(BranchTrue, target);
+}
+
 void PythonCompiler::emit_jump_if_or_pop(bool isTrue, Label target) {
     auto tmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
     m_il.st_loc(tmp);
 
     auto noJump = m_il.define_label();
     auto willJump = m_il.define_label();
-    // fast checks for true/false...
-    m_il.ld_loc(tmp);
-    m_il.ld_i(isTrue ? Py_False : Py_True);
-    m_il.compare_eq();
-    m_il.branch(BranchTrue, noJump);
+    // fast checks for true/false.
+	test_bool_and_branch(tmp, isTrue, noJump);
 
-    m_il.ld_loc(tmp);
-    m_il.ld_i(isTrue ? Py_True : Py_False);
-    m_il.compare_eq();
-    m_il.branch(BranchTrue, willJump);
+	test_bool_and_branch(tmp, !isTrue, willJump);
 
     // Use PyObject_IsTrue
     m_il.ld_loc(tmp);
@@ -785,6 +788,10 @@ void PythonCompiler::emit_ptr(void* value) {
 	m_il.ld_i(value);
 }
 
+void PythonCompiler::emit_bool(bool value) {
+	m_il.ld_i4(value);
+}
+
 void PythonCompiler::emit_py_object(PyObject *value) {
 	m_il.ld_i(value);
 	m_il.dup();
@@ -910,6 +917,10 @@ void PythonCompiler::emit_box_bool() {
 
 void PythonCompiler::emit_box_float() {
 	m_il.emit_call(METHOD_FLOAT_FROM_DOUBLE);
+}
+
+void PythonCompiler::emit_box_int() {
+	m_il.emit_call(METHOD_LONG_FROM_LONG);
 }
 
 void PythonCompiler::emit_for_next(Label processValue, Local iterValue) {
@@ -1054,7 +1065,7 @@ void PythonCompiler::emit_compare_object(int compareType) {
     m_il.emit_call(METHOD_RICHCMP_TOKEN);
 }
 
-bool PythonCompiler::emit_compare_object_ret_bool(int compareType) {
+bool PythonCompiler::emit_compare_object_int(int compareType) {
     switch (compareType) {
         case Py_EQ:
             call_optimizing_function(METHOD_RICHEQUALS_GENERIC_TOKEN);
@@ -1094,7 +1105,6 @@ public:
     }
 };
 
-// CorInfoType returnType, std::vector<Parameter> params, void* addr
 #define GLOBAL_METHOD(token, addr, returnType, ...) \
     GlobalMethod g ## token(token, Method(&g_module, returnType, std::vector<Parameter>{__VA_ARGS__}, addr));
 
@@ -1259,6 +1269,7 @@ GLOBAL_METHOD(METHOD_FLOAT_FLOOR_TOKEN, static_cast<double(*)(double)>(floor), C
 GLOBAL_METHOD(METHOD_FLOAT_MODULUS_TOKEN, static_cast<double(*)(double, double)>(fmod), CORINFO_TYPE_DOUBLE, Parameter(CORINFO_TYPE_DOUBLE), Parameter(CORINFO_TYPE_DOUBLE));
 GLOBAL_METHOD(METHOD_FLOAT_FROM_DOUBLE, PyFloat_FromDouble, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_DOUBLE));
 GLOBAL_METHOD(METHOD_BOOL_FROM_LONG, PyBool_FromLong, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_INT));
+GLOBAL_METHOD(METHOD_LONG_FROM_LONG, PyLong_FromLong, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_INT));
 
 GLOBAL_METHOD(METHOD_PYERR_SETSTRING, PyErr_SetString, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_INT), Parameter(CORINFO_TYPE_INT));
 

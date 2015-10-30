@@ -65,10 +65,15 @@ class InterpreterState;
 #define STACK_KIND_OBJECT true
 #define STACK_KIND_VALUE  false
 
-#define BLOCK_CONTINUES 0x01
-#define BLOCK_RETURNS	0x02
-#define BLOCK_BREAKS	0x04
+enum EhFlags {
+	EHF_None		   = 0,
+	EHF_BlockContinues = 0x01,
+	EHF_BlockReturns   = 0x02,
+	EHF_BlockBreaks    = 0x04
+};
 
+EhFlags operator | (EhFlags lhs, EhFlags rhs);
+EhFlags operator |= (EhFlags& lhs, EhFlags rhs);
 
 struct ExceptionVars {
 	Local PrevExc, PrevExcVal, PrevTraceback;
@@ -83,13 +88,14 @@ struct ExceptionVars {
 	}
 };
 
+// Exception Handling information
 struct EhInfo {
 	bool IsFinally;
-	int Flags;
+	EhFlags Flags;
 
 	EhInfo(bool isFinally) {
 		IsFinally = isFinally;
-		Flags = 0;
+		Flags = EHF_None;
 	}
 };
 
@@ -97,7 +103,8 @@ struct BlockInfo {
 	Label Raise,		// our raise stub label, prepares the exception
 		ReRaise,		// our re-raise stub label, prepares the exception w/o traceback update
 		ErrorTarget;	// the actual label for the handler
-	int EndOffset, Kind, Flags, ContinueOffset;
+	int EndOffset, Kind, ContinueOffset;
+	EhFlags Flags;
 	size_t BlockId;
 	ExceptionVars ExVars;
 	Local LoopVar; //, LoopOpt1, LoopOpt2;
@@ -106,7 +113,7 @@ struct BlockInfo {
 	BlockInfo() {
 	}
 
-	BlockInfo(vector<bool> stack, size_t blockId, Label raise, Label reraise, Label errorTarget, int endOffset, int kind, int flags = 0, int continueOffset = 0) {
+	BlockInfo(vector<bool> stack, size_t blockId, Label raise, Label reraise, Label errorTarget, int endOffset, int kind, EhFlags flags = EHF_None, int continueOffset = 0) {
 		Stack = stack;
 		BlockId = blockId;
 		Raise = raise;
@@ -243,7 +250,6 @@ private:
 
 	// Checks to see if we have a null value as the last value on our stack
 	// indicating an error, and if so, branches to our current error handler.
-	void error_check(int curIndex, const char* reason);
 	void error_check();
 	void int_error_check();
 
@@ -252,9 +258,6 @@ private:
 	void branch_raise();
 
 	void clean_stack_for_reraise();
-	// Checks to see if we have a non-zero error code on the stack, and if so,
-	// branches to the current error handler.  Consumes the error code in the process
-	void int_error_check(int curIndex);
 
 	void unwind_eh(ExceptionVars& exVars);
 

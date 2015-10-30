@@ -140,6 +140,7 @@
 #define METHOD_FLOAT_FROM_DOUBLE            0x00000053
 #define METHOD_BOOL_FROM_LONG               0x00000054
 #define METHOD_PYERR_SETSTRING              0x00000055
+#define METHOD_LONG_FROM_LONG				0x00000056
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -333,7 +334,7 @@ public:
 
     virtual void emit_compare_object(int compareType);
     virtual void emit_compare_float(int compareType);
-    virtual bool emit_compare_object_ret_bool(int compareType);
+    virtual bool emit_compare_object_int(int compareType);
 
 	virtual void emit_store_fast(int local);
 
@@ -348,6 +349,7 @@ public:
 	virtual void emit_int(int value);
 	virtual void emit_float(double value);
 	virtual void emit_ptr(void *value);
+	virtual void emit_bool(bool value);
 	virtual void emit_py_object(PyObject* value);
 
 	virtual void emit_clear_eh();
@@ -367,11 +369,13 @@ public:
 
 	virtual void emit_box_float();
 	virtual void emit_box_bool();
+	virtual void emit_box_int();
 
 	virtual JittedCode* emit_compile();
 	
 private:
     void load_frame();
+	void test_bool_and_branch(Local value, bool isTrue, Label target);
 
     void load_local(int oparg);
     void incref();

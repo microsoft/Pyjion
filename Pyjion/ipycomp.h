@@ -75,8 +75,8 @@ public:
 // Defines the interface between the abstract compiler and code generator
 //
 // The compiler is stack based, various operations can push and pop values from the stack.
-// The compiler supports defining locals, labels, performing branches, etc...  Ultimatley it
-// will support a wide array of primitive operations, but also supports higher level Python
+// The compiler supports defining locals, labels, performing branches, etc...  Ultimately it
+// will support a wide array of primitive operations, but also support higher level Python
 // operations.
 class IPythonCompiler {
 	public:
@@ -107,7 +107,9 @@ class IPythonCompiler {
 	virtual void emit_int(int value) = 0;
 	// Emits an unboxed floating point value onto the stack
 	virtual void emit_float(double value) = 0;
-	// Emits the address of a Python object on the stack, bumping it's ref count
+	// Emits an unboxed bool onto the stack
+	virtual void emit_bool(bool value) = 0;
+	// Emits the address of a Python object on the stack, bumping its ref count
 	virtual void emit_py_object(PyObject* value) = 0;
 	// Emits a null pointer onto the stack
 	virtual void emit_null() = 0;
@@ -124,6 +126,8 @@ class IPythonCompiler {
 	virtual void emit_box_float() = 0;
 	// Boxes a raw bool into a Python object
 	virtual void emit_box_bool() = 0;
+	// Boxes a raw int into a Python object
+	virtual void emit_box_int() = 0;
 
 	/***************************************************** 
 	 * Stack based locals */
@@ -319,7 +323,7 @@ class IPythonCompiler {
 	// Performs a comparison for values on the stack which are objects, keeping a boxed Python object as the result.
 	virtual void emit_compare_object(int compareType) = 0;
 	// Performs a comparison of two Python objects on the stack keeping an unboxed bool on the stack as the result
-	virtual bool emit_compare_object_ret_bool(int compareType) = 0;
+	virtual bool emit_compare_object_int(int compareType) = 0;
 	// Performs a comparison of two unboxed floating point values on the stack
 	virtual void emit_compare_float(int compareType) = 0;
 
@@ -331,7 +335,7 @@ class IPythonCompiler {
 	virtual void emit_clear_eh() = 0;
 	// Updates the trace back as it propagtes through a function
 	virtual void emit_eh_trace() = 0;
-	// Performs EH unwind as we go through loops
+	// Performs exception handling unwind as we go through loops
 	virtual void emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback) = 0;
 	// Prepares to raise an exception, storing the existing exceptions
 	virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback, bool includeTbAndValue) = 0;
