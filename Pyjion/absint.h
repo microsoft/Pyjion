@@ -306,6 +306,14 @@ private:
 	void unpack_sequence(size_t size, int opcode);
 	Local get_optimized_local(int index, AbstractValueKind kind);
 	void pop_except();
+
+	void unary_positive(int opcodeIndex);
+	void unary_negative(int opcodeIndex);
+	void unary_not(int& opcodeIndex);
+
+	void jump_if_or_pop(bool isTrue, int opcodeIndex, int offset);
+	void pop_jump_if(bool isTrue, int opcodeIndex, int offset);
+	void test_bool_and_branch(Local value, bool isTrue, Label target);
 };
 
 

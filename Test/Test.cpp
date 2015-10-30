@@ -218,7 +218,7 @@ void PyJitTest() {
         //    TestInput("True")
         //),
 
-        TestCase(
+		TestCase(
             "def f():\n    try:\n        min(1,2)\n    finally:\n        try:\n            min(1,2)\n        except EnvironmentError:\n            pass\n    return 1",
             TestInput("1")
             ),
@@ -227,7 +227,31 @@ void PyJitTest() {
             TestInput("1")
             ),
         // Simple optimized code test cases...
-        TestCase(
+		TestCase(
+			"def f():\n    x = 1.0\n    y = +x\n    return y",
+			TestInput("1.0")
+			),
+		TestCase(
+			"def f():\n    x = 1.0\n    if not x:\n        return 1\n    return 2",
+			TestInput("2")
+			),
+		TestCase(
+			"def f():\n    x = 0.0\n    if not x:\n        return 1\n    return 2",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 1.0\n    y = -x\n    return y",
+			TestInput("-1.0")
+			),
+		TestCase(
+			"def f():\n    x = 1.0\n    y = not x\n    return y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 0.0\n    y = not x\n    return y",
+			TestInput("True")
+			),
+		TestCase(
             "def f():\n    x = 1.0\n    return x",
             TestInput("1.0")
         ),

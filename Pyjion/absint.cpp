@@ -1718,17 +1718,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
 		case JUMP_ABSOLUTE: jump_absolute(oparg); break;
 		case JUMP_FORWARD:  jump_absolute(oparg + curByte + 1); break;
 		case JUMP_IF_FALSE_OR_POP:
-		case JUMP_IF_TRUE_OR_POP:
-			m_comp->emit_jump_if_or_pop(byte != JUMP_IF_FALSE_OR_POP, getOffsetLabel(oparg));
-			m_offsetStack[oparg] = m_stack;
-			dec_stack();
-			break;
+		case JUMP_IF_TRUE_OR_POP: jump_if_or_pop(byte != JUMP_IF_FALSE_OR_POP, opcodeIndex, oparg); break;
 		case POP_JUMP_IF_TRUE:
-		case POP_JUMP_IF_FALSE:
-			m_comp->emit_pop_jump_if(byte != POP_JUMP_IF_FALSE, getOffsetLabel(oparg));
-			dec_stack();
-			m_offsetStack[oparg] = m_stack;
-			break;
+		case POP_JUMP_IF_FALSE: pop_jump_if(byte != POP_JUMP_IF_FALSE, opcodeIndex, oparg); break;
 		case LOAD_NAME:
 			m_comp->emit_load_name(PyTuple_GetItem(m_code->co_names, oparg));
 			error_check();
@@ -1848,31 +1840,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
 			inc_stack();
 			break;
 		case BUILD_SET: build_set(oparg); inc_stack(); break;
-		case UNARY_POSITIVE:
-			dec_stack();
-			m_comp->emit_unary_positive();
-			error_check();
-			inc_stack();
-			break;
-		case UNARY_NEGATIVE:
-			dec_stack();
-			m_comp->emit_unary_negative();
-			error_check();
-			inc_stack();
-			break;
-		case UNARY_NOT:
-			if (m_byteCode[curByte + 1] == POP_JUMP_IF_TRUE || m_byteCode[curByte + 1] == POP_JUMP_IF_FALSE) {
-				dec_stack(1);
-				m_comp->emit_unary_not_int();
-				branch_or_error(curByte);
-			}
-			else {
-				dec_stack(1);
-				m_comp->emit_unary_not();
-				error_check();
-				inc_stack();
-			}
-			break;
+		case UNARY_POSITIVE: unary_positive(opcodeIndex); break;
+		case UNARY_NEGATIVE: unary_negative(opcodeIndex); break;
+		case UNARY_NOT: unary_not(curByte); break;
 		case UNARY_INVERT:
 			dec_stack(1);
 			m_comp->emit_unary_invert();
@@ -2350,6 +2320,169 @@ JittedCode* AbstractInterpreter::compile_worker() {
 	return m_comp->emit_compile();
 }
 
+void AbstractInterpreter::test_bool_and_branch(Local value, bool isTrue, Label target) {
+	m_comp->emit_load_local(value);
+	m_comp->emit_ptr(isTrue ? Py_False : Py_True);
+	m_comp->emit_branch(BranchEqual, target);
+}
+
+void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpTo) {
+	auto stackInfo = get_stack_info(opcodeIndex);
+	auto one = stackInfo[stackInfo.size() - 1];
+
+	auto target = getOffsetLabel(jumpTo);
+	switch (one.Value->kind()) {
+		case AVK_Float:
+			m_comp->emit_dup();
+			m_comp->emit_float(0);
+			m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
+			m_comp->emit_pop_top();
+			break;
+		default:
+			auto tmp = m_comp->emit_spill();
+			auto noJump = m_comp->emit_define_label();
+			auto willJump = m_comp->emit_define_label();
+			
+			// fast checks for true/false.
+			test_bool_and_branch(tmp, isTrue, noJump);
+			test_bool_and_branch(tmp, !isTrue, willJump);
+
+			// Use PyObject_IsTrue
+			m_comp->emit_load_local(tmp);
+			m_comp->emit_is_true();
+			m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
+
+			// Jumping, load the value back and jump
+			m_comp->emit_mark_label(willJump);
+			m_comp->emit_load_local(tmp);	// load the value back onto the stack
+			m_comp->emit_branch(BranchAlways, target);
+
+			// not jumping, load the value and dec ref it
+			m_comp->emit_mark_label(noJump);
+			m_comp->emit_load_local(tmp);
+			m_comp->emit_pop_top();
+
+			m_comp->emit_free_local(tmp);
+			break;
+	}
+
+	m_offsetStack[jumpTo] = m_stack;
+	dec_stack();
+}
+
+void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) {
+	auto stackInfo = get_stack_info(opcodeIndex);
+	auto one = stackInfo[stackInfo.size() - 1];
+
+	auto target = getOffsetLabel(jumpTo);
+	switch (one.Value->kind()) {
+		case AVK_Float:
+			m_comp->emit_float(0);
+			m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
+			break;
+		default:
+			auto noJump = m_comp->emit_define_label();
+			auto willJump = m_comp->emit_define_label();
+			
+			// fast checks for true/false...
+			m_comp->emit_dup();
+			m_comp->emit_ptr(isTrue ? Py_False : Py_True);
+			m_comp->emit_branch(BranchEqual, noJump);
+
+			m_comp->emit_dup();
+			m_comp->emit_ptr(isTrue ? Py_True : Py_False);
+			m_comp->emit_branch(BranchEqual, willJump);
+
+			// Use PyObject_IsTrue
+			m_comp->emit_dup();
+			m_comp->emit_is_true();
+			m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
+
+			// Branching, pop the value and branch
+			m_comp->emit_mark_label(willJump);
+			m_comp->emit_pop_top();
+			m_comp->emit_branch(BranchAlways, target);
+
+			// Not branching, just pop the value and fall through
+			m_comp->emit_mark_label(noJump);
+			m_comp->emit_pop_top();
+			break;
+	}
+	dec_stack();
+	m_offsetStack[jumpTo] = m_stack;
+}
+
+void AbstractInterpreter::unary_positive(int opcodeIndex) {
+	auto stackInfo = get_stack_info(opcodeIndex);
+	auto one = stackInfo[stackInfo.size() - 1];
+
+	switch (one.Value->kind()) {
+		case AVK_Float:
+			// nop
+			break;
+		default:
+			dec_stack();
+			m_comp->emit_unary_positive();
+			error_check();
+			inc_stack();
+			break;
+	}
+}
+
+void AbstractInterpreter::unary_negative(int opcodeIndex) {
+	auto stackInfo = get_stack_info(opcodeIndex);
+	auto one = stackInfo[stackInfo.size() - 1];
+
+	switch (one.Value->kind()) {
+		case AVK_Float:
+			dec_stack();
+			m_comp->emit_unary_negative_float();
+			inc_stack(1, STACK_KIND_VALUE);
+			break;
+		default:
+			dec_stack();
+			m_comp->emit_unary_negative();
+			error_check();
+			inc_stack();
+			break;
+	}
+}
+
+void AbstractInterpreter::unary_not(int& opcodeIndex) {
+	auto stackInfo = get_stack_info(opcodeIndex);
+	auto one = stackInfo[stackInfo.size() - 1];
+
+	if (m_byteCode[opcodeIndex + 1] == POP_JUMP_IF_TRUE || m_byteCode[opcodeIndex + 1] == POP_JUMP_IF_FALSE) {
+		// optimizing away the unnecessary boxing and True/False comparisons
+		dec_stack();
+		switch (one.Value->kind()) {
+			case AVK_Float:
+				m_comp->emit_unary_not_float_push_bool();
+				branch(opcodeIndex);
+				break;
+			default:
+				m_comp->emit_unary_not_push_int();
+				branch_or_error(opcodeIndex);
+				break;
+		}
+	}
+	else {
+		// We don't know the consumer of this, produce an object
+		dec_stack();
+		switch (one.Value->kind()) {
+			case AVK_Float:
+				m_comp->emit_unary_not_float_push_bool();
+				m_comp->emit_box_bool();
+				break;
+			default:
+				m_comp->emit_unary_not();
+				error_check();
+				break;
+		}
+		inc_stack();
+	}
+}
+
 JittedCode* AbstractInterpreter::compile() {
 	bool interpreted = interpret();
 	preprocess();
@@ -2542,7 +2675,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
 	case PyCmp_IS_NOT:
 		//	TODO: Inlining this would be nice, but then we need the dec refs, e.g.:
 		if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
-			m_comp->emit_is_int(compareType != PyCmp_IS);
+			m_comp->emit_is_push_int(compareType != PyCmp_IS);
 			dec_stack(); // popped 2, pushed 1
 			branch(i);
 		}
@@ -2553,7 +2686,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
 		break;
 	case PyCmp_IN:
 		if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
-			m_comp->emit_in_int();
+			m_comp->emit_in_push_int();
 			dec_stack(2);
 			branch_or_error(i);
 		}
@@ -2566,7 +2699,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
 		break;
 	case PyCmp_NOT_IN:
 		if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
-			m_comp->emit_not_in_int();
+			m_comp->emit_not_in_push_int();
 			dec_stack(2);
 			branch_or_error(i);
 		}
@@ -2618,7 +2751,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
 
 		bool generated = false;
 		if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
-			generated = m_comp->emit_compare_object_int(compareType);
+			generated = m_comp->emit_compare_object_push_int(compareType);
 			if (generated) {
 				dec_stack(2);
 				branch_or_error(i);

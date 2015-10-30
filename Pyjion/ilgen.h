@@ -262,6 +262,10 @@ public:
         }
     }
 
+	void neg() {
+		m_il.push_back(CEE_NEG);
+	}
+
     void dup() {
         m_il.push_back(CEE_DUP);
     }
