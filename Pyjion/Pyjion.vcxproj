@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="absint.cpp" />
     <ClCompile Include="absvalue.cpp" />
+    <ClCompile Include="pycomp.cpp" />
     <ClCompile Include="pyjit.cpp" />
     <ClCompile Include="cee.cpp" />
     <ClCompile Include="intrins.cpp" />
@@ -33,7 +34,9 @@
     <ClInclude Include="cowvector.h" />
     <ClInclude Include="ilgen.h" />
     <ClInclude Include="intrins.h" />
+    <ClInclude Include="ipycomp.h" />
     <ClInclude Include="jitinfo.h" />
+    <ClInclude Include="pycomp.h" />
     <ClInclude Include="pyjit.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
