@@ -217,9 +217,8 @@ public:
 
     virtual void emit_dup_top_two();
 
-    virtual void emit_jump_if_or_pop(bool isTrue, Label target);
-    virtual void emit_pop_jump_if(bool isTrue, Label target);
     virtual void emit_load_name(PyObject* name);
+	virtual void emit_is_true();
 
 	virtual void emit_push_frame();
 	virtual void emit_pop_frame();
@@ -261,8 +260,12 @@ public:
 
     virtual void emit_unary_positive();
     virtual void emit_unary_negative();
-    virtual void emit_unary_not_int();
-    virtual void emit_unary_not();
+	virtual void emit_unary_negative_float();
+
+	virtual void emit_unary_not();
+
+	virtual void emit_unary_not_push_int();
+	virtual void emit_unary_not_float_push_bool();
     virtual void emit_unary_invert();
 
     virtual void emit_import_name(PyObject* name);
@@ -323,18 +326,18 @@ public:
     virtual void emit_binary_float(int opcode);
     virtual void emit_binary_object(int opcode);
     
-    virtual void emit_in_int();
+    virtual void emit_in_push_int();
     virtual void emit_in();
-    virtual void emit_not_in_int();
+    virtual void emit_not_in_push_int();
     virtual void emit_not_in();
 
-    virtual void emit_is_int(bool isNot);
+    virtual void emit_is_push_int(bool isNot);
 
     virtual void emit_is(bool isNot);
 
     virtual void emit_compare_object(int compareType);
     virtual void emit_compare_float(int compareType);
-    virtual bool emit_compare_object_int(int compareType);
+    virtual bool emit_compare_object_push_int(int compareType);
 
 	virtual void emit_store_fast(int local);
 
@@ -375,7 +378,6 @@ public:
 	
 private:
     void load_frame();
-	void test_bool_and_branch(Local value, bool isTrue, Label target);
 
     void load_local(int oparg);
     void incref();

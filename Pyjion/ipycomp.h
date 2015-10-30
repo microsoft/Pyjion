@@ -109,6 +109,8 @@ class IPythonCompiler {
 	virtual void emit_float(double value) = 0;
 	// Emits an unboxed bool onto the stack
 	virtual void emit_bool(bool value) = 0;
+	// Emits a pointer value onto the stack
+	virtual void emit_ptr(void* value) = 0;
 	// Emits the address of a Python object on the stack, bumping its ref count
 	virtual void emit_py_object(PyObject* value) = 0;
 	// Emits a null pointer onto the stack
@@ -231,10 +233,8 @@ class IPythonCompiler {
 	// Creates a slice object from values on the stack
 	virtual void emit_build_slice() = 0;
 
-	// Jumps if the current value is true/false, otherwise pops the current value
-	virtual void emit_jump_if_or_pop(bool isTrue, Label target) = 0;
-	// Jumps if the current value is true/false
-	virtual void emit_pop_jump_if(bool isTrue, Label target) = 0;
+	// Pushes an unboxed bool onto the stack indicating the truthiness of the top value on the stack
+	virtual void emit_is_true() = 0;
 
 	// Imports the specified name
 	virtual void emit_import_name(PyObject* name) = 0;
@@ -297,9 +297,15 @@ class IPythonCompiler {
 	// Performs a unary not, pushing the Python object result onto the stack, or NULL if an error occurred
 	virtual void emit_unary_not() = 0;
 	// Perform a unary not, pushing an unboxed int onto the stack indicating true (1), false (0), or error
-	virtual void emit_unary_not_int() = 0;
+	virtual void emit_unary_not_push_int() = 0;
+
+	// Does a unary not on an unboxed floating value, pushing an unboxed bool onto the stack
+	virtual void emit_unary_not_float_push_bool() = 0;
 	// Performs a unary invert on the top value on the stack, pushing the result onto the stack or NULL if an error occurred
 	virtual void emit_unary_invert() = 0;
+
+	// Peforms a unary negative on a unboxed floating value on the stack, pushing the unboxed result back to the stack
+	virtual void emit_unary_negative_float() = 0;
 
 	// Performans a binary operation for values on the stack which are unboxed floating points
 	virtual void emit_binary_float(int opcode) = 0;
@@ -309,21 +315,21 @@ class IPythonCompiler {
 	// Does an in/contains check and pushes a Python object onto the stack as the result, or NULL if there was an error
 	virtual void emit_in() = 0;
 	// Does an in/contains check and pushes an unboxed int onto the stack indicating true (1)/false (0)/error (-1)
-	virtual void emit_in_int() = 0;
+	virtual void emit_in_push_int() = 0;
 	// Does an not in check and pushes a Python object onto the stack as the result, or NULL if there was an error
 	virtual void emit_not_in() = 0;
 	// Does an not in check and pushes an unboxed int onto the stack indicating true (1)/false (0)/error (-1)
-	virtual void emit_not_in_int() = 0;
+	virtual void emit_not_in_push_int() = 0;
 
 	// Does an is check and pushes a boxed Python bool on the stack as the result
 	virtual void emit_is(bool isNot) = 0;
 	// Does an is check and pushes an unboxed bool onto the stack
-	virtual void emit_is_int(bool isNot) = 0;
+	virtual void emit_is_push_int(bool isNot) = 0;
 	
 	// Performs a comparison for values on the stack which are objects, keeping a boxed Python object as the result.
 	virtual void emit_compare_object(int compareType) = 0;
 	// Performs a comparison of two Python objects on the stack keeping an unboxed bool on the stack as the result
-	virtual bool emit_compare_object_int(int compareType) = 0;
+	virtual bool emit_compare_object_push_int(int compareType) = 0;
 	// Performs a comparison of two unboxed floating point values on the stack
 	virtual void emit_compare_float(int compareType) = 0;
 

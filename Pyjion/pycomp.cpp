@@ -377,75 +377,8 @@ void PythonCompiler::emit_dict_store() {
 	m_il.emit_call(METHOD_STOREMAP_TOKEN);
 }
 
-// Tests if a value is True/False and branches if it is
-void PythonCompiler::test_bool_and_branch(Local value, bool isTrue, Label target) {
-	m_il.ld_loc(value);
-	m_il.ld_i(isTrue ? Py_False : Py_True);
-	m_il.compare_eq();
-	m_il.branch(BranchTrue, target);
-}
-
-void PythonCompiler::emit_jump_if_or_pop(bool isTrue, Label target) {
-    auto tmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-    m_il.st_loc(tmp);
-
-    auto noJump = m_il.define_label();
-    auto willJump = m_il.define_label();
-    // fast checks for true/false.
-	test_bool_and_branch(tmp, isTrue, noJump);
-
-	test_bool_and_branch(tmp, !isTrue, willJump);
-
-    // Use PyObject_IsTrue
-    m_il.ld_loc(tmp);
-    m_il.emit_call(METHOD_PYOBJECT_ISTRUE);
-    m_il.ld_i(0);
-    m_il.compare_eq();
-    m_il.branch(isTrue ? BranchTrue : BranchFalse, noJump);
-
-    m_il.mark_label(willJump);
-
-    m_il.ld_loc(tmp);	// load the value back onto the stack
-
-    m_il.branch(BranchAlways, target);
-
-    m_il.mark_label(noJump);
-
-    // dec ref because we're popping...
-    m_il.ld_loc(tmp);
-    decref();
-
-    m_il.free_local(tmp);
-}
-
-void PythonCompiler::emit_pop_jump_if(bool isTrue, Label target) {
-    auto noJump = m_il.define_label();
-    auto willJump = m_il.define_label();
-    // fast checks for true/false...
-    m_il.dup();
-    m_il.ld_i(isTrue ? Py_False: Py_True);
-    m_il.compare_eq();
-    m_il.branch(BranchTrue, noJump);
-
-    m_il.dup();
-    m_il.ld_i(isTrue ? Py_True : Py_False);
-    m_il.compare_eq();
-    m_il.branch(BranchTrue, willJump);
-
-    // Use PyObject_IsTrue
-    m_il.dup();
-    m_il.emit_call(METHOD_PYOBJECT_ISTRUE);
-    m_il.ld_i(0);
-    m_il.compare_eq();
-    m_il.branch(isTrue ? BranchTrue : BranchFalse, noJump);
-
-    m_il.mark_label(willJump);
-    decref();
-
-    m_il.branch(BranchAlways, target);
-
-    m_il.mark_label(noJump);
-    decref();
+void PythonCompiler::emit_is_true() {
+	m_il.emit_call(METHOD_PYOBJECT_ISTRUE);
 }
 
 void PythonCompiler::emit_load_name(PyObject* name) {
@@ -568,12 +501,21 @@ void PythonCompiler::emit_unary_negative() {
     m_il.emit_call(METHOD_UNARY_NEGATIVE);
 }
 
-void PythonCompiler::emit_unary_not_int() {
+void PythonCompiler::emit_unary_not_push_int() {
     m_il.emit_call(METHOD_UNARY_NOT_INT);
 }
 
 void PythonCompiler::emit_unary_not() {
     m_il.emit_call(METHOD_UNARY_NOT);
+}
+
+void PythonCompiler::emit_unary_negative_float() {
+	m_il.neg();
+}
+
+void PythonCompiler::emit_unary_not_float_push_bool() {
+	m_il.ld_r8(0);
+	m_il.compare_eq();
 }
 
 void PythonCompiler::emit_unary_invert() {
@@ -1023,7 +965,7 @@ void PythonCompiler::emit_binary_object(int opcode) {
     }
 }
 
-void PythonCompiler::emit_is_int(bool isNot) {
+void PythonCompiler::emit_is_push_int(bool isNot) {
     m_il.emit_call(isNot ? METHOD_ISNOT_BOOL : METHOD_IS_BOOL);
 }
 
@@ -1031,7 +973,7 @@ void PythonCompiler::emit_is(bool isNot) {
     m_il.emit_call(isNot ? METHOD_ISNOT : METHOD_IS);
 }
 
-void PythonCompiler::emit_in_int() {
+void PythonCompiler::emit_in_push_int() {
     m_il.emit_call(METHOD_CONTAINS_INT_TOKEN);
 }
 
@@ -1039,7 +981,7 @@ void PythonCompiler::emit_in() {
     m_il.emit_call(METHOD_CONTAINS_TOKEN);
 }
 
-void PythonCompiler::emit_not_in_int() {
+void PythonCompiler::emit_not_in_push_int() {
     m_il.emit_call(METHOD_NOTCONTAINS_INT_TOKEN);
 }
 
@@ -1065,7 +1007,7 @@ void PythonCompiler::emit_compare_object(int compareType) {
     m_il.emit_call(METHOD_RICHCMP_TOKEN);
 }
 
-bool PythonCompiler::emit_compare_object_int(int compareType) {
+bool PythonCompiler::emit_compare_object_push_int(int compareType) {
     switch (compareType) {
         case Py_EQ:
             call_optimizing_function(METHOD_RICHEQUALS_GENERIC_TOKEN);
