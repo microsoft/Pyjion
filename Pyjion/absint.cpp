@@ -2294,7 +2294,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 		case WITH_CLEANUP_FINISH:
 			return nullptr;
 		default:
-#if DEBUG
+#if _DEBUG
 			printf("Unsupported opcode: %d (with related)\r\n", byte);
 #endif
 			return nullptr;
