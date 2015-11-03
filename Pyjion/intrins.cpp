@@ -1998,7 +1998,7 @@ bool PyJit_IsNot_Bool(PyObject* lhs, PyObject* rhs) {
 }
 
 void PyJit_DecRef(PyObject* value) {
-	if ((size_t)value & 0x01) {
+	if (IS_TAGGED((tagged_ptr)value)) {
 		// Tagged pointer
 		return;
 	}
