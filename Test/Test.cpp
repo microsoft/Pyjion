@@ -213,10 +213,7 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
-        //TestCase(
-        //    "def f():\n    try:\n        a = RefCountCheck() + undefined\n        return 'noerr'\n    except:\n        return finalized",
-        //    TestInput("True")
-        //),
+		// +=, -= checks are to avoid constant folding
 		TestCase(
 			"def f():\n    x = 0\n    x += 1\n    x -= 1\n    return x or 1",
 			TestInput("1")
