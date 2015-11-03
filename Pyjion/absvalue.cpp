@@ -656,6 +656,10 @@ AbstractValue* IntegerValue::unary(AbstractSource* selfSources, int op) {
     return AbstractValue::unary(selfSources, op);
 }
 
+void IntegerValue::truth(AbstractSource* selfSources) {
+	// ints don't escape on truth checks...
+}
+
 const char* IntegerValue::describe() {
     return "int";
 }

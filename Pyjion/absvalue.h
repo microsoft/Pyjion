@@ -303,6 +303,7 @@ class IntegerValue : public AbstractValue {
     virtual AbstractValue* binary(AbstractSource*selfSources, int op, AbstractValueWithSources& other);
     virtual AbstractValue* unary(AbstractSource* selfSources, int op);
     virtual const char* describe();
+	virtual void truth(AbstractSource* sources);
 };
 
 class StringValue : public AbstractValue {

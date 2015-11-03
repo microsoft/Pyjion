@@ -2353,6 +2353,12 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
 			m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
 			m_comp->emit_pop_top();
 			break;
+		case AVK_Integer:
+			m_comp->emit_dup();
+			m_comp->emit_unary_not_tagged_int_push_bool();
+			m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
+			m_comp->emit_pop_top();
+			break;
 		default:
 			auto tmp = m_comp->emit_spill();
 			auto noJump = m_comp->emit_define_label();
@@ -2395,6 +2401,10 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
 			m_comp->emit_float(0);
 			m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
 			break;
+		case AVK_Integer:
+			m_comp->emit_unary_not_tagged_int_push_bool();
+			m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
+			break;
 		default:
 			auto noJump = m_comp->emit_define_label();
 			auto willJump = m_comp->emit_define_label();
@@ -2433,6 +2443,7 @@ void AbstractInterpreter::unary_positive(int opcodeIndex) {
 
 	switch (one.Value->kind()) {
 		case AVK_Float:
+		case AVK_Integer:
 			// nop
 			break;
 		default:
@@ -2453,6 +2464,11 @@ void AbstractInterpreter::unary_negative(int opcodeIndex) {
 			dec_stack();
 			m_comp->emit_unary_negative_float();
 			inc_stack(1, STACK_KIND_VALUE);
+			break;
+		case AVK_Integer:
+			dec_stack();
+			m_comp->emit_unary_negative_tagged_int();
+			inc_stack();
 			break;
 		default:
 			dec_stack();
@@ -2475,6 +2491,10 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
 				m_comp->emit_unary_not_float_push_bool();
 				branch(opcodeIndex);
 				break;
+			case AVK_Integer:
+				m_comp->emit_unary_not_tagged_int_push_bool();
+				branch(opcodeIndex);
+				break;
 			default:
 				m_comp->emit_unary_not_push_int();
 				branch_or_error(opcodeIndex);
@@ -2487,6 +2507,10 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
 		switch (one.Value->kind()) {
 			case AVK_Float:
 				m_comp->emit_unary_not_float_push_bool();
+				m_comp->emit_box_bool();
+				break;
+			case AVK_Integer:
+				m_comp->emit_unary_not_tagged_int_push_bool();
 				m_comp->emit_box_bool();
 				break;
 			default:
@@ -2768,6 +2792,21 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
 				_ASSERTE(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
 
 				m_comp->emit_compare_float(compareType);
+				dec_stack();
+
+				if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+					branch(i);
+				}
+				else {
+					// push Python bool onto the stack
+					m_comp->emit_box_bool();
+				}
+				return;
+			}
+			else if (stackInfo[stackInfo.size() - 1].Value->kind() == AVK_Integer &&
+				stackInfo[stackInfo.size() - 2].Value->kind() == AVK_Integer) {
+
+				m_comp->emit_compare_tagged_int(compareType);
 				dec_stack();
 
 				if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
