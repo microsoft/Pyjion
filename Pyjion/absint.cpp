@@ -2500,9 +2500,6 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
 
 JittedCode* AbstractInterpreter::compile() {
 	bool interpreted = interpret();	
-	if (false) {
-		dump();
-	}
 	preprocess();
 
 	return compile_worker();

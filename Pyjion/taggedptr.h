@@ -49,10 +49,10 @@ inline bool can_tag(tagged_ptr value) {
 
 #define TAG_IT(x) ((PyObject*) (((x) << 1) | 0x01))
 #define UNTAG_IT(x) ((x) >> 1)
-#define IS_TAGGED(x) ((x)&0x01)
+#define IS_TAGGED(x) ((x) & 0x01)
 
 // Gets the number of "digits" (as defined by the Python long object) that fit into our tagged pointers
-#define DIGITS_IN_TAGGED_PTR ((MAX_BITS + PYLONG_BITS_IN_DIGIT - 1)/ PYLONG_BITS_IN_DIGIT)
+#define DIGITS_IN_TAGGED_PTR ((MAX_BITS + PYLONG_BITS_IN_DIGIT - 1) / PYLONG_BITS_IN_DIGIT)
 // Gets the size of a PyNumber object to be allocated on the stack that can hold our tagged pointer
 #define NUMBER_SIZE (sizeof(PyVarObject) + sizeof(PY_UINT32_T) * DIGITS_IN_TAGGED_PTR)
 #define INIT_TMP_NUMBER(name, value) \

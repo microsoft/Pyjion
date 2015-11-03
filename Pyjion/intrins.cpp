@@ -2010,10 +2010,10 @@ void PyJit_FloatDivideByZero() {
 }
 
 
-// Initializes a stack based number with our digits
+// Initializes a stack-based number with our digits
 inline PyObject* init_number(size_t* data, tagged_ptr number) {
 	PyObject* value = (PyObject*)data;
-	// Initialize a stack allocated number that will never leak, and never be freed...
+	// Initialize a stack-allocated number that will never leak, and never be freed...
 	value->ob_refcnt = 0x1000000;
 	value->ob_type = &PyLong_Type;
 
@@ -2032,7 +2032,7 @@ inline PyObject* init_number(size_t* data, tagged_ptr number) {
 	return value;
 }
 
-// If the functions return one of our stack based values, we return the original tagged value
+// If the functions return one of our stack-based values, we return the original tagged value
 inline PyObject* safe_return(PyObject* tmpLeft, tagged_ptr left, PyObject* res) {
 	if (res == tmpLeft) {
 		return (PyObject*)left;
