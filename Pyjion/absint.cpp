@@ -2066,9 +2066,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
 			auto handlerLabel = getOffsetLabel(oparg + curByte + 1);
 			auto blockInfo = BlockInfo(m_stack, m_blockIds++, m_comp->emit_define_label(), m_comp->emit_define_label(), handlerLabel, oparg + curByte + 1, SETUP_EXCEPT);
 			blockInfo.ExVars = ExceptionVars(
-				m_comp->emit_define_local(true),
-				m_comp->emit_define_local(true),
-				m_comp->emit_define_local(true)
+				m_comp->emit_define_local(false),
+				m_comp->emit_define_local(false),
+				m_comp->emit_define_local(false)
 				);
 			m_blockStack.push_back(blockInfo);
 			m_allHandlers.push_back(blockInfo);
@@ -2085,9 +2085,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
 			auto handlerLabel = getOffsetLabel(oparg + curByte + 1);
 			auto blockInfo = BlockInfo(m_stack, m_blockIds++, m_comp->emit_define_label(), m_comp->emit_define_label(), handlerLabel, oparg + curByte + 1, SETUP_FINALLY);
 			blockInfo.ExVars = ExceptionVars(
-				m_comp->emit_define_local(true),
-				m_comp->emit_define_local(true),
-				m_comp->emit_define_local(true)
+				m_comp->emit_define_local(false),
+				m_comp->emit_define_local(false),
+				m_comp->emit_define_local(false)
 				);
 			m_blockStack.push_back(blockInfo);
 			m_allHandlers.push_back(blockInfo);
