@@ -213,6 +213,11 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
+		TestCase(
+		"def f():\n    cs = [('CATEGORY', 'CATEGORY_SPACE')]\n    for op, av in cs:\n        while True:\n            break\n        print(op, av)",
+			TestInput("None")
+			),
+
 		// +=, -= checks are to avoid constant folding
 		TestCase(
 			"def f():\n    x = 0\n    x += 1\n    x -= 1\n    return x or 1",

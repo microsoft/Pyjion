@@ -1511,8 +1511,8 @@ void AbstractInterpreter::free_iter_local() {
 			if ((*cur).LoopVar.is_valid()) {
 				m_comp->emit_load_local((*cur).LoopVar);
 				m_comp->emit_pop_top();
-				break;
 			}
+			break;
 		}
 	}
 }

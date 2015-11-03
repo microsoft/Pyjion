@@ -913,10 +913,10 @@ void PythonCompiler::emit_for_next(Label processValue, Local iterValue) {
 	}
 	m_il.dup();
 	m_il.ld_i(nullptr);
-	m_il.compare_eq();
-	m_il.branch(BranchFalse, processValue);
+	m_il.branch(BranchNotEqual, processValue);
 
 	// iteration has ended, or an exception was raised...
+	
 	m_il.pop();
 	m_il.ld_loc(iterValue);
 	decref();
@@ -1244,7 +1244,7 @@ GLOBAL_METHOD(METHOD_COMPARE_EXCEPTIONS_INT, &PyJit_CompareExceptions_Int, CORIN
 GLOBAL_METHOD(METHOD_UNBOUND_LOCAL, &PyJit_UnboundLocal, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_PYERR_RESTORE, &PyJit_PyErrRestore, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
-GLOBAL_METHOD(METHOD_DEBUG_TRACE, &PyJit_DebugTrace, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_DEBUG_TRACE, &PyJit_DebugTrace, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_FUNC_SET_DEFAULTS, &PyJit_FunctionSetDefaults, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
