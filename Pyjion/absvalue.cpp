@@ -78,6 +78,12 @@ AbstractValue* AbstractValue::compare(AbstractSource* selfSources, int op, Abstr
 	return &Any;
 }
 
+void AbstractValue::truth(AbstractSource* selfSources) {
+	if (selfSources != nullptr) {
+		selfSources->escapes();
+	}
+}
+	
 AbstractValue* AbstractValue::merge_with(AbstractValue*other) {
 	if (this == other) {
 		return this;
@@ -116,6 +122,9 @@ AbstractSource* AbstractSource::combine(AbstractSource* one, AbstractSource* two
 						source->Sources = one->Sources;
 					}
 				}
+				if (two->needs_boxing() && !one->needs_boxing()) {
+					one->escapes();
+				}
 				two->Sources = one->Sources;
 				return one;
 			}
@@ -125,6 +134,9 @@ AbstractSource* AbstractSource::combine(AbstractSource* one, AbstractSource* two
 					if (source != one) {
 						source->Sources = two->Sources;
 					}
+				}
+				if (one->needs_boxing() && !two->needs_boxing()) {
+					two->escapes();
 				}
 				one->Sources = two->Sources;
 				return two;
@@ -154,6 +166,10 @@ void TupleSource::escapes() {
 // BoolValue methods
 AbstractValueKind BoolValue::kind() {
     return AVK_Bool;
+}
+
+void BoolValue::truth(AbstractSource* selfSources) {
+	// bools aren't boxed, and don't escape on truth checks
 }
 
 AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
@@ -702,6 +718,10 @@ const char* StringValue::describe() {
 // FloatValue methods
 AbstractValueKind FloatValue::kind() {
     return AVK_Float;
+}
+
+void FloatValue::truth(AbstractSource* selfSources) {
+	// floats don't escape on truth checks...
 }
 
 AbstractValue* FloatValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {

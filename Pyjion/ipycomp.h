@@ -107,6 +107,8 @@ class IPythonCompiler {
 	virtual void emit_int(int value) = 0;
 	// Emits an unboxed floating point value onto the stack
 	virtual void emit_float(double value) = 0;
+	// Emits a unboxed tagged integer value onto the stack
+	virtual void emit_tagged_int(ssize_t value) = 0;
 	// Emits an unboxed bool onto the stack
 	virtual void emit_bool(bool value) = 0;
 	// Emits a pointer value onto the stack
@@ -128,8 +130,8 @@ class IPythonCompiler {
 	virtual void emit_box_float() = 0;
 	// Boxes a raw bool into a Python object
 	virtual void emit_box_bool() = 0;
-	// Boxes a raw int into a Python object
-	virtual void emit_box_int() = 0;
+	// Boxes a tagged int into a Python object
+	virtual void emit_box_tagged_ptr() = 0;
 
 	/***************************************************** 
 	 * Stack based locals */
@@ -311,6 +313,8 @@ class IPythonCompiler {
 	virtual void emit_binary_float(int opcode) = 0;
 	// Performs a binary operation for values on the stack which are boxed objects
 	virtual void emit_binary_object(int opcode) = 0;
+
+	virtual void emit_binary_tagged_int(int opcode) = 0;
 
 	// Does an in/contains check and pushes a Python object onto the stack as the result, or NULL if there was an error
 	virtual void emit_in() = 0;

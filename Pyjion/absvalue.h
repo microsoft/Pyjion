@@ -173,6 +173,7 @@ public:
     virtual AbstractValue* unary(AbstractSource* selfSources, int op);
     virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual AbstractValue* compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
+	virtual void truth(AbstractSource* selfSources);
 
     virtual bool is_always_true() {
         return false;
@@ -280,6 +281,7 @@ class BoolValue : public AbstractValue {
     virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual AbstractValue* unary(AbstractSource* selfSources, int op);
     virtual const char* describe();
+	virtual void truth(AbstractSource* selfSources);
 };
 
 class BytesValue : public AbstractValue {
@@ -314,6 +316,8 @@ class FloatValue : public AbstractValue {
     virtual AbstractValueKind kind();
     virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual AbstractValue* unary(AbstractSource* selfSources, int op);
+	virtual void truth(AbstractSource* selfSources);
+
     virtual const char* describe();
 };
 

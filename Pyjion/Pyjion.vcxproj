@@ -38,6 +38,7 @@
     <ClInclude Include="jitinfo.h" />
     <ClInclude Include="pycomp.h" />
     <ClInclude Include="pyjit.h" />
+    <ClInclude Include="taggedptr.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{0B2F9AA3-F525-4042-B8C9-74F8B10F9D62}</ProjectGuid>
