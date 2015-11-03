@@ -303,11 +303,15 @@ class IPythonCompiler {
 
 	// Does a unary not on an unboxed floating value, pushing an unboxed bool onto the stack
 	virtual void emit_unary_not_float_push_bool() = 0;
+	// Performs a unary negative on a tagged integer
+	virtual void emit_unary_not_tagged_int_push_bool() = 0;
 	// Performs a unary invert on the top value on the stack, pushing the result onto the stack or NULL if an error occurred
 	virtual void emit_unary_invert() = 0;
 
 	// Peforms a unary negative on a unboxed floating value on the stack, pushing the unboxed result back to the stack
 	virtual void emit_unary_negative_float() = 0;
+	// Performs a unary negative on a tagged integer
+	virtual void emit_unary_negative_tagged_int() = 0;
 
 	// Performans a binary operation for values on the stack which are unboxed floating points
 	virtual void emit_binary_float(int opcode) = 0;
@@ -336,6 +340,8 @@ class IPythonCompiler {
 	virtual bool emit_compare_object_push_int(int compareType) = 0;
 	// Performs a comparison of two unboxed floating point values on the stack
 	virtual void emit_compare_float(int compareType) = 0;
+	// Performs a comparison of two tagged integers
+	virtual void emit_compare_tagged_int(int compareType) = 0;
 
 	/*****************************************************
 	 * Exception handling */

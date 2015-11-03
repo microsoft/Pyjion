@@ -533,9 +533,17 @@ void PythonCompiler::emit_unary_negative_float() {
 	m_il.neg();
 }
 
+void PythonCompiler::emit_unary_negative_tagged_int() {
+	m_il.emit_call(METHOD_UNARY_NEGATIVE_INT);
+}
+
 void PythonCompiler::emit_unary_not_float_push_bool() {
 	m_il.ld_r8(0);
 	m_il.compare_eq();
+}
+
+void PythonCompiler::emit_unary_not_tagged_int_push_bool() {
+	m_il.emit_call(METHOD_UNARY_NOT_INT_PUSH_BOOL);
 }
 
 void PythonCompiler::emit_unary_invert() {
@@ -1055,6 +1063,17 @@ void PythonCompiler::emit_compare_float(int compareType) {
     }
 }
 
+void PythonCompiler::emit_compare_tagged_int(int compareType) {
+	switch (compareType) {
+		case Py_EQ:  m_il.emit_call(METHOD_EQUALS_INT_TOKEN); break;
+		case Py_LT: m_il.emit_call(METHOD_LESS_THAN_INT_TOKEN); break;
+		case Py_LE: m_il.emit_call(METHOD_LESS_THAN_EQUALS_INT_TOKEN); break;
+		case Py_NE: m_il.emit_call(METHOD_NOT_EQUALS_INT_TOKEN); break;
+		case Py_GT: m_il.emit_call(METHOD_GREATER_THAN_INT_TOKEN); break;
+		case Py_GE: m_il.emit_call(METHOD_GREATER_THAN_EQUALS_INT_TOKEN); break;
+	}
+}
+
 void PythonCompiler::emit_compare_object(int compareType) {
     m_il.ld_i(compareType);
     m_il.emit_call(METHOD_RICHCMP_TOKEN);
@@ -1276,3 +1295,13 @@ GLOBAL_METHOD(METHOD_BINARY_XOR_INT_TOKEN, PyJit_BinaryXor_Int, CORINFO_TYPE_NAT
 GLOBAL_METHOD(METHOD_BINARY_OR_INT_TOKEN, PyJit_BinaryOr_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
 GLOBAL_METHOD(METHOD_MULTIPLY_INT_TOKEN, PyJit_Multiply_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
 GLOBAL_METHOD(METHOD_SUBTRACT_INT_TOKEN, PyJit_Subtract_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
+
+GLOBAL_METHOD(METHOD_UNARY_NEGATIVE_INT, PyJit_UnaryNegative_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT))
+GLOBAL_METHOD(METHOD_UNARY_NOT_INT_PUSH_BOOL, PyJit_UnaryNot_Int_PushBool, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT))
+
+GLOBAL_METHOD(METHOD_EQUALS_INT_TOKEN, PyJit_Equals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
+GLOBAL_METHOD(METHOD_LESS_THAN_INT_TOKEN, PyJit_LessThan_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
+GLOBAL_METHOD(METHOD_LESS_THAN_EQUALS_INT_TOKEN, PyJit_LessThanEquals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
+GLOBAL_METHOD(METHOD_NOT_EQUALS_INT_TOKEN, PyJit_NotEquals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
+GLOBAL_METHOD(METHOD_GREATER_THAN_INT_TOKEN, PyJit_GreaterThan_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
+GLOBAL_METHOD(METHOD_GREATER_THAN_EQUALS_INT_TOKEN, PyJit_GreaterThanEquals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))

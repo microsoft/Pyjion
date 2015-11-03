@@ -213,10 +213,251 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
-        //TestCase(
-        //    "def f():\n    try:\n        a = RefCountCheck() + undefined\n        return 'noerr'\n    except:\n        return finalized",
-        //    TestInput("True")
-        //),
+		// +=, -= checks are to avoid constant folding
+		TestCase(
+			"def f():\n    x = 0\n    x += 1\n    x -= 1\n    return x or 1",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 0\n    x += 1\n    x -= 1\n    return x and 1",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    x += 1\n    x -= 1\n    return x or 2",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    x += 1\n    x -= 1\n    return x and 2",
+			TestInput("2")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    return x or 1",
+			TestInput("4611686018427387903")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    return x and 1",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    x -= 4611686018427387903\n    return x or 1",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    x -= 4611686018427387903\n    return x and 1",
+			TestInput("0")
+			),
+
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    return -x",
+			TestInput("-4611686018427387903")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    return -x",
+			TestInput("-4611686018427387904")
+			),
+		TestCase(
+			"def f():\n    x = -4611686018427387904\n    x += 1\n    x -= 1\n    return -x",
+			TestInput("4611686018427387904")
+			),
+
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    y = not x\n    return y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    if x:\n        return True\n    return False",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    x -= 4611686018427387903\n    if x:\n        return True\n    return False",
+			TestInput("False")
+			),
+
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    if not x:\n        return True\n    return False",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    x -= 4611686018427387903\n    if not x:\n        return True\n    return False",
+			TestInput("True")
+			),
+
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    x -= 4611686018427387903\n    y = not x\n    return y",
+			TestInput("True")
+			),
+
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x == y:\n        return True\n    return False",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x <= y:\n        return True\n    return False",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x >= y:\n        return True\n    return False",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x != y:\n        return True\n    return False",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x < y:\n        return True\n    return False",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x > y:\n        return True\n    return False",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    if x < y:\n        return True\n    return False",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    if x > y:\n        return True\n    return False",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    if x < y:\n        return True\n    return False",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    if x > y:\n        return True\n    return False",
+			TestInput("False")
+			),
+
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x == y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    return x == y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    y -= 1\n    return x == y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    return x == y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    return x == y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 1\n    return x == y",
+			TestInput("True")
+			),
+
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x != y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    return x != y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    y -= 1\n    return x != y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    return x != y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    return x != y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 1\n    return x != y",
+			TestInput("False")
+			),
+
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x >= y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    return x >= y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    y -= 1\n    return x >= y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 1\n    return x >= y",
+			TestInput("True")
+			),
+
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x <= y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    return x <= y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    y -= 1\n    return x <= y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 1\n    return x <= y",
+			TestInput("True")
+			),
+
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x > y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775808\n    y = 9223372036854775807\n    return x > y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775808\n    return x > y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    return x > y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    return x > y",
+			TestInput("False")
+			),
+
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x < y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775808\n    y = 9223372036854775807\n    return x < y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775808\n    return x < y",
+			TestInput("True")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    return x < y",
+			TestInput("False")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    return x < y",
+			TestInput("True")
+			),
+
+		TestCase(
+			"def f():\n    x = 1\n    y = 1\n    return x == y",
+			TestInput("True")
+			),
 		TestCase(
 		"def f():\n    x = 1\n    y = 9223372036854775807\n    return x % y",
 			TestInput("1")

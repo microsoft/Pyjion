@@ -2276,6 +2276,39 @@ PyObject* PyJit_BoxTaggedPointer(PyObject* value) {
 	return PyJit_##name(left, right);													\
 }																						\
 
+#define TAGGED_COMPARE(name, cmp) \
+	bool PyJit_##name##_Int(PyObject *left, PyObject *right) {							\
+	tagged_ptr leftI = (tagged_ptr)left;												\
+	tagged_ptr rightI = (tagged_ptr)right;												\
+	size_t tempNumber[NUMBER_SIZE];														\
+	if (IS_TAGGED(leftI)) {																\
+		if (IS_TAGGED(rightI)) {														\
+			return UNTAG_IT(leftI) cmp UNTAG_IT(rightI);								\
+		}																				\
+		else if (!LongOverflow(right, &rightI)) {										\
+			Py_DECREF(right);															\
+			return UNTAG_IT(leftI) cmp rightI;											\
+		}																				\
+		else {																			\
+			/* right is a PyObject and too big	*/										\
+			left = init_number(tempNumber, UNTAG_IT(leftI));							\
+		}																				\
+	}																					\
+	else if (IS_TAGGED(rightI)) {														\
+		if (!LongOverflow(left, &leftI)) {												\
+			Py_DECREF(left);															\
+			return leftI cmp UNTAG_IT(rightI);											\
+		}																				\
+		else {																			\
+			/* left is a PyObject and too big...	*/									\
+			right = init_number(tempNumber, UNTAG_IT(rightI));							\
+		}																				\
+	}																					\
+																						\
+	/* both are PyObjects		*/														\
+	return long_compare((PyLongObject*)left, (PyLongObject*)right) cmp 0;				\
+}																						\
+
 TAGGED_METHOD(Add)
 TAGGED_METHOD(Subtract)
 TAGGED_METHOD(BinaryAnd)
@@ -2288,3 +2321,37 @@ TAGGED_METHOD(FloorDivide)
 TAGGED_METHOD(BinaryLShift)
 TAGGED_METHOD(BinaryRShift)
 TAGGED_METHOD(Power)
+
+TAGGED_COMPARE(Equals, ==)
+TAGGED_COMPARE(NotEquals, !=)
+TAGGED_COMPARE(GreaterThan, >)
+TAGGED_COMPARE(LessThan, <)
+TAGGED_COMPARE(GreaterThanEquals, >=)
+TAGGED_COMPARE(LessThanEquals, <=)
+
+PyObject* PyJit_UnaryNegative_Int(PyObject*value) {
+	tagged_ptr valueI = (tagged_ptr)value;
+	size_t tempNumber[NUMBER_SIZE];
+
+	if (IS_TAGGED(valueI)) {
+		auto untagged = UNTAG_IT(valueI);
+		if (untagged != MIN_TAGGED_VALUE) {
+			return TAG_IT(-untagged);
+		}
+
+		// we'll overflow on the conversion from min to max
+		value = init_number(tempNumber, untagged);		
+	}
+
+	return PyNumber_Negative(value);
+}
+
+bool PyJit_UnaryNot_Int_PushBool(PyObject*value) {
+	tagged_ptr valueI = (tagged_ptr)value;
+	if (IS_TAGGED(valueI)) {
+		auto untagged = UNTAG_IT(valueI);
+		return untagged == 0;
+	}
+	
+	return Py_SIZE(value) == 0;
+}

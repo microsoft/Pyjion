@@ -262,4 +262,13 @@ PyObject* PyJit_BinaryRShift_Int(PyObject *left, PyObject *right);
 PyObject* PyJit_Power_Int(PyObject *left, PyObject *right);
 
 PyObject* PyJit_BoxTaggedPointer(PyObject* value);
+PyObject* PyJit_UnaryNegative_Int(PyObject*value);
+bool PyJit_UnaryNot_Int_PushBool(PyObject*value);
+
+bool PyJit_Equals_Int(PyObject *left, PyObject *right);
+bool PyJit_LessThan_Int(PyObject *left, PyObject *right);
+bool PyJit_LessThanEquals_Int(PyObject *left, PyObject *right);
+bool PyJit_NotEquals_Int(PyObject *left, PyObject *right);
+bool PyJit_GreaterThan_Int(PyObject *left, PyObject *right);
+bool PyJit_GreaterThanEquals_Int(PyObject *left, PyObject *right);
 #endif
