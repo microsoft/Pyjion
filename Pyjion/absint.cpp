@@ -24,6 +24,7 @@
 */
 
 #include "absint.h"
+#include "taggedptr.h"
 #include <opcode.h>
 #include <deque>
 #include <unordered_map>
@@ -305,6 +306,7 @@ bool AbstractInterpreter::interpret() {
                             queue.push_back(oparg);
                         }
 
+						value.Value->truth(value.Sources);
                         if (value.Value->is_always_false()) {
                             // We're always jumping, we don't need to process the following opcodes...
                             goto next;
@@ -322,6 +324,7 @@ bool AbstractInterpreter::interpret() {
                             queue.push_back(oparg);
                         }
 
+						value.Value->truth(value.Sources);
                         if (value.Value->is_always_true()) {
                             // We're always jumping, we don't need to process the following opcodes...
                             goto next;
@@ -337,6 +340,7 @@ bool AbstractInterpreter::interpret() {
                             queue.push_back(oparg);
                         }
                         auto value = lastState.pop_no_escape();
+						value.Value->truth(value.Sources);
                         if (value.Value->is_always_true()) {
                             // we always jump, no need to analyze the following instructions...
                             goto next;
@@ -350,6 +354,7 @@ bool AbstractInterpreter::interpret() {
                             queue.push_back(oparg);
                         }
                         auto value = lastState.pop_no_escape();
+						value.Value->truth(value.Sources);
                         if (value.Value->is_always_false()) {
                             // we always jump, no need to analyze the following instructions...
                             goto next;
@@ -1908,6 +1913,16 @@ JittedCode* AbstractInterpreter::compile_worker() {
 					inc_stack(1, STACK_KIND_VALUE);
 					break;
 				}
+				else if (one.Value->kind() == AVK_Integer && two.Value->kind() == AVK_Integer) {
+					dec_stack(2);
+
+					m_comp->emit_binary_tagged_int(byte);
+
+					error_check();
+
+					inc_stack();
+					break;
+				}
 			}
 			dec_stack(2);
 
@@ -2484,7 +2499,7 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
 }
 
 JittedCode* AbstractInterpreter::compile() {
-	bool interpreted = interpret();
+	bool interpreted = interpret();	
 	preprocess();
 
 	return compile_worker();
@@ -2526,6 +2541,11 @@ void AbstractInterpreter::store_fast(int local, int opcodeIndex) {
 			dec_stack();
 			return;
 		}
+		else if (stackValue.Value->kind() == AVK_Integer) {
+			m_comp->emit_store_local(get_optimized_local(local, AVK_Any));
+			dec_stack();
+			return;
+		}
 	}
 
 	_ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT);
@@ -2540,6 +2560,15 @@ void AbstractInterpreter::load_const(int constIndex, int opcodeIndex) {
 			m_comp->emit_float(PyFloat_AsDouble(constValue));
 			inc_stack(1, STACK_KIND_VALUE);
 			return;
+		}
+		else if (PyLong_CheckExact(constValue)) {
+			int overflow;
+			auto value = PyLong_AsLongLongAndOverflow(constValue, &overflow);
+			if (!overflow && can_tag(value)) {
+				m_comp->emit_tagged_int(value);
+				inc_stack();
+				return;
+			}
 		}
 	}
 	m_comp->emit_py_object(constValue);
@@ -2556,6 +2585,9 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
 
 			// we need to convert the returned floating point value back into a boxed float.
 			m_comp->emit_box_float();
+		}
+		else if (stackInfo[stackInfo.size() - 1].Value->kind() == AVK_Integer) {
+			m_comp->emit_box_tagged_ptr();
 		}
 	}
 
@@ -2777,6 +2809,11 @@ void AbstractInterpreter::load_fast(int local, int opcodeIndex) {
 		if (kind == AVK_Float) {
 			m_comp->emit_load_local(get_optimized_local(local, AVK_Float));
 			inc_stack(1, STACK_KIND_VALUE);
+			return;
+		}
+		else if (kind == AVK_Integer) {
+			m_comp->emit_load_local(get_optimized_local(local, AVK_Any));
+			inc_stack();
 			return;
 		}
 	}

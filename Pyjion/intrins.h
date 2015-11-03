@@ -244,7 +244,22 @@ PyObject* Call0_Generic(PyObject *target, void**addr);
 extern PyObject* g_emptyTuple;
 
 
-void PyJit_DebugDecRef(PyObject* value);
+void PyJit_DecRef(PyObject* value);
 
 void PyJit_FloatDivideByZero();
+
+PyObject* PyJit_Add_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_Subtract_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_BinaryAnd_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_BinaryOr_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_BinaryXor_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_Multiply_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_Modulo_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_TrueDivide_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_FloorDivide_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_BinaryLShift_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_BinaryRShift_Int(PyObject *left, PyObject *right);
+PyObject* PyJit_Power_Int(PyObject *left, PyObject *right);
+
+PyObject* PyJit_BoxTaggedPointer(PyObject* value);
 #endif

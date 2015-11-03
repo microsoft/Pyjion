@@ -26,6 +26,15 @@
 */
 
 #include "intrins.h"
+#include "taggedptr.h"
+#include <cstdint>
+
+#ifdef _MSC_VER
+
+#include <safeint.h>
+using namespace msl::utilities;
+
+#endif
 
 //#define DEBUG_TRACE
 PyObject* g_emptyTuple;
@@ -1988,10 +1997,294 @@ bool PyJit_IsNot_Bool(PyObject* lhs, PyObject* rhs) {
     return lhs != rhs;
 }
 
-void PyJit_DebugDecRef(PyObject* value) {
+void PyJit_DecRef(PyObject* value) {
+	if (IS_TAGGED((tagged_ptr)value)) {
+		// Tagged pointer
+		return;
+	}
     Py_DecRef(value);
 }
 
 void PyJit_FloatDivideByZero() {
     PyErr_SetString(PyExc_ZeroDivisionError, "float division by zero");
 }
+
+
+// Initializes a stack-based number with our digits
+inline PyObject* init_number(size_t* data, tagged_ptr number) {
+	PyObject* value = (PyObject*)data;
+	// Initialize a stack-allocated number that will never leak, and never be freed...
+	value->ob_refcnt = 0x1000000;
+	value->ob_type = &PyLong_Type;
+
+	// This won't overflow on min int because we never have min int due to the stolen bit
+	auto size = 0;
+	auto tmpNumber = abs(number);
+	for (int i = 0; i < DIGITS_IN_TAGGED_PTR; i++) {
+		((PyLongObject*)value)->ob_digit[i] = tmpNumber & ((1 << PYLONG_BITS_IN_DIGIT) - 1);
+		tmpNumber >>= PYLONG_BITS_IN_DIGIT;
+		size++;
+		if (tmpNumber == 0) {
+			break;
+		}
+	}
+	Py_SIZE(value) = number < 0 ? -((int)size) : size;
+	return value;
+}
+
+// If the functions return one of our stack-based values, we return the original tagged value
+inline PyObject* safe_return(PyObject* tmpLeft, tagged_ptr left, PyObject* res) {
+	if (res == tmpLeft) {
+		return (PyObject*)left;
+	}
+	return res;
+}
+
+inline PyObject* safe_return(PyObject* tmpLeft, tagged_ptr left, PyObject* tmpRight, tagged_ptr right, PyObject* res) {
+	if (res == tmpLeft) {
+		return (PyObject*)left;
+	}
+	else if (res == tmpRight) {
+		return (PyObject*)right;
+	}
+	else {
+		return res;
+	}
+}
+
+inline bool LongOverflow(PyObject* obj, tagged_ptr* value) {
+	int overflow;
+	*value = AS_LONG_AND_OVERFLOW(obj, &overflow);
+	return overflow || !can_tag(*value);
+}
+
+inline PyObject* PyJit_Tagged_Add(tagged_ptr left, tagged_ptr right) {
+	tagged_ptr res;
+#ifdef _MSC_VER
+	if(SafeAdd(left, right, res)) {
+#elif __clang__ || __GNUC__
+	if (!__builtin_add_overflow(left, right, &res)) {
+#else
+#error No support for this compiler
+#endif
+		if (can_tag(res)) {
+			return TAG_IT(res);
+		}
+	}
+
+	INIT_TMP_NUMBER(tmpLeft, left);
+	INIT_TMP_NUMBER(tmpRight, right);
+	// We overflowed big time...
+	return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Add(tmpLeft, tmpRight));
+}
+
+inline PyObject* PyJit_Tagged_Subtract(tagged_ptr left, tagged_ptr right) {
+	tagged_ptr res;
+#ifdef _MSC_VER
+	if (SafeSubtract(left, right, res)) {
+#elif __clang__ || __GNUC__
+	if (!__builtin_sub_overflow(left, right, &res)) {
+#else
+#error No support for this compiler
+#endif
+		if (can_tag(res)) {
+			return TAG_IT(res);
+		}
+	}
+
+	INIT_TMP_NUMBER(tmpLeft, left);
+	INIT_TMP_NUMBER(tmpRight, right);
+	
+	// We overflowed big time...
+	return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Subtract(tmpLeft, tmpRight));
+}
+
+inline PyObject* PyJit_Tagged_Multiply(tagged_ptr left, tagged_ptr right) {
+	tagged_ptr res;
+#ifdef _MSC_VER
+	if (SafeMultiply(left, right, res)) {
+#elif __clang__ || __GNUC__
+	if (!__builtin_mul_overflow(left, right, &res)) {
+#else
+#error No support for this compiler
+#endif
+		if (can_tag(res)) {
+			return TAG_IT(res);
+		}
+		// We overflowed by a single bit
+		return PyLong_FromLongLong(res);
+	}
+
+	INIT_TMP_NUMBER(tmpLeft, left);
+	INIT_TMP_NUMBER(tmpRight, right);
+	// We overflowed big time...
+	return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Multiply(tmpLeft, tmpRight));
+}
+
+
+inline PyObject* PyJit_Tagged_Modulo(tagged_ptr left, tagged_ptr right) {
+	tagged_ptr res;
+#ifdef _MSC_VER
+	if (SafeModulus(left, right, res)) {
+#else
+#error No support for this compiler
+#endif
+		if (can_tag(res)) {
+			return TAG_IT(res);
+		}
+		// We overflowed by a single bit
+		return NEW_LONG(res);
+	}
+
+	INIT_TMP_NUMBER(tmpLeft, left);
+	INIT_TMP_NUMBER(tmpRight, right);
+
+	return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Remainder(tmpLeft, tmpRight));
+}
+
+inline PyObject* PyJit_Tagged_TrueDivide(tagged_ptr left, tagged_ptr right) {
+	if (right == 0) {
+		PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
+		return nullptr;
+	}
+
+	double ld = (double)left, rd = (double)right;
+	return PyFloat_FromDouble(ld / rd);
+}
+
+inline PyObject* PyJit_Tagged_FloorDivide(tagged_ptr left, tagged_ptr right) {
+	tagged_ptr res;
+#ifdef _MSC_VER
+	if (SafeDivide(left, right, res) ) {
+#else
+#error No support for this compiler
+#endif
+		if (can_tag(res)) {
+			return TAG_IT(res);
+		}
+		// We overflowed by a single bit
+		return NEW_LONG(res);
+	}
+
+	INIT_TMP_NUMBER(tmpLeft, left);
+	INIT_TMP_NUMBER(tmpRight, right);
+	return safe_return(tmpLeft, left, tmpRight, right, PyNumber_FloorDivide(tmpLeft, tmpRight));
+}
+
+inline PyObject* PyJit_Tagged_BinaryLShift(tagged_ptr left, tagged_ptr right) {
+	if (right < 0) {
+		PyErr_SetString(PyExc_ValueError, "negative shift count");
+		return nullptr;
+	}
+	else if (left == 0) {
+		// shifting zero is always zero regardless of right
+		return TAG_IT(0);
+	}
+	
+	if (right < MAX_BITS) {
+		if (left > 0) {
+			// If left doesn't have any high bits set, it's safe to shift
+			if ((left & ~((1 << right) - 1)) == 0) {
+				auto res = left << right;
+				if (can_tag(res)) {
+					return TAG_IT(res);
+				}
+			}
+		}
+		else {
+			// Shifting a negative value, of course we have high bits set
+			// TODO: Implement optimial version
+		}
+	}
+	
+	// we're overflowed
+	INIT_TMP_NUMBER(tmpLeft, left);
+	INIT_TMP_NUMBER(tmpRight, right);
+
+	return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Lshift(tmpLeft, tmpRight));
+}
+
+inline PyObject* PyJit_Tagged_BinaryRShift(tagged_ptr left, tagged_ptr right) {
+	if (right < 0) {
+		PyErr_SetString(PyExc_ValueError, "negative shift count");
+		return nullptr;
+	}
+
+	return TAG_IT(left >> right);
+}
+
+inline PyObject* PyJit_Tagged_BinaryAnd(tagged_ptr left, tagged_ptr right) {
+	return TAG_IT(left & right);
+}
+
+inline PyObject* PyJit_Tagged_BinaryOr(tagged_ptr left, tagged_ptr right) {
+	return TAG_IT(left | right);
+}
+
+inline PyObject* PyJit_Tagged_BinaryXor(tagged_ptr left, tagged_ptr right) {
+	return TAG_IT(left ^ right);
+}
+
+inline PyObject* PyJit_Tagged_Power(tagged_ptr left, tagged_ptr right) {
+	INIT_TMP_NUMBER(tmpLeft, left);
+	INIT_TMP_NUMBER(tmpRight, right);
+
+	// TODO: Optimal version
+	return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Power(tmpLeft, tmpRight, Py_None));
+}
+
+PyObject* PyJit_BoxTaggedPointer(PyObject* value) {
+	tagged_ptr tagged = (tagged_ptr)value;
+	if (IS_TAGGED(tagged)) {
+		return NEW_LONG(UNTAG_IT(tagged));
+	}
+	return value;
+}
+
+#define TAGGED_METHOD(name) \
+	PyObject* PyJit_##name##_Int(PyObject *left, PyObject *right) {						\
+	tagged_ptr leftI = (tagged_ptr)left;												\
+	tagged_ptr rightI = (tagged_ptr)right;												\
+	size_t tempNumber[NUMBER_SIZE];														\
+	if (IS_TAGGED(leftI)) {																\
+		if (IS_TAGGED(rightI)) {														\
+			return PyJit_Tagged_##name(UNTAG_IT(leftI), UNTAG_IT(rightI));				\
+		}																				\
+		else if (!LongOverflow(right, &rightI)) {										\
+			Py_DECREF(right);															\
+			return PyJit_Tagged_##name(UNTAG_IT(leftI), rightI);						\
+		}																				\
+		else {																			\
+			/* right is a PyObject and too big	*/										\
+			left = init_number(tempNumber, UNTAG_IT(leftI));							\
+			return safe_return(left, leftI, PyJit_##name(left, right));					\
+		}																				\
+	}																					\
+	else if (IS_TAGGED(rightI)) {														\
+		if (!LongOverflow(left, &leftI)) {												\
+			Py_DECREF(left);															\
+			return PyJit_Tagged_##name(leftI, UNTAG_IT(rightI));						\
+		}																				\
+		else {																			\
+			/* left is a PyObject and too big...	*/									\
+			right = init_number(tempNumber, UNTAG_IT(rightI));							\
+			return safe_return(right, rightI, PyJit_##name(left, right));				\
+		}																				\
+	}																					\
+																						\
+	/* both are PyObjects		*/														\
+	return PyJit_##name(left, right);													\
+}																						\
+
+TAGGED_METHOD(Add)
+TAGGED_METHOD(Subtract)
+TAGGED_METHOD(BinaryAnd)
+TAGGED_METHOD(BinaryOr)
+TAGGED_METHOD(BinaryXor)
+TAGGED_METHOD(Multiply)
+TAGGED_METHOD(Modulo)
+TAGGED_METHOD(TrueDivide)
+TAGGED_METHOD(FloorDivide)
+TAGGED_METHOD(BinaryLShift)
+TAGGED_METHOD(BinaryRShift)
+TAGGED_METHOD(Power)

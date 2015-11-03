@@ -140,7 +140,20 @@
 #define METHOD_FLOAT_FROM_DOUBLE            0x00000053
 #define METHOD_BOOL_FROM_LONG               0x00000054
 #define METHOD_PYERR_SETSTRING              0x00000055
-#define METHOD_LONG_FROM_LONG				0x00000056
+#define METHOD_BOX_TAGGED_PTR				0x00000056
+
+#define METHOD_ADD_INT_TOKEN				0x00000057
+#define METHOD_DIVIDE_INT_TOKEN				0x00000058
+#define METHOD_FLOORDIVIDE_INT_TOKEN		0x00000059
+#define METHOD_POWER_INT_TOKEN				0x0000005A	
+#define METHOD_MODULO_INT_TOKEN				0x0000005B
+#define METHOD_BINARY_LSHIFT_INT_TOKEN		0x0000005C
+#define METHOD_BINARY_RSHIFT_INT_TOKEN		0x0000005D
+#define METHOD_BINARY_AND_INT_TOKEN			0x0000005E
+#define METHOD_BINARY_XOR_INT_TOKEN			0x0000005F
+#define METHOD_BINARY_OR_INT_TOKEN			0x00000060
+#define METHOD_MULTIPLY_INT_TOKEN			0x00000061
+#define METHOD_SUBTRACT_INT_TOKEN			0x00000062
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -324,6 +337,7 @@ public:
 	virtual void emit_for_next(Label processValue, Local iterValue);
     
     virtual void emit_binary_float(int opcode);
+	virtual void emit_binary_tagged_int(int opcode);
     virtual void emit_binary_object(int opcode);
     
     virtual void emit_in_push_int();
@@ -351,6 +365,7 @@ public:
 
 	virtual void emit_int(int value);
 	virtual void emit_float(double value);
+	virtual void emit_tagged_int(ssize_t value);
 	virtual void emit_ptr(void *value);
 	virtual void emit_bool(bool value);
 	virtual void emit_py_object(PyObject* value);
@@ -372,7 +387,7 @@ public:
 
 	virtual void emit_box_float();
 	virtual void emit_box_bool();
-	virtual void emit_box_int();
+	virtual void emit_box_tagged_ptr();
 
 	virtual JittedCode* emit_compile();
 	
@@ -380,7 +395,7 @@ private:
     void load_frame();
 
     void load_local(int oparg);
-    void incref();
+    void incref(bool maybeTagged = false);
     void decref();
 	
     void call_optimizing_function(int baseFunction);

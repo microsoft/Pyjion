@@ -217,7 +217,332 @@ void PyJitTest() {
         //    "def f():\n    try:\n        a = RefCountCheck() + undefined\n        return 'noerr'\n    except:\n        return finalized",
         //    TestInput("True")
         //),
+		TestCase(
+		"def f():\n    x = 1\n    y = 9223372036854775807\n    return x % y",
+			TestInput("1")
+			),
 
+		TestCase(
+		"def f():\n    x = 1\n    y = 2\n    return x / y",
+			TestInput("0.5")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 4611686018427387903\n    return x / y",
+			TestInput("2.168404344971009e-19")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 9223372036854775807\n    return x / y",
+			TestInput("1.0842021724855044e-19")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 1\n    return x / y",
+			TestInput("4.611686018427388e+18")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 1\n    return x / y",
+			TestInput("9.223372036854776e+18")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x / y",
+			TestInput("1.0")
+			),
+
+		TestCase(
+			"def f():\n    x = 1\n    y = 2\n    return x >> y",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 4611686018427387903\n    return x >> y",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 9223372036854775807\n    return x >> y",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 1\n    return x >> y",
+			TestInput("2305843009213693951")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 1\n    return x >> y",
+			TestInput("4611686018427387903")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x >> y",
+			TestInput("0")
+			),
+
+		TestCase(
+			"def f():\n    x = 1\n    y = 2\n    return x << y",
+			TestInput("4")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 32\n    return x << y",
+			TestInput("4294967296")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 62\n    return x << y",
+			TestInput("4611686018427387904")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 63\n    return x << y",
+			TestInput("9223372036854775808")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 64\n    return x << y",
+			TestInput("18446744073709551616")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 1\n    return x << y",
+			TestInput("9223372036854775806")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 1\n    return x << y",
+			TestInput("18446744073709551614")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x << y",
+			TestInput("<NULL>")
+			),
+
+		TestCase(
+			"def f():\n    x = 1\n    y = 2\n    return x ** y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 32\n    return x ** y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 4611686018427387903\n    return x ** y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 9223372036854775807\n    return x ** y",
+			TestInput("1")
+		),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 1\n    return x ** y",
+			TestInput("4611686018427387903")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 1\n    return x ** y",
+			TestInput("9223372036854775807")
+			),
+
+		TestCase(
+			"def f():\n    x = 1\n    y = 2\n    return x // y",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 4611686018427387903\n    return x // y",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 9223372036854775807\n    return x // y",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 1\n    return x // y",
+			TestInput("4611686018427387903")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 4611686018427387903\n    return x // y",
+			TestInput("2")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = -4611686018427387903\n    return x // y",
+			TestInput("-3")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 1\n    return x // y",
+			TestInput("9223372036854775807")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = -1\n    return x // y",
+			TestInput("-9223372036854775807")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x // y",
+			TestInput("1")
+			),
+
+		TestCase(
+			"def f():\n    x = 1\n    y = 2\n    return x % y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 4611686018427387903\n    return x % y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 1\n    return x % y",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 4611686018427387903\n    return x % y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = -4611686018427387903\n    return x % y",
+			TestInput("-4611686018427387902")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 1\n    return x % y",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = -1\n    return x % y",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x % y",
+			TestInput("0")
+			),
+
+
+		TestCase(
+			"def f():\n    x = 1\n    y = 2\n    return x | y",
+			TestInput("3")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 4611686018427387903\n    return x | y",
+			TestInput("4611686018427387903")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 9223372036854775807\n    return x | y",
+			TestInput("9223372036854775807")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 1\n    return x | y",
+			TestInput("4611686018427387903")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 1\n    return x | y",
+			TestInput("9223372036854775807")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x | y",
+			TestInput("9223372036854775807")
+			),
+
+
+		TestCase(
+			"def f():\n    x = 1\n    y = 2\n    return x & y",
+			TestInput("0")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 3\n    return x & y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 4611686018427387903\n    return x & y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 9223372036854775807\n    return x & y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 1\n    return x & y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 1\n    return x & y",
+			TestInput("1")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x & y",
+			TestInput("9223372036854775807")
+			),
+
+		TestCase(
+			"def f():\n    x = 1\n    y = 2\n    return x ^ y",
+			TestInput("3")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 3\n    return x ^ y",
+			TestInput("2")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 4611686018427387903\n    return x ^ y",
+			TestInput("4611686018427387902")
+			),
+		TestCase(
+			"def f():\n    x = 1\n    y = 9223372036854775807\n    return x ^ y",
+			TestInput("9223372036854775806")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 1\n    return x ^ y",
+			TestInput("4611686018427387902")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 1\n    return x ^ y",
+			TestInput("9223372036854775806")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x ^ y",
+			TestInput("0")
+			),
+
+		TestCase(
+		"def f():\n    x = -9223372036854775808\n    y = 1\n    return x - y",
+			TestInput("-9223372036854775809")
+			),
+		TestCase(
+		"def f():\n    x = -1\n    y = 4611686018427387904\n    return x - y",
+			TestInput("-4611686018427387905")
+			),
+		TestCase(
+			"def f():\n    x = -1\n    y = 9223372036854775808\n    return x - y",
+			TestInput("-9223372036854775809")
+			),
+		TestCase(
+			"def f():\n    x =  -4611686018427387904\n    y = 1\n    return x - y",
+			TestInput("-4611686018427387905")
+			),
+
+		TestCase(
+			"def f():\n    x = 1\n    y = 4611686018427387903\n    return x + y",
+			TestInput("4611686018427387904")
+		),
+		TestCase(
+			"def f():\n    x = 1\n    y = 9223372036854775807\n    return x + y",
+			TestInput("9223372036854775808")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 1\n    return x + y",
+			TestInput("4611686018427387904")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 1\n    return x + y",
+			TestInput("9223372036854775808")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x + y",
+			TestInput("18446744073709551614")
+			),
+
+		TestCase(
+			"def f():\n    x = 2\n    y = 4611686018427387903\n    return x * y",
+			TestInput("9223372036854775806")
+			),
+		TestCase(
+			"def f():\n    x = 2\n    y = 9223372036854775807\n    return x * y",
+			TestInput("18446744073709551614")
+			),
+		TestCase(
+			"def f():\n    x = 4611686018427387903\n    y = 2\n    return x * y",
+			TestInput("9223372036854775806")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 2\n    return x * y",
+			TestInput("18446744073709551614")
+			),
+		TestCase(
+			"def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x * y",
+			TestInput("85070591730234615847396907784232501249")
+			),
 		TestCase(
             "def f():\n    try:\n        min(1,2)\n    finally:\n        try:\n            min(1,2)\n        except EnvironmentError:\n            pass\n    return 1",
             TestInput("1")

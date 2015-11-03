@@ -270,7 +270,11 @@ public:
         m_il.push_back(CEE_DUP);
     }
 
-    void pop() {
+	void bitwise_and() {
+		m_il.push_back(CEE_AND);
+	}
+	
+	void pop() {
         m_il.push_back(CEE_POP);
     }
 
