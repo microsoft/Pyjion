@@ -1239,25 +1239,25 @@ AbstractSource* AbstractInterpreter::add_intermediate_source(size_t opcodeIndex)
 
  // Checks to see if we have a non-zero error code on the stack, and if so,
  // branches to the current error handler.  Consumes the error code in the process
-void AbstractInterpreter::int_error_check() {
+void AbstractInterpreter::int_error_check(char* reason) {
 	auto noErr = m_comp->emit_define_label();
 	m_comp->emit_int(0);
 	m_comp->emit_branch(BranchEqual, noErr);
 
-	branch_raise();
+	branch_raise(reason);
 	m_comp->emit_mark_label(noErr);
 }
 
 // Checks to see if we have a null value as the last value on our stack
 // indicating an error, and if so, branches to our current error handler.
-void AbstractInterpreter::error_check() {
+void AbstractInterpreter::error_check(char *reason) {
 	auto noErr = m_comp->emit_define_label();
 	m_comp->emit_dup();
 	m_comp->emit_null();
 	m_comp->emit_branch(BranchNotEqual, noErr);
 
 	m_comp->emit_pop();
-	branch_raise();
+	branch_raise(reason);
 	m_comp->emit_mark_label(noErr);
 }
 
@@ -1281,10 +1281,15 @@ vector<Label>& AbstractInterpreter::getRaiseAndFreeLabels(size_t blockId) {
 	return m_raiseAndFree.data()[blockId];
 }
 
-void AbstractInterpreter::branch_raise() {
+void AbstractInterpreter::branch_raise(char *reason) {
 	auto ehBlock = get_ehblock();
 
 	auto& entry_stack = ehBlock.Stack;
+#if DEBUG_TRACE
+	if (reason != nullptr) {
+		m_comp->emit_debug_msg(reason);
+	}
+#endif
 
 	// clear any non-object values from the stack up
 	// to the stack that owned the block when we entered.
@@ -1391,7 +1396,7 @@ void AbstractInterpreter::fancy_call(int na, int nk, int flags) {
 				 // finally emit the call to our helper...
 
 	m_comp->emit_fancy_call();
-	error_check();
+	error_check("fancy call failed");
 
 	// the result is back...
 	inc_stack();
@@ -1400,7 +1405,7 @@ void AbstractInterpreter::fancy_call(int na, int nk, int flags) {
 void AbstractInterpreter::build_tuple(size_t argCnt) {
 	m_comp->emit_new_tuple(argCnt);
 	if (argCnt != 0) {
-		error_check();
+		error_check("tuple build failed");
 		m_comp->emit_tuple_store(argCnt);
 		dec_stack(argCnt);
 	}
@@ -1408,7 +1413,7 @@ void AbstractInterpreter::build_tuple(size_t argCnt) {
 
 void AbstractInterpreter::build_list(size_t argCnt) {
 	m_comp->emit_new_list(argCnt);
-	error_check();
+	error_check("build list failed");
 	if (argCnt != 0) {
 		m_comp->emit_list_store(argCnt);
 	}
@@ -1418,7 +1423,7 @@ void AbstractInterpreter::build_list(size_t argCnt) {
 
 void AbstractInterpreter::build_set(size_t argCnt) {
 	m_comp->emit_new_set();
-	error_check();
+	error_check("build set failed");
 	m_comp->emit_set_store(argCnt);
 	dec_stack(argCnt);
 }
@@ -1426,7 +1431,7 @@ void AbstractInterpreter::build_set(size_t argCnt) {
 
 void AbstractInterpreter::build_map(size_t  argCnt) {
 	m_comp->emit_new_dict(argCnt);
-	error_check();
+	error_check("build map failed");
 
 	if (argCnt > 0) {
 		auto map = m_comp->emit_spill();
@@ -1436,7 +1441,7 @@ void AbstractInterpreter::build_map(size_t  argCnt) {
 			m_comp->emit_dict_store();
 
 			dec_stack(2);
-			int_error_check();
+			int_error_check("dict store failed");
 		}
 		m_comp->emit_load_and_free_local(map);
 	}
@@ -1469,21 +1474,21 @@ void AbstractInterpreter::make_function(int posdefaults, int kwdefaults, int num
 			m_comp->emit_load_local(func);
 			m_comp->emit_set_annotations();
 
-			int_error_check();
+			int_error_check("set annotations failed");
 		}
 		if (kwdefaults > 0) {
 			// TODO: If we hit an OOM here then build_map doesn't release the function
 			build_map(kwdefaults);
 			m_comp->emit_load_local(func);
 			m_comp->emit_set_kw_defaults();
-			int_error_check();
+			int_error_check("set kw defaults failed");
 		}
 		if (posdefaults > 0) {
 			build_tuple(posdefaults);
 			m_comp->emit_load_local(func);
 
 			m_comp->emit_set_defaults();
-			int_error_check();
+			int_error_check("set kw defaults failed");
 		}
 		m_comp->emit_load_and_free_local(func);
 	}
@@ -1717,7 +1722,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 		break;
 		case LOAD_BUILD_CLASS:
 			m_comp->emit_load_build_class();
-			error_check();
+			error_check("load build class failed");
 			inc_stack();
 			break;
 		case JUMP_ABSOLUTE: jump_absolute(oparg); break;
@@ -1728,48 +1733,48 @@ JittedCode* AbstractInterpreter::compile_worker() {
 		case POP_JUMP_IF_FALSE: pop_jump_if(byte != POP_JUMP_IF_FALSE, opcodeIndex, oparg); break;
 		case LOAD_NAME:
 			m_comp->emit_load_name(PyTuple_GetItem(m_code->co_names, oparg));
-			error_check();
+			error_check("load name failed");
 			inc_stack();
 			break;
 		case STORE_ATTR:
 			m_comp->emit_store_attr(PyTuple_GetItem(m_code->co_names, oparg));
 			dec_stack(2);
-			int_error_check();
+			int_error_check("store attr failed");
 			break;
 		case DELETE_ATTR:
 			m_comp->emit_delete_attr(PyTuple_GetItem(m_code->co_names, oparg));
-			int_error_check();
+			int_error_check("delete attr failed");
 			dec_stack();
 			break;
 		case LOAD_ATTR:
 			m_comp->emit_load_attr(PyTuple_GetItem(m_code->co_names, oparg));
 			dec_stack();
-			error_check();
+			error_check("load attr failed");
 			inc_stack();
 			break;
 		case STORE_GLOBAL:
 			m_comp->emit_store_global(PyTuple_GetItem(m_code->co_names, oparg));
 			dec_stack();
-			int_error_check();
+			int_error_check("store global failed");
 			break;
 		case DELETE_GLOBAL:
 			m_comp->emit_delete_global(PyTuple_GetItem(m_code->co_names, oparg));
-			int_error_check();
+			int_error_check("delete global failed");
 			break;
 		case LOAD_GLOBAL:
 			m_comp->emit_load_global(PyTuple_GetItem(m_code->co_names, oparg));
-			error_check();
+			error_check("load global failed");
 			inc_stack();
 			break;
 		case LOAD_CONST: load_const(oparg, opcodeIndex); break;
 		case STORE_NAME:
 			m_comp->emit_store_name(PyTuple_GetItem(m_code->co_names, oparg));
 			dec_stack();
-			int_error_check();
+			int_error_check("store name failed");
 			break;
 		case DELETE_NAME:
 			m_comp->emit_delete_name(PyTuple_GetItem(m_code->co_names, oparg));
-			int_error_check();
+			int_error_check("delete name failed");
 			break;
 		case DELETE_FAST:
 			load_fast_worker(oparg, true);
@@ -1810,7 +1815,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 				m_comp->emit_call_with_kws();
 				dec_stack();
 			}
-			error_check();
+			error_check("call function failed");
 			inc_stack();
 			break;
 		}
@@ -1829,12 +1834,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
 		case STORE_SUBSCR:
 			dec_stack(3);
 			m_comp->emit_store_subscr();
-			int_error_check();
+			int_error_check("store subscr failed");
 			break;
 		case DELETE_SUBSCR:
 			dec_stack(2);
 			m_comp->emit_delete_subscr();
-			int_error_check();
+			int_error_check("delete subscr failed");
 			break;
 		case BUILD_SLICE:
 			dec_stack(oparg);
@@ -1851,7 +1856,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 		case UNARY_INVERT:
 			dec_stack(1);
 			m_comp->emit_unary_invert();
-			error_check();
+			error_check("unary invert failed");
 			inc_stack();
 			break;
 		case BINARY_SUBSCR:
@@ -1918,7 +1923,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
 					m_comp->emit_binary_tagged_int(byte);
 
-					error_check();
+					error_check("tagged binary add failed");
 
 					inc_stack();
 					break;
@@ -1928,7 +1933,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
 			m_comp->emit_binary_object(byte);
 
-			error_check();
+			error_check("binary op failed");
 			inc_stack();
 
 			break;
@@ -1946,7 +1951,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 			break;
 		case LOAD_DEREF:
 			m_comp->emit_load_deref(oparg);
-			error_check();
+			error_check("load deref failed");
 			inc_stack();
 			break;
 		case STORE_DEREF:
@@ -1983,7 +1988,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 			else*/ {
 				m_comp->emit_getiter();
 				dec_stack();
-				error_check();
+				error_check("get iter failed");
 				inc_stack();
 			}
 		}
@@ -2011,29 +2016,29 @@ JittedCode* AbstractInterpreter::compile_worker() {
 			// stack, but it's not in the count
 			m_comp->emit_set_add();
 			dec_stack(2);
-			error_check();
+			error_check("set add failed");
 			inc_stack();
 			break;
 		case MAP_ADD:
 			m_comp->emit_map_add();
 			dec_stack(3);
-			error_check();
+			error_check("map add failed");
 			inc_stack();
 			break;
 		case LIST_APPEND:
 			m_comp->emit_list_append();
 			dec_stack(2);
-			error_check();
+			error_check("list append failed");
 			inc_stack();
 			break;
 		case PRINT_EXPR:
 			m_comp->emit_print_expr();
 			dec_stack();
-			int_error_check();
+			int_error_check("print expr failed");
 			break;
 		case LOAD_CLASSDEREF:
 			m_comp->emit_load_classderef(oparg);
-			error_check();
+			error_check("load classderef failed");
 			inc_stack();
 			break;
 		case RAISE_VARARGS:
@@ -2261,18 +2266,18 @@ JittedCode* AbstractInterpreter::compile_worker() {
 		case IMPORT_NAME:
 			m_comp->emit_import_name(PyTuple_GetItem(m_code->co_names, oparg));
 			dec_stack(2);
-			error_check();
+			error_check("import name failed");
 			inc_stack();
 			break;
 		case IMPORT_FROM:
 			m_comp->emit_import_from(PyTuple_GetItem(m_code->co_names, oparg));
-			error_check();
+			error_check("import from failed");
 			inc_stack();
 			break;
 		case IMPORT_STAR:
 			m_comp->emit_import_star();
 			dec_stack(1);
-			int_error_check();
+			int_error_check("import star failed");
 			break;
 		case SETUP_WITH:
 		case WITH_CLEANUP_START:
@@ -2449,7 +2454,7 @@ void AbstractInterpreter::unary_positive(int opcodeIndex) {
 		default:
 			dec_stack();
 			m_comp->emit_unary_positive();
-			error_check();
+			error_check("unary positive failed");
 			inc_stack();
 			break;
 	}
@@ -2473,7 +2478,7 @@ void AbstractInterpreter::unary_negative(int opcodeIndex) {
 		default:
 			dec_stack();
 			m_comp->emit_unary_negative();
-			error_check();
+			error_check("unary negative failed");
 			inc_stack();
 			break;
 	}
@@ -2515,7 +2520,7 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
 				break;
 			default:
 				m_comp->emit_unary_not();
-				error_check();
+				error_check("unary not failed");
 				break;
 		}
 		inc_stack();
@@ -2717,7 +2722,7 @@ void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *lo
 
 	m_comp->emit_for_next(processValue, iterValue);
 
-	int_error_check();
+	int_error_check("for_iter failed");
 
 	jump_absolute(loopIndex);
 
@@ -2749,7 +2754,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
 		else {
 			m_comp->emit_in();
 			dec_stack(2);
-			error_check();
+			error_check("in failed");
 			inc_stack();
 		}
 		break;
@@ -2762,7 +2767,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
 		else {
 			m_comp->emit_not_in();
 			dec_stack(2);
-			error_check();
+			error_check("not in failed");
 			inc_stack();
 		}
 		break;
@@ -2777,7 +2782,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
 			// CPython generates code, but is left for completeness.
 			m_comp->emit_compare_exceptions();
 			dec_stack(2);
-			error_check();
+			error_check("exc match failed");
 			inc_stack();
 		}
 		break;
@@ -2832,7 +2837,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
 		if (!generated) {
 			m_comp->emit_compare_object(compareType);
 			dec_stack(2);
-			error_check();
+			error_check("compare failed");
 			inc_stack();
 		}
 		break;
@@ -2888,7 +2893,7 @@ void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
 	// the list local address, and the remainder address
 	// PyObject* seq, size_t leftSize, size_t rightSize, PyObject** tempStorage, PyObject** list, PyObject*** remainder
 
-	error_check(); // TODO: We leak the sequence on failure
+	error_check("unpack ex failed"); // TODO: We leak the sequence on failure
 
 	auto fastTmp = m_comp->emit_spill();
 

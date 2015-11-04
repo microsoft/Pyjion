@@ -250,12 +250,12 @@ private:
 
 	// Checks to see if we have a null value as the last value on our stack
 	// indicating an error, and if so, branches to our current error handler.
-	void error_check();
-	void int_error_check();
+	void error_check(char* reason = nullptr);
+	void int_error_check(char* reason = nullptr);
 
 	vector<Label>& getRaiseAndFreeLabels(size_t blockId);
 
-	void branch_raise();
+	void branch_raise(char* reason = nullptr);
 
 	void clean_stack_for_reraise();
 
