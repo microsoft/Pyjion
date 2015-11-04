@@ -466,6 +466,8 @@ void PythonCompiler::emit_delete_fast(int index, PyObject* name) {
 void PythonCompiler::emit_new_tuple(size_t size) {
 	if (size == 0) {
 		m_il.ld_i(PyTuple_New(0));
+		m_il.dup();
+		incref(false);
 	}
 	else {
 		m_il.ld_i(size);
@@ -934,6 +936,11 @@ void PythonCompiler::emit_getiter_opt() {
     emit_error_check();
     inc_stack();
 }*/
+
+void PythonCompiler::emit_debug_msg(const char* msg) {
+	m_il.ld_i((void*)msg);
+	m_il.emit_call(METHOD_DEBUG_TRACE);
+}
 
 void PythonCompiler::emit_binary_float(int opcode) {
     switch (opcode) {

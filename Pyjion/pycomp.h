@@ -401,6 +401,8 @@ public:
 	virtual void emit_box_bool();
 	virtual void emit_box_tagged_ptr();
 
+	virtual void emit_debug_msg(const char* msg);
+
 	virtual JittedCode* emit_compile();
 	
 private:
