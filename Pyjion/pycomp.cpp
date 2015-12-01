@@ -1105,6 +1105,11 @@ JittedCode* PythonCompiler::emit_compile() {
 	CorJitInfo* jitInfo = new CorJitInfo(g_execEngine, m_code, m_module);
 	auto addr = m_il.compile(jitInfo, g_jit, m_code->co_stacksize + 100).m_addr;
 	if (addr == nullptr) {
+		printf("Compiling failed %s from %s line %d #%d\r\n",
+			PyUnicode_AsUTF8(m_code->co_name),
+			PyUnicode_AsUTF8(m_code->co_filename),
+			m_code->co_firstlineno
+			);
 		delete jitInfo;
 		return nullptr;
 	}

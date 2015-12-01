@@ -223,7 +223,7 @@ private:
     bool update_start_state(InterpreterState& newState, size_t index);
     void init_starting_state();
     char* opcode_name(int opcode);
-    void preprocess();
+    bool preprocess();
     void dump_sources(AbstractSource* sources);
     AbstractSource* new_source(AbstractSource* source) {
         m_sources.push_back(source);

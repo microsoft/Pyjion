@@ -54,7 +54,7 @@ AbstractInterpreter::~AbstractInterpreter() {
 
 #define NEXTARG() *(unsigned short*)&m_byteCode[curByte + 1]; curByte+= 2
 
-void AbstractInterpreter::preprocess() {
+bool AbstractInterpreter::preprocess() {
 	for (int i = 0; i < m_code->co_argcount; i++) {
 		// all parameters are initially definitely assigned
 		m_assignmentState[i] = true;
@@ -71,6 +71,10 @@ void AbstractInterpreter::preprocess() {
         }
 
         switch (byte) {
+			case YIELD_FROM:
+			case YIELD_VALUE:
+				return false;
+
 			case UNPACK_EX:
 				if (m_comp != nullptr) {
 					m_sequenceLocals[curByte] = m_comp->emit_allocate_stack_array(((oparg & 0xFF) + (oparg >> 8)) * sizeof(void*));
@@ -91,7 +95,7 @@ void AbstractInterpreter::preprocess() {
 				break;
 			case SETUP_WITH:
 				// not supported...
-				return;
+				return false;
             case SETUP_LOOP:
                 blockStarts.push_back(AbsIntBlockInfo(opcodeIndex, oparg + curByte + 1, true));
                 break;
@@ -124,7 +128,7 @@ void AbstractInterpreter::preprocess() {
                 break;
         }
     }
-
+	return true;
 }
 
 void AbstractInterpreter::init_starting_state() {
@@ -153,7 +157,9 @@ void AbstractInterpreter::init_starting_state() {
 }
 
 bool AbstractInterpreter::interpret() {
-    preprocess();
+	if (!preprocess()) {
+		return false;
+	}
 
     init_starting_state();
     //dump();
@@ -951,11 +957,12 @@ void AbstractInterpreter::dump() {
                     break;
                 case STORE_FAST:
                 case DELETE_FAST:
-                    printf("    %-3Id %-22s %d (%s)\r\n",
+                    printf("    %-3Id %-22s %d (%s) [%s]\r\n",
                         byteIndex,
                         opcode_name(opcode),
                         oparg,
-                        PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, oparg))
+                        PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, oparg)),
+						should_box(byteIndex) ? "BOXED" : "NON-BOXED"
                         );
                     break;
                 case LOAD_ATTR:
@@ -1743,8 +1750,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
 			break;
 		case DELETE_ATTR:
 			m_comp->emit_delete_attr(PyTuple_GetItem(m_code->co_names, oparg));
-			int_error_check("delete attr failed");
 			dec_stack();
+			int_error_check("delete attr failed");
 			break;
 		case LOAD_ATTR:
 			m_comp->emit_load_attr(PyTuple_GetItem(m_code->co_names, oparg));
@@ -2529,6 +2536,9 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
 
 JittedCode* AbstractInterpreter::compile() {
 	bool interpreted = interpret();	
+	if (!interpreted) {
+		return nullptr;
+	}
 	preprocess();
 
 	return compile_worker();

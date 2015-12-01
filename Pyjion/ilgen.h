@@ -476,7 +476,9 @@ public:
             &nativeEntry,
             &nativeSizeOfCode
             );
-        res.m_addr = nativeEntry;
+		if (result == CORJIT_OK) {
+	        res.m_addr = nativeEntry;
+		}
         return res;
     }
 
