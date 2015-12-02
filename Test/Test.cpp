@@ -214,6 +214,11 @@ void PyJitTest() {
 
     TestCase cases[] = {
 		TestCase(
+			"def x():\n     try:\n         b\n     except:\n         c\n\ndef f():\n    try:\n        x()\n    except:\n        pass\n    return sys.exc_info()[0]\n\n",
+			TestInput("None")
+		),
+
+		TestCase(
 		"def f():\n    cs = [('CATEGORY', 'CATEGORY_SPACE')]\n    for op, av in cs:\n        while True:\n            break\n        print(op, av)",
 			TestInput("None")
 			),
@@ -1506,6 +1511,7 @@ void PyJitTest() {
     };
 
 
+	auto sysModule = PyImport_ImportModule("sys");;
 
     for (int i = 0; i < _countof(cases); i++) {
         auto curCase = cases[i];
@@ -1520,7 +1526,9 @@ void PyJitTest() {
 
             auto globals = PyDict_New();
             auto builtins = PyThreadState_GET()->interp->builtins;
-            PyDict_SetItemString(globals, "__builtins__", builtins);
+            PyDict_SetItemString(globals, "__builtins__", builtins);			
+			PyDict_SetItemString(globals, "sys", sysModule);
+
             PyRun_String("finalized = False\nclass RefCountCheck:\n    def __del__(self):\n        print('finalizing')\n        global finalized\n        finalized = True\n    def __add__(self, other):\n        return self", Py_file_input, globals, globals);
             if (PyErr_Occurred()) {
                 PyErr_Print();
