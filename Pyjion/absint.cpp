@@ -962,7 +962,7 @@ void AbstractInterpreter::dump() {
                         opcode_name(opcode),
                         oparg,
                         PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_varnames, oparg)),
-						should_box(byteIndex) ? "BOXED" : "NON-BOXED"
+                        should_box(byteIndex) ? "BOXED" : "NON-BOXED"
                         );
                     break;
                 case LOAD_ATTR:
