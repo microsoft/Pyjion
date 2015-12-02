@@ -1601,13 +1601,13 @@ JittedCode* AbstractInterpreter::compile_worker() {
 	int oparg;
 	Label ok;
 
-	auto raiseLabel = m_comp->emit_define_label();
-	auto reraiseLabel = m_comp->emit_define_label();
+	auto raiseNoHandlerLabel = m_comp->emit_define_label();
+	Label raiseFromTopLevelHandler = Label();
 
 	m_comp->emit_lasti_init();
 	m_comp->emit_push_frame();
 
-	m_blockStack.push_back(BlockInfo(vector<bool>(), m_blockIds++, raiseLabel, reraiseLabel, Label(), -1, NOP));
+	m_blockStack.push_back(BlockInfo(vector<bool>(), m_blockIds++, raiseNoHandlerLabel, raiseNoHandlerLabel, Label(), -1, NOP));
 
 	for (int curByte = 0; curByte < m_size; curByte++) {
 		auto opcodeIndex = curByte;
@@ -2076,7 +2076,15 @@ JittedCode* AbstractInterpreter::compile_worker() {
 		case SETUP_EXCEPT:
 		{
 			auto handlerLabel = getOffsetLabel(oparg + curByte + 1);
-			auto blockInfo = BlockInfo(m_stack, m_blockIds++, m_comp->emit_define_label(), m_comp->emit_define_label(), handlerLabel, oparg + curByte + 1, SETUP_EXCEPT);
+			auto blockInfo = BlockInfo(
+				m_stack, 
+				m_blockIds++, 
+				m_comp->emit_define_label(), 
+				m_comp->emit_define_label(), 
+				handlerLabel, 
+				oparg + curByte + 1, 
+				SETUP_EXCEPT
+			);
 			blockInfo.ExVars = ExceptionVars(
 				m_comp->emit_define_local(false),
 				m_comp->emit_define_local(false),
@@ -2117,18 +2125,47 @@ JittedCode* AbstractInterpreter::compile_worker() {
 				// convert block into an END_FINALLY BlockInfo which will
 				// dispatch to all of the previous locations...
 				auto back = m_blockStack.back();
+
+				auto raiseLabel = back.Raise;
+				auto reraiseLabel = back.ReRaise;
+				auto blockId = back.BlockId;
+				auto errorTarget = back.ErrorTarget;
+
+				if (curHandler.Kind == SETUP_EXCEPT) {
+					// Popping an except, we need to unwind the current exception
+					if (back.ErrorTarget.m_index == -1) {
+						// We unwind the exception to a return from the method, not to another handler
+						if (raiseFromTopLevelHandler.m_index == -1) {
+							raiseFromTopLevelHandler = m_comp->emit_define_label();
+						}
+						raiseLabel = reraiseLabel = raiseFromTopLevelHandler;
+					}
+					else {
+						// We unwind the exception to another handler
+						raiseLabel = m_comp->emit_define_label();
+						reraiseLabel = m_comp->emit_define_label();
+					}
+					blockId = m_blockIds++;
+				}
+				
 				auto newBlock = BlockInfo(
 					back.Stack,
-					back.BlockId,
-					back.Raise,		// if we take a nested exception this is where we go to...
-					back.ReRaise,
+					blockId,
+					raiseLabel,		// if we take a nested exception this is where we go to...
+					reraiseLabel,
 					back.ErrorTarget,
 					back.EndOffset,
-					curHandler.Kind == SETUP_FINALLY ? END_FINALLY : POP_EXCEPT,
+					back.Kind == SETUP_FINALLY ? END_FINALLY : POP_EXCEPT,
 					curHandler.Flags,
 					curHandler.ContinueOffset
 					);
+
 				newBlock.ExVars = curHandler.ExVars;
+
+				if (curHandler.Kind == SETUP_EXCEPT) {
+					m_allHandlers.push_back(newBlock);
+				}
+
 				m_blockStack.push_back(newBlock);
 			}
 		}
@@ -2311,14 +2348,48 @@ JittedCode* AbstractInterpreter::compile_worker() {
 				m_comp->emit_pop_top();
 			}
 
-			m_comp->emit_mark_label(handler.Raise);
+			if (handler.Kind == POP_EXCEPT) {
+				// We're in an except handler and we're raising a new exception.  First we need
+				// to unwind the current exception.
+				auto prepare = m_comp->emit_define_label();
 
-			m_comp->emit_eh_trace();
+				m_comp->emit_mark_label(handler.Raise);
 
-			m_comp->emit_mark_label(handler.ReRaise);
+				m_comp->emit_unwind_eh(handler.ExVars.PrevExc, handler.ExVars.PrevExcVal, handler.ExVars.PrevTraceback);
+				m_comp->emit_eh_trace();
 
-			m_comp->emit_prepare_exception(handler.ExVars.PrevExc, handler.ExVars.PrevExcVal, handler.ExVars.PrevTraceback, handler.Kind != SETUP_FINALLY);
-			m_comp->emit_branch(BranchAlways, handler.ErrorTarget);
+				m_comp->emit_branch(BranchAlways, prepare);
+
+				m_comp->emit_mark_label(handler.ReRaise);
+
+				m_comp->emit_unwind_eh(handler.ExVars.PrevExc, handler.ExVars.PrevExcVal, handler.ExVars.PrevTraceback);
+				m_comp->emit_mark_label(prepare);
+			}
+			else {
+				m_comp->emit_mark_label(handler.Raise);
+
+				m_comp->emit_eh_trace();
+
+				m_comp->emit_mark_label(handler.ReRaise);
+			}
+
+			if (handler.Raise.m_index == raiseFromTopLevelHandler.m_index) {
+				// We're in an except handler raising an exception with no outer exception
+				// handlers.  We'll return NULL from the function indicating an error has
+				// occurred
+				_ASSERTE(handler.Kind == POP_EXCEPT);
+
+				m_comp->emit_branch(BranchAlways, raiseNoHandlerLabel);
+			}
+			else {
+				m_comp->emit_prepare_exception(
+					handler.ExVars.PrevExc, 
+					handler.ExVars.PrevExcVal, 
+					handler.ExVars.PrevTraceback, 
+					handler.Kind != SETUP_FINALLY && handler.Kind != END_FINALLY
+				);
+				m_comp->emit_branch(BranchAlways, handler.ErrorTarget);
+			}
 		}
 	}
 
@@ -2328,8 +2399,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 		m_comp->emit_mark_label(*curLabel);
 		m_comp->emit_pop_top();
 	}
-	m_comp->emit_mark_label(raiseLabel);
-	m_comp->emit_mark_label(reraiseLabel);
+	m_comp->emit_mark_label(raiseNoHandlerLabel);
 
 	m_comp->emit_null();
 	auto finalRet = m_comp->emit_define_label();
