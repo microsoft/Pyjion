@@ -1,0 +1,30 @@
+diff --git a/clr.coreclr.props b/clr.coreclr.props
+index 2373b7b..2c0aa4e 100644
+--- a/clr.coreclr.props
++++ b/clr.coreclr.props
+@@ -10,7 +10,7 @@
+     <FeatureStubsAsIL Condition="'$(TargetArch)' == 'arm64'">true</FeatureStubsAsIL>
+     <FeatureBclFormatting>true</FeatureBclFormatting>
+     <FeatureCollectibleTypes>true</FeatureCollectibleTypes>
+-    <FeatureCominteropApartmentSupport>true</FeatureCominteropApartmentSupport>
++    <FeatureCominteropApartmentSupport>false</FeatureCominteropApartmentSupport>
+     <FeatureCoreclr>true</FeatureCoreclr>
+     <FeatureCorruptingExceptions>true</FeatureCorruptingExceptions>
+     <FeatureDbiDebugging>true</FeatureDbiDebugging>
+@@ -57,12 +57,12 @@
+     <FeatureReadyToRun Condition="'$(TargetArch)'!='arm64'">true</FeatureReadyToRun>
+
+     <FeatureCoreSystem>true</FeatureCoreSystem>
+-    <FeatureClassicCominterop>true</FeatureClassicCominterop>
++    <FeatureClassicCominterop>false</FeatureClassicCominterop>
+     <FeatureLegacySurface>true</FeatureLegacySurface>
+-    <FeatureCominterop>true</FeatureCominterop>
++    <FeatureCominterop>false</FeatureCominterop>
+     <FeatureICastable>true</FeatureICastable>
+-    <FeatureCominteropUnmanagedActivation>true</FeatureCominteropUnmanagedActivation>
+-    <FeatureCominteropWinRTManagedActivation>true</FeatureCominteropWinRTManagedActivation>
++    <FeatureCominteropUnmanagedActivation>false</FeatureCominteropUnmanagedActivation>
++    <FeatureCominteropWinRTManagedActivation>false</FeatureCominteropWinRTManagedActivation>
+     <FeatureCrypto>true</FeatureCrypto>
+     <FeatureHostAssemblyResolver>true</FeatureHostAssemblyResolver>
+     <FeatureLazyCOWPages Condition="('$(TargetArch)' == 'i386') or ('$(TargetArch)' == 'arm')">true</FeatureLazyCOWPages>
