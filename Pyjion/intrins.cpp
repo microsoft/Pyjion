@@ -2153,7 +2153,12 @@ inline PyObject* PyJit_Tagged_TrueDivide(tagged_ptr left, tagged_ptr right) {
 }
 
 inline PyObject* PyJit_Tagged_FloorDivide(tagged_ptr left, tagged_ptr right) {
-	tagged_ptr res;
+    if (right == 0) {
+        PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
+        return nullptr;
+    }
+    
+    tagged_ptr res;
 #ifdef _MSC_VER
 	if (SafeDivide(left, right, res) ) {
 #else
