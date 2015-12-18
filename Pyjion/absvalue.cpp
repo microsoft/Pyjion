@@ -746,6 +746,10 @@ AbstractValue* FloatValue::binary(AbstractSource* selfSources, int op, AbstractV
             case INPLACE_POWER:
             case INPLACE_SUBTRACT:
             case INPLACE_TRUE_DIVIDE:
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+                }
+                other.escapes();
                 return this;
         }
     }
@@ -761,6 +765,10 @@ AbstractValue* FloatValue::binary(AbstractSource* selfSources, int op, AbstractV
             case INPLACE_POWER:
             case INPLACE_SUBTRACT:
             case INPLACE_TRUE_DIVIDE:
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+                }
+                other.escapes();
                 return &Complex;
         }
     }
@@ -799,6 +807,10 @@ AbstractValue* FloatValue::binary(AbstractSource* selfSources, int op, AbstractV
             case INPLACE_POWER:
             case INPLACE_SUBTRACT:
             case INPLACE_TRUE_DIVIDE:
+                if (selfSources != nullptr) {
+                    selfSources->escapes();
+                }
+                other.escapes();
                 return this;
         }
     }

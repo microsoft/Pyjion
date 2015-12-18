@@ -28,6 +28,7 @@
 #include <opcode.h>
 #include <deque>
 #include <unordered_map>
+#include <algorithm>
 
 #define NUM_ARGS(n) ((n)&0xFF)
 #define NUM_KW_ARGS(n) (((n)>>8) & 0xff)
@@ -163,7 +164,6 @@ bool AbstractInterpreter::interpret() {
 
     init_starting_state();
     //dump();
-
 
     // walk all the blocks in the code one by one, analyzing them, and enqueing any
     // new blocks that we encounter from branches.
@@ -537,7 +537,7 @@ bool AbstractInterpreter::interpret() {
                 case CALL_FUNCTION_VAR_KW:
                     {
                         int na = NUM_ARGS(oparg);
-                        int nk = NUM_KW_ARGS(oparg >> 8);
+                        int nk = NUM_KW_ARGS(oparg);
                         int flags = (opcode - CALL_FUNCTION) & 3;
                         int n = na + 2 * nk;
 
@@ -2072,7 +2072,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 				}
 				break;
 			}
-			break;
+            break;
 		case SETUP_EXCEPT:
 		{
 			auto handlerLabel = getOffsetLabel(oparg + curByte + 1);

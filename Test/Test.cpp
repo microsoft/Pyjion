@@ -967,6 +967,10 @@ void PyJitTest() {
         TestInput("42")
         ),
         TestCase(
+        "def f():\n    x = 1\n    y = 0\n    try:\n        return x // y\n    except:\n        return 42",
+        TestInput("42")
+        ),
+        TestCase(
             "def f(x):\n    if not x:\n        return True\n    return False",
             vector<TestInput>({
                 TestInput("False", vector<PyObject*>({ PyLong_FromLong(1) })),
