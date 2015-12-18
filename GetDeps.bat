@@ -10,13 +10,21 @@ REM ########################################################
 REM # Clone CoreCLR code base
 git clone https://github.com/dotnet/coreclr CoreCLR
 pushd CoreCLR
-git reset --hard 98c63c1612b2635a40d9a719c1505e0ad4bef08a
+git reset --hard b16ff5935ff9df3211798f18f0c951666ae27774
 
 REM ########################################################
 REM # Apply changes to disable COM interop support
 
 echo Disabling COM interop support...
-git apply ..\coreclr.diff
+git apply ..\Patches\CoreCLR\src\inc\utilcode.h
+git apply ..\Patches\CoreCLR\src\utilcode\CMakeLists.txt
+git apply ..\Patches\CoreCLR\src\utilcode\util.cpp
+git apply ..\Patches\CoreCLR\src\CMakeLists.txt
+git apply ..\Patches\CoreCLR\build.cmd
+git apply ..\Patches\CoreCLR\clr.coreclr.props
+git apply ..\Patches\CoreCLR\clr.defines.targets
+git apply ..\Patches\CoreCLR\clr.desktop.props
+git apply ..\Patches\CoreCLR\CMakeLists.txt
 popd
 
 REM ########################################################
@@ -31,5 +39,5 @@ REM ########################################################
 REM # Apply changes to integrate JIT support into CPython
 
 echo Applying changes to enable JIT support...
-git apply ..\python.diff
+git apply ..\Patches\python.diff
 popd

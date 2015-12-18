@@ -1,6 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 *.diff text eol=lf
+/Patches/** eol=lf
 
 # Custom for Visual Studio
 *.cs     diff=csharp

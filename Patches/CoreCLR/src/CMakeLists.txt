@@ -1,0 +1,29 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 31c37e5..c56a892 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -38,22 +38,10 @@ endif(CLR_CMAKE_PLATFORM_UNIX)
+
+ add_subdirectory(utilcode)
+ add_subdirectory(gcinfo)
+-add_subdirectory(coreclr)
+ add_subdirectory(jit)
+-add_subdirectory(vm)
+-add_subdirectory(md)
+-add_subdirectory(debug)
+ add_subdirectory(inc)
+-add_subdirectory(strongname)
+-add_subdirectory(binder)
+-add_subdirectory(classlibnative)
+-add_subdirectory(dlls)
+-add_subdirectory(ToolBox)
+-add_subdirectory(tools)
+-add_subdirectory(unwinder)
+-add_subdirectory(ildasm)
+-
+-if(WIN32)
++
++if(FALSE)
+   add_subdirectory(ipcman)
+ endif(WIN32)
+
