@@ -224,7 +224,7 @@ class PythonCompiler : public IPythonCompiler {
     size_t m_size;
     UserModule* m_module;
     Local m_tb, m_ehVal, m_excType;
-	Local m_lasti;
+    Local m_lasti;
 
 public:
     PythonCompiler(PyCodeObject *code);
@@ -240,19 +240,19 @@ public:
     virtual void emit_dup_top_two();
 
     virtual void emit_load_name(PyObject* name);
-	virtual void emit_is_true();
+    virtual void emit_is_true();
 
-	virtual void emit_push_frame();
-	virtual void emit_pop_frame();
-	virtual void emit_eh_trace();
+    virtual void emit_push_frame();
+    virtual void emit_pop_frame();
+    virtual void emit_eh_trace();
 
-	void emit_lasti_init();
-	void emit_lasti_update(int index);
+    void emit_lasti_init();
+    void emit_lasti_update(int index);
 
-	virtual void emit_check_function_result();
+    virtual void emit_check_function_result();
 
-	virtual void emit_ret();
-	
+    virtual void emit_ret();
+
     virtual void emit_store_name(PyObject* name);
     virtual void emit_delete_name(PyObject* name);
     virtual void emit_store_attr(PyObject* name);
@@ -263,17 +263,17 @@ public:
     virtual void emit_load_global(PyObject* name);
     virtual void emit_delete_fast(int index, PyObject* name);
 
-	virtual void emit_new_tuple(size_t size);
-	virtual void emit_tuple_store(size_t size);
+    virtual void emit_new_tuple(size_t size);
+    virtual void emit_tuple_store(size_t size);
 
-	virtual void emit_new_list(size_t argCnt);
-	virtual void emit_list_store(size_t argCnt);
+    virtual void emit_new_list(size_t argCnt);
+    virtual void emit_list_store(size_t argCnt);
 
-	virtual void emit_new_set();
-	virtual void emit_set_store(size_t argCnt);
-	virtual void emit_dict_store();
+    virtual void emit_new_set();
+    virtual void emit_set_store(size_t argCnt);
+    virtual void emit_dict_store();
 
-	virtual void emit_new_dict(size_t size);
+    virtual void emit_new_dict(size_t size);
 
     virtual void emit_build_slice();
 
@@ -282,14 +282,14 @@ public:
 
     virtual void emit_unary_positive();
     virtual void emit_unary_negative();
-	virtual void emit_unary_negative_float();
-	virtual void emit_unary_negative_tagged_int();
+    virtual void emit_unary_negative_float();
+    virtual void emit_unary_negative_tagged_int();
 
-	virtual void emit_unary_not();
+    virtual void emit_unary_not();
 
-	virtual void emit_unary_not_push_int();
-	virtual void emit_unary_not_float_push_bool();
-	virtual void emit_unary_not_tagged_int_push_bool();
+    virtual void emit_unary_not_push_int();
+    virtual void emit_unary_not_float_push_bool();
+    virtual void emit_unary_not_tagged_int_push_bool();
     virtual void emit_unary_invert();
 
     virtual void emit_import_name(PyObject* name);
@@ -298,40 +298,40 @@ public:
 
     virtual void emit_load_build_class();
 
-	virtual void emit_unpack_sequence(Local sequence, Local sequenceStorage, Label success, size_t size);
-	virtual void emit_load_array(int index);
+    virtual void emit_unpack_sequence(Local sequence, Local sequenceStorage, Label success, size_t size);
+    virtual void emit_load_array(int index);
 
     virtual void emit_unpack_ex(Local sequence, size_t leftSize, size_t rightSize, Local sequenceStorage, Local list, Local remainder);
 
     virtual void emit_fancy_call();
-	// Emits a call for the specified argument count.  If the compiler
-	// can't emit a call with this number of args then it returns false,
-	// and emit_call_with_tuple is used to call with a variable sized
-	// tuple instead.
-	virtual bool emit_call(size_t argCnt);
-	virtual void emit_call_with_tuple();
-	virtual void emit_call_with_kws();
+    // Emits a call for the specified argument count.  If the compiler
+    // can't emit a call with this number of args then it returns false,
+    // and emit_call_with_tuple is used to call with a variable sized
+    // tuple instead.
+    virtual bool emit_call(size_t argCnt);
+    virtual void emit_call_with_tuple();
+    virtual void emit_call_with_kws();
 
-	virtual void emit_new_function();
-	virtual void emit_set_closure();
-	virtual void emit_set_annotations();
-	virtual void emit_set_kw_defaults();
-	virtual void emit_set_defaults();
+    virtual void emit_new_function();
+    virtual void emit_set_closure();
+    virtual void emit_set_annotations();
+    virtual void emit_set_kw_defaults();
+    virtual void emit_set_defaults();
 
     virtual void emit_load_deref(int index);
     virtual void emit_store_deref(int index);
     virtual void emit_delete_deref(int index);
     virtual void emit_load_closure(int index);
 
-	virtual Local emit_spill();
-	virtual void emit_store_local(Local local);
-	
-	virtual void emit_load_local(Local local);
-	virtual void emit_load_and_free_local(Local local);
-	virtual Local emit_define_local(bool cache);
-	virtual Local emit_define_local(LocalKind kind = LK_Pointer);
-	virtual void emit_free_local(Local local);
-	virtual Local emit_allocate_stack_array(size_t elements);
+    virtual Local emit_spill();
+    virtual void emit_store_local(Local local);
+
+    virtual void emit_load_local(Local local);
+    virtual void emit_load_and_free_local(Local local);
+    virtual Local emit_define_local(bool cache);
+    virtual Local emit_define_local(LocalKind kind = LK_Pointer);
+    virtual void emit_free_local(Local local);
+    virtual Local emit_allocate_stack_array(size_t elements);
 
     virtual void emit_set_add();
     virtual void emit_map_add();
@@ -339,18 +339,18 @@ public:
 
     virtual void emit_raise_varargs();
 
-	virtual void emit_null();
+    virtual void emit_null();
 
     virtual void emit_print_expr();
     virtual void emit_load_classderef(int index);
     virtual void emit_getiter();
     //void emit_getiter_opt();
-	virtual void emit_for_next(Label processValue, Local iterValue);
-    
+    virtual void emit_for_next(Label processValue, Local iterValue);
+
     virtual void emit_binary_float(int opcode);
-	virtual void emit_binary_tagged_int(int opcode);
+    virtual void emit_binary_tagged_int(int opcode);
     virtual void emit_binary_object(int opcode);
-    
+
     virtual void emit_in_push_int();
     virtual void emit_in();
     virtual void emit_not_in_push_int();
@@ -362,56 +362,56 @@ public:
 
     virtual void emit_compare_object(int compareType);
     virtual void emit_compare_float(int compareType);
-	virtual void emit_compare_tagged_int(int compareType);
+    virtual void emit_compare_tagged_int(int compareType);
     virtual bool emit_compare_object_push_int(int compareType);
 
-	virtual void emit_store_fast(int local);
+    virtual void emit_store_fast(int local);
 
-	virtual void emit_unbound_local_check(int local, Label success);
-	virtual void emit_load_fast(int local);
+    virtual void emit_unbound_local_check(int local, Label success);
+    virtual void emit_load_fast(int local);
 
-	virtual Label emit_define_label();
-	virtual void emit_mark_label(Label label);
-	virtual void emit_branch(BranchType branchType, Label label);
-	virtual void emit_compare_equal();
+    virtual Label emit_define_label();
+    virtual void emit_mark_label(Label label);
+    virtual void emit_branch(BranchType branchType, Label label);
+    virtual void emit_compare_equal();
 
-	virtual void emit_int(int value);
-	virtual void emit_float(double value);
-	virtual void emit_tagged_int(ssize_t value);
-	virtual void emit_ptr(void *value);
-	virtual void emit_bool(bool value);
-	virtual void emit_py_object(PyObject* value);
+    virtual void emit_int(int value);
+    virtual void emit_float(double value);
+    virtual void emit_tagged_int(ssize_t value);
+    virtual void emit_ptr(void *value);
+    virtual void emit_bool(bool value);
+    virtual void emit_py_object(PyObject* value);
 
-	virtual void emit_clear_eh();
-	virtual void emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback);
-	virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback, bool includeTbAndValue);
-	virtual void emit_restore_err();
-	virtual void emit_restore_err(Local finallyReason);
-	virtual void emit_pyerr_setstring(PyObject* exception, const char*msg);
+    virtual void emit_clear_eh();
+    virtual void emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback);
+    virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback, bool includeTbAndValue);
+    virtual void emit_restore_err();
+    virtual void emit_restore_err(Local finallyReason);
+    virtual void emit_pyerr_setstring(PyObject* exception, const char*msg);
 
-	virtual void emit_compare_exceptions();
-	virtual void emit_compare_exceptions_int();
+    virtual void emit_compare_exceptions();
+    virtual void emit_compare_exceptions_int();
 
-	// Pops a value off the stack, performing no operations related to reference counting
-	virtual void emit_pop();
-	// Dups the current value on the stack, performing no operations related to reference counting
-	virtual void emit_dup();
+    // Pops a value off the stack, performing no operations related to reference counting
+    virtual void emit_pop();
+    // Dups the current value on the stack, performing no operations related to reference counting
+    virtual void emit_dup();
 
-	virtual void emit_box_float();
-	virtual void emit_box_bool();
-	virtual void emit_box_tagged_ptr();
+    virtual void emit_box_float();
+    virtual void emit_box_bool();
+    virtual void emit_box_tagged_ptr();
 
-	virtual void emit_debug_msg(const char* msg);
+    virtual void emit_debug_msg(const char* msg);
 
-	virtual JittedCode* emit_compile();
-	
+    virtual JittedCode* emit_compile();
+
 private:
     void load_frame();
 
     void load_local(int oparg);
     void incref(bool maybeTagged = false);
     void decref();
-	
+
     void call_optimizing_function(int baseFunction);
 
     CorInfoType to_clr_type(LocalKind kind);

@@ -42,125 +42,125 @@ SliceValue Slice;
 ComplexValue Complex;
 
 AbstractSource::AbstractSource() {
-	Sources = shared_ptr<AbstractSources>(new AbstractSources());
-	Sources->Sources.insert(this);
+    Sources = shared_ptr<AbstractSources>(new AbstractSources());
+    Sources->Sources.insert(this);
 }
 
 AbstractValue* AbstractValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-	if (selfSources != nullptr) {
-		selfSources->escapes();
-	}
-	other.escapes();
+    if (selfSources != nullptr) {
+        selfSources->escapes();
+    }
+    other.escapes();
 
-	return &Any;
+    return &Any;
 }
 
 AbstractValue* AbstractValue::unary(AbstractSource* selfSources, int op) {
-	if (selfSources != nullptr) {
-		selfSources->escapes();
-	}
-	return &Any;
+    if (selfSources != nullptr) {
+        selfSources->escapes();
+    }
+    return &Any;
 }
 
 AbstractValue* AbstractValue::compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-	if (is_known_type(kind()) && is_known_type(other.Value->kind()) && kind() == other.Value->kind()) {
-		// We know all of the known types don't have fancy rich comparison
-		// operations and will return true/false.  This is in contrast to
-		// user defined types which can override the rich comparison methods
-		// and return values which are not bools.
-		return &Bool;
-	}
+    if (is_known_type(kind()) && is_known_type(other.Value->kind()) && kind() == other.Value->kind()) {
+        // We know all of the known types don't have fancy rich comparison
+        // operations and will return true/false.  This is in contrast to
+        // user defined types which can override the rich comparison methods
+        // and return values which are not bools.
+        return &Bool;
+    }
 
-	if (selfSources != nullptr) {
-		selfSources->escapes();
-	}
-	other.escapes();
-	return &Any;
+    if (selfSources != nullptr) {
+        selfSources->escapes();
+    }
+    other.escapes();
+    return &Any;
 }
 
 void AbstractValue::truth(AbstractSource* selfSources) {
-	if (selfSources != nullptr) {
-		selfSources->escapes();
-	}
+    if (selfSources != nullptr) {
+        selfSources->escapes();
+    }
 }
-	
+
 AbstractValue* AbstractValue::merge_with(AbstractValue*other) {
-	if (this == other) {
-		return this;
-	}
-	return &Any;
+    if (this == other) {
+        return this;
+    }
+    return &Any;
 }
 
 void AbstractSource::escapes() {
-	if (Sources) {
-		Sources->m_escapes = true;
-	}
+    if (Sources) {
+        Sources->m_escapes = true;
+    }
 }
 
 bool AbstractSource::needs_boxing() {
-	if (Sources) {
-		return Sources->m_escapes;
-	}
-	return true;
+    if (Sources) {
+        return Sources->m_escapes;
+    }
+    return true;
 }
 
 AbstractSource* AbstractSource::combine(AbstractSource* one, AbstractSource* two) {
-	if (one == two) {
-		return one;
-	}
-	if (one != nullptr) {
-		if (two != nullptr) {
-			if (one->Sources.get() == two->Sources.get()) {
-				return one;
-			}
+    if (one == two) {
+        return one;
+    }
+    if (one != nullptr) {
+        if (two != nullptr) {
+            if (one->Sources.get() == two->Sources.get()) {
+                return one;
+            }
 
-			// link the sources...
-			if (one->Sources->Sources.size() > two->Sources->Sources.size()) {
-				for (auto source : two->Sources->Sources) {
-					one->Sources->Sources.insert(source);
-					if (source != two) {
-						source->Sources = one->Sources;
-					}
-				}
-				if (two->needs_boxing() && !one->needs_boxing()) {
-					one->escapes();
-				}
-				two->Sources = one->Sources;
-				return one;
-			}
-			else {
-				for (auto source : one->Sources->Sources) {
-					two->Sources->Sources.insert(source);
-					if (source != one) {
-						source->Sources = two->Sources;
-					}
-				}
-				if (one->needs_boxing() && !two->needs_boxing()) {
-					two->escapes();
-				}
-				one->Sources = two->Sources;
-				return two;
-			}
-		}
-		else {
-			// merging with an unknown source...
-			one->escapes();
-			return one;
-		}
-	}
-	else if (two != nullptr) {
-		// merging with an unknown source...
-		two->escapes();
-		return two;
-	}
-	return nullptr;
+            // link the sources...
+            if (one->Sources->Sources.size() > two->Sources->Sources.size()) {
+                for (auto source : two->Sources->Sources) {
+                    one->Sources->Sources.insert(source);
+                    if (source != two) {
+                        source->Sources = one->Sources;
+                    }
+                }
+                if (two->needs_boxing() && !one->needs_boxing()) {
+                    one->escapes();
+                }
+                two->Sources = one->Sources;
+                return one;
+            }
+            else {
+                for (auto source : one->Sources->Sources) {
+                    two->Sources->Sources.insert(source);
+                    if (source != one) {
+                        source->Sources = two->Sources;
+                    }
+                }
+                if (one->needs_boxing() && !two->needs_boxing()) {
+                    two->escapes();
+                }
+                one->Sources = two->Sources;
+                return two;
+            }
+        }
+        else {
+            // merging with an unknown source...
+            one->escapes();
+            return one;
+        }
+    }
+    else if (two != nullptr) {
+        // merging with an unknown source...
+        two->escapes();
+        return two;
+    }
+    return nullptr;
 }
 /*
 void TupleSource::escapes() {
-	for (auto cur = m_sources.begin(); cur != m_sources.end(); cur++) {
-		(*cur).escapes();
-	}
-	m_escapes = true;
+    for (auto cur = m_sources.begin(); cur != m_sources.end(); cur++) {
+        (*cur).escapes();
+    }
+    m_escapes = true;
 }*/
 
 // BoolValue methods
@@ -169,7 +169,7 @@ AbstractValueKind BoolValue::kind() {
 }
 
 void BoolValue::truth(AbstractSource* selfSources) {
-	// bools aren't boxed, and don't escape on truth checks
+    // bools aren't boxed, and don't escape on truth checks
 }
 
 AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
@@ -188,8 +188,8 @@ AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractVa
             {
                 if (selfSources != nullptr) {
                     selfSources->escapes();
-	            }
-	            other.escapes();
+                }
+                other.escapes();
                 return &Float;
             }
             case BINARY_ADD:
@@ -252,8 +252,8 @@ AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractVa
             {
                 if (selfSources != nullptr) {
                     selfSources->escapes();
-	            }
-	            other.escapes();
+                }
+                other.escapes();
                 return &Float;
             }
         }
@@ -268,8 +268,8 @@ AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractVa
             {
                 if (selfSources != nullptr) {
                     selfSources->escapes();
-	            }
-	            other.escapes();
+                }
+                other.escapes();
                 return &Float;
             }
             case BINARY_ADD:
@@ -320,14 +320,14 @@ AbstractValue* BoolValue::binary(AbstractSource* selfSources, int op, AbstractVa
 }
 
 AbstractValue* BoolValue::unary(AbstractSource* selfSources, int op) {
-        switch (op) {
-            case UNARY_NOT:
-                return this;
-            case UNARY_INVERT:
-            case UNARY_NEGATIVE:
-            case UNARY_POSITIVE:
-                return &Integer;
-        }
+    switch (op) {
+        case UNARY_NOT:
+            return this;
+        case UNARY_INVERT:
+        case UNARY_NEGATIVE:
+        case UNARY_POSITIVE:
+            return &Integer;
+    }
     return AbstractValue::unary(selfSources, op);
 }
 
@@ -398,10 +398,10 @@ AbstractValue* BytesValue::binary(AbstractSource* selfSources, int op, AbstractV
 }
 
 AbstractValue* BytesValue::unary(AbstractSource* selfSources, int op) {
-        switch (op) {
-            case UNARY_NOT:
-                return &Bool;
-        }
+    switch (op) {
+        case UNARY_NOT:
+            return &Bool;
+    }
     return AbstractValue::unary(selfSources, op);
 }
 
@@ -418,62 +418,62 @@ AbstractValue* ComplexValue::binary(AbstractSource* selfSources, int op, Abstrac
     auto other_kind = other.Value->kind();
     if (other_kind == AVK_Bool) {
         switch (op) {
-        case BINARY_ADD:
-        case BINARY_MULTIPLY:
-        case BINARY_POWER:
-        case BINARY_SUBTRACT:
-        case BINARY_TRUE_DIVIDE:
-        case INPLACE_ADD:
-        case INPLACE_MULTIPLY:
-        case INPLACE_POWER:
-        case INPLACE_SUBTRACT:
-        case INPLACE_TRUE_DIVIDE:
-            return this;
+            case BINARY_ADD:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return this;
         }
     }
     else if (other_kind == AVK_Complex) {
         switch (op) {
-        case BINARY_ADD:
-        case BINARY_MULTIPLY:
-        case BINARY_POWER:
-        case BINARY_SUBTRACT:
-        case BINARY_TRUE_DIVIDE:
-        case INPLACE_ADD:
-        case INPLACE_MULTIPLY:
-        case INPLACE_POWER:
-        case INPLACE_SUBTRACT:
-        case INPLACE_TRUE_DIVIDE:
-            return this;
+            case BINARY_ADD:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return this;
         }
     }
     else if (other_kind == AVK_Float) {
         switch (op) {
-        case BINARY_ADD:
-        case BINARY_MULTIPLY:
-        case BINARY_POWER:
-        case BINARY_SUBTRACT:
-        case BINARY_TRUE_DIVIDE:
-        case INPLACE_ADD:
-        case INPLACE_MULTIPLY:
-        case INPLACE_POWER:
-        case INPLACE_SUBTRACT:
-        case INPLACE_TRUE_DIVIDE:
-            return this;
+            case BINARY_ADD:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return this;
         }
     }
     else if (other_kind == AVK_Integer) {
         switch (op) {
-        case BINARY_ADD:
-        case BINARY_MULTIPLY:
-        case BINARY_POWER:
-        case BINARY_SUBTRACT:
-        case BINARY_TRUE_DIVIDE:
-        case INPLACE_ADD:
-        case INPLACE_MULTIPLY:
-        case INPLACE_POWER:
-        case INPLACE_SUBTRACT:
-        case INPLACE_TRUE_DIVIDE:
-            return this;
+            case BINARY_ADD:
+            case BINARY_MULTIPLY:
+            case BINARY_POWER:
+            case BINARY_SUBTRACT:
+            case BINARY_TRUE_DIVIDE:
+            case INPLACE_ADD:
+            case INPLACE_MULTIPLY:
+            case INPLACE_POWER:
+            case INPLACE_SUBTRACT:
+            case INPLACE_TRUE_DIVIDE:
+                return this;
         }
     }
     return AbstractValue::binary(selfSources, op, other);
@@ -481,11 +481,11 @@ AbstractValue* ComplexValue::binary(AbstractSource* selfSources, int op, Abstrac
 
 AbstractValue* ComplexValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
-    case UNARY_NEGATIVE:
-    case UNARY_POSITIVE:
-        return this;
+        case UNARY_NOT:
+            return &Bool;
+        case UNARY_NEGATIVE:
+        case UNARY_POSITIVE:
+            return this;
     }
     return AbstractValue::unary(selfSources, op);
 }
@@ -508,8 +508,8 @@ AbstractValue* IntegerValue::binary(AbstractSource* selfSources, int op, Abstrac
             {
                 if (selfSources != nullptr) {
                     selfSources->escapes();
-	            }
-	            other.escapes();
+                }
+                other.escapes();
                 return &Float;
             }
             case BINARY_ADD:
@@ -578,8 +578,8 @@ AbstractValue* IntegerValue::binary(AbstractSource* selfSources, int op, Abstrac
             {
                 if (selfSources != nullptr) {
                     selfSources->escapes();
-	            }
-	            other.escapes();
+                }
+                other.escapes();
                 return &Float;
             }
         }
@@ -591,8 +591,8 @@ AbstractValue* IntegerValue::binary(AbstractSource* selfSources, int op, Abstrac
             {
                 if (selfSources != nullptr) {
                     selfSources->escapes();
-	            }
-	            other.escapes();
+                }
+                other.escapes();
                 return &Float;
             }
             case BINARY_ADD:
@@ -645,19 +645,19 @@ AbstractValue* IntegerValue::binary(AbstractSource* selfSources, int op, Abstrac
 }
 
 AbstractValue* IntegerValue::unary(AbstractSource* selfSources, int op) {
-        switch (op) {
-            case UNARY_NOT:
-                return &Bool;
-            case UNARY_INVERT:
-            case UNARY_NEGATIVE:
-            case UNARY_POSITIVE:
-                return this;
-        }
+    switch (op) {
+        case UNARY_NOT:
+            return &Bool;
+        case UNARY_INVERT:
+        case UNARY_NEGATIVE:
+        case UNARY_POSITIVE:
+            return this;
+    }
     return AbstractValue::unary(selfSources, op);
 }
 
 void IntegerValue::truth(AbstractSource* selfSources) {
-	// ints don't escape on truth checks...
+    // ints don't escape on truth checks...
 }
 
 const char* IntegerValue::describe() {
@@ -725,7 +725,7 @@ AbstractValueKind FloatValue::kind() {
 }
 
 void FloatValue::truth(AbstractSource* selfSources) {
-	// floats don't escape on truth checks...
+    // floats don't escape on truth checks...
 }
 
 AbstractValue* FloatValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
@@ -818,13 +818,13 @@ AbstractValue* FloatValue::binary(AbstractSource* selfSources, int op, AbstractV
 }
 
 AbstractValue* FloatValue::unary(AbstractSource* selfSources, int op) {
-        switch (op) {
-            case UNARY_NOT:
-                return &Bool;
-            case UNARY_NEGATIVE:
-            case UNARY_POSITIVE:
-                return this;
-        }
+    switch (op) {
+        case UNARY_NOT:
+            return &Bool;
+        case UNARY_NEGATIVE:
+        case UNARY_POSITIVE:
+            return this;
+    }
     return AbstractValue::unary(selfSources, op);
 }
 
@@ -967,8 +967,8 @@ AbstractValueKind DictValue::kind() {
 
 AbstractValue* DictValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
+        case UNARY_NOT:
+            return &Bool;
     }
     return AbstractValue::unary(selfSources, op);
 }
@@ -1019,8 +1019,8 @@ AbstractValueKind NoneValue::kind() {
 
 AbstractValue* NoneValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
+        case UNARY_NOT:
+            return &Bool;
     }
     return AbstractValue::unary(selfSources, op);
 }
@@ -1036,8 +1036,8 @@ AbstractValueKind FunctionValue::kind() {
 
 AbstractValue* FunctionValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
+        case UNARY_NOT:
+            return &Bool;
     }
     return AbstractValue::unary(selfSources, op);
 }
@@ -1052,8 +1052,8 @@ AbstractValueKind SliceValue::kind() {
 }
 AbstractValue* SliceValue::unary(AbstractSource* selfSources, int op) {
     switch (op) {
-    case UNARY_NOT:
-        return &Bool;
+        case UNARY_NOT:
+            return &Bool;
     }
     return AbstractValue::unary(selfSources, op);
 }

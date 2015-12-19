@@ -100,7 +100,7 @@ PythonCompiler::PythonCompiler(PyCodeObject *code) :
     m_tb = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
     m_ehVal = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
     m_excType = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-	m_lasti = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    m_lasti = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 }
 
 void PythonCompiler::load_frame() {
@@ -108,31 +108,31 @@ void PythonCompiler::load_frame() {
 }
 
 void PythonCompiler::emit_push_frame() {
-	load_frame();
-	m_il.emit_call(METHOD_PY_PUSHFRAME);
+    load_frame();
+    m_il.emit_call(METHOD_PY_PUSHFRAME);
 }
 
 void PythonCompiler::emit_pop_frame() {
-	load_frame();
-	m_il.emit_call(METHOD_PY_POPFRAME);
+    load_frame();
+    m_il.emit_call(METHOD_PY_POPFRAME);
 }
 
 void PythonCompiler::emit_eh_trace() {
-	load_frame();
-	m_il.emit_call(METHOD_EH_TRACE);
+    load_frame();
+    m_il.emit_call(METHOD_EH_TRACE);
 }
 
 void PythonCompiler::emit_lasti_init() {
-	load_frame();
-	m_il.ld_i(offsetof(PyFrameObject, f_lasti));
-	m_il.add();
-	m_il.st_loc(m_lasti);
+    load_frame();
+    m_il.ld_i(offsetof(PyFrameObject, f_lasti));
+    m_il.add();
+    m_il.st_loc(m_lasti);
 }
 
 void PythonCompiler::emit_lasti_update(int index) {
-	m_il.ld_loc(m_lasti);
-	m_il.ld_i(index);
-	m_il.st_ind_i4();
+    m_il.ld_loc(m_lasti);
+    m_il.ld_i(index);
+    m_il.st_ind_i4();
 }
 
 void PythonCompiler::load_local(int oparg) {
@@ -143,15 +143,15 @@ void PythonCompiler::load_local(int oparg) {
 }
 
 void PythonCompiler::incref(bool maybeTagged) {
-	Label tagged, done;
-	if (maybeTagged) {
-		m_il.dup();
-		m_il.ld_i(1);
-		m_il.bitwise_and();
-		tagged = m_il.define_label();
-		done = m_il.define_label();
-		m_il.branch(BranchTrue, tagged);
-	}
+    Label tagged, done;
+    if (maybeTagged) {
+        m_il.dup();
+        m_il.ld_i(1);
+        m_il.bitwise_and();
+        tagged = m_il.define_label();
+        done = m_il.define_label();
+        m_il.branch(BranchTrue, tagged);
+    }
 
     LD_FIELDA(PyObject, ob_refcnt);
     m_il.dup();
@@ -160,20 +160,20 @@ void PythonCompiler::incref(bool maybeTagged) {
     m_il.add();
     m_il.st_ind_i4();
 
-	if (maybeTagged) {
-		m_il.branch(BranchAlways, done);
+    if (maybeTagged) {
+        m_il.branch(BranchAlways, done);
 
-		m_il.mark_label(tagged);
-		m_il.pop();
+        m_il.mark_label(tagged);
+        m_il.pop();
 
-		m_il.mark_label(done);
-	}
+        m_il.mark_label(done);
+    }
 
 }
 
 void PythonCompiler::decref() {
     m_il.emit_call(METHOD_DECREF_TOKEN);
-	// It might be nice to inline this at some point:
+    // It might be nice to inline this at some point:
     //LD_FIELDA(PyObject, ob_refcnt);
     //m_il.push_back(CEE_DUP);
     //m_il.push_back(CEE_LDIND_I4);
@@ -188,11 +188,11 @@ void PythonCompiler::decref() {
 
 
 Local PythonCompiler::emit_allocate_stack_array(size_t bytes) {
-	auto sequenceTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-	m_il.ld_i(bytes);
-	m_il.localloc();
-	m_il.st_loc(sequenceTmp);
-	return sequenceTmp;
+    auto sequenceTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    m_il.ld_i(bytes);
+    m_il.localloc();
+    m_il.st_loc(sequenceTmp);
+    return sequenceTmp;
 }
 
 
@@ -201,50 +201,50 @@ Local PythonCompiler::emit_allocate_stack_array(size_t bytes) {
  */
 
 void PythonCompiler::emit_unbound_local_check(int local, Label success) {
-	//// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
-	//// locals that are provably assigned)
-	m_il.dup();
-	m_il.load_null();
-	m_il.branch(BranchNotEqual, success);
+    //// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
+    //// locals that are provably assigned)
+    m_il.dup();
+    m_il.load_null();
+    m_il.branch(BranchNotEqual, success);
 
-	m_il.pop();
-	m_il.ld_i(PyTuple_GetItem(m_code->co_varnames, local));
-	m_il.emit_call(METHOD_UNBOUND_LOCAL);
+    m_il.pop();
+    m_il.ld_i(PyTuple_GetItem(m_code->co_varnames, local));
+    m_il.emit_call(METHOD_UNBOUND_LOCAL);
 }
 
 void PythonCompiler::emit_load_fast(int local) {
-	load_local(local);
-	m_il.dup();
-	incref();
+    load_local(local);
+    m_il.dup();
+    incref();
 }
 
 CorInfoType PythonCompiler::to_clr_type(LocalKind kind) {
-	switch (kind) {
-	case LK_Float: return CORINFO_TYPE_DOUBLE;
-	case LK_Int: return CORINFO_TYPE_INT;
-	case LK_Bool: return CORINFO_TYPE_BOOL;
-	}
-	return CORINFO_TYPE_NATIVEINT;
+    switch (kind) {
+        case LK_Float: return CORINFO_TYPE_DOUBLE;
+        case LK_Int: return CORINFO_TYPE_INT;
+        case LK_Bool: return CORINFO_TYPE_BOOL;
+    }
+    return CORINFO_TYPE_NATIVEINT;
 }
 
 
 void PythonCompiler::emit_store_fast(int local) {
-	// TODO: Move locals out of the Python frame object and into real locals
-	load_local(local);
-	decref();
+    // TODO: Move locals out of the Python frame object and into real locals
+    load_local(local);
+    decref();
 
-	auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-	m_il.st_loc(valueTmp);
+    auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    m_il.st_loc(valueTmp);
 
-	load_frame();
-	m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + local * sizeof(size_t));
-	m_il.add();
+    load_frame();
+    m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + local * sizeof(size_t));
+    m_il.add();
 
-	m_il.ld_loc(valueTmp);
+    m_il.ld_loc(valueTmp);
 
-	m_il.st_ind_i();
+    m_il.st_ind_i();
 
-	m_il.free_local(valueTmp);
+    m_il.free_local(valueTmp);
 }
 
 void PythonCompiler::emit_rot_two() {
@@ -311,94 +311,94 @@ void PythonCompiler::emit_dup_top_two() {
 }
 
 void PythonCompiler::emit_new_list(size_t argCnt) {
-	m_il.ld_i(argCnt);
-	m_il.emit_call(METHOD_PYLIST_NEW);
+    m_il.ld_i(argCnt);
+    m_il.emit_call(METHOD_PYLIST_NEW);
 }
 
 void PythonCompiler::emit_list_store(size_t argCnt) {
-	auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-	auto listTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-	auto listItems = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    auto listTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    auto listItems = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 
-	m_il.dup();
-	m_il.st_loc(listTmp);
+    m_il.dup();
+    m_il.st_loc(listTmp);
 
-	// load the address of the list item...
-	m_il.ld_i(offsetof(PyListObject, ob_item));
-	m_il.add();
-	m_il.ld_ind_i();
+    // load the address of the list item...
+    m_il.ld_i(offsetof(PyListObject, ob_item));
+    m_il.add();
+    m_il.ld_ind_i();
 
-	m_il.st_loc(listItems);
+    m_il.st_loc(listItems);
 
-	for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
-		// save the argument into a temporary...
-		m_il.st_loc(valueTmp);
+    for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
+        // save the argument into a temporary...
+        m_il.st_loc(valueTmp);
 
-		// load the address of the list item...
-		m_il.ld_loc(listItems);
-		m_il.ld_i(arg * sizeof(size_t));
-		m_il.add();
+        // load the address of the list item...
+        m_il.ld_loc(listItems);
+        m_il.ld_i(arg * sizeof(size_t));
+        m_il.add();
 
-		// reload the value
-		m_il.ld_loc(valueTmp);
+        // reload the value
+        m_il.ld_loc(valueTmp);
 
-		// store into the array
-		m_il.st_ind_i();
-	}
+        // store into the array
+        m_il.st_ind_i();
+    }
 
-	// update the size of the list...
-	m_il.ld_loc(listTmp);
-	m_il.dup();
-	m_il.ld_i(offsetof(PyVarObject, ob_size));
-	m_il.add();
-	m_il.ld_i(argCnt);
-	m_il.st_ind_i();
+    // update the size of the list...
+    m_il.ld_loc(listTmp);
+    m_il.dup();
+    m_il.ld_i(offsetof(PyVarObject, ob_size));
+    m_il.add();
+    m_il.ld_i(argCnt);
+    m_il.st_ind_i();
 
-	m_il.free_local(valueTmp);
-	m_il.free_local(listTmp);
-	m_il.free_local(listItems);
+    m_il.free_local(valueTmp);
+    m_il.free_local(listTmp);
+    m_il.free_local(listItems);
 }
 
 void PythonCompiler::emit_new_set() {
-	m_il.load_null();
-	m_il.emit_call(METHOD_PYSET_NEW);
+    m_il.load_null();
+    m_il.emit_call(METHOD_PYSET_NEW);
 }
 
 void PythonCompiler::emit_set_store(size_t argCnt) {
-	if (argCnt != 0) {
-		auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-		auto setTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    if (argCnt != 0) {
+        auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+        auto setTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 
-		m_il.st_loc(setTmp);
+        m_il.st_loc(setTmp);
 
-		for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
-			// save the argument into a temporary...
-			m_il.st_loc(valueTmp);
+        for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
+            // save the argument into a temporary...
+            m_il.st_loc(valueTmp);
 
-			// load the address of the tuple item...
-			m_il.ld_loc(setTmp);
-			m_il.ld_loc(valueTmp);
-			m_il.emit_call(METHOD_PYSET_ADD);
-			m_il.pop();
-		}
+            // load the address of the tuple item...
+            m_il.ld_loc(setTmp);
+            m_il.ld_loc(valueTmp);
+            m_il.emit_call(METHOD_PYSET_ADD);
+            m_il.pop();
+        }
 
-		m_il.ld_loc(setTmp);
-		m_il.free_local(valueTmp);
-		m_il.free_local(setTmp);
-	}
+        m_il.ld_loc(setTmp);
+        m_il.free_local(valueTmp);
+        m_il.free_local(setTmp);
+    }
 }
 
 void PythonCompiler::emit_new_dict(size_t size) {
-	m_il.ld_i(size);
-	m_il.emit_call(METHOD_PYDICT_NEWPRESIZED);
+    m_il.ld_i(size);
+    m_il.emit_call(METHOD_PYDICT_NEWPRESIZED);
 }
 
 void PythonCompiler::emit_dict_store() {
-	m_il.emit_call(METHOD_STOREMAP_TOKEN);
+    m_il.emit_call(METHOD_STOREMAP_TOKEN);
 }
 
 void PythonCompiler::emit_is_true() {
-	m_il.emit_call(METHOD_PYOBJECT_ISTRUE);
+    m_il.emit_call(METHOD_PYOBJECT_ISTRUE);
 }
 
 void PythonCompiler::emit_load_name(PyObject* name) {
@@ -438,7 +438,7 @@ void PythonCompiler::emit_store_global(PyObject* name) {
     // value is on the stack
     load_frame();
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_STOREGLOBAL_TOKEN);	
+    m_il.emit_call(METHOD_STOREGLOBAL_TOKEN);
 }
 
 void PythonCompiler::emit_delete_global(PyObject* name) {
@@ -453,8 +453,8 @@ void PythonCompiler::emit_load_global(PyObject* name) {
     m_il.emit_call(METHOD_LOADGLOBAL_TOKEN);
 }
 
-void PythonCompiler::emit_delete_fast(int index, PyObject* name) {    
-	load_local(index);
+void PythonCompiler::emit_delete_fast(int index, PyObject* name) {
+    load_local(index);
     decref();
     load_frame();
     m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + index * sizeof(size_t));
@@ -464,41 +464,41 @@ void PythonCompiler::emit_delete_fast(int index, PyObject* name) {
 }
 
 void PythonCompiler::emit_new_tuple(size_t size) {
-	if (size == 0) {
-		m_il.ld_i(PyTuple_New(0));
-		m_il.dup();
-		incref(false);
-	}
-	else {
-		m_il.ld_i(size);
-		m_il.emit_call(METHOD_PYTUPLE_NEW);
-	}
+    if (size == 0) {
+        m_il.ld_i(PyTuple_New(0));
+        m_il.dup();
+        incref(false);
+    }
+    else {
+        m_il.ld_i(size);
+        m_il.emit_call(METHOD_PYTUPLE_NEW);
+    }
 }
 
 void PythonCompiler::emit_tuple_store(size_t argCnt) {
-	auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-	auto tupleTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-	m_il.st_loc(tupleTmp);
+    auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    auto tupleTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    m_il.st_loc(tupleTmp);
 
-	for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
-		// save the argument into a temporary...
-		m_il.st_loc(valueTmp);
+    for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
+        // save the argument into a temporary...
+        m_il.st_loc(valueTmp);
 
-		// load the address of the tuple item...
-		m_il.ld_loc(tupleTmp);
-		m_il.ld_i(arg * sizeof(size_t) + offsetof(PyTupleObject, ob_item));
-		m_il.add();
+        // load the address of the tuple item...
+        m_il.ld_loc(tupleTmp);
+        m_il.ld_i(arg * sizeof(size_t) + offsetof(PyTupleObject, ob_item));
+        m_il.add();
 
-		// reload the value
-		m_il.ld_loc(valueTmp);
+        // reload the value
+        m_il.ld_loc(valueTmp);
 
-		// store into the array
-		m_il.st_ind_i();
-	}
-	m_il.ld_loc(tupleTmp);
+        // store into the array
+        m_il.st_ind_i();
+    }
+    m_il.ld_loc(tupleTmp);
 
-	m_il.free_local(valueTmp);
-	m_il.free_local(tupleTmp);
+    m_il.free_local(valueTmp);
+    m_il.free_local(tupleTmp);
 }
 
 void PythonCompiler::emit_store_subscr() {
@@ -532,20 +532,20 @@ void PythonCompiler::emit_unary_not() {
 }
 
 void PythonCompiler::emit_unary_negative_float() {
-	m_il.neg();
+    m_il.neg();
 }
 
 void PythonCompiler::emit_unary_negative_tagged_int() {
-	m_il.emit_call(METHOD_UNARY_NEGATIVE_INT);
+    m_il.emit_call(METHOD_UNARY_NEGATIVE_INT);
 }
 
 void PythonCompiler::emit_unary_not_float_push_bool() {
-	m_il.ld_r8(0);
-	m_il.compare_eq();
+    m_il.ld_r8(0);
+    m_il.compare_eq();
 }
 
 void PythonCompiler::emit_unary_not_tagged_int_push_bool() {
-	m_il.emit_call(METHOD_UNARY_NOT_INT_PUSH_BOOL);
+    m_il.emit_call(METHOD_UNARY_NOT_INT_PUSH_BOOL);
 }
 
 void PythonCompiler::emit_unary_invert() {
@@ -582,48 +582,48 @@ void PythonCompiler::emit_load_build_class() {
 }
 
 void PythonCompiler::emit_unpack_sequence(Local sequence, Local sequenceStorage, Label success, size_t size) {
-	// load the iterable, the count, and our temporary 
-	// storage if we need to iterate over the object.
-	m_il.ld_loc(sequence);
-	m_il.ld_i(size);
-	m_il.ld_loc(sequenceStorage);
-	m_il.emit_call(METHOD_UNPACK_SEQUENCE_TOKEN);
+    // load the iterable, the count, and our temporary 
+    // storage if we need to iterate over the object.
+    m_il.ld_loc(sequence);
+    m_il.ld_i(size);
+    m_il.ld_loc(sequenceStorage);
+    m_il.emit_call(METHOD_UNPACK_SEQUENCE_TOKEN);
 
-	m_il.dup();
-	m_il.load_null();
-	m_il.branch(BranchNotEqual, success);
-	m_il.pop();
-	m_il.ld_loc(sequence);
-	decref();
+    m_il.dup();
+    m_il.load_null();
+    m_il.branch(BranchNotEqual, success);
+    m_il.pop();
+    m_il.ld_loc(sequence);
+    decref();
 }
 
 void PythonCompiler::emit_load_array(int index) {
-	m_il.ld_i((index * sizeof(size_t)));
-	m_il.add();
-	m_il.ld_ind_i();
+    m_il.ld_i((index * sizeof(size_t)));
+    m_il.add();
+    m_il.ld_ind_i();
 }
 
 Local PythonCompiler::emit_define_local(LocalKind kind) {
-	return m_il.define_local(Parameter(to_clr_type(kind)));
+    return m_il.define_local(Parameter(to_clr_type(kind)));
 }
 
 Local PythonCompiler::emit_define_local(bool cache) {
-	if (cache) {
-		return m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-	}
-	else {
-		return m_il.define_local_no_cache(Parameter(CORINFO_TYPE_NATIVEINT));
-	}
+    if (cache) {
+        return m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    }
+    else {
+        return m_il.define_local_no_cache(Parameter(CORINFO_TYPE_NATIVEINT));
+    }
 }
 
 void PythonCompiler::emit_unpack_ex(Local sequence, size_t leftSize, size_t rightSize, Local sequenceStorage, Local list, Local remainder) {
-	m_il.ld_loc(sequence);
-	m_il.ld_i(leftSize);
-	m_il.ld_i(rightSize);
-	m_il.ld_loc(sequenceStorage);
-	m_il.ld_loca(list);
-	m_il.ld_loca(remainder);
-	m_il.emit_call(METHOD_UNPACK_SEQUENCEEX_TOKEN);
+    m_il.ld_loc(sequence);
+    m_il.ld_i(leftSize);
+    m_il.ld_i(rightSize);
+    m_il.ld_loc(sequenceStorage);
+    m_il.ld_loca(list);
+    m_il.ld_loca(remainder);
+    m_il.emit_call(METHOD_UNPACK_SEQUENCEEX_TOKEN);
 }
 
 void PythonCompiler::emit_fancy_call() {
@@ -631,26 +631,26 @@ void PythonCompiler::emit_fancy_call() {
 }
 
 bool PythonCompiler::emit_call(size_t argCnt) {
-	switch (argCnt) {
-	case 0: call_optimizing_function(METHOD_CALL0_OPT_TOKEN); return true;
-	case 1: m_il.emit_call(METHOD_CALL1_TOKEN); return true;
-	case 2: m_il.emit_call(METHOD_CALL2_TOKEN); return true;
-	case 3: m_il.emit_call(METHOD_CALL3_TOKEN); return true;
-	case 4: m_il.emit_call(METHOD_CALL4_TOKEN); return true;
-	}
-	return false;
+    switch (argCnt) {
+        case 0: call_optimizing_function(METHOD_CALL0_OPT_TOKEN); return true;
+        case 1: m_il.emit_call(METHOD_CALL1_TOKEN); return true;
+        case 2: m_il.emit_call(METHOD_CALL2_TOKEN); return true;
+        case 3: m_il.emit_call(METHOD_CALL3_TOKEN); return true;
+        case 4: m_il.emit_call(METHOD_CALL4_TOKEN); return true;
+    }
+    return false;
 }
 
 void PythonCompiler::emit_call_with_tuple() {
-	m_il.emit_call(METHOD_CALLN_TOKEN);
+    m_il.emit_call(METHOD_CALLN_TOKEN);
 }
 
 void PythonCompiler::call_optimizing_function(int baseFunction) {
-	auto id = new IndirectDispatchMethod(g_module.m_methods[baseFunction]);
-	m_il.ld_i(&id->m_addr);
-	auto token = (int)(FIRST_USER_FUNCTION_TOKEN + m_module->m_methods.size());
-	m_module->m_methods[token] = id;
-	m_il.emit_call(token);
+    auto id = new IndirectDispatchMethod(g_module.m_methods[baseFunction]);
+    m_il.ld_i(&id->m_addr);
+    auto token = (int)(FIRST_USER_FUNCTION_TOKEN + m_module->m_methods.size());
+    m_module->m_methods[token] = id;
+    m_il.emit_call(token);
 }
 
 void PythonCompiler::emit_call_with_kws() {
@@ -660,142 +660,142 @@ void PythonCompiler::emit_call_with_kws() {
 }
 
 void PythonCompiler::emit_store_local(Local local) {
-	m_il.st_loc(local);
+    m_il.st_loc(local);
 }
 
 Local PythonCompiler::emit_spill() {
-	auto tmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-	m_il.st_loc(tmp);
-	return tmp;
+    auto tmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    m_il.st_loc(tmp);
+    return tmp;
 }
 
 void PythonCompiler::emit_load_and_free_local(Local local) {
-	m_il.ld_loc(local);
-	m_il.free_local(local);
+    m_il.ld_loc(local);
+    m_il.free_local(local);
 }
 
 void PythonCompiler::emit_load_local(Local local) {
-	m_il.ld_loc(local);
+    m_il.ld_loc(local);
 }
 
 void PythonCompiler::emit_pop() {
-	m_il.pop();
+    m_il.pop();
 }
 
 void PythonCompiler::emit_dup() {
-	m_il.dup();
+    m_il.dup();
 }
 
 void PythonCompiler::emit_free_local(Local local) {
-	m_il.free_local(local);
+    m_il.free_local(local);
 }
 
 void PythonCompiler::emit_branch(BranchType branchType, Label label) {
-	m_il.branch(branchType, label);
+    m_il.branch(branchType, label);
 }
 
 void PythonCompiler::emit_compare_equal() {
-	m_il.compare_eq();
+    m_il.compare_eq();
 }
 
 void PythonCompiler::emit_restore_err() {
-	m_il.emit_call(METHOD_PYERR_RESTORE);
+    m_il.emit_call(METHOD_PYERR_RESTORE);
 }
 
 void PythonCompiler::emit_compare_exceptions() {
-	m_il.emit_call(METHOD_COMPARE_EXCEPTIONS);
+    m_il.emit_call(METHOD_COMPARE_EXCEPTIONS);
 }
 
 void PythonCompiler::emit_compare_exceptions_int() {
-	m_il.emit_call(METHOD_COMPARE_EXCEPTIONS_INT);
+    m_il.emit_call(METHOD_COMPARE_EXCEPTIONS_INT);
 }
 
 
 void PythonCompiler::emit_restore_err(Local finallyReason) {
-	m_il.ld_loc(m_tb);
-	m_il.ld_loc(m_ehVal);
-	m_il.ld_loc(finallyReason);
-	m_il.emit_call(METHOD_PYERR_RESTORE);
+    m_il.ld_loc(m_tb);
+    m_il.ld_loc(m_ehVal);
+    m_il.ld_loc(finallyReason);
+    m_il.emit_call(METHOD_PYERR_RESTORE);
 }
 
 void PythonCompiler::emit_pyerr_setstring(PyObject* exception, const char*msg) {
-	emit_ptr(exception);
-	emit_ptr((void*)msg);
-	m_il.emit_call(METHOD_PYERR_SETSTRING);
+    emit_ptr(exception);
+    emit_ptr((void*)msg);
+    m_il.emit_call(METHOD_PYERR_SETSTRING);
 }
 
 void PythonCompiler::emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback) {
-	m_il.ld_loc(prevExc);
-	m_il.ld_loc(prevExcVal);
-	m_il.ld_loc(prevTraceback);
-	m_il.emit_call(METHOD_UNWIND_EH);
+    m_il.ld_loc(prevExc);
+    m_il.ld_loc(prevExcVal);
+    m_il.ld_loc(prevTraceback);
+    m_il.emit_call(METHOD_UNWIND_EH);
 }
 
 void PythonCompiler::emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback, bool includeTbAndValue) {
-	m_il.ld_loca(m_excType);
-	m_il.ld_loca(m_ehVal);
-	m_il.ld_loca(m_tb);
+    m_il.ld_loca(m_excType);
+    m_il.ld_loca(m_ehVal);
+    m_il.ld_loca(m_tb);
 
-	m_il.ld_loca(prevExc);
-	m_il.ld_loca(prevExcVal);
-	m_il.ld_loca(prevTraceback);
+    m_il.ld_loca(prevExc);
+    m_il.ld_loca(prevExcVal);
+    m_il.ld_loca(prevTraceback);
 
-	m_il.emit_call(METHOD_PREPARE_EXCEPTION);
-	// Should be pushing previous values on the stack
-	if (includeTbAndValue) {
-		m_il.ld_loc(m_tb);
-		m_il.ld_loc(m_ehVal);
-	}
-	m_il.ld_loc(m_excType);
+    m_il.emit_call(METHOD_PREPARE_EXCEPTION);
+    // Should be pushing previous values on the stack
+    if (includeTbAndValue) {
+        m_il.ld_loc(m_tb);
+        m_il.ld_loc(m_ehVal);
+    }
+    m_il.ld_loc(m_excType);
 }
 
 void PythonCompiler::emit_int(int value) {
-	m_il.ld_i4(value);
+    m_il.ld_i4(value);
 }
 
 void PythonCompiler::emit_tagged_int(ssize_t value) {
-	m_il.ld_i((size_t)((value << 1) | 0x01));
+    m_il.ld_i((size_t)((value << 1) | 0x01));
 }
 
 void PythonCompiler::emit_float(double value) {
-	m_il.ld_r8(value);
+    m_il.ld_r8(value);
 }
 
 void PythonCompiler::emit_ptr(void* value) {
-	m_il.ld_i(value);
+    m_il.ld_i(value);
 }
 
 void PythonCompiler::emit_bool(bool value) {
-	m_il.ld_i4(value);
+    m_il.ld_i4(value);
 }
 
 void PythonCompiler::emit_py_object(PyObject *value) {
-	m_il.ld_i(value);
-	m_il.dup();
-	incref();
+    m_il.ld_i(value);
+    m_il.dup();
+    incref();
 }
 
 // Emits a call to create a new function, consuming the code object and
 // the qualified name.
 void PythonCompiler::emit_new_function() {
-	load_frame();
-	m_il.emit_call(METHOD_NEWFUNCTION_TOKEN);
+    load_frame();
+    m_il.emit_call(METHOD_NEWFUNCTION_TOKEN);
 }
 
 void PythonCompiler::emit_set_closure() {
-	m_il.emit_call(METHOD_SET_CLOSURE);
+    m_il.emit_call(METHOD_SET_CLOSURE);
 }
 
 void PythonCompiler::emit_set_annotations() {
-	m_il.emit_call(METHOD_PY_FUNC_SET_ANNOTATIONS);
+    m_il.emit_call(METHOD_PY_FUNC_SET_ANNOTATIONS);
 }
 
 void PythonCompiler::emit_set_kw_defaults() {
-	m_il.emit_call(METHOD_PY_FUNC_SET_KW_DEFAULTS);
+    m_il.emit_call(METHOD_PY_FUNC_SET_KW_DEFAULTS);
 }
 
 void PythonCompiler::emit_set_defaults() {
-	m_il.emit_call(METHOD_FUNC_SET_DEFAULTS);
+    m_il.emit_call(METHOD_FUNC_SET_DEFAULTS);
 }
 
 void PythonCompiler::emit_load_deref(int index) {
@@ -833,14 +833,14 @@ void PythonCompiler::emit_load_closure(int index) {
     incref();
 }
 
-void PythonCompiler::emit_set_add()  {
+void PythonCompiler::emit_set_add() {
     // due to FOR_ITER magic we store the
     // iterable off the stack, and oparg here is based upon the stacking
     // of the generator indexes, so we don't need to spill anything...
     m_il.emit_call(METHOD_SET_ADD_TOKEN);
 }
 
-void PythonCompiler::emit_map_add() 
+void PythonCompiler::emit_map_add()
 {
     m_il.emit_call(METHOD_MAP_ADD_TOKEN);
 }
@@ -850,7 +850,7 @@ void PythonCompiler::emit_list_append() {
 }
 
 void PythonCompiler::emit_null() {
-	m_il.load_null();
+    m_il.load_null();
 }
 
 void PythonCompiler::emit_raise_varargs() {
@@ -873,59 +873,59 @@ void PythonCompiler::emit_getiter() {
 }
 
 Label PythonCompiler::emit_define_label() {
-	return m_il.define_label();
+    return m_il.define_label();
 }
 
 void PythonCompiler::emit_check_function_result() {
-	m_il.emit_call(METHOD_PY_CHECKFUNCTIONRESULT);
+    m_il.emit_call(METHOD_PY_CHECKFUNCTIONRESULT);
 }
 
 void PythonCompiler::emit_ret() {
-	m_il.ret();
+    m_il.ret();
 }
 
 void PythonCompiler::emit_mark_label(Label label) {
-	m_il.mark_label(label);
+    m_il.mark_label(label);
 }
 
 void PythonCompiler::emit_box_bool() {
-	m_il.emit_call(METHOD_BOOL_FROM_LONG);
+    m_il.emit_call(METHOD_BOOL_FROM_LONG);
 }
 
 void PythonCompiler::emit_box_float() {
-	m_il.emit_call(METHOD_FLOAT_FROM_DOUBLE);
+    m_il.emit_call(METHOD_FLOAT_FROM_DOUBLE);
 }
 
 void PythonCompiler::emit_box_tagged_ptr() {
-	m_il.emit_call(METHOD_BOX_TAGGED_PTR);
+    m_il.emit_call(METHOD_BOX_TAGGED_PTR);
 }
 
 void PythonCompiler::emit_for_next(Label processValue, Local iterValue) {
-	auto error = m_il.define_local(Parameter(CORINFO_TYPE_INT));
-	m_il.ld_loca(error);
+    auto error = m_il.define_local(Parameter(CORINFO_TYPE_INT));
+    m_il.ld_loca(error);
 
-	/*
-	if (inLoop) {
-	m_il.ld_loca(loopOpt1);
-	m_il.ld_loca(loopOpt2);
-	m_il.emit_call(SIG_ITERNEXT_OPTIMIZED_TOKEN);
-	}
-	else*/
-	{
-		m_il.emit_call(SIG_ITERNEXT_TOKEN);
-	}
-	m_il.dup();
-	m_il.ld_i(nullptr);
-	m_il.branch(BranchNotEqual, processValue);
+    /*
+    if (inLoop) {
+    m_il.ld_loca(loopOpt1);
+    m_il.ld_loca(loopOpt2);
+    m_il.emit_call(SIG_ITERNEXT_OPTIMIZED_TOKEN);
+    }
+    else*/
+    {
+        m_il.emit_call(SIG_ITERNEXT_TOKEN);
+    }
+    m_il.dup();
+    m_il.ld_i(nullptr);
+    m_il.branch(BranchNotEqual, processValue);
 
-	// iteration has ended, or an exception was raised...
-	
-	m_il.pop();
-	m_il.ld_loc(iterValue);
-	decref();
-	m_il.ld_loc(error);
+    // iteration has ended, or an exception was raised...
 
-	m_il.free_local(error);
+    m_il.pop();
+    m_il.ld_loc(iterValue);
+    decref();
+    m_il.ld_loc(error);
+
+    m_il.free_local(error);
 }
 
 /*
@@ -939,8 +939,8 @@ void PythonCompiler::emit_getiter_opt() {
 }*/
 
 void PythonCompiler::emit_debug_msg(const char* msg) {
-	m_il.ld_i((void*)msg);
-	m_il.emit_call(METHOD_DEBUG_TRACE);
+    m_il.ld_i((void*)msg);
+    m_il.emit_call(METHOD_DEBUG_TRACE);
 }
 
 void PythonCompiler::emit_binary_float(int opcode) {
@@ -971,32 +971,32 @@ void PythonCompiler::emit_binary_float(int opcode) {
 }
 
 void PythonCompiler::emit_binary_tagged_int(int opcode) {
-	switch (opcode) {
-		case INPLACE_ADD: 
-		case BINARY_ADD: m_il.emit_call(METHOD_ADD_INT_TOKEN); break;
-		case INPLACE_TRUE_DIVIDE: 
-		case BINARY_TRUE_DIVIDE: m_il.emit_call(METHOD_DIVIDE_INT_TOKEN); break;
-		case INPLACE_FLOOR_DIVIDE: 
-		case BINARY_FLOOR_DIVIDE: m_il.emit_call(METHOD_FLOORDIVIDE_INT_TOKEN); break;
-		case INPLACE_POWER: 
-		case BINARY_POWER: m_il.emit_call(METHOD_POWER_INT_TOKEN); break;
-		case INPLACE_MODULO: 
-		case BINARY_MODULO: m_il.emit_call(METHOD_MODULO_INT_TOKEN); break;
-		case INPLACE_LSHIFT:
-		case BINARY_LSHIFT: m_il.emit_call(METHOD_BINARY_LSHIFT_INT_TOKEN); break;
-		case INPLACE_RSHIFT:
-		case BINARY_RSHIFT: m_il.emit_call(METHOD_BINARY_RSHIFT_INT_TOKEN); break;
-		case INPLACE_AND:
-		case BINARY_AND: m_il.emit_call(METHOD_BINARY_AND_INT_TOKEN); break;
-		case INPLACE_XOR:
-		case BINARY_XOR: m_il.emit_call(METHOD_BINARY_XOR_INT_TOKEN); break;
-		case INPLACE_OR: 
-		case BINARY_OR: m_il.emit_call(METHOD_BINARY_OR_INT_TOKEN); break;
-		case INPLACE_MULTIPLY: 
-		case BINARY_MULTIPLY: m_il.emit_call(METHOD_MULTIPLY_INT_TOKEN); break;
-		case INPLACE_SUBTRACT:
-		case BINARY_SUBTRACT: m_il.emit_call(METHOD_SUBTRACT_INT_TOKEN); break;
-	}
+    switch (opcode) {
+        case INPLACE_ADD:
+        case BINARY_ADD: m_il.emit_call(METHOD_ADD_INT_TOKEN); break;
+        case INPLACE_TRUE_DIVIDE:
+        case BINARY_TRUE_DIVIDE: m_il.emit_call(METHOD_DIVIDE_INT_TOKEN); break;
+        case INPLACE_FLOOR_DIVIDE:
+        case BINARY_FLOOR_DIVIDE: m_il.emit_call(METHOD_FLOORDIVIDE_INT_TOKEN); break;
+        case INPLACE_POWER:
+        case BINARY_POWER: m_il.emit_call(METHOD_POWER_INT_TOKEN); break;
+        case INPLACE_MODULO:
+        case BINARY_MODULO: m_il.emit_call(METHOD_MODULO_INT_TOKEN); break;
+        case INPLACE_LSHIFT:
+        case BINARY_LSHIFT: m_il.emit_call(METHOD_BINARY_LSHIFT_INT_TOKEN); break;
+        case INPLACE_RSHIFT:
+        case BINARY_RSHIFT: m_il.emit_call(METHOD_BINARY_RSHIFT_INT_TOKEN); break;
+        case INPLACE_AND:
+        case BINARY_AND: m_il.emit_call(METHOD_BINARY_AND_INT_TOKEN); break;
+        case INPLACE_XOR:
+        case BINARY_XOR: m_il.emit_call(METHOD_BINARY_XOR_INT_TOKEN); break;
+        case INPLACE_OR:
+        case BINARY_OR: m_il.emit_call(METHOD_BINARY_OR_INT_TOKEN); break;
+        case INPLACE_MULTIPLY:
+        case BINARY_MULTIPLY: m_il.emit_call(METHOD_MULTIPLY_INT_TOKEN); break;
+        case INPLACE_SUBTRACT:
+        case BINARY_SUBTRACT: m_il.emit_call(METHOD_SUBTRACT_INT_TOKEN); break;
+    }
 }
 
 void PythonCompiler::emit_binary_object(int opcode) {
@@ -1072,14 +1072,14 @@ void PythonCompiler::emit_compare_float(int compareType) {
 }
 
 void PythonCompiler::emit_compare_tagged_int(int compareType) {
-	switch (compareType) {
-		case Py_EQ:  m_il.emit_call(METHOD_EQUALS_INT_TOKEN); break;
-		case Py_LT: m_il.emit_call(METHOD_LESS_THAN_INT_TOKEN); break;
-		case Py_LE: m_il.emit_call(METHOD_LESS_THAN_EQUALS_INT_TOKEN); break;
-		case Py_NE: m_il.emit_call(METHOD_NOT_EQUALS_INT_TOKEN); break;
-		case Py_GT: m_il.emit_call(METHOD_GREATER_THAN_INT_TOKEN); break;
-		case Py_GE: m_il.emit_call(METHOD_GREATER_THAN_EQUALS_INT_TOKEN); break;
-	}
+    switch (compareType) {
+        case Py_EQ:  m_il.emit_call(METHOD_EQUALS_INT_TOKEN); break;
+        case Py_LT: m_il.emit_call(METHOD_LESS_THAN_INT_TOKEN); break;
+        case Py_LE: m_il.emit_call(METHOD_LESS_THAN_EQUALS_INT_TOKEN); break;
+        case Py_NE: m_il.emit_call(METHOD_NOT_EQUALS_INT_TOKEN); break;
+        case Py_GT: m_il.emit_call(METHOD_GREATER_THAN_INT_TOKEN); break;
+        case Py_GE: m_il.emit_call(METHOD_GREATER_THAN_EQUALS_INT_TOKEN); break;
+    }
 }
 
 void PythonCompiler::emit_compare_object(int compareType) {
@@ -1103,19 +1103,19 @@ bool PythonCompiler::emit_compare_object_push_int(int compareType) {
 }
 
 JittedCode* PythonCompiler::emit_compile() {
-	CorJitInfo* jitInfo = new CorJitInfo(g_execEngine, m_code, m_module);
-	auto addr = m_il.compile(jitInfo, g_jit, m_code->co_stacksize + 100).m_addr;
-	if (addr == nullptr) {
-		printf("Compiling failed %s from %s line %d\r\n",
-			PyUnicode_AsUTF8(m_code->co_name),
-			PyUnicode_AsUTF8(m_code->co_filename),
-			m_code->co_firstlineno
-			);
-		delete jitInfo;
-		return nullptr;
-	}
+    CorJitInfo* jitInfo = new CorJitInfo(g_execEngine, m_code, m_module);
+    auto addr = m_il.compile(jitInfo, g_jit, m_code->co_stacksize + 100).m_addr;
+    if (addr == nullptr) {
+        printf("Compiling failed %s from %s line %d\r\n",
+            PyUnicode_AsUTF8(m_code->co_name),
+            PyUnicode_AsUTF8(m_code->co_filename),
+            m_code->co_firstlineno
+            );
+        delete jitInfo;
+        return nullptr;
+    }
 
-	return jitInfo;
+    return jitInfo;
 
 }
 

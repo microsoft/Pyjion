@@ -44,7 +44,7 @@ typedef ssize_t tagged_ptr;
 #define MIN_TAGGED_VALUE (- ((tagged_ptr)1 << (MAX_BITS-1)))
 
 inline bool can_tag(tagged_ptr value) {
-	return value >= MIN_TAGGED_VALUE && value <= MAX_TAGGED_VALUE;
+    return value >= MIN_TAGGED_VALUE && value <= MAX_TAGGED_VALUE;
 }
 
 #define TAG_IT(x) ((PyObject*) (((x) << 1) | 0x01))
