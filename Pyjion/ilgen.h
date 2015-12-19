@@ -202,7 +202,7 @@ public:
         push_back(CEE_LDIND_I4);
     }
 
-	void branch(BranchType branchType, Label label) {
+    void branch(BranchType branchType, Label label) {
         auto info = &m_labels[label.m_index];
         if (info->m_location == -1) {
             info->m_branchOffsets.push_back((int)m_il.size() + 1);
@@ -262,19 +262,19 @@ public:
         }
     }
 
-	void neg() {
-		m_il.push_back(CEE_NEG);
-	}
+    void neg() {
+        m_il.push_back(CEE_NEG);
+    }
 
     void dup() {
         m_il.push_back(CEE_DUP);
     }
 
-	void bitwise_and() {
-		m_il.push_back(CEE_AND);
-	}
-	
-	void pop() {
+    void bitwise_and() {
+        m_il.push_back(CEE_AND);
+    }
+
+    void pop() {
         m_il.push_back(CEE_POP);
     }
 
@@ -327,17 +327,17 @@ public:
         compare_eq();
     }
 
-	void ld_i(int i) {
-		m_il.push_back(CEE_LDC_I4);
-		emit_int(i);
-		m_il.push_back(CEE_CONV_I);
-	}
+    void ld_i(int i) {
+        m_il.push_back(CEE_LDC_I4);
+        emit_int(i);
+        m_il.push_back(CEE_CONV_I);
+    }
 
-	void ld_i(size_t i) {
-		ld_i((void*)i);
-	}
+    void ld_i(size_t i) {
+        ld_i((void*)i);
+    }
 
-	void ld_i(void* ptr) {
+    void ld_i(void* ptr) {
         size_t value = (size_t)ptr;
 #ifdef _TARGET_AMD64_
         if ((value & 0xFFFFFFFF) == value) {
@@ -476,9 +476,9 @@ public:
             &nativeEntry,
             &nativeSizeOfCode
             );
-		if (result == CORJIT_OK) {
-	        res.m_addr = nativeEntry;
-		}
+        if (result == CORJIT_OK) {
+            res.m_addr = nativeEntry;
+        }
         return res;
     }
 

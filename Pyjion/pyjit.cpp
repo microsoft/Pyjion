@@ -43,7 +43,7 @@ extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
 #endif
 
     PythonCompiler jitter(code);
-	AbstractInterpreter interp(code, &jitter);
+    AbstractInterpreter interp(code, &jitter);
     auto res = interp.compile();
 
     if (res == nullptr) {

@@ -227,45 +227,45 @@ public:
                 break;
 #ifdef _TARGET_AMD64_
             case IMAGE_REL_BASED_REL32:
-                {
-                    target = (BYTE *)target + addlDelta;
+            {
+                target = (BYTE *)target + addlDelta;
 
-                    INT32 * fixupLocation = (INT32 *)((BYTE *)location + slotNum);
-                    BYTE * baseAddr = (BYTE *)fixupLocation + sizeof(INT32);
+                INT32 * fixupLocation = (INT32 *)((BYTE *)location + slotNum);
+                BYTE * baseAddr = (BYTE *)fixupLocation + sizeof(INT32);
 
-                    INT64 delta = (INT64)((BYTE *)target - baseAddr);
+                INT64 delta = (INT64)((BYTE *)target - baseAddr);
 
-                    //
-                    // Do we need to insert a jump stub to make the source reach the target?
-                    //
-                    // Note that we cannot stress insertion of jump stub by inserting it unconditionally. JIT records the relocations 
-                    // for intra-module jumps and calls. It does not expect the register used by the jump stub to be trashed.
-                    //
-                    //if (!FitsInI4(delta))
-                    //{
-                    //	if (m_fAllowRel32)
-                    //	{
-                    //		//
-                    //		// When m_fAllowRel32 == TRUE, the JIT will use REL32s for both data addresses and direct code targets.
-                    //		// Since we cannot tell what the relocation is for, we have to defensively retry.
-                    //		//
-                    //		m_fRel32Overflow = TRUE;
-                    //		delta = 0;
-                    //	}
-                    //	else
-                    //	{
-                    //		//
-                    //		// When m_fAllowRel32 == FALSE, the JIT will use a REL32s for direct code targets only.
-                    //		// Use jump stub.
-                    //		// 
-                    //		delta = rel32UsingJumpStub(fixupLocation, (PCODE)target, m_pMethodBeingCompiled);
-                    //	}
-                    //}
+                //
+                // Do we need to insert a jump stub to make the source reach the target?
+                //
+                // Note that we cannot stress insertion of jump stub by inserting it unconditionally. JIT records the relocations 
+                // for intra-module jumps and calls. It does not expect the register used by the jump stub to be trashed.
+                //
+                //if (!FitsInI4(delta))
+                //{
+                //	if (m_fAllowRel32)
+                //	{
+                //		//
+                //		// When m_fAllowRel32 == TRUE, the JIT will use REL32s for both data addresses and direct code targets.
+                //		// Since we cannot tell what the relocation is for, we have to defensively retry.
+                //		//
+                //		m_fRel32Overflow = TRUE;
+                //		delta = 0;
+                //	}
+                //	else
+                //	{
+                //		//
+                //		// When m_fAllowRel32 == FALSE, the JIT will use a REL32s for direct code targets only.
+                //		// Use jump stub.
+                //		// 
+                //		delta = rel32UsingJumpStub(fixupLocation, (PCODE)target, m_pMethodBeingCompiled);
+                //	}
+                //}
 
-                    // Write the 32-bits pc-relative delta into location
-                    *fixupLocation = (INT32)delta;
-                }
-                break;
+                // Write the 32-bits pc-relative delta into location
+                *fixupLocation = (INT32)delta;
+            }
+            break;
 #endif // _TARGET_AMD64_
 
             default:
