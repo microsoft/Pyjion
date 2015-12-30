@@ -2541,23 +2541,29 @@ void AbstractInterpreter::unary_negative(int opcodeIndex) {
     auto stackInfo = get_stack_info(opcodeIndex);
     auto one = stackInfo[stackInfo.size() - 1];
 
-    switch (one.Value->kind()) {
-        case AVK_Float:
-            dec_stack();
-            m_comp->emit_unary_negative_float();
-            inc_stack(1, STACK_KIND_VALUE);
-            break;
-        case AVK_Integer:
-            dec_stack();
-            m_comp->emit_unary_negative_tagged_int();
-            inc_stack();
-            break;
-        default:
-            dec_stack();
-            m_comp->emit_unary_negative();
-            error_check("unary negative failed");
-            inc_stack();
-            break;
+    bool handled = false;
+    if (!one.needs_boxing()) {
+        switch (one.Value->kind()) {
+            case AVK_Float:
+                handled = true;
+                dec_stack();
+                m_comp->emit_unary_negative_float();
+                inc_stack(1, STACK_KIND_VALUE);
+                break;
+            case AVK_Integer:
+                handled = true;
+                dec_stack();
+                m_comp->emit_unary_negative_tagged_int();
+                inc_stack();
+                break;
+        }
+    }
+
+    if (!handled) {
+        dec_stack();
+        m_comp->emit_unary_negative();
+        error_check("unary negative failed");
+        inc_stack();
     }
 }
 
