@@ -213,6 +213,15 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
+        // Too many items to unpack from list/tuple shouldn't crash
+        TestCase(
+            "def f():\n    x = [1,2,3]\n    a, b = x",
+            TestInput("<NULL>")
+            ),
+        TestCase(
+            "def f():\n    x = (1,2,3)\n    a, b = x",
+            TestInput("<NULL>")
+            ),
         // failure to unpack shouldn't crash, should raise Python exception
         TestCase(
             "def f():\n    x = [1]\n    a, b, *c = x",
