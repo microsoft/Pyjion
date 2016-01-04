@@ -1450,6 +1450,10 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
         // the function allocated space on the stack for us to
         // store these temporarily.
         auto it = PyObject_GetIter(seq);
+        if (it == nullptr) {
+            goto Error;
+        }
+
         auto sp = tempStorage + leftSize + rightSize;
         int i = 0;
         for (; i < leftSize; i++) {
@@ -1510,11 +1514,10 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
 
     Error:
         for (int i = 0; i < leftSize; i++) {
-            Py_DECREF(tempStorage[i]);
+            Py_XDECREF(tempStorage[i]);
         }
         Py_XDECREF(it);
         return nullptr;
-
     }
 }
 

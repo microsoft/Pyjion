@@ -213,6 +213,16 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
+        // failure to unpack shouldn't crash, should raise Python exception
+        TestCase(
+            "def f():\n    x = [1]\n    a, b, *c = x",
+            TestInput("<NULL>")
+            ),
+        // unpacking non-iterable shouldn't crash
+        TestCase(
+            "def f():\n    a, b, c = len",
+            TestInput("<NULL>")
+        ),
         TestCase(
             "def x():\n     try:\n         b\n     except:\n         c\n\ndef f():\n    try:\n        x()\n    except:\n        pass\n    return sys.exc_info()[0]\n\n",
             TestInput("None")
