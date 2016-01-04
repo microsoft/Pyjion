@@ -581,12 +581,15 @@ void PyJit_PrepareException(PyObject** exc, PyObject**val, PyObject** tb, PyObje
 void PyJit_UnwindEh(PyObject*exc, PyObject*val, PyObject*tb) {
     auto tstate = PyThreadState_GET();
     assert(val == nullptr || PyExceptionInstance_Check(val));
-    Py_XDECREF(tstate->exc_traceback);
-    Py_XDECREF(tstate->exc_type);
-    Py_XDECREF(tstate->exc_value);
+    auto oldtb = tstate->exc_traceback;
+    auto oldtype = tstate->exc_type;
+    auto oldvalue = tstate->exc_value;
     tstate->exc_traceback = tb;
     tstate->exc_type = exc;
     tstate->exc_value = val;
+    Py_XDECREF(oldtb);
+    Py_XDECREF(oldtype);
+    Py_XDECREF(oldvalue);
 }
 
 #define CANNOT_CATCH_MSG "catching classes that do not inherit from "\
