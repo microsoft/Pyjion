@@ -1602,12 +1602,13 @@ JittedCode* AbstractInterpreter::compile_worker() {
     Label ok;
 
     auto raiseNoHandlerLabel = m_comp->emit_define_label();
+    auto reraiseNoHandlerLabel = m_comp->emit_define_label();
     Label raiseFromTopLevelHandler = Label();
 
     m_comp->emit_lasti_init();
     m_comp->emit_push_frame();
 
-    m_blockStack.push_back(BlockInfo(vector<bool>(), m_blockIds++, raiseNoHandlerLabel, raiseNoHandlerLabel, Label(), -1, NOP));
+    m_blockStack.push_back(BlockInfo(vector<bool>(), m_blockIds++, raiseNoHandlerLabel, reraiseNoHandlerLabel, Label(), -1, NOP));
 
     for (int curByte = 0; curByte < m_size; curByte++) {
         auto opcodeIndex = curByte;
@@ -2350,22 +2351,40 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
             if (handler.Kind == POP_EXCEPT) {
                 // We're in an except handler and we're raising a new exception.  First we need
-                // to unwind the current exception.
+                // to unwind the current exception.  If we're doing a raise we need to update the
+                // traceback with our line/frame information.  If we're doing a re-raise we need
+                // to skip that.
                 auto prepare = m_comp->emit_define_label();
 
                 m_comp->emit_mark_label(handler.Raise);
-
                 m_comp->emit_unwind_eh(handler.ExVars.PrevExc, handler.ExVars.PrevExcVal, handler.ExVars.PrevTraceback);
-                m_comp->emit_eh_trace();
+                m_comp->emit_eh_trace();     // update the traceback
 
-                m_comp->emit_branch(BranchAlways, prepare);
+                if (handler.Raise.m_index == raiseFromTopLevelHandler.m_index) {
+                    // We're in an except handler raising an exception with no outer exception
+                    // handlers.  We'll return NULL from the function indicating an error has
+                    // occurred
+                    m_comp->emit_branch(BranchAlways, raiseNoHandlerLabel);
+                }
+                else {
+                    m_comp->emit_branch(BranchAlways, prepare);
+                }
 
                 m_comp->emit_mark_label(handler.ReRaise);
-
                 m_comp->emit_unwind_eh(handler.ExVars.PrevExc, handler.ExVars.PrevExcVal, handler.ExVars.PrevTraceback);
                 m_comp->emit_mark_label(prepare);
+                if (handler.Raise.m_index == raiseFromTopLevelHandler.m_index) {
+                    // We're in an except handler re-raising an exception with no outer exception
+                    // handlers.  We'll return NULL from the function indicating an error has
+                    // occurred
+                    m_comp->emit_branch(BranchAlways, reraiseNoHandlerLabel);
+                }
             }
             else {
+                // We're not in a nested exception handler, we just need to emit our
+                // line tracing information if we're doing a raise, and skip it if
+                // we're a re-raise.  Then we prepare the exception and branch to 
+                // whatever opcode will handle the exception.
                 m_comp->emit_mark_label(handler.Raise);
 
                 m_comp->emit_eh_trace();
@@ -2373,15 +2392,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_mark_label(handler.ReRaise);
             }
 
-            if (handler.Raise.m_index == raiseFromTopLevelHandler.m_index) {
-                // We're in an except handler raising an exception with no outer exception
-                // handlers.  We'll return NULL from the function indicating an error has
-                // occurred
-                _ASSERTE(handler.Kind == POP_EXCEPT);
-
-                m_comp->emit_branch(BranchAlways, raiseNoHandlerLabel);
-            }
-            else {
+            if (handler.Raise.m_index != raiseFromTopLevelHandler.m_index) {
                 m_comp->emit_prepare_exception(
                     handler.ExVars.PrevExc,
                     handler.ExVars.PrevExcVal,
@@ -2399,7 +2410,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
         m_comp->emit_mark_label(*curLabel);
         m_comp->emit_pop_top();
     }
+
     m_comp->emit_mark_label(raiseNoHandlerLabel);
+    m_comp->emit_eh_trace();
+    m_comp->emit_mark_label(reraiseNoHandlerLabel);
 
     m_comp->emit_null();
     auto finalRet = m_comp->emit_define_label();
