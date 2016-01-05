@@ -213,6 +213,29 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
+        // partial should be boxed because it's consumed by print after being assigned in the break loop
+        TestCase(
+            "def f():\n    partial = 0\n    while 1:\n        partial = 1\n        break\n    if not partial:\n        print(partial)\n        return True\n    return False\n",
+            TestInput("False")
+            ),
+
+        // UNARY_NOT/POP_JUMP_IF_FALSE with optimized value on stack should be compiled correctly w/o crashing
+        TestCase(
+            "def f():\n    abc = 1.0\n    i = 0\n    n = 0\n    if i == n and not abc:\n        return 42\n    return 23",
+            TestInput("23")
+        ),
+        TestCase(
+            "def f():\n    abc = 1\n    i = 0\n    n = 0\n    if i == n and not abc:\n        return 42\n    return 23",
+            TestInput("23")
+            ),
+        TestCase(
+            "def f():\n    abc = 0.0\n    i = 0\n    n = 0\n    if i == n and not abc:\n        return 42\n    return 23",
+            TestInput("42")
+            ),
+        TestCase(
+            "def f():\n    abc = 0\n    i = 0\n    n = 0\n    if i == n and not abc:\n        return 42\n    return 23",
+            TestInput("42")
+            ),
         // Too many items to unpack from list/tuple shouldn't crash
         TestCase(
             "def f():\n    x = [1,2,3]\n    a, b = x",

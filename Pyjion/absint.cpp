@@ -163,6 +163,7 @@ bool AbstractInterpreter::interpret() {
     }
 
     init_starting_state();
+
     //dump();
 
     // walk all the blocks in the code one by one, analyzing them, and enqueing any
@@ -732,8 +733,11 @@ bool AbstractInterpreter::interpret() {
                     // BREAK_LOOP does an unwind block, which restores the
                     // stack state to what it was when we entered the loop.  So
                     // we get the start state for where the SETUP_LOOP happened
-                    // here and propagate it to where we're breaking to.
-                    if (update_start_state(m_startStates[breakTo.BlockStart], breakTo.BlockEnd)) {
+                    // here and propagate it to where we're breaking to.  But we
+                    // need to preserve our local state as that isn't restored.
+                    InterpreterState startState = m_startStates[breakTo.BlockStart];
+                    startState.m_locals = lastState.m_locals;
+                    if (update_start_state(startState, breakTo.BlockEnd)) {
                         queue.push_back(breakTo.BlockEnd);
                     }
 
@@ -983,15 +987,21 @@ void AbstractInterpreter::dump() {
                     break;
                 case LOAD_CONST:
                 {
+                    auto store = m_opcodeSources.find(byteIndex);
+                    AbstractSource* source = nullptr;
+                    if (store != m_opcodeSources.end()) {
+                        source = store->second;
+                    }
                     auto repr = PyObject_Repr(PyTuple_GetItem(m_code->co_consts, oparg));
                     auto reprStr = PyUnicode_AsUTF8(repr);
                     printf(
-                        "    %-3Id %-22s %d (%s) [%s]\r\n",
+                        "    %-3Id %-22s %d (%s) [%s] (src=%p)\r\n",
                         byteIndex,
                         opcode_name(opcode),
                         oparg,
                         reprStr,
-                        should_box(byteIndex) ? "BOXED" : "NON-BOXED"
+                        should_box(byteIndex) ? "BOXED" : "NON-BOXED",
+                        source
                         );
                     Py_DECREF(repr);
                     break;
@@ -2587,7 +2597,6 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
 
     if (m_byteCode[opcodeIndex + 1] == POP_JUMP_IF_TRUE || m_byteCode[opcodeIndex + 1] == POP_JUMP_IF_FALSE) {
         // optimizing away the unnecessary boxing and True/False comparisons
-        dec_stack();
         switch (one.Value->kind()) {
             case AVK_Float:
                 m_comp->emit_unary_not_float_push_bool();
@@ -2598,6 +2607,7 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
                 branch(opcodeIndex);
                 break;
             default:
+                dec_stack();
                 m_comp->emit_unary_not_push_int();
                 branch_or_error(opcodeIndex);
                 break;
