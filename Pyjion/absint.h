@@ -216,7 +216,6 @@ public:
     bool has_info(size_t byteCodeIndex);
 
 private:
-
     AbstractValue* to_abstract(PyObject* obj);
     bool merge_states(InterpreterState& newState, int index);
     bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
@@ -256,6 +255,7 @@ private:
     vector<Label>& getRaiseAndFreeLabels(size_t blockId);
 
     void branch_raise(char* reason = nullptr);
+    void raise_on_negative_one();
 
     void clean_stack_for_reraise();
 

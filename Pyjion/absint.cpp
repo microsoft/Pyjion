@@ -1576,6 +1576,16 @@ void AbstractInterpreter::branch_or_error(int& curByte) {
     mark_offset_label(curByte);
     auto oparg = NEXTARG();
 
+    raise_on_negative_one();
+
+    m_comp->emit_branch(jmpType == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, getOffsetLabel(oparg));
+    m_offsetStack[oparg] = m_stack;
+}
+
+// Checks to see if -1 is the current value on the stack, and if so, falls into
+// the logic for raising an exception.  If not execution continues forward progress.
+// Used for checking if an API reports an error (typically true/false/-1)
+void AbstractInterpreter::raise_on_negative_one() {
     m_comp->emit_dup();
     m_comp->emit_int(-1);
 
@@ -1587,9 +1597,6 @@ void AbstractInterpreter::branch_or_error(int& curByte) {
     m_comp->emit_pop();
     branch_raise();
     m_comp->emit_mark_label(noErr);
-
-    m_comp->emit_branch(jmpType == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, getOffsetLabel(oparg));
-    m_offsetStack[oparg] = m_stack;
 }
 
 // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
@@ -2450,6 +2457,8 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
     auto one = stackInfo[stackInfo.size() - 1];
 
     auto target = getOffsetLabel(jumpTo);
+    m_offsetStack[jumpTo] = m_stack;
+    dec_stack();
     switch (one.Value->kind()) {
         case AVK_Float:
             m_comp->emit_dup();
@@ -2476,6 +2485,8 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
             m_comp->emit_load_local(tmp);
             m_comp->emit_is_true();
 
+            raise_on_negative_one();
+
             m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
 
             // Jumping, load the value back and jump
@@ -2491,9 +2502,6 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
             m_comp->emit_free_local(tmp);
             break;
     }
-
-    m_offsetStack[jumpTo] = m_stack;
-    dec_stack();
 }
 
 void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) {
@@ -2526,6 +2534,9 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
             // Use PyObject_IsTrue
             m_comp->emit_dup();
             m_comp->emit_is_true();
+
+            raise_on_negative_one();
+
             m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
 
             // Branching, pop the value and branch
