@@ -164,8 +164,6 @@ bool AbstractInterpreter::interpret() {
 
     init_starting_state();
 
-    //dump();
-
     // walk all the blocks in the code one by one, analyzing them, and enqueing any
     // new blocks that we encounter from branches.
     deque<size_t> queue;
@@ -735,7 +733,7 @@ bool AbstractInterpreter::interpret() {
                     // we get the start state for where the SETUP_LOOP happened
                     // here and propagate it to where we're breaking to.  But we
                     // need to preserve our local state as that isn't restored.
-                    InterpreterState startState = m_startStates[breakTo.BlockStart];
+                    auto startState = m_startStates[breakTo.BlockStart];
                     startState.m_locals = lastState.m_locals;
                     if (update_start_state(startState, breakTo.BlockEnd)) {
                         queue.push_back(breakTo.BlockEnd);
@@ -2477,6 +2475,7 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
             // Use PyObject_IsTrue
             m_comp->emit_load_local(tmp);
             m_comp->emit_is_true();
+
             m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
 
             // Jumping, load the value back and jump
