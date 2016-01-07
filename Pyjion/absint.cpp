@@ -56,6 +56,11 @@ AbstractInterpreter::~AbstractInterpreter() {
 #define NEXTARG() *(unsigned short*)&m_byteCode[curByte + 1]; curByte+= 2
 
 bool AbstractInterpreter::preprocess() {
+    if (m_code->co_flags & (CO_COROUTINE | CO_GENERATOR)) {
+        // Don't compile co-routines or generators.  We can't rely on
+        // detecting yields because they could be optimized out.
+        return false;
+    }
     for (int i = 0; i < m_code->co_argcount; i++) {
         // all parameters are initially definitely assigned
         m_assignmentState[i] = true;
