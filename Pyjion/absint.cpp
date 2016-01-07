@@ -2253,7 +2253,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                 auto ehInfo = m_ehInfo.back();
                 m_ehInfo.pop_back();
-                auto exVars = m_blockStack.back().ExVars;
+                auto curBlock = m_blockStack.back();
+                auto exVars = curBlock.ExVars;
                 m_blockStack.pop_back();
 
                 if (ehInfo.IsFinally) {
@@ -2295,7 +2296,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                             if (cur->Kind == SETUP_LOOP) {
                                 m_comp->emit_load_local(finallyReason);
                                 m_comp->emit_int(EHF_BlockContinues);
-                                m_comp->emit_branch(BranchEqual, getOffsetLabel(cur->ContinueOffset));
+                                m_comp->emit_branch(BranchEqual, getOffsetLabel(curBlock.ContinueOffset));
                                 break;
                             }
                             else if ((*cur).Kind == SETUP_FINALLY) {
