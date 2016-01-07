@@ -107,6 +107,7 @@ struct BlockInfo {
     EhFlags Flags;
     size_t BlockId;
     ExceptionVars ExVars;
+    ExceptionVars PrevExVars;
     Local LoopVar; //, LoopOpt1, LoopOpt2;
     vector<bool> Stack;
 
@@ -178,7 +179,14 @@ class __declspec(dllexport) AbstractInterpreter {
     // Tracks the state of the stack when we perform a branch.  We copy the existing state to the map and
     // reload it when we begin processing at the stack.
     unordered_map<int, vector<bool>> m_offsetStack;
-    vector<vector<Label>> m_raiseAndFree;
+    // Set of labels used for when we need to raise an error but have values on the stack
+    // that need to be freed.  We have one set of labels which fall through to each other
+    // before doing the raise:
+    //      free2: <decref>/<pop>
+    //      free1: <decref>/<pop>
+    //      raise logic.
+    //  This was we don't need to have decref/frees spread all over the code
+    vector<vector<Label>> m_raiseAndFree, m_reraiseAndFree;
     Label m_retLabel;
     Local m_retValue;
     // Stores information for a stack allocated local used for sequence unpacking.  We need to allocate
@@ -252,9 +260,14 @@ private:
     void error_check(char* reason = nullptr);
     void int_error_check(char* reason = nullptr);
 
-    vector<Label>& getRaiseAndFreeLabels(size_t blockId);
+    vector<Label>& get_raise_and_free_labels(size_t blockId);
+    vector<Label>& get_reraise_and_free_labels(size_t blockId);
+    void ensure_labels(vector<Label>& labels, size_t count);
 
     void branch_raise(char* reason = nullptr);
+    size_t clear_value_stack();
+    void free_for_raise(size_t blockId);
+    void trace_eh_on_raise();
     void raise_on_negative_one();
 
     void clean_stack_for_reraise();

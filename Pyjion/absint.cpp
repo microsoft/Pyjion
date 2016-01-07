@@ -1288,7 +1288,7 @@ Label AbstractInterpreter::getOffsetLabel(int jumpTo) {
     return jumpToLabel;
 }
 
-vector<Label>& AbstractInterpreter::getRaiseAndFreeLabels(size_t blockId) {
+vector<Label>& AbstractInterpreter::get_raise_and_free_labels(size_t blockId) {
     while (m_raiseAndFree.size() <= blockId) {
         m_raiseAndFree.emplace_back();
     }
@@ -1296,15 +1296,18 @@ vector<Label>& AbstractInterpreter::getRaiseAndFreeLabels(size_t blockId) {
     return m_raiseAndFree.data()[blockId];
 }
 
-void AbstractInterpreter::branch_raise(char *reason) {
+vector<Label>& AbstractInterpreter::get_reraise_and_free_labels(size_t blockId) {
+    while (m_reraiseAndFree.size() <= blockId) {
+        m_reraiseAndFree.emplace_back();
+    }
+
+    return m_reraiseAndFree.data()[blockId];
+}
+
+size_t AbstractInterpreter::clear_value_stack() {
     auto ehBlock = get_ehblock();
 
     auto& entry_stack = ehBlock.Stack;
-#if DEBUG_TRACE
-    if (reason != nullptr) {
-        m_comp->emit_debug_msg(reason);
-    }
-#endif
 
     // clear any non-object values from the stack up
     // to the stack that owned the block when we entered.
@@ -1319,8 +1322,29 @@ void AbstractInterpreter::branch_raise(char *reason) {
             break;
         }
     }
+    return count;
+}
+
+void AbstractInterpreter::ensure_labels(vector<Label>& labels, size_t count) {
+    for (auto i = labels.size(); i < count; i++) {
+        labels.push_back(m_comp->emit_define_label());
+    }
+}
+
+void AbstractInterpreter::branch_raise(char *reason) {
+    auto ehBlock = get_ehblock();
+
+    auto& entry_stack = ehBlock.Stack;
+#if DEBUG_TRACE
+    if (reason != nullptr) {
+        m_comp->emit_debug_msg(reason);
+    }
+#endif
+
+    auto count = clear_value_stack();
 
     if (count == 0) {
+        // No values on the stack, we can just branch directly to the raise label
         m_comp->emit_branch(BranchAlways, ehBlock.Raise);
     }
     else {
@@ -1330,15 +1354,13 @@ void AbstractInterpreter::branch_raise(char *reason) {
             _ASSERTE(value != STACK_KIND_VALUE);
         }
 
-        auto& labels = getRaiseAndFreeLabels(ehBlock.BlockId);
+        auto& labels = get_raise_and_free_labels(ehBlock.BlockId);
 
-        for (auto i = labels.size(); i < count; i++) {
-            labels.push_back(m_comp->emit_define_label());
-        }
+        ensure_labels(labels, count);
 
         m_comp->emit_branch(BranchAlways, labels[count - 1]);
     }
-    }
+}
 
 void AbstractInterpreter::clean_stack_for_reraise() {
     auto ehBlock = get_ehblock();
@@ -1618,7 +1640,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
     auto raiseNoHandlerLabel = m_comp->emit_define_label();
     auto reraiseNoHandlerLabel = m_comp->emit_define_label();
-    Label raiseFromTopLevelHandler = Label();
 
     m_comp->emit_lasti_init();
     m_comp->emit_push_frame();
@@ -2077,14 +2098,45 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         // returns 1 if we're doing a re-raise in which case we don't need
                         // to update the traceback.  Otherwise returns 0.
                         auto curHandler = get_ehblock();
+                        auto stackDepth = m_stack.size() - curHandler.Stack.size();
                         if (oparg == 0) {
-                            m_comp->emit_branch(BranchFalse, curHandler.Raise);
-                            m_comp->emit_branch(BranchAlways, curHandler.ReRaise);
+                            bool noStack = true;
+                            if (stackDepth != 0) {
+                                // This is pretty rare, you need to do a re-raise with something
+                                // already on the stack.  One way to get to it is doing a bare raise
+                                // inside of finally block.  We spill the result of the raise into a
+                                // temporary, then we clear up any values on the stack, and we generate
+                                // a set of labels for freeing objects on the stack for the re-raise.
+                                auto raiseTmp = m_comp->emit_define_local(LK_Bool);
+                                m_comp->emit_store_local(raiseTmp);
+                                auto count = clear_value_stack();
+
+                                auto& raiseLabels = get_raise_and_free_labels(curHandler.BlockId);
+                                auto& reraiseLabels = get_reraise_and_free_labels(curHandler.BlockId);
+
+                                m_comp->emit_load_and_free_local(raiseTmp);
+                                if (count != 0) {
+                                    ensure_labels(raiseLabels, count);
+                                    ensure_labels(reraiseLabels, count);
+
+                                    m_comp->emit_branch(BranchFalse, raiseLabels[count - 1]);
+                                    m_comp->emit_branch(BranchAlways, reraiseLabels[count - 1]);
+                                    noStack = false;
+                                }
+                            }
+
+                            if (noStack) {
+                                // The stack actually ended up being empty - either because we didn't
+                                // have any values, or the values were all non-objects that we could
+                                // spill eagerly.
+                                m_comp->emit_branch(BranchFalse, curHandler.Raise);
+                                m_comp->emit_branch(BranchAlways, curHandler.ReRaise);
+                            }
                         }
                         else {
                             // if we have args we'll always return 0...
                             m_comp->emit_pop();
-                            m_comp->emit_branch(BranchAlways, curHandler.Raise);
+                            branch_raise();
                         }
                         break;
                 }
@@ -2149,18 +2201,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                     if (curHandler.Kind == SETUP_EXCEPT) {
                         // Popping an except, we need to unwind the current exception
-                        if (back.ErrorTarget.m_index == -1) {
-                            // We unwind the exception to a return from the method, not to another handler
-                            if (raiseFromTopLevelHandler.m_index == -1) {
-                                raiseFromTopLevelHandler = m_comp->emit_define_label();
-                            }
-                            raiseLabel = reraiseLabel = raiseFromTopLevelHandler;
-                        }
-                        else {
-                            // We unwind the exception to another handler
-                            raiseLabel = m_comp->emit_define_label();
-                            reraiseLabel = m_comp->emit_define_label();
-                        }
+                        raiseLabel = m_comp->emit_define_label();
+                        reraiseLabel = m_comp->emit_define_label();
                         blockId = m_blockIds++;
                     }
 
@@ -2358,7 +2400,18 @@ JittedCode* AbstractInterpreter::compile_worker() {
     // little stub and then back up to the correct handler.
     if (m_allHandlers.size() != 0) {
         for (auto& handler : m_allHandlers) {
-            auto raiseAndFreeLabels = getRaiseAndFreeLabels(handler.BlockId);
+            // emit reraise frees...
+            auto reraiseAndFreeLabels = get_reraise_and_free_labels(handler.BlockId);
+            for (auto& curFree = reraiseAndFreeLabels.rbegin(); 
+                      curFree != reraiseAndFreeLabels.rend(); curFree++) {
+                m_comp->emit_mark_label(*curFree);
+                m_comp->emit_pop_top();
+            }
+            if (reraiseAndFreeLabels.size() != 0) {
+                m_comp->emit_branch(BranchAlways, handler.ReRaise);
+            }
+
+            auto raiseAndFreeLabels = get_raise_and_free_labels(handler.BlockId);
             for (auto& curFree = raiseAndFreeLabels.rbegin(); curFree != raiseAndFreeLabels.rend(); curFree++) {
                 m_comp->emit_mark_label(*curFree);
                 m_comp->emit_pop_top();
@@ -2375,7 +2428,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_unwind_eh(handler.ExVars.PrevExc, handler.ExVars.PrevExcVal, handler.ExVars.PrevTraceback);
                 m_comp->emit_eh_trace();     // update the traceback
 
-                if (handler.Raise.m_index == raiseFromTopLevelHandler.m_index) {
+                if(handler.ErrorTarget.m_index == -1) {
                     // We're in an except handler raising an exception with no outer exception
                     // handlers.  We'll return NULL from the function indicating an error has
                     // occurred
@@ -2388,7 +2441,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_mark_label(handler.ReRaise);
                 m_comp->emit_unwind_eh(handler.ExVars.PrevExc, handler.ExVars.PrevExcVal, handler.ExVars.PrevTraceback);
                 m_comp->emit_mark_label(prepare);
-                if (handler.Raise.m_index == raiseFromTopLevelHandler.m_index) {
+                if (handler.ErrorTarget.m_index == -1) {
                     // We're in an except handler re-raising an exception with no outer exception
                     // handlers.  We'll return NULL from the function indicating an error has
                     // occurred
@@ -2407,7 +2460,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_mark_label(handler.ReRaise);
             }
 
-            if (handler.Raise.m_index != raiseFromTopLevelHandler.m_index) {
+            if (handler.ErrorTarget.m_index != -1) {
                 m_comp->emit_prepare_exception(
                     handler.ExVars.PrevExc,
                     handler.ExVars.PrevExcVal,
@@ -2420,7 +2473,16 @@ JittedCode* AbstractInterpreter::compile_worker() {
     }
 
     // label we branch to for error handling when we have no EH handlers, return NULL.
-    auto raiseAndFreeLabels = getRaiseAndFreeLabels(m_blockStack[0].BlockId);
+    auto reraiseAndFreeLabels = get_reraise_and_free_labels(m_blockStack[0].BlockId);
+    for (auto curLabel = reraiseAndFreeLabels.rbegin(); curLabel != reraiseAndFreeLabels.rend(); curLabel++) {
+        m_comp->emit_mark_label(*curLabel);
+        m_comp->emit_pop_top();
+    }
+    if (reraiseAndFreeLabels.size() != 0) {
+        m_comp->emit_branch(BranchAlways, reraiseNoHandlerLabel);
+    }
+    
+    auto raiseAndFreeLabels = get_raise_and_free_labels(m_blockStack[0].BlockId);
     for (auto curLabel = raiseAndFreeLabels.rbegin(); curLabel != raiseAndFreeLabels.rend(); curLabel++) {
         m_comp->emit_mark_label(*curLabel);
         m_comp->emit_pop_top();
@@ -2444,7 +2506,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
     m_comp->emit_ret();
 
     return m_comp->emit_compile();
-    }
+}
 
 void AbstractInterpreter::test_bool_and_branch(Local value, bool isTrue, Label target) {
     m_comp->emit_load_local(value);
@@ -3105,7 +3167,6 @@ void AbstractInterpreter::pop_except() {
     // clear the exception.
     m_comp->emit_clear_eh();
     auto block = m_blockStack.back();
-    //m_blockStack.pop_back();
     unwind_eh(block.ExVars);
 #ifdef DEBUG_TRACE
     m_il.ld_i("Exception cleared");

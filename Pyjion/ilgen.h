@@ -127,6 +127,7 @@ public:
 
     void mark_label(Label label) {
         auto info = &m_labels[label.m_index];
+        _ASSERTE(info->m_location == -1);
         info->m_location = (int)m_il.size();
         for (int i = 0; i < info->m_branchOffsets.size(); i++) {
             auto from = info->m_branchOffsets[i];
