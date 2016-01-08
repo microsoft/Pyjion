@@ -185,7 +185,7 @@ class __declspec(dllexport) AbstractInterpreter {
     //      free2: <decref>/<pop>
     //      free1: <decref>/<pop>
     //      raise logic.
-    //  This was we don't need to have decref/frees spread all over the code
+    //  This was so we don't need to have decref/frees spread all over the code
     vector<vector<Label>> m_raiseAndFree, m_reraiseAndFree;
     Label m_retLabel;
     Local m_retValue;
