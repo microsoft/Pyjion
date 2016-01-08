@@ -1,6 +1,6 @@
 diff -r 8667c26e2bec Include/ceval.h
 --- a/Include/ceval.h	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Include/ceval.h	Mon Aug 31 14:44:51 2015 -0700
++++ b/Include/ceval.h	Thu Jan 07 11:46:53 2016 -0800
 @@ -10,6 +10,11 @@
  PyAPI_FUNC(PyObject *) PyEval_CallObjectWithKeywords(
      PyObject *, PyObject *, PyObject *);
@@ -23,7 +23,7 @@ diff -r 8667c26e2bec Include/ceval.h
  
 diff -r 8667c26e2bec Include/code.h
 --- a/Include/code.h	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Include/code.h	Mon Aug 31 14:44:51 2015 -0700
++++ b/Include/code.h	Thu Jan 07 11:46:53 2016 -0800
 @@ -7,6 +7,23 @@
  extern "C" {
  #endif
@@ -63,7 +63,7 @@ diff -r 8667c26e2bec Include/code.h
  #define CO_NEWLOCALS	0x0002
 diff -r 8667c26e2bec Include/dictobject.h
 --- a/Include/dictobject.h	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Include/dictobject.h	Mon Aug 31 14:44:51 2015 -0700
++++ b/Include/dictobject.h	Thu Jan 07 11:46:53 2016 -0800
 @@ -138,7 +138,7 @@
  PyAPI_FUNC(void) _PyDict_DebugMallocStats(FILE *out);
  
@@ -75,62 +75,40 @@ diff -r 8667c26e2bec Include/dictobject.h
  #ifdef __cplusplus
 diff -r 8667c26e2bec Include/pystate.h
 --- a/Include/pystate.h	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Include/pystate.h	Mon Aug 31 14:44:51 2015 -0700
-@@ -12,6 +12,8 @@
++++ b/Include/pystate.h	Thu Jan 07 11:46:53 2016 -0800
+@@ -12,6 +12,9 @@
  
  struct _ts; /* Forward */
  struct _is; /* Forward */
 +typedef void*(__stdcall *CompileFunction)(PyObject*);
++typedef void*(__stdcall *JitFreeFunction)(PyObject*);
 +typedef void(__stdcall *JitInitFunction)();
  
  #ifdef Py_LIMITED_API
  typedef struct _is PyInterpreterState;
-@@ -41,6 +43,7 @@
+@@ -41,6 +44,8 @@
  #endif
  
      PyObject *builtins_copy;
-+	CompileFunction jitcompile;
++    CompileFunction jitcompile;
++    JitFreeFunction jitfree;
  } PyInterpreterState;
  #endif
  
-diff -r 8667c26e2bec Lib/encodings/aliases.py
---- a/Lib/encodings/aliases.py	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Lib/encodings/aliases.py	Mon Aug 31 14:44:51 2015 -0700
-@@ -1,4 +1,4 @@
--""" Encoding Aliases Support
-+﻿""" Encoding Aliases Support
+diff -r 8667c26e2bec Lib/test/test_list.py
+--- a/Lib/test/test_list.py	Mon Jun 15 09:11:37 2015 -0700
++++ b/Lib/test/test_list.py	Thu Jan 07 11:46:53 2016 -0800
+@@ -1,6 +1,7 @@
+ import sys
+ from test import support, list_tests
+ import pickle
++import unittest
  
-     This module is used by the encodings package search function to
-     map encodings names to module names.
-@@ -15,6 +15,7 @@
-         aliases have also been added.
- 
- """
-+
- aliases = {
- 
-     # Please keep this list sorted alphabetically by value !
-diff -r 8667c26e2bec Lib/importlib/_bootstrap.py
---- a/Lib/importlib/_bootstrap.py	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Lib/importlib/_bootstrap.py	Mon Aug 31 14:44:51 2015 -0700
-@@ -1,4 +1,4 @@
--"""Core implementation of import.
-+﻿"""Core implementation of import.
- 
- This module is NOT meant to be directly imported! It has been designed such
- that it can be bootstrapped into Python as the implementation of import. As
-diff -r 8667c26e2bec Lib/importlib/_bootstrap_external.py
---- a/Lib/importlib/_bootstrap_external.py	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Lib/importlib/_bootstrap_external.py	Mon Aug 31 14:44:51 2015 -0700
-@@ -1,4 +1,4 @@
--"""Core implementation of path-based import.
-+﻿"""Core implementation of path-based import.
- 
- This module is NOT meant to be directly imported! It has been designed such
- that it can be bootstrapped into Python as the implementation of import. As
+ class ListTest(list_tests.CommonTest):
+     type2test = list
 diff -r 8667c26e2bec Objects/codeobject.c
 --- a/Objects/codeobject.c	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Objects/codeobject.c	Mon Aug 31 14:44:51 2015 -0700
++++ b/Objects/codeobject.c	Thu Jan 07 11:46:53 2016 -0800
 @@ -7,6 +7,7 @@
  
  /* all_name_chars(s): true iff all chars in s are valid NAME_CHARS */
@@ -149,7 +127,15 @@ diff -r 8667c26e2bec Objects/codeobject.c
      return co;
  }
  
-@@ -542,6 +546,61 @@
+@@ -370,6 +374,7 @@
+     Py_XDECREF(co->co_filename);
+     Py_XDECREF(co->co_name);
+     Py_XDECREF(co->co_lnotab);
++    Py_XDECREF(co->co_jitted);
+     if (co->co_cell2arg != NULL)
+         PyMem_FREE(co->co_cell2arg);
+     if (co->co_zombieframe != NULL)
+@@ -542,6 +547,69 @@
      code_new,                           /* tp_new */
  };
  
@@ -167,12 +153,20 @@ diff -r 8667c26e2bec Objects/codeobject.c
 +    return PyObject_New(PyJittedCode, &PyJittedCode_Type);
 +}
 +
++static void
++jittedcode_dealloc(PyJittedCode *co) {
++    PyThreadState *tstate = PyThreadState_GET();
++    if (tstate->interp->jitfree != NULL) {
++        tstate->interp->jitfree(co);
++    }
++}
++
 +PyTypeObject PyJittedCode_Type = {
 +    PyVarObject_HEAD_INIT(&PyType_Type, 0)
 +    "jittedcode",                       /* tp_name */
 +    sizeof(PyJittedCode),               /* tp_basicsize */
 +    0,                                  /* tp_itemsize */
-+    0,                                  /* tp_dealloc */
++    jittedcode_dealloc,                 /* tp_dealloc */
 +    0,                                  /* tp_print */
 +    0,                                  /* tp_getattr */
 +    0,                                  /* tp_setattr */
@@ -211,50 +205,9 @@ diff -r 8667c26e2bec Objects/codeobject.c
  /* Use co_lnotab to compute the line number from a bytecode index, addrq.  See
     lnotab_notes.txt for the details of the lnotab representation.
  */
-diff -r 8667c26e2bec Objects/object.c
---- a/Objects/object.c	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Objects/object.c	Mon Aug 31 14:44:51 2015 -0700
-@@ -1787,12 +1787,12 @@
- _Py_PrintReferences(FILE *fp)
- {
-     PyObject *op;
--    fprintf(fp, "Remaining objects:\n");
-+    fprintf(fp, "Remaining objects:\r\n");
-     for (op = refchain._ob_next; op != &refchain; op = op->_ob_next) {
--        fprintf(fp, "%p [%" PY_FORMAT_SIZE_T "d] ", op, op->ob_refcnt);
-+        fprintf(fp, "[%" PY_FORMAT_SIZE_T "d] ", op->ob_refcnt);
-         if (PyObject_Print(op, fp, 0) != 0)
-             PyErr_Clear();
--        putc('\n', fp);
-+        putc('\r\n', fp);
-     }
- }
- 
-diff -r 8667c26e2bec Objects/obmalloc.c
---- a/Objects/obmalloc.c	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Objects/obmalloc.c	Mon Aug 31 14:44:51 2015 -0700
-@@ -1175,6 +1175,7 @@
-     uint size;
- 
-     _Py_AllocatedBlocks++;
-+	//printf("Allocated: %d\r\n", _Py_AllocatedBlocks);
- 
-     assert(nelem <= PY_SSIZE_T_MAX / elsize);
-     nbytes = nelem * elsize;
-diff -r 8667c26e2bec Objects/typeobject.c
---- a/Objects/typeobject.c	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Objects/typeobject.c	Mon Aug 31 14:44:51 2015 -0700
-@@ -7208,6 +7208,7 @@
-             return -1;
-         }
-         if (co->co_argcount == 0) {
-+			assert(0);
-             PyErr_SetString(PyExc_RuntimeError,
-                             "super(): no arguments");
-             return -1;
 diff -r 8667c26e2bec Python/ceval.c
 --- a/Python/ceval.c	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Python/ceval.c	Mon Aug 31 14:44:51 2015 -0700
++++ b/Python/ceval.c	Thu Jan 07 11:46:53 2016 -0800
 @@ -796,6 +796,31 @@
  PyObject *
  PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
@@ -287,84 +240,39 @@ diff -r 8667c26e2bec Python/ceval.c
  #ifdef DXPAIRS
      int lastopcode = 0;
  #endif
-@@ -1170,7 +1195,7 @@
- 
-        f->f_lasti now refers to the index of the last instruction
-        executed.  You might think this was obvious from the name, but
--       this wasn't always true before 2.3!  PyFrame_New now sets
-+       this wasn't always true before 2.3!  PyFrame_New now setsYIELD_
-        f->f_lasti to -1 (i.e. the index *before* the first instruction)
-        and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
-        does work.  Promise.
-@@ -1203,7 +1228,7 @@
-     }
- 
- #ifdef LLTRACE
--    lltrace = _PyDict_GetItemId(f->f_globals, &PyId___ltrace__) != NULL;
-+	lltrace = _PyDict_GetItemId(f->f_globals, &PyId___ltrace__) != NULL;
- #endif
- 
-     why = WHY_NOT;
-@@ -2138,6 +2163,7 @@
-                 goto fast_block_end;
-             }
-             else if (status != Py_None) {
-+				assert(FALSE);
-                 PyErr_SetString(PyExc_SystemError,
-                     "'finally' pops bad exception");
-                 Py_DECREF(status);
-@@ -4242,8 +4268,13 @@
- prtrace(PyObject *v, char *str)
- {
-     printf("%s ", str);
--    if (PyObject_Print(v, stdout, 0) != 0)
--        PyErr_Clear(); /* Don't know what else to do */
-+	if (!PyErr_Occurred) {
-+		if (PyObject_Print(v, stdout, 0) != 0)
-+			PyErr_Clear(); /* Don't know what else to do */
-+	}
-+	else{
-+		printf("Can't print during error...");
-+	}
-     printf("\n");
-     return 1;
- }
-@@ -4936,6 +4967,7 @@
-             t = PySequence_Tuple(stararg);
-             if (t == NULL) {
-                 if (PyErr_ExceptionMatches(PyExc_TypeError)) {
-+					assert(FALSE);
-                     PyErr_Format(PyExc_TypeError,
-                                  "%.200s%.200s argument after * "
-                                  "must be a sequence, not %.200s",
 diff -r 8667c26e2bec Python/pylifecycle.c
 --- a/Python/pylifecycle.c	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Python/pylifecycle.c	Mon Aug 31 14:44:51 2015 -0700
-@@ -321,6 +321,18 @@
++++ b/Python/pylifecycle.c	Thu Jan 07 11:46:53 2016 -0800
+@@ -321,6 +321,20 @@
      if (interp == NULL)
          Py_FatalError("Py_Initialize: can't make first interpreter");
  
-+	HMODULE pyjit = LoadLibrary("pyjit.dll");
-+	if (pyjit != NULL) {
-+		interp->jitcompile = (CompileFunction)GetProcAddress(pyjit, "JitCompile");
-+		if (interp->jitcompile != NULL) {
-+			JitInitFunction jitinit = (JitInitFunction)GetProcAddress(pyjit, "JitInit");
-+			jitinit();
-+		}
-+	}
-+	else {
-+		interp->jitcompile = NULL;
-+	}
++    HMODULE pyjit = LoadLibrary("pyjit.dll");
++    if (pyjit != NULL) {
++        interp->jitcompile = (CompileFunction)GetProcAddress(pyjit, "JitCompile");
++        if (interp->jitcompile != NULL) {
++            JitInitFunction jitinit = (JitInitFunction)GetProcAddress(pyjit, "JitInit");
++            jitinit();
++
++            interp->jitfree = (JitFreeFunction)GetProcAddress(pyjit, "JitFree");
++        }
++    }
++    else {
++        interp->jitcompile = NULL;
++    }
 +
      tstate = PyThreadState_New(interp);
      if (tstate == NULL)
          Py_FatalError("Py_Initialize: can't make first thread");
-@@ -687,7 +699,7 @@
-      * An address can be used to find the repr of the object, printed
-      * above by _Py_PrintReferences.
-      */
--    if (Py_GETENV("PYTHONDUMPREFS"))
-+    if (Py_GETENV("PYTHONDUMPREFS2"))
-         _Py_PrintReferenceAddresses(stderr);
- #endif /* Py_TRACE_REFS */
- #ifdef PYMALLOC_DEBUG
+diff -r 8667c26e2bec Python/pystate.c
+--- a/Python/pystate.c	Mon Jun 15 09:11:37 2015 -0700
++++ b/Python/pystate.c	Thu Jan 07 11:46:53 2016 -0800
+@@ -80,6 +80,8 @@
+         interp->codecs_initialized = 0;
+         interp->fscodec_initialized = 0;
+         interp->importlib = NULL;
++        interp->jitcompile = NULL;
++        interp->jitfree = NULL;
+ #ifdef HAVE_DLOPEN
+ #ifdef RTLD_NOW
+         interp->dlopenflags = RTLD_NOW;
