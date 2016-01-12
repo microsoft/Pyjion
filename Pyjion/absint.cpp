@@ -132,6 +132,15 @@ bool AbstractInterpreter::preprocess() {
                     }
                 }
                 break;
+            case LOAD_GLOBAL:
+            {
+                auto name = PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg));
+                if (!strcmp(name, "vars") || !strcmp(name, "dir")) {
+                    return false;
+                }
+            }
+            break;
+
         }
     }
     return true;
