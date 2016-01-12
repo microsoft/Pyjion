@@ -346,6 +346,7 @@ AbstractValue* BytesValue::binary(AbstractSource* selfSources, int op, AbstractV
         switch (op) {
             case BINARY_MULTIPLY:
             case INPLACE_MULTIPLY:
+                other.escapes();
                 return this;
         }
     }
@@ -369,8 +370,10 @@ AbstractValue* BytesValue::binary(AbstractSource* selfSources, int op, AbstractV
         switch (op) {
             case BINARY_MULTIPLY:
             case INPLACE_MULTIPLY:
+                other.escapes();
                 return this;
             case BINARY_SUBSCR:
+                other.escapes();
                 return &Integer;
         }
     }
