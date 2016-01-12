@@ -397,6 +397,7 @@ public:
     virtual void emit_box_float();
     virtual void emit_box_bool();
     virtual void emit_box_tagged_ptr();
+    virtual void emit_incref(bool maybeTagged = false);
 
     virtual void emit_debug_msg(const char* msg);
 
@@ -406,7 +407,6 @@ private:
     void load_frame();
 
     void load_local(int oparg);
-    void incref(bool maybeTagged = false);
     void decref();
 
     void call_optimizing_function(int baseFunction);

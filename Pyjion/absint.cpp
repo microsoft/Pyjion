@@ -266,7 +266,7 @@ bool AbstractInterpreter::interpret() {
                 {
                     auto localSource = add_local_source(opcodeIndex, oparg);
                     auto local = lastState.get_local(oparg);
-
+                    
                     local.ValueInfo.Sources = AbstractSource::combine(localSource, local.ValueInfo.Sources);
 
                     lastState.push(local.ValueInfo);
@@ -2409,7 +2409,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     if (m_offsetStack.find(curByte) != m_offsetStack.end()) {
                         dec_stack(3);
                         free_iter_locals_on_exception();
-                        m_comp->emit_debug_msg("Restoring error for exception");
                         m_comp->emit_restore_err();
 
                         unwind_eh(ehInfo.ExVars);
@@ -3152,6 +3151,9 @@ void AbstractInterpreter::load_fast_worker(int local, bool checkUnbound) {
 
         m_comp->emit_mark_label(success);
     }
+
+    m_comp->emit_dup();
+    m_comp->emit_incref(false);
 }
 
 void AbstractInterpreter::unpack_ex(size_t size, int opcode) {

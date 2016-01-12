@@ -214,6 +214,10 @@ void PyJitTest() {
 
     TestCase cases[] = {
         TestCase(
+            "def f():\n    unbound += 1",
+            TestInput("<NULL>")
+            ),
+        TestCase(
             "def f():\n    5 % 0",
             TestInput("<NULL>")
             ),

@@ -139,7 +139,7 @@ void PythonCompiler::load_local(int oparg) {
     m_il.ld_ind_i();
 }
 
-void PythonCompiler::incref(bool maybeTagged) {
+void PythonCompiler::emit_incref(bool maybeTagged) {
     Label tagged, done;
     if (maybeTagged) {
         m_il.dup();
@@ -211,8 +211,6 @@ void PythonCompiler::emit_unbound_local_check(int local, Label success) {
 
 void PythonCompiler::emit_load_fast(int local) {
     load_local(local);
-    m_il.dup();
-    incref();
 }
 
 CorInfoType PythonCompiler::to_clr_type(LocalKind kind) {
@@ -283,7 +281,7 @@ void PythonCompiler::emit_pop_top() {
 void PythonCompiler::emit_dup_top() {
     m_il.dup();
     m_il.dup();
-    incref(true);
+    emit_incref(true);
 }
 
 void PythonCompiler::emit_dup_top_two() {
@@ -299,9 +297,9 @@ void PythonCompiler::emit_dup_top_two() {
     m_il.ld_loc(top);
 
     m_il.ld_loc(top);
-    incref(true);
+    emit_incref(true);
     m_il.ld_loc(second);
-    incref(true);
+    emit_incref(true);
 
     m_il.free_local(top);
     m_il.free_local(second);
@@ -464,7 +462,7 @@ void PythonCompiler::emit_new_tuple(size_t size) {
     if (size == 0) {
         m_il.ld_i(PyTuple_New(0));
         m_il.dup();
-        incref(false);
+        emit_incref(false);
     }
     else {
         m_il.ld_i(size);
@@ -758,7 +756,7 @@ void PythonCompiler::emit_bool(bool value) {
 void PythonCompiler::emit_py_object(PyObject *value) {
     m_il.ld_i(value);
     m_il.dup();
-    incref();
+    emit_incref();
 }
 
 // Emits a call to create a new function, consuming the code object and
@@ -816,7 +814,7 @@ void PythonCompiler::emit_load_closure(int index) {
     m_il.add();
     m_il.ld_ind_i();
     m_il.dup();
-    incref();
+    emit_incref();
 }
 
 void PythonCompiler::emit_set_add() {
