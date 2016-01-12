@@ -214,6 +214,10 @@ void PyJitTest() {
 
     TestCase cases[] = {
         TestCase(
+            "def f():\n    if 0.0 < 1.0 <= 1.0 == 1.0 >= 1.0 > 0.0 != 1.0:  return 42",
+            TestInput("42")
+            ),
+        TestCase(
             "def f():\n    try:\n        try:\n            pass\n        finally:\n            raise OSError\n    except OSError as e:\n        return 1\n    return 0\n",
             TestInput("1")
             ),

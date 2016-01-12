@@ -1719,7 +1719,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         loopIndex = i;
                         break;
                     }
-                    else if (m_blockStack[i].Kind == END_FINALLY || m_blockStack[i].Kind == POP_EXCEPT ) {
+                    else if (m_blockStack[i].Kind == END_FINALLY || m_blockStack[i].Kind == POP_EXCEPT) {
                         if (clearEh == -1) {
                             clearEh = i;
                         }
@@ -2235,7 +2235,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
                             );
                     }
                     else {
-                        // Exceptions inside of a finally will go back to the 
+                        // Exceptions inside of a finally will go back to the back handler but
+                        // we save the finally handlers exception vars for EH unwind
                         m_allHandlers.emplace_back(
                             ExceptionHandler(
                                 back.CurrentHandler,
