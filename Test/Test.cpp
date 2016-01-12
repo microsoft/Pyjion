@@ -213,6 +213,26 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
+        TestCase(
+            "def f():\n    try:\n        try:\n            pass\n        finally:\n            raise OSError\n    except OSError as e:\n        return 1\n    return 0\n",
+            TestInput("1")
+            ),
+        TestCase(
+            "def f():\n    try:\n        raise\n    except RuntimeError:\n        return 42",
+            TestInput("42")
+        ),
+        TestCase(
+            "def f():\n    try:\n        while True:\n            try:\n                raise Exception()\n            except Exception:\n                break\n    finally:\n        pass\n    return 42",
+            TestInput("42")
+            ),
+        TestCase(
+            "def f():\n    try:\n        pass\n    finally:\n        raise",
+            TestInput("<NULL>")
+        ),
+        TestCase(
+            "def f():\n    try:\n        pass\n    finally:\n        raise OSError",
+            TestInput("<NULL>")
+        ),
         // partial should be boxed because it's consumed by print after being assigned in the break loop
         TestCase(
             "def f():\n    partial = 0\n    while 1:\n        partial = 1\n        break\n    if not partial:\n        print(partial)\n        return True\n    return False\n",
