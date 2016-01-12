@@ -214,6 +214,26 @@ void PyJitTest() {
 
     TestCase cases[] = {
         TestCase(
+            "def f():\n    5 % 0",
+            TestInput("<NULL>")
+            ),
+        TestCase(
+            "def f():\n    5.0 % 0.0",
+            TestInput("<NULL>")
+            ),
+        TestCase(
+            "def f():\n    5.0 // 0.0",
+            TestInput("<NULL>")
+            ),
+        TestCase(
+            "def f():\n    5.0 / 0.0",
+            TestInput("<NULL>")
+            ),
+        TestCase(
+            "def f():\n    x = 'abc'*3\n    return x",
+            TestInput("'abcabcabc'")
+            ),
+        TestCase(
             "def f():\n    if 0.0 < 1.0 <= 1.0 == 1.0 >= 1.0 > 0.0 != 1.0:  return 42",
             TestInput("42")
             ),

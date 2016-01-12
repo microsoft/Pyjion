@@ -680,6 +680,7 @@ AbstractValue* StringValue::binary(AbstractSource* selfSources, int op, Abstract
         switch (op) {
             case BINARY_MULTIPLY:
             case INPLACE_MULTIPLY:
+                other.escapes();
                 return this;
         }
     }
@@ -688,12 +689,14 @@ AbstractValue* StringValue::binary(AbstractSource* selfSources, int op, Abstract
             case BINARY_MULTIPLY:
             case BINARY_SUBSCR:
             case INPLACE_MULTIPLY:
+                other.escapes();
                 return this;
         }
     }
     else if (other_kind == AVK_Slice) {
         switch (op) {
             case BINARY_SUBSCR:
+                other.escapes();
                 return this;
         }
     }
@@ -701,6 +704,7 @@ AbstractValue* StringValue::binary(AbstractSource* selfSources, int op, Abstract
         switch (op) {
             case BINARY_ADD:
             case INPLACE_ADD:
+                other.escapes();
                 return this;
         }
     }

@@ -200,16 +200,27 @@ bool AbstractInterpreter::interpret() {
                 case NOP: break;
                 case ROT_TWO:
                 {
-                    auto tmp = lastState[lastState.stack_size() - 1];
-                    lastState[lastState.stack_size() - 1] = lastState[lastState.stack_size() - 2];
-                    lastState[lastState.stack_size() - 2] = tmp;
+                    // ROT_TWO currently assumes we have native ints on the stack,
+                    // so we force escape here...  We should fix that up in the future
+                    // and use pop_no_escape
+                    auto tmp = lastState.pop();
+                    auto second = lastState.pop();
+                    lastState.push(tmp);
+                    lastState.push(second);
+                    
+                    //auto tmp = lastState[lastState.stack_size() - 1];
+                    //lastState[lastState.stack_size() - 1] = lastState[lastState.stack_size() - 2];
+                    //lastState[lastState.stack_size() - 2] = tmp;
                     break;
                 }
                 case ROT_THREE:
                 {
-                    auto top = lastState.pop_no_escape();
-                    auto second = lastState.pop_no_escape();
-                    auto third = lastState.pop_no_escape();
+                    // ROT_THREE currently assumes we have native ints on the stack,
+                    // so we force escape here...  We should fix that up in the future
+                    // and use pop_no_escape
+                    auto top = lastState.pop();
+                    auto second = lastState.pop();
+                    auto third = lastState.pop();
 
                     lastState.push(top);
                     lastState.push(third);
@@ -1685,15 +1696,38 @@ JittedCode* AbstractInterpreter::compile_worker() {
     processOpCode:
         switch (byte) {
             case NOP: break;
-            case ROT_TWO: m_comp->emit_rot_two(); break;
-            case ROT_THREE: m_comp->emit_rot_three(); break;
+            case ROT_TWO: 
+            {
+                auto tmp = m_stack[m_stack.size() - 1];
+                m_stack[m_stack.size() - 1] = m_stack[m_stack.size() - 2];
+                m_stack[m_stack.size() - 2] = tmp;
+
+                m_comp->emit_rot_two();
+                break;
+            }
+            case ROT_THREE: 
+            {
+                bool top = m_stack.back();
+                m_stack.pop_back();
+                bool second = m_stack.back();
+                m_stack.pop_back();
+                bool third = m_stack.back();
+                m_stack.pop_back();
+
+                m_stack.push_back(top);
+                m_stack.push_back(third);
+                m_stack.push_back(second);
+
+                m_comp->emit_rot_three();
+                break;
+            }
             case POP_TOP:
                 m_comp->emit_pop_top();
                 dec_stack();
                 break;
             case DUP_TOP:
                 m_comp->emit_dup_top();
-                inc_stack();
+                m_stack.push_back(m_stack.back());
                 break;
             case DUP_TOP_TWO:
                 inc_stack(2);
@@ -1948,7 +1982,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                         dec_stack(2);
 
-                        if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE) {
+                        if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE ||
+                            byte == INPLACE_FLOOR_DIVIDE || byte == BINARY_FLOOR_DIVIDE ||
+                            byte == INPLACE_MODULO || byte == BINARY_MODULO) {
                             m_comp->emit_dup();
                             m_comp->emit_float(0);
                             auto noErr = m_comp->emit_define_label();

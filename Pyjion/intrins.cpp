@@ -2149,6 +2149,11 @@ return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Multiply(tmpLeft, tm
 
 
 inline PyObject* PyJit_Tagged_Modulo(tagged_ptr left, tagged_ptr right) {
+    if (right == 0) {
+        PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
+        return nullptr;
+    }
+
     tagged_ptr res;
 #ifdef _MSC_VER
     if (SafeModulus(left, right, res)) {
