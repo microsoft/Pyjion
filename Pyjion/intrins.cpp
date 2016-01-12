@@ -1060,7 +1060,7 @@ int PyJit_FunctionSetKwDefaults(PyObject* defs, PyObject* func) {
 
 void PyJit_EhTrace(PyFrameObject *f) {
     PyTraceBack_Here(f);
-
+    
     //auto tstate = PyThreadState_GET();
 
     //if (tstate->c_tracefunc != NULL) {
@@ -1079,7 +1079,7 @@ int PyJit_Raise(PyObject *exc, PyObject *cause) {
         type = tstate->exc_type;
         value = tstate->exc_value;
         tb = tstate->exc_traceback;
-        if (type == Py_None) {
+        if (type == Py_None || type == nullptr) {
             PyErr_SetString(PyExc_RuntimeError,
                 "No active exception to reraise");
             return 0;

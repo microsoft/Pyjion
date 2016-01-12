@@ -223,7 +223,6 @@ class PythonCompiler : public IPythonCompiler {
     unsigned char *m_byteCode;
     size_t m_size;
     UserModule* m_module;
-    Local m_tb, m_ehVal, m_excType;
     Local m_lasti;
 
 public:
@@ -382,11 +381,9 @@ public:
     virtual void emit_bool(bool value);
     virtual void emit_py_object(PyObject* value);
 
-    virtual void emit_clear_eh();
     virtual void emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback);
-    virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback, bool includeTbAndValue);
+    virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback);
     virtual void emit_restore_err();
-    virtual void emit_restore_err(Local finallyReason);
     virtual void emit_pyerr_setstring(PyObject* exception, const char*msg);
 
     virtual void emit_compare_exceptions();

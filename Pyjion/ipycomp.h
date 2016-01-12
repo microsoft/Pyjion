@@ -348,16 +348,14 @@ public:
      // Raises an exception taking the exception, type, and cause
     virtual void emit_raise_varargs() = 0;
     // Clears the current exception
-    virtual void emit_clear_eh() = 0;
     // Updates the trace back as it propagtes through a function
     virtual void emit_eh_trace() = 0;
     // Performs exception handling unwind as we go through loops
     virtual void emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback) = 0;
     // Prepares to raise an exception, storing the existing exceptions
-    virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback, bool includeTbAndValue) = 0;
+    virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback) = 0;
     // Restores the previous exception for nested exception handling
     virtual void emit_restore_err() = 0;
-    virtual void emit_restore_err(Local finallyReason) = 0;
     // Compares to see if an exception is handled, pushing a Python bool onto the stack
     virtual void emit_compare_exceptions() = 0;
     // Compares to see if an exception is handled, pushing an int on the stack indicating true (1), false (0), or error (-1)

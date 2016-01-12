@@ -97,9 +97,6 @@ PythonCompiler::PythonCompiler(PyCodeObject *code) :
     this->m_code = code;
     this->m_byteCode = (unsigned char *)((PyBytesObject*)code->co_code)->ob_sval;
     this->m_size = PyBytes_Size(code->co_code);
-    m_tb = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-    m_ehVal = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-    m_excType = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
     m_lasti = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 }
 
@@ -569,13 +566,6 @@ void PythonCompiler::emit_import_star() {
     m_il.emit_call(METHOD_PY_IMPORTSTAR);
 }
 
-void PythonCompiler::emit_clear_eh() {
-    // we made it to the end of an EH block w/o throwing,
-    // clear the exception.
-    m_il.load_null();
-    m_il.st_loc(m_ehVal);
-}
-
 void PythonCompiler::emit_load_build_class() {
     load_frame();
     m_il.emit_call(METHOD_GETBUILDCLASS_TOKEN);
@@ -710,14 +700,6 @@ void PythonCompiler::emit_compare_exceptions_int() {
     m_il.emit_call(METHOD_COMPARE_EXCEPTIONS_INT);
 }
 
-
-void PythonCompiler::emit_restore_err(Local finallyReason) {
-    m_il.ld_loc(m_tb);
-    m_il.ld_loc(m_ehVal);
-    m_il.ld_loc(finallyReason);
-    m_il.emit_call(METHOD_PYERR_RESTORE);
-}
-
 void PythonCompiler::emit_pyerr_setstring(PyObject* exception, const char*msg) {
     emit_ptr(exception);
     emit_ptr((void*)msg);
@@ -731,22 +713,26 @@ void PythonCompiler::emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevT
     m_il.emit_call(METHOD_UNWIND_EH);
 }
 
-void PythonCompiler::emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback, bool includeTbAndValue) {
-    m_il.ld_loca(m_excType);
-    m_il.ld_loca(m_ehVal);
-    m_il.ld_loca(m_tb);
+void PythonCompiler::emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback) {
+    auto excType = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    auto ehVal = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    auto tb = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    m_il.ld_loca(excType);
+    m_il.ld_loca(ehVal);
+    m_il.ld_loca(tb);
 
     m_il.ld_loca(prevExc);
     m_il.ld_loca(prevExcVal);
     m_il.ld_loca(prevTraceback);
 
     m_il.emit_call(METHOD_PREPARE_EXCEPTION);
-    // Should be pushing previous values on the stack
-    if (includeTbAndValue) {
-        m_il.ld_loc(m_tb);
-        m_il.ld_loc(m_ehVal);
-    }
-    m_il.ld_loc(m_excType);
+    m_il.ld_loc(tb);
+    m_il.ld_loc(ehVal);
+    m_il.ld_loc(excType);
+
+    m_il.free_local(excType);
+    m_il.free_local(ehVal);
+    m_il.free_local(tb);
 }
 
 void PythonCompiler::emit_int(int value) {

@@ -391,6 +391,7 @@ public:
     }
 
     void st_loc(int index) {
+        _ASSERTE(index != -1);
         switch (index) {
             case 0: m_il.push_back(CEE_STLOC_0); break;
             case 1: m_il.push_back(CEE_STLOC_1); break;
@@ -411,6 +412,7 @@ public:
     }
 
     void ld_loc(int index) {
+        _ASSERTE(index != -1);
         switch (index) {
             case 0: m_il.push_back(CEE_LDLOC_0); break;
             case 1: m_il.push_back(CEE_LDLOC_1); break;
@@ -504,6 +506,7 @@ public:
     }
 
     void ld_arg(int index) {
+        _ASSERTE(index != -1);
         switch (index) {
             case 0: push_back(CEE_LDARG_0); break;
             case 1: push_back(CEE_LDARG_1); break;
