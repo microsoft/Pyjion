@@ -1790,7 +1790,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                             // need to mark those finallys as needing special handling.
                             inFinally = true;
                             if (clearEh != -1) {
-                                unwind_eh(m_allHandlers[m_blockStack[clearEh].CurrentHandler].ExVars);
+                                unwind_eh(m_blockStack[clearEh].CurrentHandler);
                             }
                             m_comp->emit_int(byte == BREAK_LOOP ? EHF_BlockBreaks : EHF_BlockContinues);
                             m_comp->emit_branch(BranchAlways, m_allHandlers[m_blockStack[i].CurrentHandler].ErrorTarget);
@@ -1803,7 +1803,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                 if (!inFinally) {
                     if (clearEh != -1) {
-                        unwind_eh(m_allHandlers[m_blockStack[clearEh].CurrentHandler].ExVars);
+                        unwind_eh(m_blockStack[clearEh].CurrentHandler);
                     }
                     if (byte != CONTINUE_LOOP) {
                         free_iter_local();
@@ -1811,10 +1811,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                     if (byte == BREAK_LOOP) {
                         assert(loopIndex != -1);
-                        m_comp->emit_branch(BranchAlways, getOffsetLabel(m_blockStack[loopIndex].EndOffset));
+                        m_comp->emit_branch(BranchLeave, getOffsetLabel(m_blockStack[loopIndex].EndOffset));
                     }
                     else {
-                        m_comp->emit_branch(BranchAlways, getOffsetLabel(oparg));
+                        m_comp->emit_branch(BranchLeave, getOffsetLabel(oparg));
                     }
                 }
 
@@ -2213,7 +2213,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         m_comp->emit_define_label(),
                         m_comp->emit_define_label(),
                         handlerLabel,
-                        m_stack
+                        m_stack,
+                        EHF_TryExcept
                     )
                 );
 
@@ -2238,7 +2239,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         m_comp->emit_define_label(),
                         handlerLabel,
                         m_stack,
-                        EHF_InFinally
+                        EHF_TryFinally
                     )
                 );
             }
@@ -2252,6 +2253,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     // convert block into an END_FINALLY/POP_EXCEPT BlockInfo
                     auto back = m_blockStack.back();
                     
+                    auto& prevHandler = m_allHandlers[curHandler.CurrentHandler];
+                    auto& backHandler = m_allHandlers[back.CurrentHandler];
+
                     auto newBlock = BlockInfo(
                         back.EndOffset,
                         curHandler.Kind == SETUP_FINALLY ? END_FINALLY : POP_EXCEPT,
@@ -2260,47 +2264,32 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         curHandler.ContinueOffset
                         );
 
-                    auto& prevHandler = m_allHandlers[curHandler.CurrentHandler];
-                    auto& backHandler = m_allHandlers[back.CurrentHandler];
-                    // For both types of blocks we want to use the prevHandler.ExVars for
-                    // the exception vars so that we'll unwind from the correct values.
-                    if (curHandler.Kind == SETUP_EXCEPT) {
-                        // For an  exception in an except block we need to first unwind the
-                        // current exception before processing the nested exception.  
-                        EhFlags flags = EHF_None;
-                        ExceptionVars exVars = prevHandler.ExVars;
-                        if (backHandler.Flags & EHF_InFinally) {
-                            flags |= EHF_InFinally;
-                            exVars.FinallyTb = backHandler.ExVars.FinallyTb;
-                            exVars.FinallyValue = backHandler.ExVars.FinallyValue;
-                        }
-                        m_allHandlers.emplace_back(
-                            ExceptionHandler(
-                                m_allHandlers.size(),
-                                exVars,
-                                m_comp->emit_define_label(),
-                                m_comp->emit_define_label(),
-                                backHandler.ErrorTarget,
-                                backHandler.EntryStack,
-                                flags | EHF_InExceptBlock
-                                )
-                            );
+                    // For exceptions in a except/finally block we need to unwind the
+                    // current exceptions before raising a new exception.  When we emit
+                    // the unwind code we use the exception vars that we created for the
+                    // try portion of the block, so we just flow those in here, but when we
+                    // hit an error we'll branch to any previous handler that was on the
+                    // stack.
+                    EhFlags flags = EHF_None;
+                    ExceptionVars exVars = prevHandler.ExVars;
+                    if (backHandler.Flags & EHF_TryFinally) {
+                        flags |= EHF_TryFinally;
+                        exVars.FinallyTb = backHandler.ExVars.FinallyTb;
+                        exVars.FinallyValue = backHandler.ExVars.FinallyValue;
                     }
-                    else {
-                        // Exceptions inside of a finally will go back to the back handler but
-                        // we save the finally handlers exception vars for EH unwind
-                        m_allHandlers.emplace_back(
-                            ExceptionHandler(
-                                back.CurrentHandler,
-                                prevHandler.ExVars,
-                                backHandler.Raise,
-                                backHandler.ReRaise,
-                                backHandler.ErrorTarget,
-                                backHandler.EntryStack,
-                                EHF_FinallyHandler
-                                )
-                            );
-                    }
+
+                    m_allHandlers.emplace_back(
+                        ExceptionHandler(
+                            m_allHandlers.size(),
+                            exVars,
+                            m_comp->emit_define_label(),
+                            m_comp->emit_define_label(),
+                            backHandler.ErrorTarget,
+                            backHandler.EntryStack,
+                            flags | EHF_InExceptHandler,
+                            back.CurrentHandler
+                            )
+                        );
 
                     m_blockStack.push_back(newBlock);
                 }
@@ -2376,11 +2365,11 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         }
 
                         if (clearEh != -1) {
-                            unwind_eh(m_allHandlers[m_blockStack[clearEh].CurrentHandler].ExVars);
+                            unwind_eh(m_blockStack[clearEh].CurrentHandler);
                         }
 
                         if (!hasOuterFinally) {
-                            m_comp->emit_branch(BranchAlways, m_retLabel);
+                            m_comp->emit_branch(BranchLeave, m_retLabel);
                         }
 
                         m_comp->emit_mark_label(exceptional);
@@ -2394,7 +2383,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_load_local(finallyReason);
                     m_comp->emit_restore_err();
 
-                    unwind_eh(ehInfo.ExVars);
+                    unwind_eh(curBlock.CurrentHandler);
 
                     auto ehBlock = get_ehblock();
 
@@ -2418,7 +2407,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         free_iter_locals_on_exception();
                         m_comp->emit_restore_err();
 
-                        unwind_eh(ehInfo.ExVars);
+                        unwind_eh(curBlock.CurrentHandler);
                         clean_stack_for_reraise();
 
                         m_comp->emit_branch(BranchAlways, get_ehblock().ReRaise);
@@ -2468,8 +2457,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
         // TODO: Unify the first handler with this loop
         for (size_t i = 1; i < m_allHandlers.size(); i++) {
             auto& handler = m_allHandlers[i];
-            if (handler.Flags & EHF_FinallyHandler) { continue; }
-            emit_raise_and_free(handler);
+
+            emit_raise_and_free(i);
 
             if (handler.ErrorTarget.m_index != -1) {
                 m_comp->emit_prepare_exception(
@@ -2477,7 +2466,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     handler.ExVars.PrevExcVal,
                     handler.ExVars.PrevTraceback
                 );
-                if (handler.Flags & EHF_InFinally) {
+                if (handler.Flags & EHF_TryFinally) {
                     auto tmpEx = m_comp->emit_spill();
 
                     m_comp->emit_store_local(handler.ExVars.FinallyValue);
@@ -2491,7 +2480,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
     }
 
     // label we branch to for error handling when we have no EH handlers, return NULL.
-    emit_raise_and_free(m_allHandlers[0]);
+    emit_raise_and_free(0);
 
     m_comp->emit_null();
     auto finalRet = m_comp->emit_define_label();
@@ -2509,7 +2498,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
     return m_comp->emit_compile();
 }
 
-void AbstractInterpreter::emit_raise_and_free(ExceptionHandler& handler) {
+void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
+    auto handler = m_allHandlers[handlerIndex];
     auto reraiseAndFreeLabels = get_reraise_and_free_labels(handler.RaiseAndFreeId);
     for (auto curLabel = reraiseAndFreeLabels.rbegin(); curLabel != reraiseAndFreeLabels.rend(); curLabel++) {
         m_comp->emit_mark_label(*curLabel);
@@ -2524,7 +2514,7 @@ void AbstractInterpreter::emit_raise_and_free(ExceptionHandler& handler) {
         m_comp->emit_pop_top();
     }
 
-    if (handler.Flags & EHF_InExceptBlock) {
+    if (handler.Flags & EHF_InExceptHandler) {
         // We're in an except handler and we're raising a new exception.  First we need
         // to unwind the current exception.  If we're doing a raise we need to update the
         // traceback with our line/frame information.  If we're doing a re-raise we need
@@ -2532,7 +2522,8 @@ void AbstractInterpreter::emit_raise_and_free(ExceptionHandler& handler) {
         auto prepare = m_comp->emit_define_label();
 
         m_comp->emit_mark_label(handler.Raise);
-        m_comp->emit_unwind_eh(handler.ExVars.PrevExc, handler.ExVars.PrevExcVal, handler.ExVars.PrevTraceback);
+        unwind_eh(handlerIndex);
+
         m_comp->emit_eh_trace();     // update the traceback
 
         if (handler.ErrorTarget.m_index == -1) {
@@ -2546,7 +2537,9 @@ void AbstractInterpreter::emit_raise_and_free(ExceptionHandler& handler) {
         }
 
         m_comp->emit_mark_label(handler.ReRaise);
-        m_comp->emit_unwind_eh(handler.ExVars.PrevExc, handler.ExVars.PrevExcVal, handler.ExVars.PrevTraceback);
+
+        unwind_eh(handlerIndex);
+
         m_comp->emit_mark_label(prepare);
         if (handler.ErrorTarget.m_index == -1) {
             // We're in an except handler re-raising an exception with no outer exception
@@ -2574,18 +2567,25 @@ void AbstractInterpreter::unwind_loop(Local finallyReason, EhFlags branchKind, i
     for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
         if (m_blockStack[i].Kind == SETUP_LOOP) {
             if (clearEh != -1) {
-                unwind_eh(m_allHandlers[m_blockStack[clearEh].CurrentHandler].ExVars);
+                unwind_eh(m_blockStack[clearEh].CurrentHandler);
             }
 
+            // We need to emit a BranchLeave here in case we're inside of a nested finally block.  Finally
+            // blocks leave a value on the stack during the entire computation, so we need to clear the
+            // stack before branching away.  Right now we just always emit this BranchNotEqual/BranchLeave pattern
+            auto target = getOffsetLabel(branchKind == EHF_BlockContinues ? continueOffset : m_blockStack[i].EndOffset);
+            auto noBranch = m_comp->emit_define_label();
             m_comp->emit_load_local(finallyReason);
             m_comp->emit_int(branchKind);
-            m_comp->emit_branch(BranchEqual, getOffsetLabel(branchKind == EHF_BlockContinues ? continueOffset : m_blockStack[i].EndOffset));
+            m_comp->emit_branch(BranchNotEqual, noBranch);
+            m_comp->emit_branch(BranchLeave, target);
+            m_comp->emit_mark_label(noBranch);
             break;
         }
         else if (m_blockStack[i].Kind == SETUP_FINALLY) {
             // need to dispatch to outer finally...
             if (clearEh != -1) {
-                unwind_eh(m_allHandlers[m_blockStack[clearEh].CurrentHandler].ExVars);
+                unwind_eh(m_blockStack[clearEh].CurrentHandler);
             }
 
             m_comp->emit_load_local(finallyReason);
@@ -2911,7 +2911,7 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
                 // through.
                 inFinally = true;
                 if (clearEh != -1) {
-                    unwind_eh(m_allHandlers[m_blockStack[clearEh].CurrentHandler].ExVars);
+                    unwind_eh(m_blockStack[clearEh].CurrentHandler);
                 }
                 free_all_iter_locals(blockIndex);
                 m_comp->emit_int(EHF_BlockReturns);
@@ -2934,7 +2934,7 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
 
     if (!inFinally) {
         if (clearEh != -1) {
-            unwind_eh(m_allHandlers[m_blockStack[clearEh].CurrentHandler].ExVars);
+            unwind_eh(m_blockStack[clearEh].CurrentHandler);
         }
         free_all_iter_locals();
         m_comp->emit_branch(BranchLeave, m_retLabel);
@@ -3217,10 +3217,21 @@ void AbstractInterpreter::jump_absolute(int index) {
     m_comp->emit_branch(BranchAlways, getOffsetLabel(index));
 }
 
-void AbstractInterpreter::unwind_eh(ExceptionVars& exVars) {
-    if (exVars.PrevExc.is_valid()) {
-    m_comp->emit_unwind_eh(exVars.PrevExc, exVars.PrevExcVal, exVars.PrevTraceback);
-    }
+
+// Unwinds exception handling starting at the current handler.  Emits the unwind for all
+// of the current handlers until we reach one which will actually handle the current
+// exception.
+void AbstractInterpreter::unwind_eh(size_t fromHandler) {
+    auto cur = fromHandler;
+    do {
+        auto& exVars = m_allHandlers[cur].ExVars;
+
+        if (exVars.PrevExc.is_valid()) {
+            m_comp->emit_unwind_eh(exVars.PrevExc, exVars.PrevExcVal, exVars.PrevTraceback);
+        }
+
+        cur = m_allHandlers[cur].BackHandler;
+    } while (cur != -1 && !(m_allHandlers[cur].Flags & (EHF_TryExcept | EHF_TryFinally)));
 }
 
 ExceptionHandler& AbstractInterpreter::get_ehblock() {
@@ -3264,7 +3275,7 @@ void AbstractInterpreter::pop_except() {
     // we made it to the end of an EH block w/o throwing,
     // clear the exception.
     auto block = m_blockStack.back();
-    unwind_eh(m_allHandlers[block.CurrentHandler].ExVars);
+    unwind_eh(block.CurrentHandler);
 #ifdef DEBUG_TRACE
     m_il.ld_i("Exception cleared");
     m_il.emit_call(METHOD_DEBUG_TRACE);

@@ -67,12 +67,18 @@ class InterpreterState;
 
 enum EhFlags {
     EHF_None = 0,
+    // The exception handling block includes a continue statement
     EHF_BlockContinues = 0x01,
+    // The exception handling block includes a return statement
     EHF_BlockReturns = 0x02,
+    // The exception handling block includes a break statement
     EHF_BlockBreaks = 0x04,
-    EHF_InExceptBlock = 0x08,
-    EHF_InFinally = 0x10,
-    EHF_FinallyHandler = 0x20
+    // The exception handling block is in the try portion of a try/finally
+    EHF_TryFinally = 0x08,
+    // The exception handling block is in the try portion of a try/except
+    EHF_TryExcept = 0x10,
+    // The exception handling block is in the finally or except portion of a try/finally or try/except
+    EHF_InExceptHandler = 0x20,
 };
 
 EhFlags operator | (EhFlags lhs, EhFlags rhs);
@@ -114,8 +120,9 @@ struct ExceptionHandler {
         ErrorTarget;    // The place to branch to for handling errors
     ExceptionVars ExVars;
     vector<bool> EntryStack;
+    size_t BackHandler;
 
-    ExceptionHandler(size_t raiseAndFreeId, ExceptionVars exceptionVars, Label raise, Label reraise, Label errorTarget, vector<bool> entryStack, EhFlags flags = EHF_None) {
+    ExceptionHandler(size_t raiseAndFreeId, ExceptionVars exceptionVars, Label raise, Label reraise, Label errorTarget, vector<bool> entryStack, EhFlags flags = EHF_None, size_t backHandler = -1) {
         RaiseAndFreeId = raiseAndFreeId;
         Flags = flags;
         ExVars = exceptionVars;
@@ -123,6 +130,7 @@ struct ExceptionHandler {
         Raise = raise;
         ReRaise = reraise;
         ErrorTarget = errorTarget;
+        BackHandler = backHandler;
     }
 };
 
@@ -272,7 +280,7 @@ private:
 
     vector<Label>& get_raise_and_free_labels(size_t blockId);
     vector<Label>& get_reraise_and_free_labels(size_t blockId);
-    void emit_raise_and_free(ExceptionHandler& handler);
+    void emit_raise_and_free(size_t handlerIndex);
 
     void ensure_labels(vector<Label>& labels, size_t count);
 
@@ -282,7 +290,7 @@ private:
 
     void clean_stack_for_reraise();
 
-    void unwind_eh(ExceptionVars& exVars);
+    void unwind_eh(size_t fromHandler);
     void unwind_loop(Local finallyReason, EhFlags branchKind, int branchOffset);
 
     ExceptionHandler& get_ehblock();
