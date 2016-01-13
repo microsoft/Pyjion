@@ -214,6 +214,34 @@ void PyJitTest() {
 
     TestCase cases[] = {
         TestCase(
+            "def f():\n    x = b'abc'*3\n    return x",
+            TestInput("b'abcabcabc'")
+            ),
+        TestCase(
+            "def f():\n    unbound += 1",
+            TestInput("<NULL>")
+            ),
+        TestCase(
+            "def f():\n    5 % 0",
+            TestInput("<NULL>")
+            ),
+        TestCase(
+            "def f():\n    5.0 % 0.0",
+            TestInput("<NULL>")
+            ),
+        TestCase(
+            "def f():\n    5.0 // 0.0",
+            TestInput("<NULL>")
+            ),
+        TestCase(
+            "def f():\n    5.0 / 0.0",
+            TestInput("<NULL>")
+            ),
+        TestCase(
+            "def f():\n    x = 'abc'*3\n    return x",
+            TestInput("'abcabcabc'")
+            ),
+        TestCase(
             "def f():\n    if 0.0 < 1.0 <= 1.0 == 1.0 >= 1.0 > 0.0 != 1.0:  return 42",
             TestInput("42")
             ),
@@ -1624,6 +1652,7 @@ void PyJitTest() {
                 _ASSERT(!PyErr_Occurred());
             }
             else {
+                auto tstate = PyThreadState_GET();
                 _ASSERT(PyErr_Occurred());
                 PyErr_Clear();
             }

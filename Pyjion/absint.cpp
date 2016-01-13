@@ -132,6 +132,20 @@ bool AbstractInterpreter::preprocess() {
                     }
                 }
                 break;
+            case LOAD_GLOBAL:
+            {
+                auto name = PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg));
+                if (!strcmp(name, "vars") || !strcmp(name, "dir")) {
+                    // In the future we might be able to do better, e.g. keep locals in fast locals,
+                    // but for now this is a known limitation that if you load vars/dir we won't
+                    // optimize your code, and if you alias them you won't get the correct behavior.
+                    // Longer term we should patch vars/dir/_getframe and be able to provide the
+                    // correct values from generated code.
+                    return false;
+                }
+            }
+            break;
+
         }
     }
     return true;
@@ -200,16 +214,29 @@ bool AbstractInterpreter::interpret() {
                 case NOP: break;
                 case ROT_TWO:
                 {
-                    auto tmp = lastState[lastState.stack_size() - 1];
-                    lastState[lastState.stack_size() - 1] = lastState[lastState.stack_size() - 2];
-                    lastState[lastState.stack_size() - 2] = tmp;
+                    // ROT_TWO currently assumes we have native ints on the stack,
+                    // so we force escape here...  We should fix that up in the future
+                    // and use pop_no_escape
+                    auto tmp = lastState.pop();
+                    auto second = lastState.pop();
+                    lastState.push(tmp);
+                    lastState.push(second);
+                    
+                    // When issue #88 goes away this code can be brought back, and the above
+                    // code can be removed.
+                    //auto tmp = lastState[lastState.stack_size() - 1];
+                    //lastState[lastState.stack_size() - 1] = lastState[lastState.stack_size() - 2];
+                    //lastState[lastState.stack_size() - 2] = tmp;
                     break;
                 }
                 case ROT_THREE:
                 {
-                    auto top = lastState.pop_no_escape();
-                    auto second = lastState.pop_no_escape();
-                    auto third = lastState.pop_no_escape();
+                    // ROT_THREE currently assumes we have native ints on the stack,
+                    // so we force escape here...  We should fix that up in the future
+                    // and use pop_no_escape
+                    auto top = lastState.pop();
+                    auto second = lastState.pop();
+                    auto third = lastState.pop();
 
                     lastState.push(top);
                     lastState.push(third);
@@ -246,7 +273,7 @@ bool AbstractInterpreter::interpret() {
                 {
                     auto localSource = add_local_source(opcodeIndex, oparg);
                     auto local = lastState.get_local(oparg);
-
+                    
                     local.ValueInfo.Sources = AbstractSource::combine(localSource, local.ValueInfo.Sources);
 
                     lastState.push(local.ValueInfo);
@@ -1685,15 +1712,38 @@ JittedCode* AbstractInterpreter::compile_worker() {
     processOpCode:
         switch (byte) {
             case NOP: break;
-            case ROT_TWO: m_comp->emit_rot_two(); break;
-            case ROT_THREE: m_comp->emit_rot_three(); break;
+            case ROT_TWO: 
+            {
+                auto tmp = m_stack[m_stack.size() - 1];
+                m_stack[m_stack.size() - 1] = m_stack[m_stack.size() - 2];
+                m_stack[m_stack.size() - 2] = tmp;
+
+                m_comp->emit_rot_two();
+                break;
+            }
+            case ROT_THREE: 
+            {
+                bool top = m_stack.back();
+                m_stack.pop_back();
+                bool second = m_stack.back();
+                m_stack.pop_back();
+                bool third = m_stack.back();
+                m_stack.pop_back();
+
+                m_stack.push_back(top);
+                m_stack.push_back(third);
+                m_stack.push_back(second);
+
+                m_comp->emit_rot_three();
+                break;
+            }
             case POP_TOP:
                 m_comp->emit_pop_top();
                 dec_stack();
                 break;
             case DUP_TOP:
                 m_comp->emit_dup_top();
-                inc_stack();
+                m_stack.push_back(m_stack.back());
                 break;
             case DUP_TOP_TWO:
                 inc_stack(2);
@@ -1948,7 +1998,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                         dec_stack(2);
 
-                        if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE) {
+                        if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE ||
+                            byte == INPLACE_FLOOR_DIVIDE || byte == BINARY_FLOOR_DIVIDE ||
+                            byte == INPLACE_MODULO || byte == BINARY_MODULO) {
                             m_comp->emit_dup();
                             m_comp->emit_float(0);
                             auto noErr = m_comp->emit_define_label();
@@ -2364,7 +2416,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     if (m_offsetStack.find(curByte) != m_offsetStack.end()) {
                         dec_stack(3);
                         free_iter_locals_on_exception();
-                        m_comp->emit_debug_msg("Restoring error for exception");
                         m_comp->emit_restore_err();
 
                         unwind_eh(ehInfo.ExVars);
@@ -3107,6 +3158,9 @@ void AbstractInterpreter::load_fast_worker(int local, bool checkUnbound) {
 
         m_comp->emit_mark_label(success);
     }
+
+    m_comp->emit_dup();
+    m_comp->emit_incref(false);
 }
 
 void AbstractInterpreter::unpack_ex(size_t size, int opcode) {

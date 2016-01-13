@@ -363,6 +363,8 @@ public:
     // Sets the current exception type and text
     virtual void emit_pyerr_setstring(PyObject* exception, const char*msg) = 0;
 
+    virtual void emit_incref(bool maybeTagged = false) = 0; 
+
     virtual void emit_debug_msg(const char* msg) = 0;
     /* Compiles the generated code */
     virtual JittedCode* emit_compile() = 0;
