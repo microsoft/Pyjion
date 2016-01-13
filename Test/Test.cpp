@@ -214,6 +214,10 @@ void PyJitTest() {
 
     TestCase cases[] = {
         TestCase(
+            "def f():\n    x = b'abc'*3\n    return x",
+            TestInput("b'abcabcabc'")
+            ),
+        TestCase(
             "def f():\n    unbound += 1",
             TestInput("<NULL>")
             ),
@@ -1648,6 +1652,7 @@ void PyJitTest() {
                 _ASSERT(!PyErr_Occurred());
             }
             else {
+                auto tstate = PyThreadState_GET();
                 _ASSERT(PyErr_Occurred());
                 PyErr_Clear();
             }

@@ -136,6 +136,11 @@ bool AbstractInterpreter::preprocess() {
             {
                 auto name = PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg));
                 if (!strcmp(name, "vars") || !strcmp(name, "dir")) {
+                    // In the future we might be able to do better, e.g. keep locals in fast locals,
+                    // but for now this is a known limitation that if you load vars/dir we won't
+                    // optimize your code, and if you alias them you won't get the correct behavior.
+                    // Longer term we should patch vars/dir/_getframe and be able to provide the
+                    // correct values from generated code.
                     return false;
                 }
             }
