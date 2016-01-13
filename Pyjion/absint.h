@@ -206,6 +206,7 @@ class __declspec(dllexport) AbstractInterpreter {
     //      raise logic.
     //  This was so we don't need to have decref/frees spread all over the code
     vector<vector<Label>> m_raiseAndFree, m_reraiseAndFree;
+    unordered_set<size_t> m_jumpsTo;
     Label m_retLabel;
     Local m_retValue;
     // Stores information for a stack allocated local used for sequence unpacking.  We need to allocate
@@ -339,6 +340,7 @@ private:
     Local get_optimized_local(int index, AbstractValueKind kind);
     void pop_except();
 
+    bool can_optimize_pop_jump(int opcodeIndex);
     void unary_positive(int opcodeIndex);
     void unary_negative(int opcodeIndex);
     void unary_not(int& opcodeIndex);

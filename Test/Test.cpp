@@ -213,6 +213,10 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
+        TestCase(
+            "def f(a, q, r):\n    if not (a == q and r == 0):\n        return 42\n    return 23",
+            TestInput("42", vector<PyObject*>({ PyLong_FromLong(2), PyLong_FromLong(4), PyLong_FromLong(7) }))
+        ),
         // Break from nested try/finally needs to use BranchLeave to clear the stack
         TestCase(
             "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                break\n            finally:\n                pass\n    return 42",
