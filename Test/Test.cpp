@@ -213,6 +213,45 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
+        // Break from nested try/finally needs to use BranchLeave to clear the stack
+        TestCase(
+            "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                break\n            finally:\n                pass\n    return 42",
+            TestInput("42")
+            ),
+        // Break from a double nested try/finally needs to unwind all exceptions
+        TestCase(
+            "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                raise Exception()\n            finally:\n                try:\n                     break\n                finally:\n                    pass\n    return 42",
+            TestInput("42")
+            ),
+        // return from nested try/finally should use BranchLeave to clear stack when branching to return label
+        TestCase(
+            "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            return 42\n        finally:\n            pass",
+            TestInput("42")
+        ),
+        // Return from nested try/finally should unwind nested exception handlers
+        TestCase(
+            "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            raise Exception()\n        finally:\n            try:\n                return 42\n            finally:\n                pass\n    return 23",
+            TestInput("42")
+        ),
+        // Break from a nested exception handler needs to unwind all exception handlers
+        TestCase(
+            "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  break\n    return 42",
+            TestInput("42")
+            ),
+        // Return from a nested exception handler needs to unwind all exception handlers
+        TestCase(
+            "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  return 23\n    return 42",
+            TestInput("23")
+            ),
+        // We need to do BranchLeave to clear the stack when doing a break inside of a finally
+        TestCase(
+            "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            break\n    return 42",
+            TestInput("42")
+        ),
+        TestCase(
+            "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()",
+            TestInput("<NULL>")
+            ),
         TestCase(
             "def f():\n    x = b'abc'*3\n    return x",
             TestInput("b'abcabcabc'")
@@ -1652,10 +1691,13 @@ void PyJitTest() {
                 _ASSERT(!PyErr_Occurred());
             }
             else {
-                auto tstate = PyThreadState_GET();
                 _ASSERT(PyErr_Occurred());
                 PyErr_Clear();
             }
+            auto tstate = PyThreadState_GET();
+            _ASSERTE(tstate->exc_value == nullptr);
+            _ASSERTE(tstate->exc_traceback == nullptr);
+            _ASSERTE(tstate->exc_type == nullptr || tstate->exc_type == Py_None);
             //Py_DECREF(frame);
             Py_XDECREF(res);
             Py_DECREF(codeObj);
