@@ -222,6 +222,8 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(tmp);
                     lastState.push(second);
                     
+                    // When issue #88 goes away this code can be brought back, and the above
+                    // code can be removed.
                     //auto tmp = lastState[lastState.stack_size() - 1];
                     //lastState[lastState.stack_size() - 1] = lastState[lastState.stack_size() - 2];
                     //lastState[lastState.stack_size() - 2] = tmp;
