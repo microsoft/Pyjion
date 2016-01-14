@@ -1696,7 +1696,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             vector<bool>()
         )
     );
-
+    
     for (int curByte = 0; curByte < m_size; curByte++) {
         auto opcodeIndex = curByte;
         auto byte = m_byteCode[curByte];
@@ -2287,7 +2287,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         exVars.FinallyTb = backHandler.ExVars.FinallyTb;
                         exVars.FinallyValue = backHandler.ExVars.FinallyValue;
                     }
-
+                    
                     m_allHandlers.emplace_back(
                         ExceptionHandler(
                             m_allHandlers.size(),
@@ -2393,7 +2393,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_load_local(finallyReason);
                     m_comp->emit_restore_err();
 
-                    unwind_eh(curBlock.CurrentHandler);
+                    unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
 
                     auto ehBlock = get_ehblock();
 
@@ -3238,7 +3238,7 @@ void AbstractInterpreter::jump_absolute(int index) {
 // Unwinds exception handling starting at the current handler.  Emits the unwind for all
 // of the current handlers until we reach one which will actually handle the current
 // exception.
-void AbstractInterpreter::unwind_eh(size_t fromHandler) {
+void AbstractInterpreter::unwind_eh(size_t fromHandler, size_t toHandler) {
     auto cur = fromHandler;
     do {
         auto& exVars = m_allHandlers[cur].ExVars;
@@ -3248,7 +3248,7 @@ void AbstractInterpreter::unwind_eh(size_t fromHandler) {
         }
 
         cur = m_allHandlers[cur].BackHandler;
-    } while (cur != -1 && !(m_allHandlers[cur].Flags & (EHF_TryExcept | EHF_TryFinally)));
+    } while (cur != -1 && cur != toHandler && !(m_allHandlers[cur].Flags & (EHF_TryExcept | EHF_TryFinally)));
 }
 
 ExceptionHandler& AbstractInterpreter::get_ehblock() {
@@ -3292,11 +3292,22 @@ void AbstractInterpreter::pop_except() {
     // we made it to the end of an EH block w/o throwing,
     // clear the exception.
     auto block = m_blockStack.back();
-    unwind_eh(block.CurrentHandler);
+    unwind_eh(block.CurrentHandler, m_allHandlers[block.CurrentHandler].BackHandler);
 #ifdef DEBUG_TRACE
     m_il.ld_i("Exception cleared");
     m_il.emit_call(METHOD_DEBUG_TRACE);
 #endif
+}
+
+void AbstractInterpreter::debug_log(const char* fmt, ...) {
+    va_list args;
+
+    va_start(args, fmt);
+    const int bufferSize = 181;
+    char* buffer = new char[bufferSize];
+    vsprintf_s(buffer, bufferSize, fmt, args);
+    va_end(args);
+    m_comp->emit_debug_msg(buffer);
 }
 
 EhFlags operator | (EhFlags lhs, EhFlags rhs) {

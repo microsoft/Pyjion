@@ -291,7 +291,7 @@ private:
 
     void clean_stack_for_reraise();
 
-    void unwind_eh(size_t fromHandler);
+    void unwind_eh(size_t fromHandler, size_t toHandler = -1);
     void unwind_loop(Local finallyReason, EhFlags branchKind, int branchOffset);
 
     ExceptionHandler& get_ehblock();
@@ -348,6 +348,8 @@ private:
     void jump_if_or_pop(bool isTrue, int opcodeIndex, int offset);
     void pop_jump_if(bool isTrue, int opcodeIndex, int offset);
     void test_bool_and_branch(Local value, bool isTrue, Label target);
+
+    void debug_log(const char* fmt, ...);
 };
 
 
