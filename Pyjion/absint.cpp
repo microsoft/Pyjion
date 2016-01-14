@@ -145,6 +145,16 @@ bool AbstractInterpreter::preprocess() {
                 }
             }
             break;
+            case JUMP_FORWARD:
+                m_jumpsTo.insert(oparg + curByte + 1);
+                break;
+            case JUMP_ABSOLUTE:
+            case JUMP_IF_FALSE_OR_POP:
+            case JUMP_IF_TRUE_OR_POP:
+            case POP_JUMP_IF_TRUE:
+            case POP_JUMP_IF_FALSE:
+                m_jumpsTo.insert(oparg);
+                break;
 
         }
     }
@@ -2755,11 +2765,18 @@ void AbstractInterpreter::unary_negative(int opcodeIndex) {
     }
 }
 
+bool AbstractInterpreter::can_optimize_pop_jump(int opcodeIndex) {
+    if (m_byteCode[opcodeIndex + 1] == POP_JUMP_IF_TRUE || m_byteCode[opcodeIndex + 1] == POP_JUMP_IF_FALSE) {
+        return m_jumpsTo.find(opcodeIndex + 1) == m_jumpsTo.end();
+    }
+    return false;
+}
+
 void AbstractInterpreter::unary_not(int& opcodeIndex) {
     auto stackInfo = get_stack_info(opcodeIndex);
     auto one = stackInfo[stackInfo.size() - 1];
 
-    if (m_byteCode[opcodeIndex + 1] == POP_JUMP_IF_TRUE || m_byteCode[opcodeIndex + 1] == POP_JUMP_IF_FALSE) {
+    if (can_optimize_pop_jump(opcodeIndex)) {
         // optimizing away the unnecessary boxing and True/False comparisons
         switch (one.Value->kind()) {
             case AVK_Float:
@@ -3015,7 +3032,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
         case PyCmp_IS:
         case PyCmp_IS_NOT:
             //	TODO: Inlining this would be nice, but then we need the dec refs, e.g.:
-            if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+            if (can_optimize_pop_jump(i)) {
                 m_comp->emit_is_push_int(compareType != PyCmp_IS);
                 dec_stack(); // popped 2, pushed 1
                 branch(i);
@@ -3026,7 +3043,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
             }
             break;
         case PyCmp_IN:
-            if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+            if (can_optimize_pop_jump(i)) {
                 m_comp->emit_in_push_int();
                 dec_stack(2);
                 branch_or_error(i);
@@ -3039,7 +3056,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
             }
             break;
         case PyCmp_NOT_IN:
-            if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+            if (can_optimize_pop_jump(i)) {
                 m_comp->emit_not_in_push_int();
                 dec_stack(2);
                 branch_or_error(i);
@@ -3079,7 +3096,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
                     m_comp->emit_compare_float(compareType);
                     dec_stack();
 
-                    if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+                    if (can_optimize_pop_jump(i)) {
                         branch(i);
                     }
                     else {
@@ -3094,7 +3111,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
                     m_comp->emit_compare_tagged_int(compareType);
                     dec_stack();
 
-                    if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+                    if (can_optimize_pop_jump(i)) {
                         branch(i);
                     }
                     else {
@@ -3106,7 +3123,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
             }
 
             bool generated = false;
-            if (m_byteCode[i + 1] == POP_JUMP_IF_TRUE || m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+            if (can_optimize_pop_jump(i)) {
                 generated = m_comp->emit_compare_object_push_int(compareType);
                 if (generated) {
                     dec_stack(2);
