@@ -214,6 +214,10 @@ void PyJitTest() {
 
     TestCase cases[] = {
         TestCase(
+            "def f():\n    def f(self) -> 42 : pass\n    return 42",
+            TestInput("42")
+        ),
+        TestCase(
             "def f(a, q, r):\n    if not (a == q and r == 0):\n        return 42\n    return 23",
             TestInput("42", vector<PyObject*>({ PyLong_FromLong(2), PyLong_FromLong(4), PyLong_FromLong(7) }))
         ),

@@ -1019,7 +1019,6 @@ int PyJit_FunctionSetAnnotations(PyObject* values, PyObject* names, PyObject* fu
         name = PyTuple_GET_ITEM(names, name_ix);
         value = PyTuple_GET_ITEM(values, name_ix);
         err = PyDict_SetItem(anns, name, value);
-        Py_DECREF(value);
         if (err != 0) {
             Py_DECREF(anns);
             Py_DECREF(func);
