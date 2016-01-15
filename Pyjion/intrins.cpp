@@ -682,10 +682,6 @@ void PyJit_PyErrRestore(PyObject*tb, PyObject*value, PyObject*exception) {
     PyErr_Restore(exception, value, tb);
 }
 
-PyObject* PyJit_CheckFunctionResult(PyObject* value) {
-    return _Py_CheckFunctionResult(nullptr, value, "CompiledCode");
-}
-
 PyObject* PyJit_ImportName(PyObject*level, PyObject*from, PyObject* name, PyFrameObject* f) {
     _Py_IDENTIFIER(__import__);
     PyObject *func = _PyDict_GetItemId(f->f_builtins, &PyId___import__);
@@ -2391,3 +2387,4 @@ bool PyJit_UnaryNot_Int_PushBool(PyObject*value) {
 
     return Py_SIZE(value) == 0;
 }
+

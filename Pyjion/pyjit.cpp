@@ -28,6 +28,27 @@
 
 unordered_map<PyJittedCode*, JittedCode*> g_jittedCode;
 
+PyObject* __stdcall Jit_EvalHelper(void* state, PyFrameObject*frame) {
+    PyThreadState *tstate = PyThreadState_GET();
+    if (tstate->use_tracing) {
+        if (tstate->c_tracefunc != NULL) {
+            return PyEval_EvalFrameEx_NoJit(frame, 0);
+        }
+    }
+
+    if (Py_EnterRecursiveCall("")) {
+        return NULL;
+    }
+
+    frame->f_executing = 1;
+    auto res = ((Py_EvalFunc)state)(nullptr, frame);
+
+    Py_LeaveRecursiveCall();
+    frame->f_executing = 0;
+
+    return _Py_CheckFunctionResult(NULL, res, "Jit_EvalHelper");
+}
+
 extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
     if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
         return nullptr;
@@ -61,8 +82,8 @@ extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
     }
 
     g_jittedCode[jittedCode] = res;
-    jittedCode->j_evalfunc = (Py_EvalFunc)res->get_code_addr();
-    jittedCode->j_evalstate = nullptr;
+    jittedCode->j_evalfunc = &Jit_EvalHelper; //(Py_EvalFunc)res->get_code_addr();
+    jittedCode->j_evalstate = res->get_code_addr();
     return jittedCode;
 }
 

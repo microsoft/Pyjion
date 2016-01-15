@@ -1681,7 +1681,7 @@ void PyJitTest() {
                 frame->f_localsplus[arg] = input.m_args[arg];
             }
 
-            auto res = addr->j_evalfunc(nullptr, frame);
+            auto res = addr->j_evalfunc(addr->j_evalstate, frame);
 
             auto repr = PyUnicode_AsUTF8(PyObject_Repr(res));
             if (strcmp(input.m_expected, repr) != 0) {
