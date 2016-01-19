@@ -135,7 +135,7 @@ bool AbstractInterpreter::preprocess() {
             case LOAD_GLOBAL:
             {
                 auto name = PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg));
-                if (!strcmp(name, "vars") || !strcmp(name, "dir")) {
+                if (!strcmp(name, "vars") || !strcmp(name, "dir") || !strcmp(name, "locals")) {
                     // In the future we might be able to do better, e.g. keep locals in fast locals,
                     // but for now this is a known limitation that if you load vars/dir we won't
                     // optimize your code, and if you alias them you won't get the correct behavior.
@@ -1696,7 +1696,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             vector<bool>()
         )
     );
-
+    
     for (int curByte = 0; curByte < m_size; curByte++) {
         auto opcodeIndex = curByte;
         auto byte = m_byteCode[curByte];
@@ -1800,7 +1800,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                             // need to mark those finallys as needing special handling.
                             inFinally = true;
                             if (clearEh != -1) {
-                                unwind_eh(m_blockStack[clearEh].CurrentHandler);
+                                unwind_eh(
+                                    m_blockStack[clearEh].CurrentHandler, 
+                                    m_allHandlers[m_blockStack[i].CurrentHandler].BackHandler
+                                );
                             }
                             m_comp->emit_int(byte == BREAK_LOOP ? EHF_BlockBreaks : EHF_BlockContinues);
                             m_comp->emit_branch(BranchAlways, m_allHandlers[m_blockStack[i].CurrentHandler].ErrorTarget);
@@ -1813,7 +1816,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                 if (!inFinally) {
                     if (clearEh != -1) {
-                        unwind_eh(m_blockStack[clearEh].CurrentHandler);
+                        unwind_eh(
+                            m_blockStack[clearEh].CurrentHandler, 
+                            m_blockStack[loopIndex].CurrentHandler
+                        );
                     }
                     if (byte != CONTINUE_LOOP) {
                         free_iter_local();
@@ -2287,7 +2293,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         exVars.FinallyTb = backHandler.ExVars.FinallyTb;
                         exVars.FinallyValue = backHandler.ExVars.FinallyValue;
                     }
-
+                    
                     m_allHandlers.emplace_back(
                         ExceptionHandler(
                             m_allHandlers.size(),
@@ -2393,7 +2399,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_load_local(finallyReason);
                     m_comp->emit_restore_err();
 
-                    unwind_eh(curBlock.CurrentHandler);
+                    unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
 
                     auto ehBlock = get_ehblock();
 
@@ -2417,7 +2423,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         free_iter_locals_on_exception();
                         m_comp->emit_restore_err();
 
-                        unwind_eh(curBlock.CurrentHandler);
+                        unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
                         clean_stack_for_reraise();
 
                         m_comp->emit_branch(BranchAlways, get_ehblock().ReRaise);
@@ -2502,7 +2508,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
     m_comp->emit_mark_label(finalRet);
     m_comp->emit_pop_frame();
 
-    m_comp->emit_check_function_result();
     m_comp->emit_ret();
 
     return m_comp->emit_compile();
@@ -2577,7 +2582,7 @@ void AbstractInterpreter::unwind_loop(Local finallyReason, EhFlags branchKind, i
     for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
         if (m_blockStack[i].Kind == SETUP_LOOP) {
             if (clearEh != -1) {
-                unwind_eh(m_blockStack[clearEh].CurrentHandler);
+                unwind_eh(m_blockStack[clearEh].CurrentHandler, m_blockStack[i].CurrentHandler);
             }
 
             // We need to emit a BranchLeave here in case we're inside of a nested finally block.  Finally
@@ -2595,7 +2600,10 @@ void AbstractInterpreter::unwind_loop(Local finallyReason, EhFlags branchKind, i
         else if (m_blockStack[i].Kind == SETUP_FINALLY) {
             // need to dispatch to outer finally...
             if (clearEh != -1) {
-                unwind_eh(m_blockStack[clearEh].CurrentHandler);
+                unwind_eh(
+                    m_blockStack[clearEh].CurrentHandler, 
+                    m_allHandlers[m_blockStack[clearEh].CurrentHandler].BackHandler
+                );
             }
 
             m_comp->emit_load_local(finallyReason);
@@ -2928,7 +2936,10 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
                 // through.
                 inFinally = true;
                 if (clearEh != -1) {
-                    unwind_eh(m_blockStack[clearEh].CurrentHandler);
+                    unwind_eh(
+                        m_blockStack[clearEh].CurrentHandler, 
+                        m_allHandlers[m_blockStack[blockIndex].CurrentHandler].BackHandler
+                    );
                 }
                 free_all_iter_locals(blockIndex);
                 m_comp->emit_int(EHF_BlockReturns);
@@ -3229,7 +3240,7 @@ void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
     m_comp->emit_free_local(remainderTmp);
 }
 
-void AbstractInterpreter::jump_absolute(int index) {
+void AbstractInterpreter::jump_absolute(int index) { 
     m_offsetStack[index] = m_stack;
     m_comp->emit_branch(BranchAlways, getOffsetLabel(index));
 }
@@ -3238,7 +3249,7 @@ void AbstractInterpreter::jump_absolute(int index) {
 // Unwinds exception handling starting at the current handler.  Emits the unwind for all
 // of the current handlers until we reach one which will actually handle the current
 // exception.
-void AbstractInterpreter::unwind_eh(size_t fromHandler) {
+void AbstractInterpreter::unwind_eh(size_t fromHandler, size_t toHandler) {
     auto cur = fromHandler;
     do {
         auto& exVars = m_allHandlers[cur].ExVars;
@@ -3248,7 +3259,7 @@ void AbstractInterpreter::unwind_eh(size_t fromHandler) {
         }
 
         cur = m_allHandlers[cur].BackHandler;
-    } while (cur != -1 && !(m_allHandlers[cur].Flags & (EHF_TryExcept | EHF_TryFinally)));
+    } while (cur != -1 && cur != toHandler && !(m_allHandlers[cur].Flags & (EHF_TryExcept | EHF_TryFinally)));
 }
 
 ExceptionHandler& AbstractInterpreter::get_ehblock() {
@@ -3292,11 +3303,22 @@ void AbstractInterpreter::pop_except() {
     // we made it to the end of an EH block w/o throwing,
     // clear the exception.
     auto block = m_blockStack.back();
-    unwind_eh(block.CurrentHandler);
+    unwind_eh(block.CurrentHandler, m_allHandlers[block.CurrentHandler].BackHandler);
 #ifdef DEBUG_TRACE
     m_il.ld_i("Exception cleared");
     m_il.emit_call(METHOD_DEBUG_TRACE);
 #endif
+}
+
+void AbstractInterpreter::debug_log(const char* fmt, ...) {
+    va_list args;
+
+    va_start(args, fmt);
+    const int bufferSize = 181;
+    char* buffer = new char[bufferSize];
+    vsprintf_s(buffer, bufferSize, fmt, args);
+    va_end(args);
+    m_comp->emit_debug_msg(buffer);
 }
 
 EhFlags operator | (EhFlags lhs, EhFlags rhs) {
