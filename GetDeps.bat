@@ -28,16 +28,9 @@ git apply ..\Patches\CoreCLR\CMakeLists.txt
 popd
 
 REM ########################################################
-REM # Clone CPython code base
-
-echo Getting CPython...
-git clone https://github.com/python/cpython.git Python
-pushd Python
-git reset --hard efe0e11c78f890146375f1d4cbed4b513cdffa3c
-
-REM ########################################################
 REM # Apply changes to integrate JIT support into CPython
 
 echo Applying changes to enable JIT support...
+pushd Python
 git apply ..\Patches\python.diff
 popd
