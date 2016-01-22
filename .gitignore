@@ -1,6 +1,7 @@
 /Libs/
 /Pyjion/x64/
 /Test/x64/
+/Tests/x64/
 /Tools/*.h
 /Tools/*.cpp
 /ipch/

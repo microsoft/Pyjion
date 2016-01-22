@@ -19,7 +19,6 @@ git clone --recursive https://github.com/Microsoft/Pyjion.git
 ```
 
 ### Patching dependencies
-
 Run `PatchDeps.bat` to patch Python to have JIT support and CoreCLR to disable COM support.
 
 ### Build Dependencies
@@ -32,13 +31,8 @@ Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Pyth
 * Run `CopyFiles.bat` to copy files to key locations
 
 ### Testing
-* From Visual Studio
-  4. Set the `Test` solution as the StartUp project
-  5. Run the solution (i.e., press F5)
-* From Powershell
-  4. Run `x64\Debug\Test.exe`
-
-If the output window closes and return an exit code of 0 then the tests passed.
+  1. Run `x64\Debug\Test.exe`
+  2. Run `x64\Debug\Tests.exe`
 
 ### Running
 1. Copy `x64\Debug\pyjit.dll` to `Python\PCbuild\amd64\` (initially done by `CopyFiles.bat`, so only do as necessary after rebuilding Pyjion)
