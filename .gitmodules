@@ -1,0 +1,6 @@
+[submodule "Python"]
+	path = Python
+	url = https://github.com/python/cpython.git
+[submodule "CoreCLR"]
+	path = CoreCLR
+	url = https://github.com/dotnet/coreclr.git
