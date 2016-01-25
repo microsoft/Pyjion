@@ -2290,8 +2290,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     ExceptionVars exVars = prevHandler.ExVars;
                     if (backHandler.Flags & EHF_TryFinally) {
                         flags |= EHF_TryFinally;
-                        exVars.FinallyTb = backHandler.ExVars.FinallyTb;
-                        exVars.FinallyValue = backHandler.ExVars.FinallyValue;
                     }
                     
                     m_allHandlers.emplace_back(
@@ -2339,25 +2337,24 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     // We're actually ending a finally.  If we're in an exceptional case we
                     // need to re-throw, otherwise we need to just continue execution.  Our
                     // exception handling code will only push the exception type on in this case.
-                    auto finallyReason = m_comp->emit_define_local();
                     auto noException = m_comp->emit_define_label();
                     dec_stack();
-                    m_comp->emit_store_local(finallyReason);
-                    m_comp->emit_load_local(finallyReason);
+                    m_comp->emit_store_local(ehInfo.ExVars.FinallyExc);
+                    m_comp->emit_load_local(ehInfo.ExVars.FinallyExc);
                     m_comp->emit_py_object(Py_None);
                     m_comp->emit_branch(BranchEqual, noException);
 
                     if (flags & EHF_BlockBreaks) {
-                        unwind_loop(finallyReason, EHF_BlockBreaks, 0);
+                        unwind_loop(ehInfo.ExVars.FinallyExc, EHF_BlockBreaks, 0);
                     }
 
                     if (flags & EHF_BlockContinues) {
-                        unwind_loop(finallyReason, EHF_BlockContinues, curBlock.ContinueOffset);
+                        unwind_loop(ehInfo.ExVars.FinallyExc, EHF_BlockContinues, curBlock.ContinueOffset);
                     }
 
                     if (flags & EHF_BlockReturns) {
                         auto exceptional = m_comp->emit_define_label();
-                        m_comp->emit_load_local(finallyReason);
+                        m_comp->emit_load_local(ehInfo.ExVars.FinallyExc);
                         m_comp->emit_int(EHF_BlockReturns);
                         m_comp->emit_compare_equal();
                         m_comp->emit_branch(BranchFalse, exceptional);
@@ -2367,7 +2364,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
                             if (m_blockStack[i].Kind == SETUP_FINALLY) {
                                 // need to dispatch to outer finally...
-                                m_comp->emit_load_local(finallyReason);
+                                m_comp->emit_load_local(ehInfo.ExVars.FinallyExc);
                                 m_comp->emit_branch(BranchAlways, m_allHandlers[m_blockStack[i].CurrentHandler].ErrorTarget);
                                 hasOuterFinally = true;
                                 break;
@@ -2396,19 +2393,16 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     
                     m_comp->emit_load_local(ehInfo.ExVars.FinallyTb);
                     m_comp->emit_load_local(ehInfo.ExVars.FinallyValue);
-                    m_comp->emit_load_local(finallyReason);
+                    m_comp->emit_load_local(ehInfo.ExVars.FinallyExc);
                     m_comp->emit_restore_err();
-
                     unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
 
                     auto ehBlock = get_ehblock();
 
                     clean_stack_for_reraise();
-
                     m_comp->emit_branch(BranchAlways, ehBlock.ReRaise);
 
                     m_comp->emit_mark_label(noException);
-                    m_comp->emit_free_local(finallyReason);
                 }
                 else {
                     // END_FINALLY is marking the EH rethrow.  The byte code branches
@@ -2485,8 +2479,14 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 if (handler.Flags & EHF_TryFinally) {
                     auto tmpEx = m_comp->emit_spill();
 
-                    m_comp->emit_store_local(handler.ExVars.FinallyValue);
-                    m_comp->emit_store_local(handler.ExVars.FinallyTb);
+                    auto targetHandler = i;
+                    while (m_allHandlers[targetHandler].BackHandler != -1) {
+                        targetHandler = m_allHandlers[targetHandler].BackHandler;
+                    }
+                    auto& vars = m_allHandlers[targetHandler].ExVars;
+
+                    m_comp->emit_store_local(vars.FinallyValue);
+                    m_comp->emit_store_local(vars.FinallyTb);
 
                     m_comp->emit_load_and_free_local(tmpEx);
                 }
@@ -2955,6 +2955,13 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
                     m_comp->emit_pop_top();
                     m_comp->emit_load_local(m_allHandlers[m_blockStack[blockIndex].CurrentHandler].ExVars.FinallyValue);
                     m_comp->emit_pop_top();
+                    m_comp->emit_load_local(m_allHandlers[m_blockStack[blockIndex].CurrentHandler].ExVars.FinallyExc);
+                    m_comp->emit_pop_top();
+
+                    m_comp->emit_null();
+                    m_comp->emit_null();
+                    m_comp->emit_null();
+                    m_comp->emit_restore_err();
                 }
             }
         }
