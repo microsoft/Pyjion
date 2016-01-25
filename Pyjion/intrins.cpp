@@ -675,10 +675,13 @@ const char * ObjInfo(PyObject *obj);
 
 void PyJit_PyErrRestore(PyObject*tb, PyObject*value, PyObject*exception) {
 #ifdef DEBUG_TRACE
-    printf("Restoring exception %s\r\n", ObjInfo(exception));
-    printf("Restoring value %s\r\n", ObjInfo(value));
-    printf("Restoring tb %s\r\n", ObjInfo(tb));
+    printf("Restoring exception %p %s\r\n", exception, ObjInfo(exception));
+    printf("Restoring value %p %s\r\n", value, ObjInfo(value));
+    printf("Restoring tb %p %s\r\n", tb, ObjInfo(tb));
 #endif
+    if (exception == Py_None) {
+        exception = nullptr;
+    }
     PyErr_Restore(exception, value, tb);
 }
 

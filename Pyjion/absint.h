@@ -95,7 +95,7 @@ struct ExceptionVars {
     // The previous traceback and exception values if we're handling a finally block.
     // We store these in locals and keep only the exception type on the stack so that
     // we don't enter the finally handler with multiple stack depths.
-    Local FinallyTb, FinallyValue;
+    Local FinallyExc, FinallyTb, FinallyValue;
 
     ExceptionVars() {
     }
@@ -105,6 +105,7 @@ struct ExceptionVars {
         PrevExcVal = comp->emit_define_local(false);
         PrevTraceback = comp->emit_define_local(false);
         if (isFinally) {
+            FinallyExc = comp->emit_define_local(false);
             FinallyTb = comp->emit_define_local(false);;
             FinallyValue = comp->emit_define_local(false);
         }
