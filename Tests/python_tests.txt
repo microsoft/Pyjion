@@ -356,31 +356,28 @@ test_runpy
 ##test_sax
 # TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_sched
-# TODO: Unknown unsupported opcode: DELETE_DEREF
-##test_scope
-# TODO: crashes
+test_scope
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_script_helper
 test_select
 test_selectors
 test_set
 test_setcomps
-# TODO: crashes
-##test_shelve
+test_shelve
 test_shlex
-# TODO: Fatal Python error: ..\Python\traceback.c:54 object at 00000091DE19B058 has negative ref count -2604246222170760230
-##test_shutil
-# TODO: crashes
+test_shutil
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_signal
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_site
 test_slice
 test_smtpd
-# TODO: OSError: [WinError 10022] An invalid argument was supplied
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_smtplib
 # Use of the 'network' resource not enabled
 ##test_smtpnet
 test_sndhdr
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_socket
 # Use of the 'network' resource not enabled
 ##test_socketserver
@@ -388,9 +385,9 @@ test_sort
 test_source_encoding
 # No module named 'spwd'
 ##test_spwd
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_sqlite
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_ssl
 test_startfile
 test_stat
@@ -404,12 +401,11 @@ test_strtod
 test_struct
 test_structmembers
 test_structseq
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_subprocess
 test_sunau
 test_sundry
-# TODO: Unknown unsupported opcode: DELETE_DEREF
-##test_super
+test_super
 test_support
 test_symbol
 test_symtable
@@ -419,31 +415,31 @@ test_syntax
 test_sysconfig
 # No module named 'syslog'
 ##test_syslog
-# TODO: fails, passed on Python 3.5.0
+# TODO: https://github.com/Microsoft/Pyjion/issues/108
 ##test_sys_setprofile
-# TODO: SystemError: CompiledCode returned NULL without setting an error
+# TODO: https://github.com/Microsoft/Pyjion/issues/92
 ##test_sys_settrace
-# TODO: hangs
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_tarfile
 test_tcl
-# TODO: PermissionError: [WinError 5] Access is denied
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_telnetlib
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_tempfile
 test_textwrap
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_thread
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_threadedtempfile
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_threaded_import
 # TODO: https://github.com/Microsoft/Pyjion/issues/94
 ##test_threading
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_threading_local
 # Can't test signal on win32
 ##test_threadsignals
-# TODO: fails, passed on Python 3.5.0
+# Known failure
 ##test_time
 test_timeit
 # Use of the 'network' resource not enabled
@@ -453,73 +449,66 @@ test_timeit
 # Use of the 'gui' resource not enabled
 ##test_tk
 #test_tokenize
-# Fails under install of Python 3.5.0
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_tools
-# TODO: fails, passes on Python 3.5.0
-##test_trace
-# TODO: crashes
+test_trace
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_traceback
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_tracemalloc
 # Use of the 'gui' resource not enabled
 ##test_ttk_guionly
 test_ttk_textonly
 test_tuple
 test_typechecks
-# TODO: absint.cpp(2881) : Assertion failed: m_stack[m_stack.size() - 1] == STACK_KIND_VALUE
-##test_types
-# TODO: Assertion failed: _PyGCHead_REFS(gc) != 0, file ..\Modules\gcmodule.c, line 379
-##test_typing
+test_types
+test_typing
 test_ucn
 test_unary
 test_unicode
 test_unicodedata
 test_unicode_file
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_unittest
 test_univnewlines
 test_unpack
 test_unpack_ex
-# TODO: crashes
-##test_urllib
-# TODO: crashes
-##test_urllib2
+test_urllib
+test_urllib2
 # Use of the 'network' resource not enabled
 ##test_urllib2net
-# TODO: OSError: [WinError 10022] An invalid argument was supplied
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_urllib2_localnet
 # Use of the 'network' resource not enabled
 ##test_urllibnet
 test_urllib_response
 test_urlparse
-# TODO: crashes
-##test_userdict
+test_userdict
 test_userlist
 test_userstring
-# TODO: COMPILATION FAILED: file: importer.cpp:14600 compiling method foo:bar(long,long):long reason Block at offset 1c0e to 1c3c in foo:bar(long,long):long entered with different stack depths.
-##test_uu
+test_uu
 test_uuid
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_venv
 # os.fork not defined
 ##test_wait3
 # os.fork not defined
 ##test_wait4
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_warnings
 test_wave
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_weakref
 test_weakset
 test_webbrowser
-# TODO: c:\users\brcan\documents\repositories\pyjion\pyjion\absint.h(360) : Assertion failed: !(valueInfo.Value == &Undefined && !isUndefined)
+# TODO: https://github.com/Microsoft/Pyjion/issues/102
 ##test_winreg
 # Use of the 'audio' resource not enabled
 ##test_winsound
 test_with
 test_wsgiref
 test_xdrlib
-# TODO: Fatal Python error: a function returned NULL without setting an error
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_xmlrpc
 # Use of the 'network' resource not enabled
 ##test_xmlrpc_net
@@ -527,19 +516,16 @@ test_xml_dom_minicompat
 test_xml_etree
 test_xml_etree_c
 test_zipapp
-# TODO: clean hangs
-##test_zipfile
+test_zipfile
 # test requires loads of disk-space bytes and a long time to run
 ##test_zipfile64
-# TODO: failed, passes on Python 3.5.0
-##test_zipimport
-# TODO: COMPILATION FAILED: file: importer.cpp:14600 compiling method foo:bar(long,long):long reason Block at offset 1188 to 11c5 in foo:bar(long,long):long entered with different stack depths.
+test_zipimport
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_zipimport_support
 test_zlib
-# TODO: Assertion failed: !(valueInfo.Value == &Undefined && !isUndefined)
+# TODO: https://github.com/Microsoft/Pyjion/issues/102
 ##test__locale
 test__opcode
 test__osx_support
-# TODO: hangs
-##test___all__
+test___all__
 test___future__
