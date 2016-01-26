@@ -9,22 +9,20 @@
 # (which makes it easy to search for skipped tests instead of any comment).
 # If the skip is because of a bug, then the explanation comment should lead with a `TODO` comment.
 # ----------
-# TODO: Assertion failed: !PyErr_Occurred(), file ..\Objects\methodobject.c, line 93
-##test_abc
+test_abc
 test_abstract_numbers
 test_aifc
 test_argparse
 test_array
 test_asdl_parser
 test_ast
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_asynchat
-# TODO: hangs
+# TODO: https://github.com/Microsoft/Pyjion/issues/104
 ##test_asyncio
-# TODO: Exception in thread Thread-1
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_asyncore
-# TODO: test test_atexit failed -- Traceback (most recent call last)
-##test_atexit
+test_atexit
 test_audioop
 test_augassign
 test_base64
@@ -37,33 +35,32 @@ test_bisect
 test_bool
 test_buffer
 test_bufio
-# TODO: c:\users\brcan\documents\repositories\pyjion\pyjion\absint.h(360) : Assertion failed: !(valueInfo.Value == &Undefined && !isUndefined)
+# TODO: https://github.com/Microsoft/Pyjion/issues/102
 ##test_builtin
 test_bytes
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_bz2
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_calendar
 test_call
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_capi
 test_cgi
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_cgitb
 test_charmapcodec
 test_class
 test_cmath
-# TODO: COMPILATION FAILED: file: importer.cpp:14600 compiling method foo:bar(long,long):long reason Block at offset 1188 to 11c5 in foo:bar(long,long):long entered with different stack depths.
-##test_cmd
-# TODO: crashes
+test_cmd
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_cmd_line
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_cmd_line_script
 test_code
 test_codeccallbacks
 test_codecencodings_cn
 test_codecencodings_hk
-# TODO: Test fails, but passes under Python 3.5.0
+# Common failure
 ##test_codecencodings_iso2022
 test_codecencodings_jp
 test_codecencodings_kr
@@ -73,41 +70,33 @@ test_codecmaps_hk
 test_codecmaps_jp
 test_codecmaps_kr
 test_codecmaps_tw
-# TODO: absint.cpp(1506) : Assertion failed: m_stack.size() >= size
-##test_codecs
+test_codecs
 test_codeop
 test_code_module
-# TODO: IL Code Size exceeded, using MinOpts for method foo:bar(long,long):long
-##test_collections
+test_collections
 test_colorsys
 test_compare
-# TODO: IL Code Size exceeded, using MinOpts for method foo:bar(long,long):long
-##test_compile
-# TODO: crashes
+test_compile
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_compileall
 test_complex
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_concurrent_futures
-# TODO: Failed, but passes on Python 3.5.0
-##test_configparser
+test_configparser
 test_contains
-# TODO: COMPILATION FAILED: file: importer.cpp:14305 compiling method foo:bar(long,long):long reason can't have 'unreached' end of BB with non-empty stack
-##test_contextlib
+test_contextlib
 test_copy
 test_copyreg
-# TODO: hangs
-##test_coroutines
-# TODO: fails, but passes under Python 3.5.0
-##test_cprofile
+test_coroutines
+test_cprofile
 test_crashers
 # No module named '_crypt'
 ##test_crypt
 test_csv
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_ctypes
 # Use of the 'curses' resource not enabled
 ##test_curses
-# Fails on an installed copy of Python 3.5.0
 test_datetime
 test_dbm
 test_dbm_dumb
@@ -115,13 +104,12 @@ test_dbm_dumb
 ##test_dbm_gnu
 # No module named '_dbm'
 ##test_dbm_ndbm
-# TODO: COMPILATION FAILED: file: importer.cpp:14600 compiling method foo:bar(long,long):long reason Block at offset 16e4 to 16eb in foo:bar(long,long):long entered with different stack depths.
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_decimal
 test_decorators
 test_defaultdict
 test_deque
-# TODO: IL Code Size exceeded, using MinOpts for method foo:bar(long,long):long
-##test_descr
+test_descr
 test_descrtut
 # test works only on Solaris OS family
 ##test_devpoll
@@ -129,26 +117,20 @@ test_dict
 test_dictcomps
 test_dictviews
 test_difflib
-# TODO: fails, but passes under Python 3.5.0
-##test_difflib_expect
 test_dis
-# TODO: hangs
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_distutils
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_doctest
 test_doctest2
-# TODO: failed, but passed under Python 3.5.0
-##test_doctest3
-# TODO: Failed, but passed under Python 3.5.0
-##test_doctest4
-# TODO: crashed
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_docxmlrpc
 test_dummy_thread
 test_dummy_threading
 test_dynamic
 test_dynamicclassattribute
 test_eintr
-# TODO: COMPILATION FAILED: file: importer.cpp:14600 compiling method foo:bar(long,long):long reason Block at offset 1c0e to 1c3c in foo:bar(long,long):long entered with different stack depths.
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_email
 test_ensurepip
 test_enum
@@ -157,23 +139,20 @@ test_eof
 # test works only on Linux 2.6
 ##test_epoll
 test_errno
-# TODO: crashes
-##test_exceptions
+test_exceptions
 test_exception_variations
 test_extcall
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_faulthandler
 # No module named 'fcntl'
 ##test_fcntl
 test_file
 test_filecmp
 test_fileinput
-# TODO: crashed
-##test_fileio
+test_fileio
 test_file_eintr
 test_finalization
-# TODO: IL Code Size exceeded, using MinOpts for method foo:bar(long,long):long
-##test_float
+test_float
 test_flufl
 test_fnmatch
 # No os.fork() on Windows
@@ -182,16 +161,16 @@ test_format
 test_fractions
 # TODO: https://github.com/Microsoft/Pyjion/issues/93
 ##test_frame
-# Crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_ftplib
 test_funcattrs
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_functools
 test_future
 test_future3
 test_future4
 test_future5
-# TODO: COMPILATION FAILED: file: importer.cpp:14305 compiling method foo:bar(long,long):long reason can't have 'unreached' end of BB with non-empty stack
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_gc
 # Couldn't find gdb on the path
 ##test_gdb
@@ -205,41 +184,39 @@ test_getpass
 test_gettext
 test_glob
 test_global
-# TODO: Fatal Python error: a function returned a result with an error set
-##test_grammar
+test_grammar
 # No module named 'grp'
 ##test_grp
 test_gzip
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_hash
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_hashlib
 test_heapq
 test_hmac
 test_html
 test_htmlparser
-# TODO: Fatal Python error: a function returned NULL without setting an error
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_httplib
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_httpservers
 test_http_cookiejar
 test_http_cookies
-# TODO: Fails, passes under Python 3.5.0
-##test_idle
-# TODO: fails, passes under Python 3.5.0
+test_idle
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_imaplib
 test_imghdr
 test_imp
-# TODO: hangs
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_import
-# TODO: hangs
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_importlib
 test_index
-# TODO: Fatal Python error: a function returned a result with an error set
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_inspect
 test_int
 test_int_literal
-# TODO: Fatal Python error: a function returned NULL without setting an error
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_io
 # No module named 'fcntl'
 ##test_ioctl
@@ -248,29 +225,26 @@ test_isinstance
 test_iter
 test_iterlen
 test_itertools
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_json
 test_keyword
 test_keywordonlyarg
 # test works only on BSD
 ##test_kqueue
 test_largefile
-# TODO: Assertion failed: _PyGCHead_REFS(gc) != 0, file ..\Modules\gcmodule.c, line 379
-##test_lib2to3
+test_lib2to3
 test_linecache
 test_list
 test_listcomps
-# TODO: COMPILATION FAILED: file: importer.cpp:14600 compiling method foo:bar(long,long):long reason Block at offset 0a15 to 0a35 in foo:bar(long,long):long entered with different stack depths.
-##test_locale
-# TODO: crashes
+test_locale
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_logging
 test_long
 test_longexp
 test_lzma
 test_macpath
 test_macurl2path
-# TODO: issues deleting old test files
-##test_mailbox
+test_mailbox
 test_mailcap
 test_marshal
 test_math
@@ -279,18 +253,17 @@ test_memoryview
 test_metaclass
 test_mimetypes
 test_minidom
-# TODO: COMPILATION FAILED: file: importer.cpp:14600 compiling method foo:bar(long,long):long reason Block at offset 1811 to 1837 in foo:bar(long,long):long entered with different stack depths.
-##test_mmap
-# TODO: crashes
+test_mmap
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_module
 test_modulefinder
 test_msilib
 test_multibytecodec
 test_multiprocessing_fork
 test_multiprocessing_forkserver
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_multiprocessing_main_handling
-# TODO: COMPILATION FAILED: file: importer.cpp:14600 compiling method foo:bar(long,long):long reason Block at offset 0c2b to 0c32 in foo:bar(long,long):long entered with different stack depths.
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_multiprocessing_spawn
 test_netrc
 # No module named 'nis'
@@ -302,30 +275,26 @@ test_numeric_tower
 test_opcodes
 # os.openpty() not available.
 ##test_openpty
-# TODO: Fatal Python error: a function returned a result with an error set
-##test_operator
+test_operator
 test_optparse
-# TODO: c:\users\brcan\documents\repositories\pyjion\pyjion\absint.h(360) : Assertion failed: !(valueInfo.Value == &Undefined && !isUndefined)
+# TODO: https://github.com/Microsoft/Pyjion/issues/102
 ##test_os
 # Use of the 'audio' resource not enabled
 ##test_ossaudiodev
 test_osx_env
 # TODO: crashes
 ##test_parser
-# TODO: test cleanup hanging
-##test_pathlib
-# TODO: crashes
+test_pathlib
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_pdb
 test_peepholer
 test_pep247
 test_pep277
 test_pep292
 test_pep3120
-# TODO: AssertionError: 'Unicode' not found in ['self']
-##test_pep3131
+test_pep3131
 test_pep3151
-# TODO: COMPILATION FAILED: file: importer.cpp:14600 compiling method foo:bar(long,long):long reason Block at offset 22bd to 22e3 in foo:bar(long,long):long entered with different stack depths
-##test_pep352
+test_pep352
 test_pep380
 test_pep479
 test_pickle
@@ -335,23 +304,22 @@ test_pickletools
 test_pkg
 test_pkgimport
 test_pkgutil
-# TODO: c:\users\brcan\documents\repositories\pyjion\pyjion\absint.h(360) : Assertion failed: !(valueInfo.Value == &Undefined && !isUndefined)
+# TODO: https://github.com/Microsoft/Pyjion/issues/102
 ##test_platform
 test_plistlib
 # select.poll not defined
 ##test_poll
 test_popen
-# TODO: OSError: [WinError 10022] An invalid argument was supplied
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_poplib
 # No module named 'posix'
 ##test_posix
 test_posixpath
-# TODO: Assert: c:\users\brcan\documents\repositories\pyjion\coreclr\src\jit\importer.cpp 10245
+# TODO: https://github.com/Microsoft/Pyjion/issues/107
 ##test_pow
 test_pprint
 test_print
-# TODO: fails, passed on Python 3.5.0
-##test_profile
+test_profile
 test_property
 test_pstats
 # No module named 'termios'
@@ -360,18 +328,16 @@ test_pulldom
 # No module named 'pwd'
 ##test_pwd
 test_pyclbr
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_pydoc
-# TODO: fails, passed on Python 3.5.0
-##test_pyexpat
+test_pyexpat
 test_py_compile
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_queue
-# TODO: absint.cpp(1506) : Assertion failed: m_stack.size() >= size
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_quopri
-# TODO: COMPILATION FAILED: file: importer.cpp:14305 compiling method foo:bar(long,long):long reason can't have 'unreached' end of BB with non-empty stack
-##test_raise
-# TODO: fails, passed on Python 3.5.0
+test_raise
+# Known failure
 ##test_random
 test_range
 test_re
@@ -383,12 +349,12 @@ test_reprlib
 ##test_resource
 test_richcmp
 test_rlcompleter
-# TODO: OSError: [WinError 10022] An invalid argument was supplied
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_robotparser
 test_runpy
-# TODO: fails, passed on Python 3.5.0
+# Known failure
 ##test_sax
-# TODO: crashes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
 ##test_sched
 # TODO: Unknown unsupported opcode: DELETE_DEREF
 ##test_scope
