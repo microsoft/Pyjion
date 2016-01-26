@@ -1,0 +1,531 @@
+# A list of all tests in Python 3.5.
+# To run tests from PowerShell in a Pyjion checkout:
+#   .\Python\python.bat -m test -n -f Tests\python_tests.txt
+#
+# When reproducing failures, make sure to run under `-m test`, e.g.,:
+#   .\Python\python.bat -m test test_concurrent_futures
+#
+# A skipped test is commented out with a leading `##` marker along with a preceding comment explaining why the test is skipped
+# (which makes it easy to search for skipped tests instead of any comment).
+# If the skip is because of a bug, then the explanation comment should lead with a `TODO` comment.
+# ----------
+test_abc
+test_abstract_numbers
+test_aifc
+test_argparse
+test_array
+test_asdl_parser
+test_ast
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_asynchat
+# TODO: https://github.com/Microsoft/Pyjion/issues/104
+##test_asyncio
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_asyncore
+test_atexit
+test_audioop
+test_augassign
+test_base64
+test_bigaddrspace
+test_bigmem
+test_binascii
+test_binhex
+test_binop
+test_bisect
+test_bool
+test_buffer
+test_bufio
+# TODO: https://github.com/Microsoft/Pyjion/issues/102
+##test_builtin
+test_bytes
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_bz2
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_calendar
+test_call
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_capi
+test_cgi
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_cgitb
+test_charmapcodec
+test_class
+test_cmath
+test_cmd
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_cmd_line
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_cmd_line_script
+test_code
+test_codeccallbacks
+test_codecencodings_cn
+test_codecencodings_hk
+# Common failure
+##test_codecencodings_iso2022
+test_codecencodings_jp
+test_codecencodings_kr
+test_codecencodings_tw
+test_codecmaps_cn
+test_codecmaps_hk
+test_codecmaps_jp
+test_codecmaps_kr
+test_codecmaps_tw
+test_codecs
+test_codeop
+test_code_module
+test_collections
+test_colorsys
+test_compare
+test_compile
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_compileall
+test_complex
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_concurrent_futures
+test_configparser
+test_contains
+test_contextlib
+test_copy
+test_copyreg
+test_coroutines
+test_cprofile
+test_crashers
+# No module named '_crypt'
+##test_crypt
+test_csv
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_ctypes
+# Use of the 'curses' resource not enabled
+##test_curses
+test_datetime
+test_dbm
+test_dbm_dumb
+# No module named '_gdbm'
+##test_dbm_gnu
+# No module named '_dbm'
+##test_dbm_ndbm
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_decimal
+test_decorators
+test_defaultdict
+test_deque
+test_descr
+test_descrtut
+# test works only on Solaris OS family
+##test_devpoll
+test_dict
+test_dictcomps
+test_dictviews
+test_difflib
+test_dis
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_distutils
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_doctest
+test_doctest2
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_docxmlrpc
+test_dummy_thread
+test_dummy_threading
+test_dynamic
+test_dynamicclassattribute
+test_eintr
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_email
+test_ensurepip
+test_enum
+test_enumerate
+test_eof
+# test works only on Linux 2.6
+##test_epoll
+test_errno
+test_exceptions
+test_exception_variations
+test_extcall
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_faulthandler
+# No module named 'fcntl'
+##test_fcntl
+test_file
+test_filecmp
+test_fileinput
+test_fileio
+test_file_eintr
+test_finalization
+test_float
+test_flufl
+test_fnmatch
+# No os.fork() on Windows
+##test_fork1
+test_format
+test_fractions
+# TODO: https://github.com/Microsoft/Pyjion/issues/93
+##test_frame
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_ftplib
+test_funcattrs
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_functools
+test_future
+test_future3
+test_future4
+test_future5
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_gc
+# Couldn't find gdb on the path
+##test_gdb
+# TODO: https://github.com/Microsoft/Pyjion/issues/86
+##test_generators
+test_genericpath
+test_genexps
+test_getargs2
+test_getopt
+test_getpass
+test_gettext
+test_glob
+test_global
+test_grammar
+# No module named 'grp'
+##test_grp
+test_gzip
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_hash
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_hashlib
+test_heapq
+test_hmac
+test_html
+test_htmlparser
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_httplib
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_httpservers
+test_http_cookiejar
+test_http_cookies
+test_idle
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_imaplib
+test_imghdr
+test_imp
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_import
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_importlib
+test_index
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_inspect
+test_int
+test_int_literal
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_io
+# No module named 'fcntl'
+##test_ioctl
+test_ipaddress
+test_isinstance
+test_iter
+test_iterlen
+test_itertools
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_json
+test_keyword
+test_keywordonlyarg
+# test works only on BSD
+##test_kqueue
+test_largefile
+test_lib2to3
+test_linecache
+test_list
+test_listcomps
+test_locale
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_logging
+test_long
+test_longexp
+test_lzma
+test_macpath
+test_macurl2path
+test_mailbox
+test_mailcap
+test_marshal
+test_math
+test_memoryio
+test_memoryview
+test_metaclass
+test_mimetypes
+test_minidom
+test_mmap
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_module
+test_modulefinder
+test_msilib
+test_multibytecodec
+test_multiprocessing_fork
+test_multiprocessing_forkserver
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_multiprocessing_main_handling
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_multiprocessing_spawn
+test_netrc
+# No module named 'nis'
+##test_nis
+test_nntplib
+test_normalization
+test_ntpath
+test_numeric_tower
+test_opcodes
+# os.openpty() not available.
+##test_openpty
+test_operator
+test_optparse
+# TODO: https://github.com/Microsoft/Pyjion/issues/102
+##test_os
+# Use of the 'audio' resource not enabled
+##test_ossaudiodev
+test_osx_env
+# TODO: crashes
+##test_parser
+test_pathlib
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_pdb
+test_peepholer
+test_pep247
+test_pep277
+test_pep292
+test_pep3120
+test_pep3131
+test_pep3151
+test_pep352
+test_pep380
+test_pep479
+test_pickle
+test_pickletools
+# pipes module only works on posix
+##test_pipes
+test_pkg
+test_pkgimport
+test_pkgutil
+# TODO: https://github.com/Microsoft/Pyjion/issues/102
+##test_platform
+test_plistlib
+# select.poll not defined
+##test_poll
+test_popen
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_poplib
+# No module named 'posix'
+##test_posix
+test_posixpath
+# TODO: https://github.com/Microsoft/Pyjion/issues/107
+##test_pow
+test_pprint
+test_print
+test_profile
+test_property
+test_pstats
+# No module named 'termios'
+##test_pty
+test_pulldom
+# No module named 'pwd'
+##test_pwd
+test_pyclbr
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_pydoc
+test_pyexpat
+test_py_compile
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_queue
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_quopri
+test_raise
+# Known failure
+##test_random
+test_range
+test_re
+# No module named 'readline'
+##test_readline
+test_regrtest
+test_reprlib
+# No module named 'resource'
+##test_resource
+test_richcmp
+test_rlcompleter
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_robotparser
+test_runpy
+# Known failure
+##test_sax
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_sched
+test_scope
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_script_helper
+test_select
+test_selectors
+test_set
+test_setcomps
+test_shelve
+test_shlex
+test_shutil
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_signal
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_site
+test_slice
+test_smtpd
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_smtplib
+# Use of the 'network' resource not enabled
+##test_smtpnet
+test_sndhdr
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_socket
+# Use of the 'network' resource not enabled
+##test_socketserver
+test_sort
+test_source_encoding
+# No module named 'spwd'
+##test_spwd
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_sqlite
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_ssl
+test_startfile
+test_stat
+test_statistics
+test_strftime
+test_string
+test_stringprep
+test_strlit
+test_strptime
+test_strtod
+test_struct
+test_structmembers
+test_structseq
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_subprocess
+test_sunau
+test_sundry
+test_super
+test_support
+test_symbol
+test_symtable
+test_syntax
+# TODO: crashes
+##test_sys
+test_sysconfig
+# No module named 'syslog'
+##test_syslog
+# TODO: https://github.com/Microsoft/Pyjion/issues/108
+##test_sys_setprofile
+# TODO: https://github.com/Microsoft/Pyjion/issues/92
+##test_sys_settrace
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_tarfile
+test_tcl
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_telnetlib
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_tempfile
+test_textwrap
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_thread
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_threadedtempfile
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_threaded_import
+# TODO: https://github.com/Microsoft/Pyjion/issues/94
+##test_threading
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_threading_local
+# Can't test signal on win32
+##test_threadsignals
+# Known failure
+##test_time
+test_timeit
+# Use of the 'network' resource not enabled
+##test_timeout
+# Use of the 'gui' resource not enabled
+##test_tix
+# Use of the 'gui' resource not enabled
+##test_tk
+#test_tokenize
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_tools
+test_trace
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_traceback
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_tracemalloc
+# Use of the 'gui' resource not enabled
+##test_ttk_guionly
+test_ttk_textonly
+test_tuple
+test_typechecks
+test_types
+test_typing
+test_ucn
+test_unary
+test_unicode
+test_unicodedata
+test_unicode_file
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_unittest
+test_univnewlines
+test_unpack
+test_unpack_ex
+test_urllib
+test_urllib2
+# Use of the 'network' resource not enabled
+##test_urllib2net
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_urllib2_localnet
+# Use of the 'network' resource not enabled
+##test_urllibnet
+test_urllib_response
+test_urlparse
+test_userdict
+test_userlist
+test_userstring
+test_uu
+test_uuid
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_venv
+# os.fork not defined
+##test_wait3
+# os.fork not defined
+##test_wait4
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_warnings
+test_wave
+# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+##test_weakref
+test_weakset
+test_webbrowser
+# TODO: https://github.com/Microsoft/Pyjion/issues/102
+##test_winreg
+# Use of the 'audio' resource not enabled
+##test_winsound
+test_with
+test_wsgiref
+test_xdrlib
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_xmlrpc
+# Use of the 'network' resource not enabled
+##test_xmlrpc_net
+test_xml_dom_minicompat
+test_xml_etree
+test_xml_etree_c
+test_zipapp
+test_zipfile
+# test requires loads of disk-space bytes and a long time to run
+##test_zipfile64
+test_zipimport
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
+##test_zipimport_support
+test_zlib
+# TODO: https://github.com/Microsoft/Pyjion/issues/102
+##test__locale
+test__opcode
+test__osx_support
+test___all__
+test___future__
