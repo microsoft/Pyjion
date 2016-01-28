@@ -711,8 +711,6 @@ bool AbstractInterpreter::interpret() {
                     }
                     lastState.push(&Set);
                     break;
-                case DELETE_DEREF:
-                    break;
                 case STORE_DEREF:
                     // There is no tracking of cell variables.
                     lastState.pop();
