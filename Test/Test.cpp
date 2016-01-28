@@ -214,6 +214,10 @@ void PyJitTest() {
 
     TestCase cases[] = {
         TestCase(
+            "def f():\n    x = y\n    y = 1",
+            TestInput("<NULL>")
+            ),
+        TestCase(
             "def f():\n    try:\n         raise TypeError('hi')\n    except Exception as e:\n         pass\n    finally:\n         pass",
             TestInput("None")
         ),
