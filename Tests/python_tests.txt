@@ -35,7 +35,7 @@ test_bisect
 test_bool
 test_buffer
 test_bufio
-# TODO: https://github.com/Microsoft/Pyjion/issues/102
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_builtin
 test_bytes
 # TODO: https://github.com/Microsoft/Pyjion/issues/103
@@ -277,8 +277,7 @@ test_opcodes
 ##test_openpty
 test_operator
 test_optparse
-# TODO: https://github.com/Microsoft/Pyjion/issues/102
-##test_os
+test_os
 # Use of the 'audio' resource not enabled
 ##test_ossaudiodev
 test_osx_env
@@ -304,8 +303,7 @@ test_pickletools
 test_pkg
 test_pkgimport
 test_pkgutil
-# TODO: https://github.com/Microsoft/Pyjion/issues/102
-##test_platform
+test_platform
 test_plistlib
 # select.poll not defined
 ##test_poll
@@ -501,7 +499,7 @@ test_wave
 ##test_weakref
 test_weakset
 test_webbrowser
-# TODO: https://github.com/Microsoft/Pyjion/issues/102
+# TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_winreg
 # Use of the 'audio' resource not enabled
 ##test_winsound
@@ -523,8 +521,7 @@ test_zipimport
 # TODO: https://github.com/Microsoft/Pyjion/issues/103
 ##test_zipimport_support
 test_zlib
-# TODO: https://github.com/Microsoft/Pyjion/issues/102
-##test__locale
+test__locale
 test__opcode
 test__osx_support
 test___all__
