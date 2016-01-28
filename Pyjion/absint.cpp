@@ -714,10 +714,16 @@ bool AbstractInterpreter::interpret() {
                 case DELETE_DEREF:
                     break;
                 case STORE_DEREF:
+                    // There is no tracking of cell variables.
                     lastState.pop();
                     break;
                 case LOAD_DEREF:
+                    // There is no tracking of cell variables.
                     lastState.push(&Any);
+                    break;
+                case DELETE_DEREF:
+                    // Since cell variables are not tracked, no need to worry
+                    // about their deletion.
                     break;
                 case GET_ITER:
                     // TODO: Known iterable types
