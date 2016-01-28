@@ -293,7 +293,13 @@ bool AbstractInterpreter::interpret() {
                 {
                     auto valueInfo = lastState.pop_no_escape();
                     m_opcodeSources[opcodeIndex] = valueInfo.Sources;
-                    lastState.replace_local(oparg, AbstractLocalInfo(valueInfo, false));
+                    // STORE_FAST doesn't necessarily give us an assigned value because we
+                    // could be assigning an unassigned value.  e.g:
+                    // def f():
+                    //     x = y
+                    //     y = 1
+
+                    lastState.replace_local(oparg, AbstractLocalInfo(valueInfo, valueInfo.Value == &Undefined));
                 }
                 break;
                 case DELETE_FAST:
@@ -704,6 +710,8 @@ bool AbstractInterpreter::interpret() {
                         lastState.pop();
                     }
                     lastState.push(&Set);
+                    break;
+                case DELETE_DEREF:
                     break;
                 case STORE_DEREF:
                     lastState.pop();
