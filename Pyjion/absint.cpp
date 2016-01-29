@@ -848,6 +848,7 @@ bool AbstractInterpreter::interpret() {
         }
     next:;
     } while (queue.size() != 0);
+
     return true;
 }
 
@@ -2643,49 +2644,51 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
     auto target = getOffsetLabel(jumpTo);
     m_offsetStack[jumpTo] = m_stack;
     dec_stack();
-    switch (one.Value->kind()) {
-        case AVK_Float:
-            m_comp->emit_dup();
-            m_comp->emit_float(0);
-            m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
-            m_comp->emit_pop_top();
-            break;
-        case AVK_Integer:
-            m_comp->emit_dup();
-            m_comp->emit_unary_not_tagged_int_push_bool();
-            m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
-            m_comp->emit_pop_top();
-            break;
-        default:
-            auto tmp = m_comp->emit_spill();
-            auto noJump = m_comp->emit_define_label();
-            auto willJump = m_comp->emit_define_label();
-
-            // fast checks for true/false.
-            test_bool_and_branch(tmp, isTrue, noJump);
-            test_bool_and_branch(tmp, !isTrue, willJump);
-
-            // Use PyObject_IsTrue
-            m_comp->emit_load_local(tmp);
-            m_comp->emit_is_true();
-
-            raise_on_negative_one();
-
-            m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
-
-            // Jumping, load the value back and jump
-            m_comp->emit_mark_label(willJump);
-            m_comp->emit_load_local(tmp);	// load the value back onto the stack
-            m_comp->emit_branch(BranchAlways, target);
-
-            // not jumping, load the value and dec ref it
-            m_comp->emit_mark_label(noJump);
-            m_comp->emit_load_local(tmp);
-            m_comp->emit_pop_top();
-
-            m_comp->emit_free_local(tmp);
-            break;
+    
+    if (!one.needs_boxing()) {
+        switch (one.Value->kind()) {
+            case AVK_Float:
+                m_comp->emit_dup();
+                m_comp->emit_float(0);
+                m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
+                m_comp->emit_pop_top();
+                return;
+            case AVK_Integer:
+                m_comp->emit_dup();
+                m_comp->emit_unary_not_tagged_int_push_bool();
+                m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
+                m_comp->emit_pop_top();
+                return;
+        }
     }
+    
+    auto tmp = m_comp->emit_spill();
+    auto noJump = m_comp->emit_define_label();
+    auto willJump = m_comp->emit_define_label();
+
+    // fast checks for true/false.
+    test_bool_and_branch(tmp, isTrue, noJump);
+    test_bool_and_branch(tmp, !isTrue, willJump);
+
+    // Use PyObject_IsTrue
+    m_comp->emit_load_local(tmp);
+    m_comp->emit_is_true();
+
+    raise_on_negative_one();
+
+    m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
+
+    // Jumping, load the value back and jump
+    m_comp->emit_mark_label(willJump);
+    m_comp->emit_load_local(tmp);	// load the value back onto the stack
+    m_comp->emit_branch(BranchAlways, target);
+
+    // not jumping, load the value and dec ref it
+    m_comp->emit_mark_label(noJump);
+    m_comp->emit_load_local(tmp);
+    m_comp->emit_pop_top();
+
+    m_comp->emit_free_local(tmp);
 }
 
 void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) {
@@ -2693,46 +2696,53 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
     auto one = stackInfo[stackInfo.size() - 1];
 
     auto target = getOffsetLabel(jumpTo);
-    switch (one.Value->kind()) {
-        case AVK_Float:
-            m_comp->emit_float(0);
-            m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
-            break;
-        case AVK_Integer:
-            m_comp->emit_unary_not_tagged_int_push_bool();
-            m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
-            break;
-        default:
-            auto noJump = m_comp->emit_define_label();
-            auto willJump = m_comp->emit_define_label();
-
-            // fast checks for true/false...
-            m_comp->emit_dup();
-            m_comp->emit_ptr(isTrue ? Py_False : Py_True);
-            m_comp->emit_branch(BranchEqual, noJump);
-
-            m_comp->emit_dup();
-            m_comp->emit_ptr(isTrue ? Py_True : Py_False);
-            m_comp->emit_branch(BranchEqual, willJump);
-
-            // Use PyObject_IsTrue
-            m_comp->emit_dup();
-            m_comp->emit_is_true();
-
-            raise_on_negative_one();
-
-            m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
-
-            // Branching, pop the value and branch
-            m_comp->emit_mark_label(willJump);
-            m_comp->emit_pop_top();
-            m_comp->emit_branch(BranchAlways, target);
-
-            // Not branching, just pop the value and fall through
-            m_comp->emit_mark_label(noJump);
-            m_comp->emit_pop_top();
-            break;
+    bool emitted = false;
+    if (!one.needs_boxing()) {
+        switch (one.Value->kind()) {
+            case AVK_Float:
+                emitted = true;
+                m_comp->emit_float(0);
+                m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
+                break;
+            case AVK_Integer:
+                emitted = true;
+                m_comp->emit_unary_not_tagged_int_push_bool();
+                m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
+                break;
+        }
     }
+
+    if (!emitted) {
+        auto noJump = m_comp->emit_define_label();
+        auto willJump = m_comp->emit_define_label();
+
+        // fast checks for true/false...
+        m_comp->emit_dup();
+        m_comp->emit_ptr(isTrue ? Py_False : Py_True);
+        m_comp->emit_branch(BranchEqual, noJump);
+
+        m_comp->emit_dup();
+        m_comp->emit_ptr(isTrue ? Py_True : Py_False);
+        m_comp->emit_branch(BranchEqual, willJump);
+
+        // Use PyObject_IsTrue
+        m_comp->emit_dup();
+        m_comp->emit_is_true();
+
+        raise_on_negative_one();
+
+        m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
+
+        // Branching, pop the value and branch
+        m_comp->emit_mark_label(willJump);
+        m_comp->emit_pop_top();
+        m_comp->emit_branch(BranchAlways, target);
+
+        // Not branching, just pop the value and fall through
+        m_comp->emit_mark_label(noJump);
+        m_comp->emit_pop_top();
+    }
+
     dec_stack();
     m_offsetStack[jumpTo] = m_stack;
 }
