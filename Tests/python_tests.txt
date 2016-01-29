@@ -16,12 +16,10 @@ test_argparse
 test_array
 test_asdl_parser
 test_ast
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_asynchat
+test_asynchat
 # TODO: https://github.com/Microsoft/Pyjion/issues/104
 ##test_asyncio
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_asyncore
+test_asyncore
 test_atexit
 test_audioop
 test_augassign
@@ -35,27 +33,22 @@ test_bisect
 test_bool
 test_buffer
 test_bufio
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_builtin
+test_builtin
 test_bytes
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_bz2
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_calendar
+test_bz2
+test_calendar
 test_call
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
+# TODO: https://github.com/Microsoft/Pyjion/issues/115
 ##test_capi
 test_cgi
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_cgitb
+test_cgitb
 test_charmapcodec
 test_class
 test_cmath
 test_cmd
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
+# TODO: https://github.com/Microsoft/Pyjion/issues/116
 ##test_cmd_line
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_cmd_line_script
+test_cmd_line_script
 test_code
 test_codeccallbacks
 test_codecencodings_cn
@@ -77,10 +70,9 @@ test_collections
 test_colorsys
 test_compare
 test_compile
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_compileall
+test_compileall
 test_complex
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+# TODO: https://github.com/Microsoft/Pyjion/issues/118
 ##test_concurrent_futures
 test_configparser
 test_contains
@@ -93,8 +85,7 @@ test_crashers
 # No module named '_crypt'
 ##test_crypt
 test_csv
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_ctypes
+test_ctypes
 # Use of the 'curses' resource not enabled
 ##test_curses
 test_datetime
@@ -104,8 +95,7 @@ test_dbm_dumb
 ##test_dbm_gnu
 # No module named '_dbm'
 ##test_dbm_ndbm
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_decimal
+test_decimal
 test_decorators
 test_defaultdict
 test_deque
@@ -118,20 +108,17 @@ test_dictcomps
 test_dictviews
 test_difflib
 test_dis
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_distutils
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+test_distutils
+# Known failure
 ##test_doctest
 test_doctest2
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_docxmlrpc
+test_docxmlrpc
 test_dummy_thread
 test_dummy_threading
 test_dynamic
 test_dynamicclassattribute
 test_eintr
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_email
+test_email
 test_ensurepip
 test_enum
 test_enumerate
@@ -142,8 +129,7 @@ test_errno
 test_exceptions
 test_exception_variations
 test_extcall
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_faulthandler
+test_faulthandler
 # No module named 'fcntl'
 ##test_fcntl
 test_file
@@ -161,16 +147,14 @@ test_format
 test_fractions
 # TODO: https://github.com/Microsoft/Pyjion/issues/93
 ##test_frame
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_ftplib
+test_ftplib
 test_funcattrs
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_functools
+test_functools
 test_future
 test_future3
 test_future4
 test_future5
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
+# TODO: https://github.com/Microsoft/Pyjion/issues/119
 ##test_gc
 # Couldn't find gdb on the path
 ##test_gdb
@@ -188,36 +172,27 @@ test_grammar
 # No module named 'grp'
 ##test_grp
 test_gzip
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_hash
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_hashlib
+test_hash
+test_hashlib
 test_heapq
 test_hmac
 test_html
 test_htmlparser
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_httplib
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_httpservers
+test_httplib
+test_httpservers
 test_http_cookiejar
 test_http_cookies
 test_idle
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_imaplib
+test_imaplib
 test_imghdr
 test_imp
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_import
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_importlib
+test_import
+test_importlib
 test_index
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_inspect
+test_inspect
 test_int
 test_int_literal
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_io
+test_io
 # No module named 'fcntl'
 ##test_ioctl
 test_ipaddress
@@ -225,7 +200,7 @@ test_isinstance
 test_iter
 test_iterlen
 test_itertools
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+# TODO: https://github.com/Microsoft/Pyjion/issues/120
 ##test_json
 test_keyword
 test_keywordonlyarg
@@ -237,8 +212,7 @@ test_linecache
 test_list
 test_listcomps
 test_locale
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_logging
+test_logging
 test_long
 test_longexp
 test_lzma
@@ -254,16 +228,15 @@ test_metaclass
 test_mimetypes
 test_minidom
 test_mmap
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_module
+test_module
 test_modulefinder
 test_msilib
 test_multibytecodec
 test_multiprocessing_fork
 test_multiprocessing_forkserver
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+# Failing due to timeout due to JITting taking "too long"
 ##test_multiprocessing_main_handling
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+# TODO: https://github.com/Microsoft/Pyjion/issues/122
 ##test_multiprocessing_spawn
 test_netrc
 # No module named 'nis'
@@ -284,7 +257,7 @@ test_osx_env
 # TODO: crashes
 ##test_parser
 test_pathlib
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+# TODO: https://github.com/Microsoft/Pyjion/issues/123
 ##test_pdb
 test_peepholer
 test_pep247
@@ -308,13 +281,11 @@ test_plistlib
 # select.poll not defined
 ##test_poll
 test_popen
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_poplib
+test_poplib
 # No module named 'posix'
 ##test_posix
 test_posixpath
-# TODO: https://github.com/Microsoft/Pyjion/issues/107
-##test_pow
+test_pow
 test_pprint
 test_print
 test_profile
@@ -326,14 +297,11 @@ test_pulldom
 # No module named 'pwd'
 ##test_pwd
 test_pyclbr
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_pydoc
+test_pydoc
 test_pyexpat
 test_py_compile
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_queue
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_quopri
+test_queue
+test_quopri
 test_raise
 # Known failure
 ##test_random

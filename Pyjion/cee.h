@@ -86,7 +86,7 @@ public:
     PVOID* TLS_GetDataBlock() {
         //printf("get data block\r\n");
         PVOID* block = (PVOID*)TlsGetValue(m_tlsIndex);
-        if (block == nullptr){
+        if (block == nullptr) {
             block = new PVOID[MAX_PREDEFINED_TLS_SLOT];
             memset(block, 0, sizeof(PVOID) * MAX_PREDEFINED_TLS_SLOT);
             if (block != nullptr) {
