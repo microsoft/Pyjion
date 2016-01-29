@@ -34,6 +34,7 @@
 #include "catch.hpp"
 #include <Python.h>
 #include <absint.h>
+#include <memory>
 #include <vector>
 
 PyCodeObject* CompileCode(const char* code) {
@@ -58,6 +59,29 @@ PyCodeObject* CompileCode(const char* code) {
 
     return codeObj;
 }
+
+class InferenceTest {
+private:
+    std::unique_ptr<AbstractInterpreter> m_absint;
+
+public:
+    InferenceTest(const char* code) {
+        auto pyCode = CompileCode(code);
+        m_absint = std::make_unique<AbstractInterpreter>(pyCode, nullptr);
+        if (!m_absint->interpret()) {
+            Py_DECREF(pyCode);
+            FAIL("Failed to interprete code");
+        }
+
+        Py_DECREF(pyCode);
+    }
+
+    AbstractValueKind kind(size_t byteCodeIndex, size_t localIndex) {
+        auto local = m_absint->get_local_info(byteCodeIndex, localIndex);
+        return local.ValueInfo.Value->kind();
+    }
+};
+
 
 /* Old test code; do not use in new tests! ========================= */
 class AIVerifier {
@@ -139,7 +163,7 @@ void VerifyOldTest(AITestCase testCase) {
 }
 /* ==================================================== */
 
-TEST_CASE("float binary op type inference", "[float, binary op, inference]") {
+TEST_CASE("float binary op type inference", "[float][binary op][inference]") {
     SECTION("float + float  # type: float") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = 3.14\n    y = 3.14\n    z = x + y",
@@ -843,7 +867,7 @@ TEST_CASE("float binary op type inference", "[float, binary op, inference]") {
     }
 }
 
-TEST_CASE("float unary op type inference", "[float, unary op, inference]") {
+TEST_CASE("float unary op type inference", "[float][unary op][inference]") {
 
     SECTION("not float  # type: bool") {
         VerifyOldTest(AITestCase(
@@ -882,7 +906,7 @@ TEST_CASE("float unary op type inference", "[float, unary op, inference]") {
     }
 }
 
-TEST_CASE("int binary op type inference", "[int, binary op, inference]") {
+TEST_CASE("int binary op type inference", "[int][binary op][inference]") {
     SECTION("int / bool  # type: int") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = 42\n    y = True\n    z = x / y",
@@ -1978,7 +2002,7 @@ TEST_CASE("int binary op type inference", "[int, binary op, inference]") {
     }
 }
 
-TEST_CASE("int unary op type inference", "[int, unary op, inference]") {
+TEST_CASE("int unary op type inference", "[int][unary op][inference]") {
     SECTION("not int  # type: bool") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = 42\n    y = not x",
@@ -2016,7 +2040,7 @@ TEST_CASE("int unary op type inference", "[int, unary op, inference]") {
     }
 }
 
-TEST_CASE("bool binary op type inference", "[bool, binary op, inference]") {
+TEST_CASE("bool binary op type inference", "[bool][binary op][inference]") {
     SECTION("bool & bool  # type: bool") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = True\n    y = False\n    z = x & y",
@@ -2855,7 +2879,7 @@ TEST_CASE("bool binary op type inference", "[bool, binary op, inference]") {
     }
 }
 
-TEST_CASE("bool unary op type inference", "[bool, unary op, inference]") {
+TEST_CASE("bool unary op type inference", "[bool][unary op][inference]") {
     SECTION("not bool  # type: bool") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = True\n    y = not x",
@@ -2905,7 +2929,7 @@ TEST_CASE("bool unary op type inference", "[bool, unary op, inference]") {
     }
 }
 
-TEST_CASE("bytes binary op type inference", "[bytes, binary op, inference]") {
+TEST_CASE("bytes binary op type inference", "[bytes][binary op][inference]") {
     SECTION("bytes * bool  # type: bytes") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = b'a'\n    y = True\n    z = x * y",
@@ -3122,7 +3146,7 @@ TEST_CASE("bytes binary op type inference", "[bytes, binary op, inference]") {
     }
 }
 
-TEST_CASE("bytes unary op type inference", "[bytes, unary op, inference]") {
+TEST_CASE("bytes unary op type inference", "[bytes][unary op][inference]") {
     SECTION("not bytes  # type: bool") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = b'a'\n    y = not x",
@@ -3136,7 +3160,7 @@ TEST_CASE("bytes unary op type inference", "[bytes, unary op, inference]") {
     }
 }
 
-TEST_CASE("complex binary op type inference", "[complex, binary op, inference]") {
+TEST_CASE("complex binary op type inference", "[complex][binary op][inference]") {
     SECTION("complex + bool  # type: complex") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = 3j\n    y = True\n    z = x + y",
@@ -3628,7 +3652,7 @@ TEST_CASE("complex binary op type inference", "[complex, binary op, inference]")
     }
 }
 
-TEST_CASE("complex unary op type inference", "[complex, unary op, inference]") {
+TEST_CASE("complex unary op type inference", "[complex][unary op][inference]") {
     SECTION("+ complex  # type: complex") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = 3j\n    y = +x",
@@ -3660,7 +3684,7 @@ TEST_CASE("complex unary op type inference", "[complex, unary op, inference]") {
     }
 }
 
-TEST_CASE("dict unary op type inference", "[dict, unary op, inference]") {
+TEST_CASE("dict unary op type inference", "[dict][unary op][inference]") {
     SECTION("not dict  # type: bool") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = {}\n    y = not x",
@@ -3674,7 +3698,7 @@ TEST_CASE("dict unary op type inference", "[dict, unary op, inference]") {
     }
 }
 
-TEST_CASE("str binary op type inferene", "[str, binary op, inference]") {
+TEST_CASE("str binary op type inferene", "[str][binary op][inference]") {
     SECTION("str % bool  # type: str") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = ''\n    y = True\n    z = x % y",
@@ -4080,7 +4104,7 @@ TEST_CASE("str binary op type inferene", "[str, binary op, inference]") {
     }
 }
 
-TEST_CASE("str unary op type inference", "[str, unary op, inference]") {
+TEST_CASE("str unary op type inference", "[str][unary op][inference]") {
     SECTION("not str  # type: bool") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = ''\n    y = not x",
@@ -4094,7 +4118,7 @@ TEST_CASE("str unary op type inference", "[str, unary op, inference]") {
     }
 }
 
-TEST_CASE("list binary op type inference", "[list, binary op, inference]") {
+TEST_CASE("list binary op type inference", "[list][binary op][inference]") {
     SECTION("list * bool  # type: list") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = []\n    y = True\n    z = x * y",
@@ -4254,7 +4278,7 @@ TEST_CASE("list binary op type inference", "[list, binary op, inference]") {
     }
 }
 
-TEST_CASE("list unary op type inference", "[list, unary op, inference]") {
+TEST_CASE("list unary op type inference", "[list][unary op][inference]") {
     SECTION("not list  # type: bool") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = []\n    y = not x",
@@ -4268,7 +4292,7 @@ TEST_CASE("list unary op type inference", "[list, unary op, inference]") {
     }
 }
 
-TEST_CASE("set binary op type inference", "[set, binary op, inference]") {
+TEST_CASE("set binary op type inference", "[set][binary op][inference]") {
     SECTION("set & set  # type: set") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = {42}\n    y = {-13}\n    z = x & y",
@@ -4378,7 +4402,7 @@ TEST_CASE("set binary op type inference", "[set, binary op, inference]") {
     }
 }
 
-TEST_CASE("set unary op type inference", "[set, unary op, inference]") {
+TEST_CASE("set unary op type inference", "[set][unary op][inference]") {
     SECTION("not set  # type: bool") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = {42}\n    y = not x",
@@ -4392,7 +4416,7 @@ TEST_CASE("set unary op type inference", "[set, unary op, inference]") {
     }
 }
 
-TEST_CASE("tuple binary op type inference", "[tuple, binary op, inference]") {
+TEST_CASE("tuple binary op type inference", "[tuple][binary op][inference]") {
     SECTION("tuple * bool  # type: tuple") {
         VerifyOldTest(AITestCase(
             "def f():\n    x = ()\n    y = True\n    z = x * y",
@@ -4487,44 +4511,40 @@ TEST_CASE("tuple binary op type inference", "[tuple, binary op, inference]") {
     }
 }
 
-TEST_CASE("tuple unary op type inference", "[tuple, unary op, inference]") {
-    VerifyOldTest(AITestCase(
-        "def f():\n    x = ()\n    y = not x",
-        {
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // x not assigned yet
-            new VariableVerifier(6, 0, AVK_Tuple),              // x assigned
-            new VariableVerifier(10, 1, AVK_Undefined, true),   // y not assigned yet
-            new VariableVerifier(13, 1, AVK_Bool)               // y assigned
-        }
-    ));
+TEST_CASE("tuple unary op type inference", "[tuple][unary op][inference]") {
+    auto t = InferenceTest("def f():\n    x = ()\n    y = not x");
+    REQUIRE(t.kind(3, 0) == AVK_Undefined);   // x not assigned yet
+    REQUIRE(t.kind(6, 0) == AVK_Tuple);       // x assigned
+    REQUIRE(t.kind(10, 1) == AVK_Undefined);  // y not assigned yet
+    REQUIRE(t.kind(13, 1) == AVK_Bool);       // y assigned
 }
 
-TEST_CASE("None unary op type inference", "[None, unary op, inference]") {
+TEST_CASE("None unary op type inference", "[None][unary op][inference]") {
     SECTION("not None  # type: None") {
-        VerifyOldTest(AITestCase(
-            "def f():\n    x = None\n    y = not None",
-            {
-                new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST 0
-                new VariableVerifier(6, 0, AVK_None),               // LOAD_CONST 0
-                new VariableVerifier(10, 1, AVK_Undefined, true),   // STORE_FAST 1
-                new VariableVerifier(13, 1, AVK_Bool),              // LOAD_CONST 0
-            }
-        ));
+        auto t = InferenceTest("def f():\n    x = None\n    y = not None");
+        REQUIRE(t.kind(3, 0) == AVK_Undefined);   // STORE_FAST 0
+        REQUIRE(t.kind(6, 0) == AVK_None);        // LOAD_CONST 0
+        REQUIRE(t.kind(10, 1) == AVK_Undefined);  // STORE_FAST 1
+        REQUIRE(t.kind(13, 1) == AVK_Bool);       // LOAD_CONST 0
     }
 }
 
-TEST_CASE("Function unary op type inference", "[function, unary op, inference]") {
+TEST_CASE("Function unary op type inference", "[function][unary op][inference]") {
     SECTION("not function  # type: function") {
-        VerifyOldTest(AITestCase(
-            "def f():\n    def g(): pass\n    x = not g",
-            {
-                new VariableVerifier(9, 0, AVK_Undefined, true),   // STORE_FAST 0
-                new VariableVerifier(12, 0, AVK_Function),         // LOAD_FAST 0
-                new VariableVerifier(16, 1, AVK_Undefined, true),  // STORE_FAST 1
-                new VariableVerifier(19, 1, AVK_Bool),             // LOAD_CONST 0
-            }
-        ));
+        auto t = InferenceTest("def f():\n    def g(): pass\n    x = not g");
+        REQUIRE(t.kind(9, 0) == AVK_Undefined);   // STORE_FAST 0
+        REQUIRE(t.kind(12, 0) == AVK_Function);   // LOAD_FAST 0
+        REQUIRE(t.kind(16, 1) == AVK_Undefined);  // STORE_FAST 1
+        REQUIRE(t.kind(19, 1) == AVK_Bool);       // LOAD_CONST 0
     }
 }
 
 // `not slice` untested as no way to syntactically create a slice object in isolation.
+
+TEST_CASE("Generalized unpacking within a list", "[list][BUILD_LIST_UNPACK][inference]") {
+    SECTION("[1, *[2], 3]  # type: list") {
+        auto t = InferenceTest("def f():\n  z = [1, *[2], 3]");
+        REQUIRE(t.kind(15, 0) == AVK_Undefined);  // STORE_FAST 0
+        REQUIRE(t.kind(18, 0) == AVK_List);       // LOAD_CONST 0
+    }
+}
