@@ -38,6 +38,22 @@ HRESULT __stdcall GetCORSystemDirectoryInternal(__out_ecount_part_opt(cchBuffer,
 
 CExecutionEngine g_execEngine;
 
+extern "C" __declspec(dllexport) BOOL WINAPI DllMain(
+    _In_ HINSTANCE hinstDLL,
+    _In_ DWORD     fdwReason,
+    _In_ LPVOID    lpvReserved
+    ) {
+    switch (fdwReason) {
+        case DLL_PROCESS_ATTACH: break;
+        case DLL_PROCESS_DETACH: break;
+        case DLL_THREAD_ATTACH: break;
+        case DLL_THREAD_DETACH:
+            g_execEngine.TLS_ThreadDetaching();
+            break;
+    }
+    return TRUE;
+}
+
 BOOL EEHeapFreeInProcessHeap(DWORD dwFlags, LPVOID lpMem) {
     return ::HeapFree(g_execEngine.ClrGetProcessHeap(), dwFlags, lpMem);
 }
