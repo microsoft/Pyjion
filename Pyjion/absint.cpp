@@ -3236,7 +3236,7 @@ void AbstractInterpreter::load_fast_worker(int local, bool checkUnbound) {
 
         m_comp->emit_ptr(PyTuple_GetItem(m_code->co_varnames, local));
 
-        m_comp->emit_unbound_local_check(local, success);
+        m_comp->emit_unbound_local_check();
         
         branch_raise();
 
