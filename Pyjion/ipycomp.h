@@ -173,7 +173,7 @@ public:
     virtual void emit_load_fast(int local) = 0;
     virtual void emit_store_fast(int local) = 0;
     virtual void emit_delete_fast(int index, PyObject* name) = 0;
-    virtual void emit_unbound_local_check(int local, Label success) = 0;
+    virtual void emit_unbound_local_check() = 0;
 
     // Loads/stores/deletes by name for values not known to be in fast locals
     virtual void emit_load_name(PyObject* name) = 0;

@@ -363,7 +363,7 @@ public:
 
     virtual void emit_store_fast(int local);
 
-    virtual void emit_unbound_local_check(int local, Label success);
+    virtual void emit_unbound_local_check();
     virtual void emit_load_fast(int local);
 
     virtual Label emit_define_label();
