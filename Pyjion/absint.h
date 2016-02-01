@@ -165,6 +165,7 @@ class __declspec(dllexport) AbstractInterpreter {
     PyCodeObject* m_code;
     unsigned char *m_byteCode;
     size_t m_size;
+    Local m_errorCheckLocal;
 
     // ** Data consumed during analysis:
     // Tracks whether an END_FINALLY is being consumed by a finally block (true) or exception block (false)
@@ -179,6 +180,7 @@ class __declspec(dllexport) AbstractInterpreter {
     // all values produced during abstract interpretation, need to be freed
     vector<AbstractValue*> m_values;
     vector<AbstractSource*> m_sources;
+    vector<Local> m_raiseAndFreeLocals;
     IPythonCompiler* m_comp;
     // m_blockStack is like Python's f_blockstack which lives on the frame object, except we only maintain
     // it at compile time.  Blocks are pushed onto the stack when we enter a loop, the start of a try block,
@@ -282,7 +284,9 @@ private:
 
     vector<Label>& get_raise_and_free_labels(size_t blockId);
     vector<Label>& get_reraise_and_free_labels(size_t blockId);
+    void ensure_raise_and_free_locals(size_t localCount);
     void emit_raise_and_free(size_t handlerIndex);
+    void spill_stack_for_raise(size_t localCount);
 
     void ensure_labels(vector<Label>& labels, size_t count);
 

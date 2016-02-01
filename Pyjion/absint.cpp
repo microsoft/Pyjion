@@ -40,6 +40,7 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* co
     if (comp != nullptr) {
         m_retLabel = comp->emit_define_label();
         m_retValue = comp->emit_define_local();
+        m_errorCheckLocal = comp->emit_define_local();
     }
 }
 
@@ -1323,12 +1324,13 @@ void AbstractInterpreter::int_error_check(char* reason) {
 void AbstractInterpreter::error_check(char *reason) {
     auto noErr = m_comp->emit_define_label();
     m_comp->emit_dup();
+    m_comp->emit_store_local(m_errorCheckLocal);
     m_comp->emit_null();
     m_comp->emit_branch(BranchNotEqual, noErr);
 
-    m_comp->emit_pop();
     branch_raise(reason);
     m_comp->emit_mark_label(noErr);
+    m_comp->emit_load_local(m_errorCheckLocal);
 }
 
 Label AbstractInterpreter::getOffsetLabel(int jumpTo) {
@@ -1341,6 +1343,19 @@ Label AbstractInterpreter::getOffsetLabel(int jumpTo) {
         jumpToLabel = jumpToLabelIter->second;
     }
     return jumpToLabel;
+}
+
+void AbstractInterpreter::ensure_raise_and_free_locals(size_t localCount) {
+    while (m_raiseAndFreeLocals.size() <= localCount) {
+        m_raiseAndFreeLocals.push_back(m_comp->emit_define_local());
+    }
+}
+
+void AbstractInterpreter::spill_stack_for_raise(size_t localCount) {
+    ensure_raise_and_free_locals(localCount);
+    for (size_t i = 0; i < localCount; i++) {
+        m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
+    }
 }
 
 vector<Label>& AbstractInterpreter::get_raise_and_free_labels(size_t blockId) {
@@ -1412,6 +1427,7 @@ void AbstractInterpreter::branch_raise(char *reason) {
 
         ensure_labels(labels, count);
 
+        spill_stack_for_raise(count);
         m_comp->emit_branch(BranchAlways, labels[count - 1]);
     }
 }
@@ -2206,6 +2222,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                                     ensure_labels(raiseLabels, count);
                                     ensure_labels(reraiseLabels, count);
 
+                                    spill_stack_for_raise(count);
                                     m_comp->emit_branch(BranchFalse, raiseLabels[count - 1]);
                                     m_comp->emit_branch(BranchAlways, reraiseLabels[count - 1]);
                                     noStack = false;
@@ -2529,16 +2546,18 @@ JittedCode* AbstractInterpreter::compile_worker() {
 void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
     auto handler = m_allHandlers[handlerIndex];
     auto reraiseAndFreeLabels = get_reraise_and_free_labels(handler.RaiseAndFreeId);
-    for (auto curLabel = reraiseAndFreeLabels.rbegin(); curLabel != reraiseAndFreeLabels.rend(); curLabel++) {
-        m_comp->emit_mark_label(*curLabel);
+    for (auto cur = reraiseAndFreeLabels.size() - 1; cur != -1; cur--) {
+        m_comp->emit_mark_label(reraiseAndFreeLabels[cur]);
+        m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
         m_comp->emit_pop_top();
     }
     if (reraiseAndFreeLabels.size() != 0) {
         m_comp->emit_branch(BranchAlways, handler.ReRaise);
     }
     auto raiseAndFreeLabels = get_raise_and_free_labels(handler.RaiseAndFreeId);
-    for (auto curLabel = raiseAndFreeLabels.rbegin(); curLabel != raiseAndFreeLabels.rend(); curLabel++) {
-        m_comp->emit_mark_label(*curLabel);
+    for (auto cur = raiseAndFreeLabels.size() - 1; cur != -1; cur--) {
+        m_comp->emit_mark_label(raiseAndFreeLabels[cur]);
+        m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
         m_comp->emit_pop_top();
     }
 
@@ -3210,10 +3229,19 @@ void AbstractInterpreter::load_fast_worker(int local, bool checkUnbound) {
     if (checkUnbound) {
         Label success = m_comp->emit_define_label();
 
-        m_comp->emit_unbound_local_check(local, success);
+        m_comp->emit_dup();
+        m_comp->emit_store_local(m_errorCheckLocal);
+        m_comp->emit_null();
+        m_comp->emit_branch(BranchNotEqual, success);
+
+        m_comp->emit_ptr(PyTuple_GetItem(m_code->co_varnames, local));
+
+        m_comp->emit_unbound_local_check();
+        
         branch_raise();
 
         m_comp->emit_mark_label(success);
+        m_comp->emit_load_local(m_errorCheckLocal);
     }
 
     m_comp->emit_dup();
