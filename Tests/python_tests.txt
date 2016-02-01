@@ -315,16 +315,13 @@ test_reprlib
 ##test_resource
 test_richcmp
 test_rlcompleter
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_robotparser
+test_robotparser
 test_runpy
 # Known failure
 ##test_sax
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_sched
+test_sched
 test_scope
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_script_helper
+test_script_helper
 test_select
 test_selectors
 test_set
@@ -332,29 +329,23 @@ test_setcomps
 test_shelve
 test_shlex
 test_shutil
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_signal
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_site
+test_signal
+test_site
 test_slice
 test_smtpd
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_smtplib
+test_smtplib
 # Use of the 'network' resource not enabled
 ##test_smtpnet
 test_sndhdr
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_socket
+test_socket
 # Use of the 'network' resource not enabled
 ##test_socketserver
 test_sort
 test_source_encoding
 # No module named 'spwd'
 ##test_spwd
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_sqlite
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_ssl
+test_sqlite
+test_ssl
 test_startfile
 test_stat
 test_statistics
@@ -367,7 +358,7 @@ test_strtod
 test_struct
 test_structmembers
 test_structseq
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
+# TODO: https://github.com/Microsoft/Pyjion/issues/127
 ##test_subprocess
 test_sunau
 test_sundry
@@ -385,24 +376,19 @@ test_sysconfig
 ##test_sys_setprofile
 # TODO: https://github.com/Microsoft/Pyjion/issues/92
 ##test_sys_settrace
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_tarfile
+# Takes a while.
+test_tarfile
 test_tcl
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_telnetlib
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_tempfile
+test_telnetlib
+test_tempfile
 test_textwrap
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_thread
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_threadedtempfile
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+test_thread
+test_threadedtempfile
+# TODO: https://github.com/Microsoft/Pyjion/issues/128
 ##test_threaded_import
 # TODO: https://github.com/Microsoft/Pyjion/issues/94
 ##test_threading
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_threading_local
+test_threading_local
 # Can't test signal on win32
 ##test_threadsignals
 # Known failure
@@ -415,13 +401,11 @@ test_timeit
 # Use of the 'gui' resource not enabled
 ##test_tk
 #test_tokenize
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_tools
+test_tools
 test_trace
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
+# TODO: https://github.com/Microsoft/Pyjion/issues/93
 ##test_traceback
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_tracemalloc
+test_tracemalloc
 # Use of the 'gui' resource not enabled
 ##test_ttk_guionly
 test_ttk_textonly
@@ -434,8 +418,7 @@ test_unary
 test_unicode
 test_unicodedata
 test_unicode_file
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_unittest
+test_unittest
 test_univnewlines
 test_unpack
 test_unpack_ex
@@ -443,8 +426,7 @@ test_urllib
 test_urllib2
 # Use of the 'network' resource not enabled
 ##test_urllib2net
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_urllib2_localnet
+test_urllib2_localnet
 # Use of the 'network' resource not enabled
 ##test_urllibnet
 test_urllib_response
@@ -454,28 +436,23 @@ test_userlist
 test_userstring
 test_uu
 test_uuid
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_venv
+test_venv
 # os.fork not defined
 ##test_wait3
 # os.fork not defined
 ##test_wait4
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_warnings
+test_warnings
 test_wave
-# TODO: https://github.com/Microsoft/Pyjion/issues/103 ?
-##test_weakref
+test_weakref
 test_weakset
 test_webbrowser
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_winreg
+test_winreg
 # Use of the 'audio' resource not enabled
 ##test_winsound
 test_with
 test_wsgiref
 test_xdrlib
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_xmlrpc
+test_xmlrpc
 # Use of the 'network' resource not enabled
 ##test_xmlrpc_net
 test_xml_dom_minicompat
@@ -486,8 +463,7 @@ test_zipfile
 # test requires loads of disk-space bytes and a long time to run
 ##test_zipfile64
 test_zipimport
-# TODO: https://github.com/Microsoft/Pyjion/issues/103
-##test_zipimport_support
+test_zipimport_support
 test_zlib
 test__locale
 test__opcode
