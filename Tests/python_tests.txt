@@ -17,7 +17,7 @@ test_array
 test_asdl_parser
 test_ast
 test_asynchat
-# TODO: https://github.com/Microsoft/Pyjion/issues/104
+# TODO: https://github.com/Microsoft/Pyjion/issues/135
 ##test_asyncio
 test_asyncore
 test_atexit
@@ -38,8 +38,7 @@ test_bytes
 test_bz2
 test_calendar
 test_call
-# TODO: https://github.com/Microsoft/Pyjion/issues/115
-##test_capi
+test_capi
 test_cgi
 test_cgitb
 test_charmapcodec
@@ -384,10 +383,8 @@ test_tempfile
 test_textwrap
 test_thread
 test_threadedtempfile
-# TODO: https://github.com/Microsoft/Pyjion/issues/128
-##test_threaded_import
-# TODO: https://github.com/Microsoft/Pyjion/issues/94
-##test_threading
+test_threaded_import
+test_threading
 test_threading_local
 # Can't test signal on win32
 ##test_threadsignals
