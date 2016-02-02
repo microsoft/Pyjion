@@ -480,12 +480,14 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     break;
                 case BUILD_LIST:
+                case BUILD_LIST_UNPACK:
                     for (int i = 0; i < oparg; i++) {
                         lastState.pop();
                     }
                     lastState.push(&List);
                     break;
                 case BUILD_TUPLE:
+                case BUILD_TUPLE_UNPACK:
                 {
                     vector<AbstractValueWithSources> sources;
                     for (int i = 0; i < oparg; i++) {
@@ -507,6 +509,12 @@ bool AbstractInterpreter::interpret() {
                 case BUILD_MAP:
                     for (int i = 0; i < oparg; i++) {
                         lastState.pop();
+                        lastState.pop();
+                    }
+                    lastState.push(&Dict);
+                    break;
+                case BUILD_MAP_UNPACK:
+                    for (int i = 0; i < oparg; i++) {
                         lastState.pop();
                     }
                     lastState.push(&Dict);
@@ -707,6 +715,7 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     break;
                 case BUILD_SET:
+                case BUILD_SET_UNPACK:
                     for (int i = 0; i < oparg; i++) {
                         lastState.pop();
                     }
