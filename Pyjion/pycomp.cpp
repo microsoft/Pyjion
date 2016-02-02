@@ -466,12 +466,12 @@ void PythonCompiler::emit_load_global(PyObject* name) {
 
 void PythonCompiler::emit_delete_fast(int index, PyObject* name) {
     load_local(index);
-    decref();
     load_frame();
     m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + index * sizeof(size_t));
     m_il.add();
     m_il.load_null();
     m_il.st_ind_i();
+    decref();
 }
 
 void PythonCompiler::emit_new_tuple(size_t size) {
