@@ -2389,4 +2389,3 @@ bool PyJit_UnaryNot_Int_PushBool(PyObject*value) {
 
     return Py_SIZE(value) == 0;
 }
-

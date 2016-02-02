@@ -1,6 +1,6 @@
 diff -r 8667c26e2bec Include/ceval.h
 --- a/Include/ceval.h	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Include/ceval.h	Thu Jan 07 11:46:53 2016 -0800
++++ b/Include/ceval.h	Tue Feb 02 12:06:26 2016 -0800
 @@ -10,6 +10,11 @@
  PyAPI_FUNC(PyObject *) PyEval_CallObjectWithKeywords(
      PyObject *, PyObject *, PyObject *);
@@ -13,7 +13,19 @@ diff -r 8667c26e2bec Include/ceval.h
  /* Inline this */
  #define PyEval_CallObject(func,arg) \
      PyEval_CallObjectWithKeywords(func, arg, (PyObject *)NULL)
-@@ -113,6 +118,7 @@
+@@ -82,6 +87,11 @@
+ PyAPI_FUNC(int) _Py_CheckRecursiveCall(char *where);
+ PyAPI_DATA(int) _Py_CheckRecursionLimit;
+ 
++/* Checks to see if periodic work needs to be done, such as releasing the GIL,
++   make any pending calls, or raising an asychronous exception.  Returns true
++   if an error occurred or false on success. */
++PyAPI_FUNC(int) _PyEval_PeriodicWork(void);
++    
+ #ifdef USE_STACKCHECK
+ /* With USE_STACKCHECK, we artificially decrement the recursion limit in order
+    to trigger regular stack checks in _Py_CheckRecursiveCall(), except if
+@@ -113,6 +123,7 @@
  PyAPI_FUNC(PyObject *) PyEval_GetCallStats(PyObject *);
  PyAPI_FUNC(PyObject *) PyEval_EvalFrame(struct _frame *);
  PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx(struct _frame *f, int exc);
@@ -23,7 +35,7 @@ diff -r 8667c26e2bec Include/ceval.h
  
 diff -r 8667c26e2bec Include/code.h
 --- a/Include/code.h	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Include/code.h	Thu Jan 07 11:46:53 2016 -0800
++++ b/Include/code.h	Tue Feb 02 12:06:26 2016 -0800
 @@ -7,6 +7,23 @@
  extern "C" {
  #endif
@@ -63,7 +75,7 @@ diff -r 8667c26e2bec Include/code.h
  #define CO_NEWLOCALS	0x0002
 diff -r 8667c26e2bec Include/dictobject.h
 --- a/Include/dictobject.h	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Include/dictobject.h	Thu Jan 07 11:46:53 2016 -0800
++++ b/Include/dictobject.h	Tue Feb 02 12:06:26 2016 -0800
 @@ -138,7 +138,7 @@
  PyAPI_FUNC(void) _PyDict_DebugMallocStats(FILE *out);
  
@@ -75,7 +87,7 @@ diff -r 8667c26e2bec Include/dictobject.h
  #ifdef __cplusplus
 diff -r 8667c26e2bec Include/pystate.h
 --- a/Include/pystate.h	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Include/pystate.h	Thu Jan 07 11:46:53 2016 -0800
++++ b/Include/pystate.h	Tue Feb 02 12:06:26 2016 -0800
 @@ -12,6 +12,9 @@
  
  struct _ts; /* Forward */
@@ -97,7 +109,7 @@ diff -r 8667c26e2bec Include/pystate.h
  
 diff -r 8667c26e2bec Lib/test/test_list.py
 --- a/Lib/test/test_list.py	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Lib/test/test_list.py	Thu Jan 07 11:46:53 2016 -0800
++++ b/Lib/test/test_list.py	Tue Feb 02 12:06:26 2016 -0800
 @@ -1,6 +1,7 @@
  import sys
  from test import support, list_tests
@@ -106,9 +118,84 @@ diff -r 8667c26e2bec Lib/test/test_list.py
  
  class ListTest(list_tests.CommonTest):
      type2test = list
+diff -r 8667c26e2bec Lib/test/test_sys.py
+--- a/Lib/test/test_sys.py	Mon Jun 15 09:11:37 2015 -0700
++++ b/Lib/test/test_sys.py	Tue Feb 02 12:06:26 2016 -0800
+@@ -857,13 +857,13 @@
+             return inner
+         check(get_cell().__closure__[0], size('P'))
+         # code
+-        check(get_cell().__code__, size('5i9Pi3P'))
+-        check(get_cell.__code__, size('5i9Pi3P'))
++        check(get_cell().__code__, size('5i9Pi4P2i'))
++        check(get_cell.__code__, size('5i9Pi4P2i'))
+         def get_cell2(x):
+             def inner():
+                 return x
+             return inner
+-        check(get_cell2.__code__, size('5i9Pi3P') + 1)
++        check(get_cell2.__code__, size('5i9Pi4P2i') + 1)
+         # complex
+         check(complex(0,1), size('2d'))
+         # method_descriptor (descriptor object)
+diff -r 8667c26e2bec Lib/test/test_telnetlib.py
+--- a/Lib/test/test_telnetlib.py	Mon Jun 15 09:11:37 2015 -0700
++++ b/Lib/test/test_telnetlib.py	Tue Feb 02 12:06:26 2016 -0800
+@@ -3,6 +3,7 @@
+ import telnetlib
+ import time
+ import contextlib
++import unittest
+ 
+ from unittest import TestCase
+ from test import support
+diff -r 8667c26e2bec Lib/test/test_tuple.py
+--- a/Lib/test/test_tuple.py	Mon Jun 15 09:11:37 2015 -0700
++++ b/Lib/test/test_tuple.py	Tue Feb 02 12:06:26 2016 -0800
+@@ -2,6 +2,7 @@
+ 
+ import gc
+ import pickle
++import unittest
+ 
+ class TupleTest(seq_tests.CommonTest):
+     type2test = tuple
+diff -r 8667c26e2bec Lib/test/test_userdict.py
+--- a/Lib/test/test_userdict.py	Mon Jun 15 09:11:37 2015 -0700
++++ b/Lib/test/test_userdict.py	Tue Feb 02 12:06:26 2016 -0800
+@@ -2,6 +2,7 @@
+ 
+ from test import support, mapping_tests
+ import collections
++import unittest
+ 
+ d0 = {}
+ d1 = {"one": 1}
+diff -r 8667c26e2bec Lib/test/test_userlist.py
+--- a/Lib/test/test_userlist.py	Mon Jun 15 09:11:37 2015 -0700
++++ b/Lib/test/test_userlist.py	Tue Feb 02 12:06:26 2016 -0800
+@@ -2,6 +2,7 @@
+ 
+ from collections import UserList
+ from test import support, list_tests
++import unittest
+ 
+ class UserListTest(list_tests.CommonTest):
+     type2test = UserList
+diff -r 8667c26e2bec Lib/test/test_wsgiref.py
+--- a/Lib/test/test_wsgiref.py	Mon Jun 15 09:11:37 2015 -0700
++++ b/Lib/test/test_wsgiref.py	Tue Feb 02 12:06:26 2016 -0800
+@@ -14,6 +14,7 @@
+ import os
+ import re
+ import sys
++import unittest
+ 
+ from test import support
+ 
 diff -r 8667c26e2bec Objects/codeobject.c
 --- a/Objects/codeobject.c	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Objects/codeobject.c	Thu Jan 07 11:46:53 2016 -0800
++++ b/Objects/codeobject.c	Tue Feb 02 12:06:26 2016 -0800
 @@ -7,6 +7,7 @@
  
  /* all_name_chars(s): true iff all chars in s are valid NAME_CHARS */
@@ -207,8 +294,63 @@ diff -r 8667c26e2bec Objects/codeobject.c
  */
 diff -r 8667c26e2bec Python/ceval.c
 --- a/Python/ceval.c	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Python/ceval.c	Thu Jan 07 11:46:53 2016 -0800
-@@ -796,6 +796,31 @@
++++ b/Python/ceval.c	Tue Feb 02 12:06:26 2016 -0800
+@@ -769,6 +769,54 @@
+    fast_next_opcode*/
+ static int _Py_TracingPossible = 0;
+ 
++#ifdef WITH_THREAD
++#define PULSE_GIL(tstate)                                       \
++    if (_Py_atomic_load_relaxed(&gil_drop_request)) {           \
++        /* Give another thread a chance */                      \
++        if (PyThreadState_Swap(NULL) != tstate)                 \
++            Py_FatalError("ceval: tstate mix-up");              \
++        drop_gil(tstate);                                       \
++                                                                \
++        /* Other threads may run now */                         \
++                                                                \
++        take_gil(tstate);                                       \
++                                                                \
++        /* Check if we should make a quick exit. */             \
++        if (_Py_Finalizing && _Py_Finalizing != tstate) {       \
++            drop_gil(tstate);                                   \
++            PyThread_exit_thread();                             \
++        }                                                       \
++                                                                \
++        if (PyThreadState_Swap(tstate) != NULL)                 \
++            Py_FatalError("ceval: orphan tstate");              \
++    }
++
++#endif
++
++int _PyEval_PeriodicWork(void) {
++    if (_Py_atomic_load_relaxed(&eval_breaker)) {
++        if (_Py_atomic_load_relaxed(&pendingcalls_to_do)) {
++            if (Py_MakePendingCalls() < 0) {
++                return 1;
++            }
++        }
++
++        PyThreadState* tstate = PyThreadState_GET();
++#ifdef WITH_THREAD
++        PULSE_GIL(tstate);
++#endif
++
++        if (tstate->async_exc != NULL) {
++            PyObject *exc = tstate->async_exc;
++            tstate->async_exc = NULL;
++            UNSIGNAL_ASYNC_EXC();
++            PyErr_SetNone(exc);
++            Py_DECREF(exc);
++            return 1;
++        }
++    }
++    return 0;
++}
+ 
+ 
+ PyObject *
+@@ -796,6 +844,31 @@
  PyObject *
  PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
  {
@@ -240,9 +382,36 @@ diff -r 8667c26e2bec Python/ceval.c
  #ifdef DXPAIRS
      int lastopcode = 0;
  #endif
+@@ -1262,25 +1335,7 @@
+                     goto error;
+             }
+ #ifdef WITH_THREAD
+-            if (_Py_atomic_load_relaxed(&gil_drop_request)) {
+-                /* Give another thread a chance */
+-                if (PyThreadState_Swap(NULL) != tstate)
+-                    Py_FatalError("ceval: tstate mix-up");
+-                drop_gil(tstate);
+-
+-                /* Other threads may run now */
+-
+-                take_gil(tstate);
+-
+-                /* Check if we should make a quick exit. */
+-                if (_Py_Finalizing && _Py_Finalizing != tstate) {
+-                    drop_gil(tstate);
+-                    PyThread_exit_thread();
+-                }
+-
+-                if (PyThreadState_Swap(tstate) != NULL)
+-                    Py_FatalError("ceval: orphan tstate");
+-            }
++            PULSE_GIL(tstate);
+ #endif
+             /* Check for asynchronous exceptions. */
+             if (tstate->async_exc != NULL) {
 diff -r 8667c26e2bec Python/pylifecycle.c
 --- a/Python/pylifecycle.c	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Python/pylifecycle.c	Thu Jan 07 11:46:53 2016 -0800
++++ b/Python/pylifecycle.c	Tue Feb 02 12:06:26 2016 -0800
 @@ -321,6 +321,20 @@
      if (interp == NULL)
          Py_FatalError("Py_Initialize: can't make first interpreter");
@@ -266,7 +435,7 @@ diff -r 8667c26e2bec Python/pylifecycle.c
          Py_FatalError("Py_Initialize: can't make first thread");
 diff -r 8667c26e2bec Python/pystate.c
 --- a/Python/pystate.c	Mon Jun 15 09:11:37 2015 -0700
-+++ b/Python/pystate.c	Thu Jan 07 11:46:53 2016 -0800
++++ b/Python/pystate.c	Tue Feb 02 12:06:26 2016 -0800
 @@ -80,6 +80,8 @@
          interp->codecs_initialized = 0;
          interp->fscodec_initialized = 0;

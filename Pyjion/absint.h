@@ -307,7 +307,7 @@ private:
     // a FOR_ITER.  Used when we're breaking from the current loop.
     void free_iter_local();
 
-    void jump_absolute(int index);
+    void jump_absolute(size_t index, size_t from);
 
     // Frees all of the iteration variables in a range. Used when we're
     // going to branch to a finally through multiple loops.
@@ -332,7 +332,7 @@ private:
     void compare_op(int compareType, int& i, int opcodeIndex);
     JittedCode* compile_worker();
 
-
+    void periodic_work();
     void store_fast(int local, int opcodeIndex);
 
     void load_const(int constIndex, int opcodeIndex);
