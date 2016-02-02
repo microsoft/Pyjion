@@ -53,10 +53,22 @@ using namespace std;
 class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager {
 public:
     HANDLE m_codeHeap, m_heap;
+    DWORD m_tlsIndex;
+    PTLS_CALLBACK_FUNCTION* m_callbacks;
 
     CExecutionEngine() {
         m_codeHeap = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
         m_heap = HeapCreate(0, 0, 0);
+        m_tlsIndex = TlsAlloc();
+        // We can't use new[] here because utilcode isn't spun up yet...
+        m_callbacks = (PTLS_CALLBACK_FUNCTION*)::HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PTLS_CALLBACK_FUNCTION) * MAX_PREDEFINED_TLS_SLOT);
+    }
+
+    ~CExecutionEngine() {
+        ::HeapDestroy(m_codeHeap);
+        ::HeapDestroy(m_heap);
+        TlsFree(m_tlsIndex);
+        ::HeapFree(GetProcessHeap(), 0, m_callbacks);
     }
 
     // Thread Local Storage is based on logical threads.  The underlying
@@ -67,34 +79,61 @@ public:
     // Associate a callback function for releasing TLS on thread/fiber death.
     // This can be NULL.
     void TLS_AssociateCallback(DWORD slot, PTLS_CALLBACK_FUNCTION callback) {
-        //printf("associate callback\r\n");
+        m_callbacks[slot] = callback;
     }
 
     // Get the TLS block for fast Get/Set operations
     PVOID* TLS_GetDataBlock() {
         //printf("get data block\r\n");
-        return NULL;
+        PVOID* block = (PVOID*)TlsGetValue(m_tlsIndex);
+        if (block == nullptr) {
+            block = new PVOID[MAX_PREDEFINED_TLS_SLOT];
+            memset(block, 0, sizeof(PVOID) * MAX_PREDEFINED_TLS_SLOT);
+            if (block != nullptr) {
+                TlsSetValue(m_tlsIndex, block);
+            }
+        }
+        return block;
     }
 
     // Get the value at a slot
     PVOID TLS_GetValue(DWORD slot) {
-        return TlsGetValue(slot);
+        auto block = TLS_GetDataBlock();
+        if (block != nullptr) {
+            return block[slot];
+        }
+        return nullptr;
     }
 
     // Get the value at a slot, return FALSE if TLS info block doesn't exist
     BOOL TLS_CheckValue(DWORD slot, PVOID * pValue) {
-        printf("check value not impl\r\n");
+        auto block = TLS_GetDataBlock();
+        if (block != nullptr) {
+            *pValue = block[slot];
+            return TRUE;
+        }
         return FALSE;
     }
 
     // Set the value at a slot
     void TLS_SetValue(DWORD slot, PVOID pData) {
-        TlsSetValue(slot, pData);
+        auto block = TLS_GetDataBlock();
+        if (block != nullptr) {
+            block[slot] = pData;
+        }
     }
 
     // Free TLS memory block and make callback
     void TLS_ThreadDetaching() {
-        printf("thread detaching...\r\n");
+        auto block = TLS_GetDataBlock();
+        if (block != nullptr) {
+            for (int i = 0; i < MAX_PREDEFINED_TLS_SLOT; i++) {
+                if (m_callbacks[i] != nullptr) {
+                    m_callbacks[i](block[i]);
+                }
+            }
+            delete[] block;
+        }
     }
 
     // Critical Sections are sometimes exposed to the host and therefore need to be

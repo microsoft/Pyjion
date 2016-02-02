@@ -38,6 +38,22 @@ HRESULT __stdcall GetCORSystemDirectoryInternal(__out_ecount_part_opt(cchBuffer,
 
 CExecutionEngine g_execEngine;
 
+extern "C" __declspec(dllexport) BOOL WINAPI DllMain(
+    _In_ HINSTANCE hinstDLL,
+    _In_ DWORD     fdwReason,
+    _In_ LPVOID    lpvReserved
+    ) {
+    switch (fdwReason) {
+        case DLL_PROCESS_ATTACH: break;
+        case DLL_PROCESS_DETACH: break;
+        case DLL_THREAD_ATTACH: break;
+        case DLL_THREAD_DETACH:
+            g_execEngine.TLS_ThreadDetaching();
+            break;
+    }
+    return TRUE;
+}
+
 BOOL EEHeapFreeInProcessHeap(DWORD dwFlags, LPVOID lpMem) {
     return ::HeapFree(g_execEngine.ClrGetProcessHeap(), dwFlags, lpMem);
 }
@@ -197,15 +213,9 @@ Local PythonCompiler::emit_allocate_stack_array(size_t bytes) {
  * Compiler interface implementation
  */
 
-void PythonCompiler::emit_unbound_local_check(int local, Label success) {
+void PythonCompiler::emit_unbound_local_check() {
     //// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
     //// locals that are provably assigned)
-    m_il.dup();
-    m_il.load_null();
-    m_il.branch(BranchNotEqual, success);
-
-    m_il.pop();
-    m_il.ld_i(PyTuple_GetItem(m_code->co_varnames, local));
     m_il.emit_call(METHOD_UNBOUND_LOCAL);
 }
 
@@ -1094,7 +1104,6 @@ JittedCode* PythonCompiler::emit_compile() {
         delete jitInfo;
         return nullptr;
     }
-
     return jitInfo;
 
 }

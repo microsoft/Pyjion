@@ -214,6 +214,10 @@ void PyJitTest() {
 
     TestCase cases[] = {
         TestCase(
+            "def f():\n    for b in range(1):\n        x = b & 1 and -1.0 or 1.0\n    return x",
+            TestInput("1.0")
+        ),
+        TestCase(
             "def f():\n    x = y\n    y = 1",
             TestInput("<NULL>")
             ),

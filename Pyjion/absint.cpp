@@ -40,6 +40,7 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* co
     if (comp != nullptr) {
         m_retLabel = comp->emit_define_label();
         m_retValue = comp->emit_define_local();
+        m_errorCheckLocal = comp->emit_define_local();
     }
 }
 
@@ -848,6 +849,7 @@ bool AbstractInterpreter::interpret() {
         }
     next:;
     } while (queue.size() != 0);
+
     return true;
 }
 
@@ -1322,12 +1324,13 @@ void AbstractInterpreter::int_error_check(char* reason) {
 void AbstractInterpreter::error_check(char *reason) {
     auto noErr = m_comp->emit_define_label();
     m_comp->emit_dup();
+    m_comp->emit_store_local(m_errorCheckLocal);
     m_comp->emit_null();
     m_comp->emit_branch(BranchNotEqual, noErr);
 
-    m_comp->emit_pop();
     branch_raise(reason);
     m_comp->emit_mark_label(noErr);
+    m_comp->emit_load_local(m_errorCheckLocal);
 }
 
 Label AbstractInterpreter::getOffsetLabel(int jumpTo) {
@@ -1340,6 +1343,19 @@ Label AbstractInterpreter::getOffsetLabel(int jumpTo) {
         jumpToLabel = jumpToLabelIter->second;
     }
     return jumpToLabel;
+}
+
+void AbstractInterpreter::ensure_raise_and_free_locals(size_t localCount) {
+    while (m_raiseAndFreeLocals.size() <= localCount) {
+        m_raiseAndFreeLocals.push_back(m_comp->emit_define_local());
+    }
+}
+
+void AbstractInterpreter::spill_stack_for_raise(size_t localCount) {
+    ensure_raise_and_free_locals(localCount);
+    for (size_t i = 0; i < localCount; i++) {
+        m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
+    }
 }
 
 vector<Label>& AbstractInterpreter::get_raise_and_free_labels(size_t blockId) {
@@ -1411,6 +1427,7 @@ void AbstractInterpreter::branch_raise(char *reason) {
 
         ensure_labels(labels, count);
 
+        spill_stack_for_raise(count);
         m_comp->emit_branch(BranchAlways, labels[count - 1]);
     }
 }
@@ -2205,6 +2222,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                                     ensure_labels(raiseLabels, count);
                                     ensure_labels(reraiseLabels, count);
 
+                                    spill_stack_for_raise(count);
                                     m_comp->emit_branch(BranchFalse, raiseLabels[count - 1]);
                                     m_comp->emit_branch(BranchAlways, reraiseLabels[count - 1]);
                                     noStack = false;
@@ -2528,16 +2546,18 @@ JittedCode* AbstractInterpreter::compile_worker() {
 void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
     auto handler = m_allHandlers[handlerIndex];
     auto reraiseAndFreeLabels = get_reraise_and_free_labels(handler.RaiseAndFreeId);
-    for (auto curLabel = reraiseAndFreeLabels.rbegin(); curLabel != reraiseAndFreeLabels.rend(); curLabel++) {
-        m_comp->emit_mark_label(*curLabel);
+    for (auto cur = reraiseAndFreeLabels.size() - 1; cur != -1; cur--) {
+        m_comp->emit_mark_label(reraiseAndFreeLabels[cur]);
+        m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
         m_comp->emit_pop_top();
     }
     if (reraiseAndFreeLabels.size() != 0) {
         m_comp->emit_branch(BranchAlways, handler.ReRaise);
     }
     auto raiseAndFreeLabels = get_raise_and_free_labels(handler.RaiseAndFreeId);
-    for (auto curLabel = raiseAndFreeLabels.rbegin(); curLabel != raiseAndFreeLabels.rend(); curLabel++) {
-        m_comp->emit_mark_label(*curLabel);
+    for (auto cur = raiseAndFreeLabels.size() - 1; cur != -1; cur--) {
+        m_comp->emit_mark_label(raiseAndFreeLabels[cur]);
+        m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
         m_comp->emit_pop_top();
     }
 
@@ -2643,49 +2663,51 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
     auto target = getOffsetLabel(jumpTo);
     m_offsetStack[jumpTo] = m_stack;
     dec_stack();
-    switch (one.Value->kind()) {
-        case AVK_Float:
-            m_comp->emit_dup();
-            m_comp->emit_float(0);
-            m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
-            m_comp->emit_pop_top();
-            break;
-        case AVK_Integer:
-            m_comp->emit_dup();
-            m_comp->emit_unary_not_tagged_int_push_bool();
-            m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
-            m_comp->emit_pop_top();
-            break;
-        default:
-            auto tmp = m_comp->emit_spill();
-            auto noJump = m_comp->emit_define_label();
-            auto willJump = m_comp->emit_define_label();
-
-            // fast checks for true/false.
-            test_bool_and_branch(tmp, isTrue, noJump);
-            test_bool_and_branch(tmp, !isTrue, willJump);
-
-            // Use PyObject_IsTrue
-            m_comp->emit_load_local(tmp);
-            m_comp->emit_is_true();
-
-            raise_on_negative_one();
-
-            m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
-
-            // Jumping, load the value back and jump
-            m_comp->emit_mark_label(willJump);
-            m_comp->emit_load_local(tmp);	// load the value back onto the stack
-            m_comp->emit_branch(BranchAlways, target);
-
-            // not jumping, load the value and dec ref it
-            m_comp->emit_mark_label(noJump);
-            m_comp->emit_load_local(tmp);
-            m_comp->emit_pop_top();
-
-            m_comp->emit_free_local(tmp);
-            break;
+    
+    if (!one.needs_boxing()) {
+        switch (one.Value->kind()) {
+            case AVK_Float:
+                m_comp->emit_dup();
+                m_comp->emit_float(0);
+                m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
+                m_comp->emit_pop_top();
+                return;
+            case AVK_Integer:
+                m_comp->emit_dup();
+                m_comp->emit_unary_not_tagged_int_push_bool();
+                m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
+                m_comp->emit_pop_top();
+                return;
+        }
     }
+    
+    auto tmp = m_comp->emit_spill();
+    auto noJump = m_comp->emit_define_label();
+    auto willJump = m_comp->emit_define_label();
+
+    // fast checks for true/false.
+    test_bool_and_branch(tmp, isTrue, noJump);
+    test_bool_and_branch(tmp, !isTrue, willJump);
+
+    // Use PyObject_IsTrue
+    m_comp->emit_load_local(tmp);
+    m_comp->emit_is_true();
+
+    raise_on_negative_one();
+
+    m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
+
+    // Jumping, load the value back and jump
+    m_comp->emit_mark_label(willJump);
+    m_comp->emit_load_local(tmp);	// load the value back onto the stack
+    m_comp->emit_branch(BranchAlways, target);
+
+    // not jumping, load the value and dec ref it
+    m_comp->emit_mark_label(noJump);
+    m_comp->emit_load_local(tmp);
+    m_comp->emit_pop_top();
+
+    m_comp->emit_free_local(tmp);
 }
 
 void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) {
@@ -2693,46 +2715,53 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
     auto one = stackInfo[stackInfo.size() - 1];
 
     auto target = getOffsetLabel(jumpTo);
-    switch (one.Value->kind()) {
-        case AVK_Float:
-            m_comp->emit_float(0);
-            m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
-            break;
-        case AVK_Integer:
-            m_comp->emit_unary_not_tagged_int_push_bool();
-            m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
-            break;
-        default:
-            auto noJump = m_comp->emit_define_label();
-            auto willJump = m_comp->emit_define_label();
-
-            // fast checks for true/false...
-            m_comp->emit_dup();
-            m_comp->emit_ptr(isTrue ? Py_False : Py_True);
-            m_comp->emit_branch(BranchEqual, noJump);
-
-            m_comp->emit_dup();
-            m_comp->emit_ptr(isTrue ? Py_True : Py_False);
-            m_comp->emit_branch(BranchEqual, willJump);
-
-            // Use PyObject_IsTrue
-            m_comp->emit_dup();
-            m_comp->emit_is_true();
-
-            raise_on_negative_one();
-
-            m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
-
-            // Branching, pop the value and branch
-            m_comp->emit_mark_label(willJump);
-            m_comp->emit_pop_top();
-            m_comp->emit_branch(BranchAlways, target);
-
-            // Not branching, just pop the value and fall through
-            m_comp->emit_mark_label(noJump);
-            m_comp->emit_pop_top();
-            break;
+    bool emitted = false;
+    if (!one.needs_boxing()) {
+        switch (one.Value->kind()) {
+            case AVK_Float:
+                emitted = true;
+                m_comp->emit_float(0);
+                m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
+                break;
+            case AVK_Integer:
+                emitted = true;
+                m_comp->emit_unary_not_tagged_int_push_bool();
+                m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
+                break;
+        }
     }
+
+    if (!emitted) {
+        auto noJump = m_comp->emit_define_label();
+        auto willJump = m_comp->emit_define_label();
+
+        // fast checks for true/false...
+        m_comp->emit_dup();
+        m_comp->emit_ptr(isTrue ? Py_False : Py_True);
+        m_comp->emit_branch(BranchEqual, noJump);
+
+        m_comp->emit_dup();
+        m_comp->emit_ptr(isTrue ? Py_True : Py_False);
+        m_comp->emit_branch(BranchEqual, willJump);
+
+        // Use PyObject_IsTrue
+        m_comp->emit_dup();
+        m_comp->emit_is_true();
+
+        raise_on_negative_one();
+
+        m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
+
+        // Branching, pop the value and branch
+        m_comp->emit_mark_label(willJump);
+        m_comp->emit_pop_top();
+        m_comp->emit_branch(BranchAlways, target);
+
+        // Not branching, just pop the value and fall through
+        m_comp->emit_mark_label(noJump);
+        m_comp->emit_pop_top();
+    }
+
     dec_stack();
     m_offsetStack[jumpTo] = m_stack;
 }
@@ -3200,10 +3229,19 @@ void AbstractInterpreter::load_fast_worker(int local, bool checkUnbound) {
     if (checkUnbound) {
         Label success = m_comp->emit_define_label();
 
-        m_comp->emit_unbound_local_check(local, success);
+        m_comp->emit_dup();
+        m_comp->emit_store_local(m_errorCheckLocal);
+        m_comp->emit_null();
+        m_comp->emit_branch(BranchNotEqual, success);
+
+        m_comp->emit_ptr(PyTuple_GetItem(m_code->co_varnames, local));
+
+        m_comp->emit_unbound_local_check();
+        
         branch_raise();
 
         m_comp->emit_mark_label(success);
+        m_comp->emit_load_local(m_errorCheckLocal);
     }
 
     m_comp->emit_dup();
