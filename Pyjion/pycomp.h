@@ -162,6 +162,7 @@
 #define METHOD_NOT_EQUALS_INT_TOKEN				0x00000068
 #define METHOD_GREATER_THAN_INT_TOKEN			0x00000069
 #define METHOD_GREATER_THAN_EQUALS_INT_TOKEN	0x0000006A
+#define METHOD_PERIODIC_WORK                    0x0000006B
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -397,6 +398,8 @@ public:
     virtual void emit_incref(bool maybeTagged = false);
 
     virtual void emit_debug_msg(const char* msg);
+
+    virtual void emit_periodic_work();
 
     virtual JittedCode* emit_compile();
 

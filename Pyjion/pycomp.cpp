@@ -1092,6 +1092,10 @@ bool PythonCompiler::emit_compare_object_push_int(int compareType) {
     return false;
 }
 
+void PythonCompiler::emit_periodic_work() {
+    m_il.emit_call(METHOD_PERIODIC_WORK);
+}
+
 JittedCode* PythonCompiler::emit_compile() {
     CorJitInfo* jitInfo = new CorJitInfo(g_execEngine, m_code, m_module);
     auto addr = m_il.compile(jitInfo, g_jit, m_code->co_stacksize + 100).m_addr;
@@ -1306,3 +1310,4 @@ GLOBAL_METHOD(METHOD_LESS_THAN_EQUALS_INT_TOKEN, PyJit_LessThanEquals_Int, CORIN
 GLOBAL_METHOD(METHOD_NOT_EQUALS_INT_TOKEN, PyJit_NotEquals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
 GLOBAL_METHOD(METHOD_GREATER_THAN_INT_TOKEN, PyJit_GreaterThan_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
 GLOBAL_METHOD(METHOD_GREATER_THAN_EQUALS_INT_TOKEN, PyJit_GreaterThanEquals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
+GLOBAL_METHOD(METHOD_PERIODIC_WORK, _PyEval_PeriodicWork, CORINFO_TYPE_BOOL)

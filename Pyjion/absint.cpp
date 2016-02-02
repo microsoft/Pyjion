@@ -1668,6 +1668,11 @@ void AbstractInterpreter::free_iter_locals_on_exception() {
     }
 }
 
+void AbstractInterpreter::periodic_work() {
+    m_comp->emit_periodic_work();
+    int_error_check("periodic work");
+}
+
 // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
 // If the value on the stack is -1, we branch to the current error handler.
 // Otherwise branches based if the current value is true/false based upon the current opcode 
@@ -1678,6 +1683,12 @@ void AbstractInterpreter::branch_or_error(int& curByte) {
     auto oparg = NEXTARG();
 
     raise_on_negative_one();
+
+    if (oparg <= curByte) {
+        auto tmp = m_comp->emit_spill();
+        periodic_work();
+        m_comp->emit_load_and_free_local(tmp);
+    }
 
     m_comp->emit_branch(jmpType == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, getOffsetLabel(oparg));
     m_offsetStack[oparg] = m_stack;
@@ -1708,6 +1719,9 @@ void AbstractInterpreter::branch(int& curByte) {
     mark_offset_label(curByte);
     auto oparg = NEXTARG();
 
+    if (oparg <= curByte) {
+        periodic_work();
+    }
     m_comp->emit_branch(jmpType == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, getOffsetLabel(oparg));
     dec_stack();
     m_offsetStack[oparg] = m_stack;
@@ -1868,6 +1882,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         m_comp->emit_branch(BranchLeave, getOffsetLabel(m_blockStack[loopIndex].EndOffset));
                     }
                     else {
+                        periodic_work();
                         m_comp->emit_branch(BranchLeave, getOffsetLabel(oparg));
                     }
                 }
@@ -1879,8 +1894,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 error_check("load build class failed");
                 inc_stack();
                 break;
-            case JUMP_ABSOLUTE: jump_absolute(oparg); break;
-            case JUMP_FORWARD:  jump_absolute(oparg + curByte + 1); break;
+            case JUMP_ABSOLUTE: jump_absolute(oparg, opcodeIndex); break;
+            case JUMP_FORWARD:  jump_absolute(oparg + curByte + 1, opcodeIndex); break;
             case JUMP_IF_FALSE_OR_POP:
             case JUMP_IF_TRUE_OR_POP: jump_if_or_pop(byte != JUMP_IF_FALSE_OR_POP, opcodeIndex, oparg); break;
             case POP_JUMP_IF_TRUE:
@@ -2629,6 +2644,9 @@ void AbstractInterpreter::unwind_loop(Local finallyReason, EhFlags branchKind, i
             // We need to emit a BranchLeave here in case we're inside of a nested finally block.  Finally
             // blocks leave a value on the stack during the entire computation, so we need to clear the
             // stack before branching away.  Right now we just always emit this BranchNotEqual/BranchLeave pattern
+            if (branchKind == EHF_BlockContinues) {
+                periodic_work();
+            }
             auto target = getOffsetLabel(branchKind == EHF_BlockContinues ? continueOffset : m_blockStack[i].EndOffset);
             auto noBranch = m_comp->emit_define_label();
             m_comp->emit_load_local(finallyReason);
@@ -2668,6 +2686,10 @@ void AbstractInterpreter::test_bool_and_branch(Local value, bool isTrue, Label t
 void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpTo) {
     auto stackInfo = get_stack_info(opcodeIndex);
     auto one = stackInfo[stackInfo.size() - 1];
+
+    if (jumpTo <= opcodeIndex) {
+        periodic_work();
+    }
 
     auto target = getOffsetLabel(jumpTo);
     m_offsetStack[jumpTo] = m_stack;
@@ -2723,6 +2745,9 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
     auto stackInfo = get_stack_info(opcodeIndex);
     auto one = stackInfo[stackInfo.size() - 1];
 
+    if (jumpTo <= opcodeIndex) {
+        periodic_work();
+    }
     auto target = getOffsetLabel(jumpTo);
     bool emitted = false;
     if (!one.needs_boxing()) {
@@ -3089,7 +3114,7 @@ void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *lo
 
     int_error_check("for_iter failed");
 
-    jump_absolute(loopIndex);
+    jump_absolute(loopIndex, opcodeIndex);
 
     m_comp->emit_mark_label(processValue);
     inc_stack();
@@ -3306,7 +3331,11 @@ void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
     m_comp->emit_free_local(remainderTmp);
 }
 
-void AbstractInterpreter::jump_absolute(int index) { 
+void AbstractInterpreter::jump_absolute(size_t index, size_t from) { 
+    if (index <= from) {
+        periodic_work();
+    }
+
     m_offsetStack[index] = m_stack;
     m_comp->emit_branch(BranchAlways, getOffsetLabel(index));
 }
