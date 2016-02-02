@@ -68,12 +68,11 @@ public:
     InferenceTest(const char* code) {
         auto pyCode = CompileCode(code);
         m_absint = std::make_unique<AbstractInterpreter>(pyCode, nullptr);
-        if (!m_absint->interpret()) {
-            Py_DECREF(pyCode);
-            FAIL("Failed to interprete code");
-        }
-
+        auto success = m_absint->interpret();
         Py_DECREF(pyCode);
+        if (!success) {
+            FAIL("Failed to interpret code");
+        }
     }
 
     AbstractValueKind kind(size_t byteCodeIndex, size_t localIndex) {
