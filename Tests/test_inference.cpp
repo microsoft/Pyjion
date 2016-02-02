@@ -4547,3 +4547,27 @@ TEST_CASE("Generalized unpacking within a list", "[list][BUILD_LIST_UNPACK][infe
         REQUIRE(t.kind(18, 0) == AVK_List);       // LOAD_CONST 0
     }
 }
+
+TEST_CASE("Generalized unpacking within a tuple", "[tuple][BUILD_TUPLE_UNPACK][inference]") {
+    SECTION("(1, *(2,) 3)  # type: tuple") {
+        auto t = InferenceTest("def f():\n  z = (1, *(2,), 3)");
+        REQUIRE(t.kind(12, 0) == AVK_Undefined);  // STORE_FAST 0
+        REQUIRE(t.kind(15, 0) == AVK_Tuple);      // LOAD_CONST 0
+    }
+}
+
+TEST_CASE("Generalize unpacking within a set", "[set][BUILD_SET_UNPACK][inference]") {
+    SECTION("{1, *{2}, 3}  # type: set") {
+        auto t = InferenceTest("def f():\n  z = {1, *{2}, 3}");
+        REQUIRE(t.kind(21, 0) == AVK_Undefined);  // STORE_FAST 0
+        REQUIRE(t.kind(24, 0) == AVK_Set);        // LOAD_CONST 0
+    }
+}
+
+TEST_CASE("Generalize unpacking within a dict", "[dict][BUILD_MAP_UNPACK][inference]") {
+    SECTION("{1:1, **{2:2}, 3:3}  # type: dict") {
+        auto t = InferenceTest("def f():\n  x = {1:1, **{2:2}, 3:3}");
+        REQUIRE(t.kind(30, 0) == AVK_Undefined);  // STORE_FAST 0
+        REQUIRE(t.kind(33, 0) == AVK_Dict);       // LOAD_CONST 0
+    }
+}
