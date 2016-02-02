@@ -21,7 +21,7 @@ diff -r 8667c26e2bec Include/ceval.h
 +   make any pending calls, or raising an asychronous exception.  Returns true
 +   if an error occurred or false on success. */
 +PyAPI_FUNC(int) _PyEval_PeriodicWork(void);
-+    
++
  #ifdef USE_STACKCHECK
  /* With USE_STACKCHECK, we artificially decrement the recursion limit in order
     to trigger regular stack checks in _Py_CheckRecursiveCall(), except if
