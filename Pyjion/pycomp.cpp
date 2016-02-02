@@ -235,11 +235,14 @@ CorInfoType PythonCompiler::to_clr_type(LocalKind kind) {
 
 void PythonCompiler::emit_store_fast(int local) {
     // TODO: Move locals out of the Python frame object and into real locals
-    load_local(local);
-    decref();
 
     auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
     m_il.st_loc(valueTmp);
+
+    // load the value onto the IL stack, we'll decref it after we replace the
+    // value in the frame object so that we never have a freed object in the
+    // frame object.
+    load_local(local);
 
     load_frame();
     m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + local * sizeof(size_t));
@@ -250,6 +253,9 @@ void PythonCompiler::emit_store_fast(int local) {
     m_il.st_ind_i();
 
     m_il.free_local(valueTmp);
+
+    // now dec ref the old value potentially freeing it.
+    decref();
 }
 
 void PythonCompiler::emit_rot_two() {
