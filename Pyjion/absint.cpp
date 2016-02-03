@@ -1540,8 +1540,41 @@ void AbstractInterpreter::build_list(size_t argCnt) {
 void AbstractInterpreter::build_set(size_t argCnt) {
     m_comp->emit_new_set();
     error_check("build set failed");
-    m_comp->emit_set_store(argCnt);
-    dec_stack(argCnt);
+
+    if (argCnt != 0) {
+        auto valueTmp = m_comp->emit_define_local();
+        auto setTmp = m_comp->emit_define_local();
+
+        m_comp->emit_store_local(setTmp);
+
+        for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
+            // save the argument into a temporary...
+            m_comp->emit_store_local(valueTmp);
+
+            dec_stack();
+
+            // load the address of the tuple item...
+            m_comp->emit_load_local(setTmp);
+            m_comp->emit_load_local(valueTmp);
+            m_comp->emit_set_add();
+
+            auto noErr = m_comp->emit_define_label();
+            m_comp->emit_branch(BranchTrue, noErr);
+            
+            // free the set too
+            m_comp->emit_load_local(setTmp);
+            m_comp->emit_pop_top();
+
+            branch_raise("set add failed");
+            m_comp->emit_mark_label(noErr);
+
+        }
+
+        m_comp->emit_load_local(setTmp);
+        m_comp->emit_free_local(valueTmp);
+        m_comp->emit_free_local(setTmp);
+    }
+    inc_stack();
 }
 
 
@@ -2018,7 +2051,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_build_slice();
                 inc_stack();
                 break;
-            case BUILD_SET: build_set(oparg); inc_stack(); break;
+            case BUILD_SET: build_set(oparg); break;
             case UNARY_POSITIVE: unary_positive(opcodeIndex); break;
             case UNARY_NEGATIVE: unary_negative(opcodeIndex); break;
             case UNARY_NOT: unary_not(curByte); break;

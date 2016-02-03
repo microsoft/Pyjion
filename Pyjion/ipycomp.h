@@ -219,8 +219,6 @@ public:
 
     // Creates a new set
     virtual void emit_new_set() = 0;
-    // Stores all of the values on the stack into a set
-    virtual void emit_set_store(size_t argCnt) = 0;
     // Adds a single item to a set
     virtual void emit_set_add() = 0;
 
