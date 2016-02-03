@@ -71,8 +71,7 @@ test_compare
 test_compile
 test_compileall
 test_complex
-# TODO: https://github.com/Microsoft/Pyjion/issues/118
-##test_concurrent_futures
+test_concurrent_futures
 test_configparser
 test_contains
 test_contextlib
@@ -153,8 +152,7 @@ test_future
 test_future3
 test_future4
 test_future5
-# TODO: https://github.com/Microsoft/Pyjion/issues/119
-##test_gc
+test_gc
 # Couldn't find gdb on the path
 ##test_gdb
 # TODO: https://github.com/Microsoft/Pyjion/issues/86
@@ -235,7 +233,7 @@ test_multiprocessing_fork
 test_multiprocessing_forkserver
 # Failing due to timeout due to JITting taking "too long"
 ##test_multiprocessing_main_handling
-# TODO: https://github.com/Microsoft/Pyjion/issues/122
+# Failing due to timeout issues
 ##test_multiprocessing_spawn
 test_netrc
 # No module named 'nis'
@@ -357,7 +355,7 @@ test_strtod
 test_struct
 test_structmembers
 test_structseq
-# TODO: https://github.com/Microsoft/Pyjion/issues/127
+# Fails due to timeout issues.
 ##test_subprocess
 test_sunau
 test_sundry
