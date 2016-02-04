@@ -375,30 +375,6 @@ void PythonCompiler::emit_new_set() {
     m_il.emit_call(METHOD_PYSET_NEW);
 }
 
-void PythonCompiler::emit_set_store(size_t argCnt) {
-    if (argCnt != 0) {
-        auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-        auto setTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-
-        m_il.st_loc(setTmp);
-
-        for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
-            // save the argument into a temporary...
-            m_il.st_loc(valueTmp);
-
-            // load the address of the tuple item...
-            m_il.ld_loc(setTmp);
-            m_il.ld_loc(valueTmp);
-            m_il.emit_call(METHOD_PYSET_ADD);
-            m_il.pop();
-        }
-
-        m_il.ld_loc(setTmp);
-        m_il.free_local(valueTmp);
-        m_il.free_local(setTmp);
-    }
-}
-
 void PythonCompiler::emit_new_dict(size_t size) {
     m_il.ld_i(size);
     m_il.emit_call(METHOD_PYDICT_NEWPRESIZED);
@@ -840,8 +816,7 @@ void PythonCompiler::emit_set_add() {
     m_il.emit_call(METHOD_SET_ADD_TOKEN);
 }
 
-void PythonCompiler::emit_map_add()
-{
+void PythonCompiler::emit_map_add() {
     m_il.emit_call(METHOD_MAP_ADD_TOKEN);
 }
 

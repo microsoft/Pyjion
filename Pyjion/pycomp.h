@@ -267,7 +267,6 @@ public:
     virtual void emit_list_store(size_t argCnt);
 
     virtual void emit_new_set();
-    virtual void emit_set_store(size_t argCnt);
     virtual void emit_dict_store();
 
     virtual void emit_new_dict(size_t size);
