@@ -164,6 +164,8 @@
 #define METHOD_GREATER_THAN_EQUALS_INT_TOKEN	0x0000006A
 #define METHOD_PERIODIC_WORK                    0x0000006B
 
+#define METHOD_EXTENDLIST_TOKEN                 0x0000006C
+
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
 #define METHOD_CALL1_TOKEN		0x00010001
@@ -265,6 +267,7 @@ public:
 
     virtual void emit_new_list(size_t argCnt);
     virtual void emit_list_store(size_t argCnt);
+    virtual void emit_list_extend();
 
     virtual void emit_new_set();
     virtual void emit_dict_store();

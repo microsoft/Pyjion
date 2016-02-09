@@ -1192,6 +1192,21 @@ PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg) {
     return value;
 }
 
+int PyJit_ExtendList(PyObject *list, PyObject *extension) {
+    assert(PyList_CheckExact(list));
+    auto res = _PyList_Extend((PyListObject*)list, extension);
+    Py_DECREF(extension);
+    int flag = 1;
+    if (res != Py_None) {
+        flag = 0;
+    }
+    else {
+        Py_DECREF(res);
+    }
+
+    return flag;
+}
+
 int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map) {
     assert(PyDict_CheckExact(map));
     auto res = PyDict_SetItem(map, key, value);

@@ -178,6 +178,8 @@ int PyJit_Raise(PyObject *exc, PyObject *cause);
 
 PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg);
 
+int PyJit_ExtendList(PyObject *list, PyObject *extension);
+
 int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map);
 
 int PyJit_StoreSubscr(PyObject* value, PyObject *container, PyObject *index);
