@@ -1547,13 +1547,11 @@ void AbstractInterpreter::extend_list(size_t argCnt) {
 
     m_comp->emit_store_local(listTmp);
     for (size_t curArg = 0; curArg < argCnt; curArg++) {
-        m_comp->emit_store_local(valueTmp);
-        dec_stack();
         m_comp->emit_load_local(listTmp);
-        m_comp->emit_load_local(valueTmp);
 
         m_comp->emit_list_extend();
         int_error_check("list extend failed");
+        dec_stack();
     }
 
     m_comp->emit_free_local(valueTmp);
