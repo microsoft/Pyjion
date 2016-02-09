@@ -35,5 +35,11 @@
     <ClCompile Include="test_inference.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="test_emission.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="testing_util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
