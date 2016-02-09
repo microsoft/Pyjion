@@ -39,6 +39,30 @@ private:
     PyCodeObject *m_code;
     PyJittedCode *m_jittedcode;
 
+    PyObject *run() {
+        auto sysModule = PyImport_ImportModule("sys");
+        auto globals = PyDict_New();
+        auto builtins = PyThreadState_GET()->interp->builtins;
+        PyDict_SetItemString(globals, "__builtins__", builtins);
+        PyDict_SetItemString(globals, "sys", sysModule);
+
+        /* XXX Why?
+        PyRun_String("finalized = False\nclass RefCountCheck:\n    def __del__(self):\n        print('finalizing')\n        global finalized\n        finalized = True\n    def __add__(self, other):\n        return self", Py_file_input, globals, globals);
+        if (PyErr_Occurred()) {
+        PyErr_Print();
+        return "";
+        }*/
+
+        // Don't DECREF as frames are recycled.
+        auto frame = PyFrame_New(PyThreadState_Get(), m_code, globals, PyDict_New());
+
+        auto res = m_jittedcode->j_evalfunc(m_jittedcode->j_evalstate, frame);
+        Py_DECREF(globals);
+        Py_DECREF(sysModule);
+
+        return res;
+    }
+
 public:
     EmissionTest(const char *code) {
         m_code = CompileCode(code);
@@ -57,27 +81,9 @@ public:
     }
 
     const char* returns() {
-        auto sysModule = PyImport_ImportModule("sys");
-        auto globals = PyDict_New();
-        auto builtins = PyThreadState_GET()->interp->builtins;
-        PyDict_SetItemString(globals, "__builtins__", builtins);
-        PyDict_SetItemString(globals, "sys", sysModule);
-
-        /* XXX Why?
-        PyRun_String("finalized = False\nclass RefCountCheck:\n    def __del__(self):\n        print('finalizing')\n        global finalized\n        finalized = True\n    def __add__(self, other):\n        return self", Py_file_input, globals, globals);
-        if (PyErr_Occurred()) {
-            PyErr_Print();
-            return "";
-        }*/
-
-        // Don't DECREF as frames are recycled.
-        auto frame = PyFrame_New(PyThreadState_Get(), m_code, globals, PyDict_New());
-
-        auto res = m_jittedcode->j_evalfunc(m_jittedcode->j_evalstate, frame);
-        Py_DECREF(globals);
-        Py_DECREF(sysModule);
-        REQUIRE(!PyErr_Occurred());
+        auto res = run();
         REQUIRE(res != nullptr);
+        REQUIRE(!PyErr_Occurred());
 
         auto repr = PyUnicode_AsUTF8(PyObject_Repr(res));
         Py_DECREF(res);
@@ -92,7 +98,9 @@ public:
     }
 
     PyObject* raises() {
-        return nullptr;
+        auto res = run();
+        REQUIRE(res == nullptr);
+        return PyErr_Occurred();
     }
 };
 
