@@ -1196,11 +1196,9 @@ int PyJit_ExtendList(PyObject *extension, PyObject *list) {
     assert(PyList_CheckExact(list));
     auto res = _PyList_Extend((PyListObject*)list, extension);
     Py_DECREF(extension);
-    int flag = 1;
-    if (res != Py_None) {
+    int flag = 1;  // Assume error unless we prove to ourselves otherwise.
+    if (res == Py_None) {
         flag = 0;
-    }
-    else {
         Py_DECREF(res);
     }
 

@@ -1550,8 +1550,8 @@ void AbstractInterpreter::extend_list(size_t argCnt) {
         m_comp->emit_load_local(listTmp);
 
         m_comp->emit_list_extend();
-        int_error_check("list extend failed");
         dec_stack();
+        int_error_check("list extend failed");
     }
 
     m_comp->emit_free_local(valueTmp);
