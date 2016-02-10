@@ -17,6 +17,10 @@ private:
 public:
     py_ptr() : m_ptr(nullptr) {}
     py_ptr(T* ptr) : m_ptr(ptr) {}
+    py_ptr(const py_ptr& copy) {
+        m_ptr = copy.get();
+        Py_INCREF(m_ptr);
+    }
 
     ~py_ptr() {
         Py_XDECREF(m_ptr);
@@ -32,6 +36,10 @@ public:
     }
 
     T* operator->() {
+        return m_ptr;
+    }
+
+    T* operator*() {
         return m_ptr;
     }
 };
