@@ -44,10 +44,11 @@ private:
 
 public:
     InferenceTest(const char* code) {
-        auto pyCode = py_ptr<PyCodeObject>(CompileCode(code));
-        m_absint = std::make_unique<AbstractInterpreter>(pyCode.get(), nullptr);
+        auto pyCode = CompileCode(code);
+        m_absint = std::make_unique<AbstractInterpreter>(pyCode, nullptr);
         auto success = m_absint->interpret();
         if (!success) {
+            Py_DECREF(pyCode);
             FAIL("Failed to interpret code");
         }
     }
@@ -126,14 +127,16 @@ public:
 };
 
 void VerifyOldTest(AITestCase testCase) {
-    auto codeObj = py_ptr<PyCodeObject>(CompileCode(testCase.m_code));
+    auto codeObj = CompileCode(testCase.m_code);
 
-    AbstractInterpreter interpreter(codeObj.get(), nullptr);
+    AbstractInterpreter interpreter(codeObj, nullptr);
     if (!interpreter.interpret()) {
         FAIL("Failed to interprete code");
     }
 
     testCase.verify(interpreter);
+
+    Py_DECREF(codeObj);
 }
 /* ==================================================== */
 
