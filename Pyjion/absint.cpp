@@ -1543,6 +1543,7 @@ void AbstractInterpreter::extend_list_recursively(Local listTmp, size_t argCnt) 
 
     auto valueTmp = m_comp->emit_define_local();
     m_comp->emit_store_local(valueTmp);
+    dec_stack();
 
     extend_list_recursively(listTmp, --argCnt);
 
@@ -1550,7 +1551,6 @@ void AbstractInterpreter::extend_list_recursively(Local listTmp, size_t argCnt) 
     m_comp->emit_load_local(valueTmp);
 
     m_comp->emit_list_extend();
-    dec_stack();
     int_error_check("list extend failed");
 
     m_comp->emit_free_local(valueTmp);

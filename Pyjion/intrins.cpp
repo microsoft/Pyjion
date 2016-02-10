@@ -1192,7 +1192,7 @@ PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg) {
     return value;
 }
 
-int PyJit_ExtendList(PyObject *extension, PyObject *list) {
+int PyJit_ExtendList(PyObject *list, PyObject *extension) {
     assert(PyList_CheckExact(list));
     auto res = _PyList_Extend((PyListObject*)list, extension);
     Py_DECREF(extension);
