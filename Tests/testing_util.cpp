@@ -29,27 +29,23 @@
 
 #include "stdafx.h"
 #include "catch.hpp"
+#include "testing_util.h"
 #include <Python.h>
 
 PyCodeObject* CompileCode(const char* code) {
-    auto globals = PyDict_New();
+    auto globals = PyObject_ptr(PyDict_New());
     auto builtins = PyThreadState_GET()->interp->builtins;
-    PyDict_SetItemString(globals, "__builtins__", builtins);
+    PyDict_SetItemString(globals.get(), "__builtins__", builtins);
 
-    auto locals = PyDict_New();
-    PyRun_String(code, Py_file_input, globals, locals);
+    auto locals = PyObject_ptr(PyDict_New());
+    PyRun_String(code, Py_file_input, globals.get(), locals.get());
     if (PyErr_Occurred()) {
         PyErr_Print();
-        Py_DECREF(globals);
         FAIL("error occurred during Python compilation");
         return nullptr;
     }
-    auto func = PyObject_GetItem(locals, PyUnicode_FromString("f"));
-    auto codeObj = (PyCodeObject*)PyObject_GetAttrString(func, "__code__");
-
-    Py_DECREF(globals);
-    Py_DECREF(locals);
-    Py_DECREF(func);
+    auto func = PyObject_ptr(PyObject_GetItem(locals.get(), PyUnicode_FromString("f")));
+    auto codeObj = (PyCodeObject*)PyObject_GetAttrString(func.get(), "__code__");
 
     return codeObj;
 }

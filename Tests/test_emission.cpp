@@ -36,57 +36,42 @@
 
 class EmissionTest {
 private:
-    PyCodeObject *m_code;
-    PyJittedCode *m_jittedcode;
+    py_ptr<PyCodeObject> m_code;
+    py_ptr<PyJittedCode> m_jittedcode;
 
-    PyObject *run() {
-        auto sysModule = PyImport_ImportModule("sys");
-        auto globals = PyDict_New();
+    PyObject* run() {
+        auto sysModule = PyObject_ptr(PyImport_ImportModule("sys"));
+        auto globals = PyObject_ptr(PyDict_New());
         auto builtins = PyThreadState_GET()->interp->builtins;
-        PyDict_SetItemString(globals, "__builtins__", builtins);
-        PyDict_SetItemString(globals, "sys", sysModule);
-
-        /* XXX Why?
-        PyRun_String("finalized = False\nclass RefCountCheck:\n    def __del__(self):\n        print('finalizing')\n        global finalized\n        finalized = True\n    def __add__(self, other):\n        return self", Py_file_input, globals, globals);
-        if (PyErr_Occurred()) {
-        PyErr_Print();
-        return "";
-        }*/
+        PyDict_SetItemString(globals.get(), "__builtins__", builtins);
+        PyDict_SetItemString(globals.get(), "sys", sysModule.get());
 
         // Don't DECREF as frames are recycled.
-        auto frame = PyFrame_New(PyThreadState_Get(), m_code, globals, PyDict_New());
+        auto frame = PyFrame_New(PyThreadState_Get(), m_code.get(), globals.get(), PyObject_ptr(PyDict_New()).get());
 
         auto res = m_jittedcode->j_evalfunc(m_jittedcode->j_evalstate, frame);
-        Py_DECREF(globals);
-        Py_DECREF(sysModule);
 
         return res;
     }
 
 public:
     EmissionTest(const char *code) {
-        m_code = CompileCode(code);
-        if (m_code == nullptr) {
+        m_code.reset(CompileCode(code));
+        if (m_code.get() == nullptr) {
             FAIL("failed to compile code");
         }
-        m_jittedcode = JitCompile(m_code);
-        if (m_jittedcode == nullptr) {
+        m_jittedcode.reset(JitCompile(m_code.get()));
+        if (m_jittedcode.get() == nullptr) {
             FAIL("failed to JIT code");
         }
     }
 
-    ~EmissionTest() {
-        Py_XDECREF(m_code);
-        Py_XDECREF(m_jittedcode);
-    }
-
-    std::string& returns() {
-        auto res = run();
-        REQUIRE(res != nullptr);
+    std::string returns() {
+        auto res = PyObject_ptr(run());
+        REQUIRE(res.get() != nullptr);
         REQUIRE(!PyErr_Occurred());
 
-        auto repr = PyUnicode_AsUTF8(PyObject_Repr(res));
-        Py_DECREF(res);
+        auto repr = PyUnicode_AsUTF8(PyObject_Repr(res.get()));
         auto tstate = PyThreadState_GET();
         REQUIRE(tstate->exc_value == nullptr);
         REQUIRE(tstate->exc_traceback == nullptr);
