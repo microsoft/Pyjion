@@ -85,7 +85,9 @@ public:
     PyObject* raises() {
         auto res = run();
         REQUIRE(res == nullptr);
-        return PyErr_Occurred();
+        auto excType = PyErr_Occurred();
+        PyErr_Clear();
+        return excType;
     }
 };
 
