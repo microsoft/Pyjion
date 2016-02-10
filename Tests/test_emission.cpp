@@ -80,7 +80,7 @@ public:
         Py_XDECREF(m_jittedcode);
     }
 
-    const char* returns() {
+    std::string& returns() {
         auto res = run();
         REQUIRE(res != nullptr);
         REQUIRE(!PyErr_Occurred());
@@ -94,7 +94,7 @@ public:
             REQUIRE(tstate->exc_type == Py_None);
         }
 
-        return repr;
+        return std::string(repr);
     }
 
     PyObject* raises() {
