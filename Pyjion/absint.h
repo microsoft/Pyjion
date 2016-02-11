@@ -267,6 +267,7 @@ private:
     void fancy_call(int na, int nk, int flags);
     bool can_skip_lasti_update(int opcodeIndex);
     void build_tuple(size_t argCnt);
+    void extend_tuple(size_t argCnt);
     void build_list(size_t argCnt);
     void extend_list_recursively(Local list, size_t argCnt);
     void extend_list(size_t argCnt);
