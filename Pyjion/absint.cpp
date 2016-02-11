@@ -1536,6 +1536,39 @@ void AbstractInterpreter::build_list(size_t argCnt) {
     dec_stack(argCnt);
 }
 
+void AbstractInterpreter::extend_list_recursively(Local listTmp, size_t argCnt) {
+    if (argCnt == 0) {
+        return;
+    }
+
+    auto valueTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(valueTmp);
+    dec_stack();
+
+    extend_list_recursively(listTmp, --argCnt);
+
+    m_comp->emit_load_local(listTmp);
+    m_comp->emit_load_local(valueTmp);
+
+    m_comp->emit_list_extend();
+    int_error_check("list extend failed");
+
+    m_comp->emit_free_local(valueTmp);
+}
+
+void AbstractInterpreter::extend_list(size_t argCnt) {
+    _ASSERTE(argCnt > 0);
+
+    m_comp->emit_new_list(0);
+    error_check("new list failed");
+
+    auto listTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(listTmp);
+
+    extend_list_recursively(listTmp, argCnt);
+
+    m_comp->emit_load_and_free_local(listTmp);
+}
 
 void AbstractInterpreter::build_set(size_t argCnt) {
     m_comp->emit_new_set();
@@ -2027,6 +2060,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             case BUILD_LIST:
                 build_list(oparg);
+                inc_stack();
+                break;
+            case BUILD_LIST_UNPACK:
+                extend_list(oparg);
                 inc_stack();
                 break;
             case BUILD_MAP:

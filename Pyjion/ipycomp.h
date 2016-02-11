@@ -216,6 +216,8 @@ public:
     virtual void emit_list_store(size_t argCnt) = 0;
     // Appends a single value to a list
     virtual void emit_list_append() = 0;
+    // Extends a list with a single iterator
+    virtual void emit_list_extend() = 0;
 
     // Creates a new set
     virtual void emit_new_set() = 0;
