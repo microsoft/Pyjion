@@ -32,6 +32,7 @@
 #include "testing_util.h"
 #include <Python.h>
 #include <frameobject.h>
+#include <util.h>
 #include <pyjit.h>
 
 class EmissionTest {
