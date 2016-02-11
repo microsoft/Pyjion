@@ -1530,7 +1530,7 @@ void AbstractInterpreter::build_tuple(size_t argCnt) {
 void AbstractInterpreter::extend_tuple(size_t argCnt) {
     extend_list(argCnt);
 
-    // XXX Convert list TOC to tuple.
+    // XXX Convert list TOC to tuple: https://github.com/python/cpython/blob/565f19d46876e4a52f948a41c9d884809c6a1002/Python/ceval.c#L2520
 }
 
 void AbstractInterpreter::build_list(size_t argCnt) {
