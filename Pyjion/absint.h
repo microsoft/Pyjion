@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __ABSINT_H__
-#define __ABSINT_H__
+#ifndef ABSINT_H
+#define ABSINT_H
 
 #include <Python.h>
 #include <vector>

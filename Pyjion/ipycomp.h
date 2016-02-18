@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __IPYCOMP_H__
-#define __IPYCOMP_H__
+#ifndef IPYCOMP_H
+#define IPYCOMP_H
 
 class Local {
 public:

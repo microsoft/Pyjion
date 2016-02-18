@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __INTRINS_H__
-#define __INTRINS_H__
+#ifndef INTRINS_H
+#define INTRINS_H
 
 #include <Python.h>
 #include <frameobject.h>

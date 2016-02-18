@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __COWVECTOR_H__
-#define __COWVECTOR_H__
+#ifndef COWVECTOR_H
+#define COWVECTOR_H
 
 #include <memory>
 #include <vector>

@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __TAGGED_PTR_H__
-#define __TAGGED_PTR_H__
+#ifndef TAGGED_PTR_H
+#define TAGGED_PTR_H
 
 #include <Python.h>
 

@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef __PYJIT_H__
-#define __PYJIT_H__
+#ifndef PYJIT_H
+#define PYJIT_H
 
 #define FEATURE_NO_HOST
 #define USE_STL

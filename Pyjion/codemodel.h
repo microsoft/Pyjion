@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __CODEMODEL_H__
-#define __CODEMODEL_H__
+#ifndef CODEMODEL_H
+#define CODEMODEL_H
 
 #define FEATURE_NO_HOST
 #define USE_STL
