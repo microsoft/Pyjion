@@ -1205,6 +1205,12 @@ int PyJit_ExtendList(PyObject *list, PyObject *extension) {
     return flag;
 }
 
+PyObject* PyJit_ListToTuple(PyObject *list) {
+    PyObject* res = PyList_AsTuple(list);
+    Py_DECREF(list);
+    return res;
+}
+
 int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map) {
     assert(PyDict_CheckExact(map));
     auto res = PyDict_SetItem(map, key, value);

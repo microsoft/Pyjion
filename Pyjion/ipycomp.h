@@ -209,6 +209,8 @@ public:
     virtual void emit_new_tuple(size_t size) = 0;
     // Stores all of the values on the stack into a tuple
     virtual void emit_tuple_store(size_t size) = 0;
+    // Convert a list to a tuple
+    virtual void emit_list_to_tuple() = 0;
 
     // Creates a new list of the specified size
     virtual void emit_new_list(size_t argCnt) = 0;

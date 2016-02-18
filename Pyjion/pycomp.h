@@ -165,6 +165,7 @@
 #define METHOD_PERIODIC_WORK                    0x0000006B
 
 #define METHOD_EXTENDLIST_TOKEN                 0x0000006C
+#define METHOD_LISTTOTUPLE_TOKEN                0x0000006D
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -268,6 +269,7 @@ public:
     virtual void emit_new_list(size_t argCnt);
     virtual void emit_list_store(size_t argCnt);
     virtual void emit_list_extend();
+    virtual void emit_list_to_tuple();
 
     virtual void emit_new_set();
     virtual void emit_dict_store();
