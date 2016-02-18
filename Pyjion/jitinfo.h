@@ -82,9 +82,7 @@ public:
         if (m_dataAddr != nullptr) {
             ::GlobalFree(m_dataAddr);
         }
-        if (m_module != nullptr) {
-            delete m_module;
-        }
+        delete m_module;
     }
 
     void* get_code_addr() {
