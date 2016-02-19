@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __ABSVALUE_H__
-#define __ABSVALUE_H__
+#ifndef ABSVALUE_H
+#define ABSVALUE_H
 
 #include <python.h>
 #include <opcode.h>

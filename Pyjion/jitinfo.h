@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __JITINFO_H__
-#define __JITINFO_H__
+#ifndef JITINFO_H
+#define JITINFO_H
 
 
 #define FEATURE_NO_HOST

@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __PYCOMP_H__
-#define __PYCOMP_H__
+#ifndef PYCOMP_H
+#define PYCOMP_H
 
 #include <stdint.h>
 #include <windows.h>

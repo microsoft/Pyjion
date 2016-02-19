@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __CEE_H__
-#define __CEE_H__
+#ifndef CEE_H
+#define CEE_H
 
 #define FEATURE_NO_HOST
 #define USE_STL
