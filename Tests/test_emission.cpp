@@ -32,6 +32,7 @@
 #include "testing_util.h"
 #include <Python.h>
 #include <frameobject.h>
+#include <util.h>
 #include <pyjit.h>
 
 class EmissionTest {
@@ -94,11 +95,23 @@ public:
 TEST_CASE("General list unpacking", "[list][BUILD_LIST_UNPACK][emission]") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): return [1, *[2], 3]");
-        REQUIRE(t.returns() == "[1, 2, 3]");
+        CHECK(t.returns() == "[1, 2, 3]");
     }
 
     SECTION("unpacking a non-iterable") {
         auto t = EmissionTest("def f(): return [1, *2, 3]");
-        REQUIRE(t.raises() == PyExc_TypeError);
+        CHECK(t.raises() == PyExc_TypeError);
+    }
+}
+
+TEST_CASE("General tuple unpacking", "[tuple][BUILD_TUPLE_UNPACK][emission]") {
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): return (1, *(2,), 3)");
+        CHECK(t.returns() == "(1, 2, 3)");
+    }
+
+    SECTION("unpacking a non-iterable") {
+        auto t = EmissionTest("def f(): return (1, *2, 3)");
+        CHECK(t.raises() == PyExc_TypeError);
     }
 }

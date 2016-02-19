@@ -1527,6 +1527,12 @@ void AbstractInterpreter::build_tuple(size_t argCnt) {
     }
 }
 
+void AbstractInterpreter::extend_tuple(size_t argCnt) {
+    extend_list(argCnt);
+    m_comp->emit_list_to_tuple();
+    error_check("extend tuple failed");
+}
+
 void AbstractInterpreter::build_list(size_t argCnt) {
     m_comp->emit_new_list(argCnt);
     error_check("build list failed");
@@ -2056,6 +2062,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case BUILD_TUPLE:
                 build_tuple(oparg);
+                inc_stack();
+                break;
+            case BUILD_TUPLE_UNPACK:
+                extend_tuple(oparg);
                 inc_stack();
                 break;
             case BUILD_LIST:

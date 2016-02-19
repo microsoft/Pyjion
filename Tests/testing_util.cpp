@@ -31,6 +31,7 @@
 #include "catch.hpp"
 #include "testing_util.h"
 #include <Python.h>
+#include <util.h>
 
 PyCodeObject* CompileCode(const char* code) {
     auto globals = PyObject_ptr(PyDict_New());
