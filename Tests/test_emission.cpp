@@ -115,3 +115,15 @@ TEST_CASE("General tuple unpacking", "[tuple][BUILD_TUPLE_UNPACK][emission]") {
         CHECK(t.raises() == PyExc_TypeError);
     }
 }
+
+TEST_CASE("General set unpacking", "[set][BUILD_SET_UNPACK][emission]") {
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): return {1, *[2], 3}");
+        CHECK(t.returns() == "{1, 2, 3}");
+    }
+
+    SECTION("unpacking a non-iterable") {
+        auto t = EmissionTest("def f(): return {1, *2, 3}");
+        CHECK(t.raises() == PyExc_TypeError);
+    }
+}

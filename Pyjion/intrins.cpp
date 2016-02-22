@@ -327,6 +327,13 @@ PyObject* PyJit_SetAdd(PyObject* set, PyObject* value) {
     return set;
 }
 
+int PyJit_UpdateSet(PyObject* set, PyObject* value) {
+    assert(PyAnySet_CheckExact(set));
+    auto res = _PySet_Update(set, value);
+    Py_DECREF(value);
+    return res;
+}
+
 PyObject* PyJit_MapAdd(PyObject*map, PyObject* value, PyObject*key) {
     int err = PyDict_SetItem(map, key, value);  /* v[w] = u */
     Py_DECREF(value);

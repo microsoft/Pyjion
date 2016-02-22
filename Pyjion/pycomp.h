@@ -166,6 +166,7 @@
 
 #define METHOD_EXTENDLIST_TOKEN                 0x0000006C
 #define METHOD_LISTTOTUPLE_TOKEN                0x0000006D
+#define METHOD_SETUPDATE_TOKEN                  0x0000006E
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -272,6 +273,7 @@ public:
     virtual void emit_list_to_tuple();
 
     virtual void emit_new_set();
+    virtual void emit_set_extend();
     virtual void emit_dict_store();
 
     virtual void emit_new_dict(size_t size);

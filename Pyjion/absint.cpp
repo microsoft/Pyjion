@@ -1616,6 +1616,39 @@ void AbstractInterpreter::build_set(size_t argCnt) {
     inc_stack();
 }
 
+void AbstractInterpreter::extend_set_recursively(Local setTmp, size_t argCnt) {
+    if (argCnt == 0) {
+        return;
+    }
+
+    auto valueTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(valueTmp);
+    dec_stack();
+
+    extend_set_recursively(setTmp, --argCnt);
+
+    m_comp->emit_load_local(setTmp);
+    m_comp->emit_load_local(valueTmp);
+
+    m_comp->emit_set_extend();
+    int_error_check("set extend failed");
+
+    m_comp->emit_free_local(valueTmp);
+}
+
+void AbstractInterpreter::extend_set(size_t argCnt) {
+    _ASSERTE(argCnt > 0);
+
+    m_comp->emit_new_set();
+    error_check("new set failed");
+
+    auto setTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(setTmp);
+
+    extend_set_recursively(setTmp, argCnt);
+
+    m_comp->emit_load_and_free_local(setTmp);
+}
 
 void AbstractInterpreter::build_map(size_t  argCnt) {
     m_comp->emit_new_dict(argCnt);
@@ -2099,6 +2132,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 inc_stack();
                 break;
             case BUILD_SET: build_set(oparg); break;
+            case BUILD_SET_UNPACK:
+                extend_set(oparg);
+                inc_stack();
+                break;
             case UNARY_POSITIVE: unary_positive(opcodeIndex); break;
             case UNARY_NEGATIVE: unary_negative(opcodeIndex); break;
             case UNARY_NOT: unary_not(curByte); break;
