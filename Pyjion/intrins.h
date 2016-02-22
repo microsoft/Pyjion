@@ -81,6 +81,8 @@ PyObject* PyJit_ListAppend(PyObject* list, PyObject* value);
 
 PyObject* PyJit_SetAdd(PyObject* set, PyObject* value);
 
+int PyJit_UpdateSet(PyObject* set, PyObject* value);
+
 PyObject* PyJit_MapAdd(PyObject*map, PyObject* value, PyObject*key);
 
 PyObject* PyJit_Multiply(PyObject *left, PyObject *right);
