@@ -77,7 +77,7 @@ pronounceable.
 #### [PyPy](http://pypy.org/)?
 [PyPy](http://pypy.org/) is an implementation of Python with its own JIT. The
 biggest difference compared to Pyjion is that PyPy doesn't support C extension
-modules without modification unless they use [CFFI](cffi.readthedocs.org).
+modules without modification unless they use [CFFI](https://cffi.readthedocs.org).
 Pyjion also aims to support many JIT compilers while PyPy only supports their
 own custom JIT compiler.
 
