@@ -1226,6 +1226,20 @@ int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map) {
     return res;
 }
 
+int PyJit_DictUpdate(PyObject* dict, PyObject* other) {
+    assert(PyDict_CheckExact(dict));
+    auto res = PyDict_Update(dict, other);
+    if (res < 0) {
+        if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+            PyErr_Format(PyExc_TypeError,
+                "'%.200s' object is not a mapping",
+                other->ob_type->tp_name);
+        }
+    }
+    Py_DECREF(other);
+    return res;
+}
+
 int PyJit_StoreSubscr(PyObject* value, PyObject *container, PyObject *index) {
     auto res = PyObject_SetItem(container, index, value);
     Py_DECREF(index);

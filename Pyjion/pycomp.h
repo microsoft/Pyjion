@@ -167,6 +167,7 @@
 #define METHOD_EXTENDLIST_TOKEN                 0x0000006C
 #define METHOD_LISTTOTUPLE_TOKEN                0x0000006D
 #define METHOD_SETUPDATE_TOKEN                  0x0000006E
+#define METHOD_DICTUPDATE_TOKEN                 0x0000006F
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -277,6 +278,7 @@ public:
     virtual void emit_dict_store();
 
     virtual void emit_new_dict(size_t size);
+    virtual void emit_map_extend();
 
     virtual void emit_build_slice();
 

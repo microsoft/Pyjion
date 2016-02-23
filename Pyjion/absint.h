@@ -278,6 +278,8 @@ private:
     void unpack_ex(size_t size, int opcode);
 
     void build_map(size_t argCnt);
+    void extend_map_recursively(Local dict, size_t argCnt);
+    void extend_map(size_t argCnt);
 
     Label getOffsetLabel(int jumpTo);
     void for_iter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo);
