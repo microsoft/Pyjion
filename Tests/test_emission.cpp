@@ -127,3 +127,15 @@ TEST_CASE("General set unpacking", "[set][BUILD_SET_UNPACK][emission]") {
         CHECK(t.raises() == PyExc_TypeError);
     }
 }
+
+TEST_CASE("General dict unpacking", "[dict][BUILD_MAP_UNPACK][emission]") {
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): return {1:'a', **{2:'b'}, 3:'c'}");
+        CHECK(t.returns() == "{1: 'a', 2: 'b', 3: 'c'}");
+    }
+
+    SECTION("unpacking a non-mapping") {
+        auto t = EmissionTest("def f(): return {1:'a', **{2}, 3:'c'}");
+        CHECK(t.raises() == PyExc_TypeError);
+    }
+}

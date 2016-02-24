@@ -234,6 +234,8 @@ public:
     virtual void emit_dict_store() = 0;
     // Adds a single key/value pair to a dict
     virtual void emit_map_add() = 0;
+    // Extends a map by another mapping
+    virtual void emit_map_extend() = 0;
 
     // Creates a slice object from values on the stack
     virtual void emit_build_slice() = 0;

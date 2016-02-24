@@ -186,6 +186,8 @@ PyObject* PyJit_ListToTuple(PyObject *list);
 
 int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map);
 
+int PyJit_DictUpdate(PyObject *dict, PyObject* other);
+
 int PyJit_StoreSubscr(PyObject* value, PyObject *container, PyObject *index);
 
 int PyJit_DeleteSubscr(PyObject *container, PyObject *index);

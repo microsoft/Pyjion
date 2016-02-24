@@ -1668,6 +1668,40 @@ void AbstractInterpreter::build_map(size_t  argCnt) {
     }
 }
 
+void AbstractInterpreter::extend_map_recursively(Local dictTmp, size_t argCnt) {
+    if (argCnt == 0) {
+        return;
+    }
+
+    auto valueTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(valueTmp);
+    dec_stack();
+
+    extend_map_recursively(dictTmp, --argCnt);
+
+    m_comp->emit_load_local(dictTmp);
+    m_comp->emit_load_local(valueTmp);
+
+    m_comp->emit_map_extend();
+    int_error_check("map extend failed");
+
+    m_comp->emit_free_local(valueTmp);
+}
+
+void AbstractInterpreter::extend_map(size_t argCnt) {
+    _ASSERTE(argCnt > 0);
+
+    m_comp->emit_new_dict(0);
+    error_check("new map failed");
+
+    auto dictTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(dictTmp);
+
+    extend_map_recursively(dictTmp, argCnt);
+
+    m_comp->emit_load_and_free_local(dictTmp);
+}
+
 void AbstractInterpreter::make_function(int posdefaults, int kwdefaults, int num_annotations, bool isClosure) {
     m_comp->emit_new_function();
     dec_stack(2);
@@ -2111,6 +2145,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             case BUILD_MAP:
                 build_map(oparg);
+                inc_stack();
+                break;
+            case BUILD_MAP_UNPACK:
+                extend_map(oparg);
                 inc_stack();
                 break;
             case STORE_SUBSCR:
