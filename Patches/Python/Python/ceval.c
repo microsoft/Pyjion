@@ -1,5 +1,5 @@
 diff --git a/Python/ceval.c b/Python/ceval.c
-index beabfeb..bd82d25 100644
+index beabfeb..c963772 100644
 --- a/Python/ceval.c
 +++ b/Python/ceval.c
 @@ -770,6 +770,55 @@ static int unpack_iterable(PyObject *, int, int, PyObject **);
@@ -58,10 +58,10 @@ index beabfeb..bd82d25 100644
  
  PyObject *
  PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
-@@ -795,6 +844,30 @@ PyEval_EvalFrame(PyFrameObject *f) {
- 
+@@ -796,6 +845,31 @@ PyEval_EvalFrame(PyFrameObject *f) {
  PyObject *
  PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
+ {
 +    if (f->f_code->co_jitted != NULL) {
 +        return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
 +    }
@@ -86,10 +86,11 @@ index beabfeb..bd82d25 100644
 +
 +PyObject *
 +PyEval_EvalFrameEx_NoJit(PyFrameObject *f, int throwflag)
- {
++{
  #ifdef DXPAIRS
      int lastopcode = 0;
-@@ -1262,25 +1335,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
+ #endif
+@@ -1262,25 +1336,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                      goto error;
              }
  #ifdef WITH_THREAD
