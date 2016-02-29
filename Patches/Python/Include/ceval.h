@@ -1,5 +1,5 @@
 diff --git a/Include/ceval.h b/Include/ceval.h
-index b5373a9..97dab63 100644
+index b5373a9..59c1171 100644
 --- a/Include/ceval.h
 +++ b/Include/ceval.h
 @@ -10,6 +10,11 @@ extern "C" {
@@ -26,3 +26,11 @@ index b5373a9..97dab63 100644
  #ifdef USE_STACKCHECK
  /* With USE_STACKCHECK, we artificially decrement the recursion limit in order
     to trigger regular stack checks in _Py_CheckRecursiveCall(), except if
+@@ -119,6 +129,7 @@ PyAPI_FUNC(const char *) PyEval_GetFuncDesc(PyObject *);
+ PyAPI_FUNC(PyObject *) PyEval_GetCallStats(PyObject *);
+ PyAPI_FUNC(PyObject *) PyEval_EvalFrame(struct _frame *);
+ PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx(struct _frame *f, int exc);
++PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx_NoJit(struct _frame *f, int exc);
+ 
+ /* Interface for threads.
+ 
