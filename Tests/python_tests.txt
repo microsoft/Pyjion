@@ -362,7 +362,6 @@ test_sunau
 test_sundry
 test_super
 test_support
-test_symbol
 test_symtable
 test_syntax
 # TODO: crashes
