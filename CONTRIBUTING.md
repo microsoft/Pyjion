@@ -3,6 +3,9 @@
 ## Code of Conduct
 The latest version of the CoC at http://contributor-covenant.org/ applies to this project.
 
+## CLA
+If your contribution is large enough you will be asked to sign the Microsoft CLA (the CLA bot will tell you if it's necessary).
+
 ## Development
 ### Pre-Reqs (all of which need to be reachable on your PATH)
 * For CoreCLR
