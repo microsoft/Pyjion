@@ -1,7 +1,9 @@
 # Contributing to Pyjion
 
 ## Code of Conduct
-The latest version of the CoC at http://contributor-covenant.org/ applies to this project.
+This project's code of conduct can be found in the
+[CODE_OF_CONDUCT.md file](https://github.com/Microsoft/Pyjion/blob/master/CODE_OF_CONDUCT.md)
+(v1.4.0 of the http://contributor-covenant.org/ CoC).
 
 ## CLA
 If your contribution is large enough you will be asked to sign the Microsoft CLA (the CLA bot will tell you if it's necessary).
