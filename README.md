@@ -54,7 +54,7 @@ supports LLVM.
 #### [IronPython](http://ironpython.net/)?
 [IronPython](http://ironpython.net/) is an implementation of Python that is
 implemented using [.NET](http://microsoft.com/NET). While IronPython tries to
-be usable from within .NET, Pyjion does not have an compatibility with .NET.
+be usable from within .NET, Pyjion does not have a compatibility with .NET.
 This also means IronPython cannot use C extension modules while Pyjion can.
 
 #### [Psyco](http://psyco.sourceforge.net/)?
