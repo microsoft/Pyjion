@@ -34,10 +34,11 @@ pronounceable.
 ### How do this compare to ...
 #### [PyPy](http://pypy.org/)?
 [PyPy](http://pypy.org/) is an implementation of Python with its own JIT. The
-biggest difference compared to Pyjion is that PyPy doesn't support C extension
-modules without modification unless they use [CFFI](https://cffi.readthedocs.org).
+biggest difference compared to Pyjion is that PyPy doesn't support all C extension
+modules without modification unless they use [CFFI](https://cffi.readthedocs.org)
+or work with the select subset of CPython's C API that PyPy does support.
 Pyjion also aims to support many JIT compilers while PyPy only supports their
-own custom JIT compiler.
+custom JIT compiler.
 
 #### [Pyston](http://pyston.org)?
 [Pyston](http://pyston.org) is an implementation of Python using
