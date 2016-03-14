@@ -3,7 +3,7 @@ Title: Adding a JIT entrypoint API to CPython
 Version: $Revision$
 Last-Modified: $Date$
 Author: Brett Cannon <brett@python.org>,
-        Dino Viehland <XXX@XXX>
+        Dino Viehland <dinov@microsoft.com>
 Status: Draft
 Type: Standards Track
 Content-Type: text/x-rst
