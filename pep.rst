@@ -115,7 +115,10 @@ XXX
 Implementation
 ==============
 
-XXX
+A set of patches implementing the proposed API is available through
+the Pyjion project [#pyjion]_. The project also includes a
+proof-of-concept JIT using the CoreCLR JIT [#coreclr]_ (Called
+RyuJIT).
 
 
 Open Issues
@@ -166,6 +169,9 @@ References
 
 .. [#pycodeobject] ``PyCodeObject``
    (https://docs.python.org/3/c-api/code.html#c.PyCodeObject)
+
+.. [#coreclr] .NET Core Runtime (CoreCLR)
+   (https://github.com/dotnet/coreclr)
 
 
 Copyright
