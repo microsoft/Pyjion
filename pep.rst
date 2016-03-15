@@ -164,6 +164,9 @@ References
 .. [#c-api] CPython's C API
    (https://docs.python.org/3/c-api/index.html)
 
+.. [#pycodeobject] ``PyCodeObject``
+   (https://docs.python.org/3/c-api/code.html#c.PyCodeObject)
+
 
 Copyright
 =========
