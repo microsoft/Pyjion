@@ -14,7 +14,7 @@ Post-History: NN-Lll-NNNN
 Abstract
 ========
 
-This PEP proposes to expand CPython's C API [#c-api]_to allow for
+This PEP proposes to expand CPython's C API [#c-api]_ to allow for
 just-in-time compilers (JITs) to participate in the execution of
 Python code. Use of a JIT will be optional for CPython and no specific
 JIT will be distributed with CPython itself.
