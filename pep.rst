@@ -72,7 +72,7 @@ Expanding ``PyCodeObject``
 Two new fields are to be added to the ``PyCodeObject`` struct
 [#pycodeobject]_ along with a sentinel constant::
 
-  struct {
+  typedef struct {
      ...
      PyJittedCode *co_jitted;  /* Stores struct to JIT details. */
      PY_UINT64_T co_run_count;  /* The number of times the code object has run. */
@@ -103,7 +103,30 @@ to a ``PyJittedCode`` struct.
 ``PyJittedCode``
 ----------------
 
-XXX
+The ``PyJittedCode`` struct carries all relevant details about what
+the JIT produced for the code object it is attached to::
+
+  typedef PyObject* (__stdcall*  Py_EvalFunc)(void*, struct _frame*);
+
+  typedef struct {
+      PyObject_HEAD
+      Py_EvalFunc jit_evalfunc;
+      void *jit_evalstate;
+  }
+
+The ``jit_evalfunc`` points to a trampoline function provided by the
+JIT to handle the execution of a Python frame and returning the
+resulting ``PyObject`` (much like ``PyEval_EvalFrameEx()``
+[#pyeval_evalframeex]_). A per-code object trampoline can be specified
+to allow for such use-cases as tracing where a tracing-specific
+trampoline could be used initially and then eventually substituted for
+a non-tracing trampoline.
+
+The ``jit_evalstate`` pointer is an opaque void pointer for the JIT
+to store whatever data it needs in relation to the code object.
+Most likely it will at least store the compiled code from the JIT, but
+it could store other bookkeeping details such as traced type
+information, etc.
 
 
 Changes to ``Python/ceval.c``
@@ -172,6 +195,9 @@ References
 
 .. [#coreclr] .NET Core Runtime (CoreCLR)
    (https://github.com/dotnet/coreclr)
+
+.. [#pyeval_evalframeex] ``PyEval_EvalFrameEx()``
+   (https://docs.python.org/3/c-api/veryhigh.html#c.PyEval_EvalFrameEx)
 
 
 Copyright
