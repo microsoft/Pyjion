@@ -129,10 +129,68 @@ it could store other bookkeeping details such as traced type
 information, etc.
 
 
+Expanding ``PyInterpreterState``
+--------------------------------
+
+The entrypoints for the JIT are per-interpreter::
+
+  typedef PyObject* (__stdcall *PyJITCompileFunction)(PyObject*);
+  typedef void* (__stdcall *PyJITFreeFunction)(PyObject*);
+
+  typedef struct {
+      ...
+      PyJITCompileFunction jit_compile;
+      PyJITFreeFunction jit_free;
+  }
+
+The ``jit_compile`` field holds a function pointer for a function that
+takes a ``PyCodeObject`` and attempts to compile it to a
+``PyJittedCode`` object which will be set on the code object it was
+compiled for.
+
+The ``jit_free`` field stores a function pointer to a function which
+is used to free ``PyJittedCode`` objects.
+
+
 Changes to ``Python/ceval.c``
 -----------------------------
 
-XXX
+The start of ``PyEval_EvalFrameEx()`` [#pyeval_evalframeex]_ will
+be changed in to follow the following semantics::
+
+  // Value chosen arbitrarily; matches PyPy's equivalent number.
+  // JIT compilers are expected to set this to an appropriate value for themselves.
+  PY_UINT64_T PyJIT_HOT_CODE = 20000;
+
+  PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
+  {
+      PyCodeObject *code = f->f_code;
+      if (code->co_jitted == PY_JIT_FAILED) {
+          // JIT compilation previously failed.
+          return PyEval_EvalFrameEx_NoJIT(f, throwflag);
+      }
+      else if (code->co_jitted != NULL) {
+          // Previously JIT compiled.
+          return code->co_jitted->jit_evalfunc(code->co_jitted->jit_evalstate, f);
+      }
+
+     if (!code->co_run_count++ > PyJIT_HOT_CODE) {
+         PyThreadState *tstate = PyThreadState_GET();
+         PyInterpreterState *interp = tstate->interp;
+         if (interp->jit_compile != NULL) {
+             code->co_jitted = interp->jit_compile((PyObject*)code);
+             if (code->co_jitted != NULL && code->co_jitted != PY_JIT_FAILED) {
+                 // Execute the jitted code...
+                 return code->co_jitted->jit_evalfunc(code->co_jitted->jit_evalstate, f);
+             }
+
+             // No longer try and compile this method.
+             code->co_compilefailed = PY_JIT_FAILED;
+         }
+     }
+
+     // Use CPython's normal eval loop.
+     return PyEval_EvalFrameEx_NoJit(f, throwflag);
 
 
 Implementation
