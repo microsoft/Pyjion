@@ -61,6 +61,54 @@ burden extremely small on CPython contributors themselves.
 Proposal
 ========
 
+The overall proposal involves expanding code object, providing
+function entrypoints for JITs, and changes to the eval loop of
+CPython.
+
+
+Expanding ``PyCodeObject``
+--------------------------
+
+Two new fields are to be added to the ``PyCodeObject`` struct
+[#pycodeobject]_ along with a sentinel constant::
+
+  struct {
+     ...
+     PyJittedCode *co_jitted;  /* Stores struct to JIT details. */
+     PY_UINT64_T co_run_count;  /* The number of times the code object has run. */
+  } PyCodeObject;
+
+  /* Constant to represent when a JIT cannot compile a code object. */
+  #define PY_JIT_FAILED 1
+
+The ``co_jitted`` field stores a pointer to a ``PyJittedCode`` struct
+which stores the details of the compiled JIT code (``PyJittedCode`` is
+explained later). By adding a level of indirection for JIT compilation
+details per code object minimizes the memory impact of this API when a
+JIT is not used/triggered.
+
+The ``co_run_count`` field counts the numbers of executions for the
+code object. This allows for JIT compilation to only be triggered for
+"hot" code objects instead of all code objects. This helps mitigate
+JIT compilation overhead by only triggering compilation for heavily
+used code objects.
+
+The ``PY_JIT_FAILED`` constant is used to signify when a JIT attempted
+to compile a code object and failed. This presents attempting to
+compile the code object in the future. The value should be a memory
+address that has nearly no chance of ever being a valid memory address
+to a ``PyJittedCode`` struct.
+
+
+``PyJittedCode``
+----------------
+
+XXX
+
+
+Changes to ``Python/ceval.c``
+-----------------------------
+
 XXX
 
 
@@ -73,13 +121,38 @@ XXX
 Open Issues
 ===========
 
-XXX
+Provisionally accept the proposed changes
+-----------------------------------------
+
+While PEP 411 introduced the concept of provisionally accepted
+packages in Python's standard library, the concept has yet to be
+applied to CPython's C API. Due to the unknown payoff from adding this
+API to CPython, it may make sense to provisionally accept this PEP
+with a goal to validate its usefulness based on whether JITs emerge
+which make use of the proposed API.
+
+
+How to specify what JIT to use?
+-------------------------------
+
+Should JITs be an explicit ``-X`` flag for CPython? Or should a JIT
+simply be like any other extension module that gets imported and it is
+up to the module to register the necessary functions during module
+initialization?
+
 
 
 Rejected Ideas
 ==============
 
-XXX
+A separate boolean to flag when a code object cannot be compiled
+----------------------------------------------------------------
+
+In the first proof-of-concept of the proposed API there was a
+``co_compilefailed`` flag that was set by the JIT when it was unable
+to compile the code object. This was eventually removed as it was
+deemed unnecessary when ``co_jitted`` could hold a sentinel value for
+the same purpose, eliminating the need for memory per code object.
 
 
 References
