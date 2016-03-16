@@ -109,13 +109,14 @@ the JIT produced for the code object it is attached to::
       void *jit_evalstate;
   }
 
-The ``jit_evalfunc`` points to a trampoline function provided by the
-JIT to handle the execution of a Python frame and returning the
-resulting ``PyObject`` (much like ``PyEval_EvalFrameEx()``
-[#pyeval_evalframeex]_). A per-code object trampoline can be specified
-to allow for such use-cases as tracing where a tracing-specific
-trampoline could be used initially and then eventually substituted for
-a non-tracing trampoline.
+The ``jit_evalfunc`` field points to a function provided by the JIT to
+handle execution of a Python frame and returning the resulting
+``PyObject`` (much like PyEval_EvalFrameEx() [#pyeval_evalframeex]_).
+The function can point directly to the generated code or can be a
+trampoline function. The JIT may use trampoline functions to provide
+tracing and call back into the Python byte code interpreter.
+Trampolines can also be used to perform common prologue and epilogue
+tasks rather than emitting into generated code.
 
 The ``jit_evalstate`` pointer is an opaque void pointer for the JIT
 to store whatever data it needs in relation to the code object.
@@ -186,15 +187,11 @@ be changed to have the following semantics::
                  // Compilation succeeded!
                  return code->co_jitted->jit_evalfunc(code->co_jitted->jit_evalstate, f);
              }
-
-             // Compilation failed, so no longer try and compile this
-             // method.
-             code->co_compilefailed = PY_JIT_FAILED;
          }
      }
 
      // Fall-through; use CPython's normal eval loop.
-     return PyEval_EvalFrameEx_NoJit(f, throwflag);
+     return PyEval_EvalFrameEx_NoJIT(f, throwflag);
 
 
 Implementation
@@ -254,6 +251,19 @@ it was unable to compile the code object. This was eventually removed
 as it was deemed unnecessary when ``co_jitted`` could be assigned a
 constant value for the same purpose, eliminating the need for memory
 per code object just for this flag.
+
+
+No ``PyJittedCode`` type
+------------------------
+
+An earlier version of this API only added an evaluation function to
+the code object and did not expose a ``PyJittedCode`` object. This had
+a couple of limitations. First, there was no way for a JIT to put in
+place a tracing function which could be shared across multiple code
+objects. Second, the expose of the JittedCode object will allow JITs
+to create decorators which could provide hints to the JIT to control
+code generation. For example a JIT could have a decorator to force or
+prevent inlining.
 
 
 References
