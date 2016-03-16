@@ -16,8 +16,8 @@ Abstract
 
 This PEP proposes to expand CPython's C API [#c-api]_ to allow for
 just-in-time compilers (JITs) to participate in the execution of
-Python code. Use of a JIT will be optional for CPython and no specific
-JIT will be distributed with CPython itself.
+Python code. The use of a JIT will be optional for CPython and no
+specific JIT will be distributed with CPython itself.
 
 Rationale
 =========
@@ -30,24 +30,22 @@ having to be turned down due to the cost of the other two goals.
 
 CPython has always held the code maintenance and portability goals
 very highly. That has historically meant that if a proposal came
-forward that increased CPython's speed was proposed it had to be
-evaluated from the perspective of how much it complicated CPython's
-code base as well as whether it would work on most operating
-systems. The idea of adding a just-in-time compiler (JIT) to CPython
-has always been rejected due to either portability or code
-maintenance reasons.
+forward that increased CPython's speed it had to be evaluated from the
+perspective of how much it complicated CPython's code base as well as
+whether it would work on most operating systems. The idea of adding a
+just-in-time compiler (JIT) to CPython has always been rejected due to
+either portability and/or code maintenance reasons.
 
 But we believe we have a solution to the common issues with adding a
 JIT to CPython. First, we do not want to add a JIT *directly*
 to CPython but instead an API that *allows* a JIT to be used. This
 alleviates the typical portability issue by simply not making it the
-responsibility of CPython to provide a JIT that works across at least
-across all major if not any platform that supports C89 + Amendment 1
-(CPython's current portability requirement). Exposing an API instead
-of using a specific JIT with CPython also allows for the best JIT to
-be used per platform and workload. Finally, it allows for easier
-experimentation by JIT authors with CPython to grow the potential
-ecosystem of JITs for CPython.
+responsibility of CPython to provide a JIT that works across supported
+platforms. Exposing an API instead of using a specific JIT with
+CPython also allows for the best JIT to be used per platform and
+workload. Finally, it allows for easier experimentation with CPython
+by JIT authors. This could help facilitate an ecosystem of JITs for
+CPython.
 
 The second part of our solution for overcoming traditional objections
 at adding a JIT to CPython is to expose a *small* expansion of the C
@@ -61,16 +59,11 @@ burden extremely small on CPython contributors themselves.
 Proposal
 ========
 
-The overall proposal involves expanding code object, providing
-function entrypoints for JITs, and changes to the eval loop of
-CPython.
-
-
 Expanding ``PyCodeObject``
 --------------------------
 
 Two new fields are to be added to the ``PyCodeObject`` struct
-[#pycodeobject]_ along with a sentinel constant::
+[#pycodeobject]_ along with a constant::
 
   typedef struct {
      ...
@@ -78,26 +71,28 @@ Two new fields are to be added to the ``PyCodeObject`` struct
      PY_UINT64_T co_run_count;  /* The number of times the code object has run. */
   } PyCodeObject;
 
-  /* Constant to represent when a JIT cannot compile a code object. */
-  #define PY_JIT_FAILED 1
+  /* Constant to represent when a JIT cannot compile a code object;
+     should not compare equal to NULL. */
+  const PyJittedCode *PY_JIT_FAILED = 1;
 
 The ``co_jitted`` field stores a pointer to a ``PyJittedCode`` struct
 which stores the details of the compiled JIT code (``PyJittedCode`` is
 explained later). By adding a level of indirection for JIT compilation
-details per code object minimizes the memory impact of this API when a
-JIT is not used/triggered.
+details per code object, the memory impact of this API is minimized
+when a JIT is not used/triggered.
 
 The ``co_run_count`` field counts the numbers of executions for the
 code object. This allows for JIT compilation to only be triggered for
 "hot" code objects instead of all code objects. This helps mitigate
 JIT compilation overhead by only triggering compilation for heavily
-used code objects.
+used code objects. (If issue #26219 [#26219]_ is accepted then the run
+count per code object will already be present in CPython).
 
 The ``PY_JIT_FAILED`` constant is used to signify when a JIT attempted
-to compile a code object and failed. This presents attempting to
-compile the code object in the future. The value should be a memory
-address that has nearly no chance of ever being a valid memory address
-to a ``PyJittedCode`` struct.
+to compile a code object and failed. Setting this constant prevents
+attempting to compile the code object in the future. The value should
+be a memory address that has nearly no chance of ever being a valid
+memory address to a ``PyJittedCode`` struct.
 
 
 ``PyJittedCode``
@@ -156,40 +151,49 @@ Changes to ``Python/ceval.c``
 -----------------------------
 
 The start of ``PyEval_EvalFrameEx()`` [#pyeval_evalframeex]_ will
-be changed in to follow the following semantics::
+be changed to have the following semantics::
 
-  // Value chosen arbitrarily; matches PyPy's equivalent number.
-  // JIT compilers are expected to set this to an appropriate value for themselves.
-  PY_UINT64_T PyJIT_HOT_CODE = 20000;
+  // Number of executions required before an attempt is made to JIT
+  // a code object. JIT compilers are expected to set this to an
+  // appropriate value themselves. The initial value is set to the
+  // highest value possible. The initial value is set to the highest
+  // value possible to minimize work in discovering that no JIT is
+  // set while still allowing for JIT compilation in the future in
+  // case a JIT is set up later.
+  PY_UINT64_T PyJIT_HOT_CODE = 9223372036854775807;
 
   PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
   {
       PyCodeObject *code = f->f_code;
-      if (code->co_jitted == PY_JIT_FAILED) {
-          // JIT compilation previously failed.
-          return PyEval_EvalFrameEx_NoJIT(f, throwflag);
-      }
-      else if (code->co_jitted != NULL) {
-          // Previously JIT compiled.
-          return code->co_jitted->jit_evalfunc(code->co_jitted->jit_evalstate, f);
+
+      if (code->co_jitted != NULL) {
+          if (code->co_jitted == PY_JIT_FAILED) {
+              // JIT compilation previously failed.
+              return PyEval_EvalFrameEx_NoJIT(f, throwflag);
+          }
+          else {
+              // Previously JIT compiled.
+              return code->co_jitted->jit_evalfunc(code->co_jitted->jit_evalstate, f);
+          }
       }
 
-     if (!code->co_run_count++ > PyJIT_HOT_CODE) {
+     if (code->co_run_count++ > PyJIT_HOT_CODE) {
          PyThreadState *tstate = PyThreadState_GET();
          PyInterpreterState *interp = tstate->interp;
          if (interp->jit_compile != NULL) {
              code->co_jitted = interp->jit_compile((PyObject*)code);
              if (code->co_jitted != NULL && code->co_jitted != PY_JIT_FAILED) {
-                 // Execute the jitted code...
+                 // Compilation succeeded!
                  return code->co_jitted->jit_evalfunc(code->co_jitted->jit_evalstate, f);
              }
 
-             // No longer try and compile this method.
+             // Compilation failed, so no longer try and compile this
+             // method.
              code->co_compilefailed = PY_JIT_FAILED;
          }
      }
 
-     // Use CPython's normal eval loop.
+     // Fall-through; use CPython's normal eval loop.
      return PyEval_EvalFrameEx_NoJit(f, throwflag);
 
 
@@ -198,7 +202,7 @@ Implementation
 
 A set of patches implementing the proposed API is available through
 the Pyjion project [#pyjion]_. The project also includes a
-proof-of-concept JIT using the CoreCLR JIT [#coreclr]_ (Called
+proof-of-concept JIT using the CoreCLR JIT [#coreclr]_ (called
 RyuJIT).
 
 
@@ -214,6 +218,18 @@ applied to CPython's C API. Due to the unknown payoff from adding this
 API to CPython, it may make sense to provisionally accept this PEP
 with a goal to validate its usefulness based on whether JITs emerge
 which make use of the proposed API.
+
+
+Make the proposed API a compile-time option
+-------------------------------------------
+
+While the API is small and performance impact of executions with no
+JIT in use should be minimal (the default, no-JIT case consists of
+1 ``!=`` comparison, a ``>`` comparison, and an increment), there will
+always be some overhead. If the C API is deemed worth having but the
+performance cost in the non-JIT case is considered too high, the API
+could become a compile-time option. This is obviously not preferred as
+it makes it more of a burden to use the new C API.
 
 
 How to specify what JIT to use?
@@ -233,10 +249,11 @@ A separate boolean to flag when a code object cannot be compiled
 ----------------------------------------------------------------
 
 In the first proof-of-concept of the proposed API there was a
-``co_compilefailed`` flag that was set by the JIT when it was unable
-to compile the code object. This was eventually removed as it was
-deemed unnecessary when ``co_jitted`` could hold a sentinel value for
-the same purpose, eliminating the need for memory per code object.
+``co_compilefailed`` flag on code objects that was set by the JIT when
+it was unable to compile the code object. This was eventually removed
+as it was deemed unnecessary when ``co_jitted`` could be assigned a
+constant value for the same purpose, eliminating the need for memory
+per code object just for this flag.
 
 
 References
@@ -256,6 +273,9 @@ References
 
 .. [#pyeval_evalframeex] ``PyEval_EvalFrameEx()``
    (https://docs.python.org/3/c-api/veryhigh.html#c.PyEval_EvalFrameEx)
+
+.. [#26219] Issue #26219: implement per-opcode cache in ceval
+   (http://bugs.python.org/issue26219)
 
 
 Copyright
