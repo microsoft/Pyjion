@@ -1,5 +1,5 @@
 diff --git a/Python/ceval.c b/Python/ceval.c
-index beabfeb..c963772 100644
+index beabfeb..ef42437 100644
 --- a/Python/ceval.c
 +++ b/Python/ceval.c
 @@ -770,6 +770,55 @@ static int unpack_iterable(PyObject *, int, int, PyObject **);
@@ -58,7 +58,12 @@ index beabfeb..c963772 100644
  
  PyObject *
  PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
-@@ -796,6 +845,31 @@ PyEval_EvalFrame(PyFrameObject *f) {
+@@ -793,9 +842,36 @@ PyEval_EvalFrame(PyFrameObject *f) {
+     return PyEval_EvalFrameEx(f, 0);
+ }
+ 
++PY_UINT64_T PyJIT_HOT_CODE = 20000;
++
  PyObject *
  PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
  {
@@ -66,7 +71,7 @@ index beabfeb..c963772 100644
 +        return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
 +    }
 +
-+    if (!f->f_code->co_compilefailed /*&& f->f_code->co_runcount++ >20 */) {
++    if ((!f->f_code->co_compilefailed) && (f->f_code->co_runcount++ > PyJIT_HOT_CODE)) {
 +        PyThreadState *tstate = PyThreadState_GET();
 +        if (tstate->interp->jitcompile != NULL) {
 +            f->f_code->co_jitted = tstate->interp->jitcompile((PyObject*)f->f_code);
@@ -90,7 +95,7 @@ index beabfeb..c963772 100644
  #ifdef DXPAIRS
      int lastopcode = 0;
  #endif
-@@ -1262,25 +1336,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
+@@ -1262,25 +1338,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                      goto error;
              }
  #ifdef WITH_THREAD
