@@ -82,7 +82,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\Pyjion;..\Python\Include;..\Python\PC</IncludePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);;$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform);$(SolutionDir)$(Platform)\$(Configuration)\;$(MSBuildProjectDirectory)\..\$(Platform)\$(Configuration)\;..\Python\PCBuild\$(Configuration)</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);;$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform);$(SolutionDir)$(Platform)\$(Configuration)\;$(MSBuildProjectDirectory)\..\$(Platform)\$(Configuration)\;..\Python\PCBuild\$(Configuration);;$(MSBuildProjectDirectory)\..\Python\PCbuild\amd64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
