@@ -1,0 +1,11 @@
+Benchmark,Base,Changed
+2to3,5.560410,5.580026
+chameleon_v2,3.911691,4.076780
+django_v3,0.385458,0.383078
+fastpickle,0.372616,0.369181
+fastunpickle,0.498875,0.487035
+json_dump_v2,2.158455,2.176631
+json_load,0.349240,0.357310
+nbody,0.233559,0.242705
+regex_v8,0.039063,0.039166
+tornado_http,0.418463,0.418276
