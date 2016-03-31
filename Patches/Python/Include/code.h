@@ -1,5 +1,5 @@
 diff --git a/Include/code.h b/Include/code.h
-index 56e6ec1..0569c00 100644
+index 56e6ec1..7ab75c9 100644
 --- a/Include/code.h
 +++ b/Include/code.h
 @@ -7,6 +7,23 @@
@@ -26,12 +26,11 @@ index 56e6ec1..0569c00 100644
  /* Bytecode object */
  typedef struct {
      PyObject_HEAD
-@@ -35,6 +52,9 @@ typedef struct {
+@@ -35,6 +52,8 @@ typedef struct {
  				   Objects/lnotab_notes.txt for details. */
      void *co_zombieframe;     /* for optimization only (see frameobject.c) */
      PyObject *co_weakreflist;   /* to support weakrefs to code objects */
 +    PyJittedCode* co_jitted;    /* Jitted code object */
-+    int co_compilefailed;       /* Set to 1 if the compilation has failed and won't be tried again*/
 +    int co_runcount;            /* The number of times the code object has been invoked */
  } PyCodeObject;
  
