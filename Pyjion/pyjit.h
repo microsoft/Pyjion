@@ -51,4 +51,14 @@
 extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code);
 extern "C" __declspec(dllexport) void JitInit();
 
+PyAPI_DATA(PyTypeObject) PyjionJittedCode_Type;
+
+/* Jitted code object.  This object is returned from the JIT implementation.  The JIT can allocate
+a jitted code object and fill in the state for which is necessary for it to perform an evaluation. */
+typedef struct {
+    PyObject_HEAD
+        Py_EvalFunc j_evalfunc;
+    void* j_evalstate;          /* opaque value, allows the JIT to track any relevant state */
+} PyjionJittedCode;
+
 #endif

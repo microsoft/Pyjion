@@ -27,6 +27,7 @@
 #include "pycomp.h"
 
 unordered_map<PyJittedCode*, JittedCode*> g_jittedCode;
+unordered_map<PyjionJittedCode*, JittedCode*> g_pyjionJittedCode;
 
 PyObject* __stdcall Jit_EvalHelper(void* state, PyFrameObject*frame) {
     PyThreadState *tstate = PyThreadState_GET();
@@ -103,3 +104,67 @@ extern "C" __declspec(dllexport) void JitInit() {
     g_emptyTuple = PyTuple_New(0);
 }
 
+static PyObject *
+jittedcode_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    if (PyTuple_GET_SIZE(args) || (kwargs && PyDict_Size(kwargs))) {
+        PyErr_SetString(PyExc_TypeError, "JittedCode takes no arguments");
+        return NULL;
+    }
+    return (PyObject *)PyObject_New(PyjionJittedCode, &PyjionJittedCode_Type);
+}
+
+extern "C" void PyjionJitFree(PyjionJittedCode* function) {
+    auto find = g_pyjionJittedCode.find(function);
+    if (find != g_pyjionJittedCode.end()) {
+        auto code = find->second;
+
+        delete code;
+        g_pyjionJittedCode.erase(function);
+    }
+}
+
+static void
+jittedcode_dealloc(PyObject *co) {
+    PyjionJitFree((PyjionJittedCode *)co);
+}
+
+PyTypeObject PyjionJittedCode_Type = {
+    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    "pyjionjittedcode",                 /* tp_name */
+    sizeof(PyjionJittedCode),           /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    jittedcode_dealloc,                 /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    0,                                  /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    jittedcode_new,                     /* tp_new */
+};
