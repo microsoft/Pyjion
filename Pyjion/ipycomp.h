@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __IPYCOMP_H__
-#define __IPYCOMP_H__
+#ifndef IPYCOMP_H
+#define IPYCOMP_H
 
 class Local {
 public:
@@ -215,6 +215,8 @@ public:
     virtual void emit_new_tuple(size_t size) = 0;
     // Stores all of the values on the stack into a tuple
     virtual void emit_tuple_store(size_t size) = 0;
+    // Convert a list to a tuple
+    virtual void emit_list_to_tuple() = 0;
 
     // Creates a new list of the specified size
     virtual void emit_new_list(size_t argCnt) = 0;
@@ -222,9 +224,13 @@ public:
     virtual void emit_list_store(size_t argCnt) = 0;
     // Appends a single value to a list
     virtual void emit_list_append() = 0;
+    // Extends a list with a single iterable
+    virtual void emit_list_extend() = 0;
 
     // Creates a new set
     virtual void emit_new_set() = 0;
+    // Extends a set with a single iterable
+    virtual void emit_set_extend() = 0;
     // Adds a single item to a set
     virtual void emit_set_add() = 0;
 
@@ -234,6 +240,8 @@ public:
     virtual void emit_dict_store() = 0;
     // Adds a single key/value pair to a dict
     virtual void emit_map_add() = 0;
+    // Extends a map by another mapping
+    virtual void emit_map_extend() = 0;
 
     // Creates a slice object from values on the stack
     virtual void emit_build_slice() = 0;

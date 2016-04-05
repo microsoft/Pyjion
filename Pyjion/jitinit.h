@@ -1,5 +1,5 @@
-#ifndef __JITINIT_H__
-#define __JITINIT_H__
+#ifndef JITINIT_H
+#define JITINIT_H
 
 
 #define FEATURE_NO_HOST

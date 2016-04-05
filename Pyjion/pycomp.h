@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __PYCOMP_H__
-#define __PYCOMP_H__
+#ifndef PYCOMP_H
+#define PYCOMP_H
 
 #include <stdint.h>
 #include <windows.h>
@@ -164,8 +164,12 @@
 #define METHOD_GREATER_THAN_EQUALS_INT_TOKEN	0x0000006A
 #define METHOD_PERIODIC_WORK                    0x0000006B
 
-#define METHOD_UNBOX_LONG_TAGGED                0x0000006C
-#define METHOD_UNBOX_FLOAT                      0x0000006D
+#define METHOD_EXTENDLIST_TOKEN                 0x0000006C
+#define METHOD_LISTTOTUPLE_TOKEN                0x0000006D
+#define METHOD_SETUPDATE_TOKEN                  0x0000006E
+#define METHOD_DICTUPDATE_TOKEN                 0x0000006F
+#define METHOD_UNBOX_LONG_TAGGED                0x00000070
+#define METHOD_UNBOX_FLOAT                      0x00000071
 
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
@@ -268,11 +272,15 @@ public:
 
     virtual void emit_new_list(size_t argCnt);
     virtual void emit_list_store(size_t argCnt);
+    virtual void emit_list_extend();
+    virtual void emit_list_to_tuple();
 
     virtual void emit_new_set();
+    virtual void emit_set_extend();
     virtual void emit_dict_store();
 
     virtual void emit_new_dict(size_t size);
+    virtual void emit_map_extend();
 
     virtual void emit_build_slice();
 

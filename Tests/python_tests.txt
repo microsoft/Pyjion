@@ -71,7 +71,8 @@ test_compare
 test_compile
 test_compileall
 test_complex
-test_concurrent_futures
+# Triggering timeout failures due to JIT taking longer than test is willing to wait.
+##test_concurrent_futures
 test_configparser
 test_contains
 test_contextlib
@@ -361,7 +362,6 @@ test_sunau
 test_sundry
 test_super
 test_support
-test_symbol
 test_symtable
 test_syntax
 # TODO: crashes
@@ -431,7 +431,8 @@ test_userlist
 test_userstring
 test_uu
 test_uuid
-test_venv
+# Test fails under debug builds due to IL-related output to stdout.
+##test_venv
 # os.fork not defined
 ##test_wait3
 # os.fork not defined

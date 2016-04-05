@@ -32,33 +32,12 @@
 */
 #include "stdafx.h"
 #include "catch.hpp"
+#include "testing_util.h"
 #include <Python.h>
 #include <absint.h>
+#include <util.h>
 #include <memory>
 #include <vector>
-
-PyCodeObject* CompileCode(const char* code) {
-    auto globals = PyDict_New();
-    auto builtins = PyThreadState_GET()->interp->builtins;
-    PyDict_SetItemString(globals, "__builtins__", builtins);
-
-    auto locals = PyDict_New();
-    PyRun_String(code, Py_file_input, globals, locals);
-    if (PyErr_Occurred()) {
-        PyErr_Print();
-        Py_DECREF(globals);
-        FAIL("error occurred during Python compilation");
-        return nullptr;
-    }
-    auto func = PyObject_GetItem(locals, PyUnicode_FromString("f"));
-    auto codeObj = (PyCodeObject*)PyObject_GetAttrString(func, "__code__");
-
-    Py_DECREF(globals);
-    Py_DECREF(locals);
-    Py_DECREF(func);
-
-    return codeObj;
-}
 
 class InferenceTest {
 private:
@@ -69,8 +48,8 @@ public:
         auto pyCode = CompileCode(code);
         m_absint = std::make_unique<AbstractInterpreter>(pyCode, nullptr);
         auto success = m_absint->interpret();
-        Py_DECREF(pyCode);
         if (!success) {
+            Py_DECREF(pyCode);
             FAIL("Failed to interpret code");
         }
     }

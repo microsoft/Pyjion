@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __ABSINT_H__
-#define __ABSINT_H__
+#ifndef ABSINT_H
+#define ABSINT_H
 
 #include <Python.h>
 #include <vector>
@@ -40,7 +40,7 @@ struct AbstractLocalInfo;
 struct AbsIntBlockInfo;
 class InterpreterState;
 
-// The abstract interpreter implementation.  The abstract interpreter performs 
+// The abstract interpreter implementation.  The abstract interpreter performs
 // static analysis of the Python byte code to determine what types are known.
 // Ultimately this information will feedback into code generation allowing
 // more efficient code to be produced.
@@ -53,10 +53,10 @@ class InterpreterState;
 // and locals based upon the opcode being performed and the existing state of the
 // stack.  When it encounters a branch it will merge the current state in with the
 // state for where we're branching to.  If the merge results in a new starting state
-// that we haven't analyzed it will then queue the target opcode as the next starting 
-// point to be analyzed. 
+// that we haven't analyzed it will then queue the target opcode as the next starting
+// point to be analyzed.
 //
-// If the branch is unconditional, or definitively taken based upon analysis, then 
+// If the branch is unconditional, or definitively taken based upon analysis, then
 // we'll go onto the next starting opcode to be analyzed.
 //
 // Once we've processed all of the blocks of code in this manner the analysis
@@ -106,7 +106,7 @@ struct ExceptionVars {
         PrevTraceback = comp->emit_define_local(false);
         if (isFinally) {
             FinallyExc = comp->emit_define_local(false);
-            FinallyTb = comp->emit_define_local(false);;
+            FinallyTb = comp->emit_define_local(false);
             FinallyValue = comp->emit_define_local(false);
         }
     }
@@ -230,7 +230,7 @@ public:
     void dump();
 
     void set_local_type(int index, AbstractValueKind kind);
-    // Returns information about the specified local variable at a specific 
+    // Returns information about the specified local variable at a specific
     // byte code index.
     AbstractLocalInfo get_local_info(size_t byteCodeIndex, size_t localIndex);
 
@@ -269,12 +269,19 @@ private:
     void fancy_call(int na, int nk, int flags);
     bool can_skip_lasti_update(int opcodeIndex);
     void build_tuple(size_t argCnt);
+    void extend_tuple(size_t argCnt);
     void build_list(size_t argCnt);
+    void extend_list_recursively(Local list, size_t argCnt);
+    void extend_list(size_t argCnt);
     void build_set(size_t argCnt);
+    void extend_set_recursively(Local set, size_t argCnt);
+    void extend_set(size_t argCnt);
 
     void unpack_ex(size_t size, int opcode);
 
     void build_map(size_t argCnt);
+    void extend_map_recursively(Local dict, size_t argCnt);
+    void extend_map(size_t argCnt);
 
     Label getOffsetLabel(int jumpTo);
     void for_iter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo);
@@ -325,11 +332,11 @@ private:
 
     // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
     // If the value on the stack is -1, we branch to the current error handler.
-    // Otherwise branches based if the current value is true/false based upon the current opcode 
+    // Otherwise branches based if the current value is true/false based upon the current opcode
     void branch_or_error(int& i);
 
     // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
-    // Branches based if the current value is true/false based upon the current opcode 
+    // Branches based if the current value is true/false based upon the current opcode
     void branch(int& i);
     void compare_op(int compareType, int& i, int opcodeIndex);
     JittedCode* compile_worker();
@@ -364,15 +371,15 @@ private:
 // Tracks the state of a local variable at each location in the function.
 // Each local has a known type associated with it as well as whether or not
 // the value is potentially undefined.  When a variable is definitely assigned
-// IsMaybeUndefined is false.  
+// IsMaybeUndefined is false.
 //
 // Initially all locals start out as being marked as IsMaybeUndefined and a special
 // typeof Undefined.  The special type is really just for convenience to avoid
 // having null types.  Merging with the undefined type will produce the other type.
 // Assigning to a variable will cause the undefined marker to be removed, and the
-// new type to be specified.  
+// new type to be specified.
 //
-// When we merge locals if the undefined flag is specified from either side we will 
+// When we merge locals if the undefined flag is specified from either side we will
 // propagate it to the new state.  This could result in:
 //
 // State 1: Type != Undefined, IsMaybeUndefined = false
@@ -432,8 +439,8 @@ struct AbstractLocalInfo {
 // attempts at sharing because most instructions will alter the value stack.
 //
 // The locals are shared between InterpreterState's using a shared_ptr because the
-// values of locals won't change between most opcodes (via CowVector).  When updating 
-// a local we first check if the locals are currently shared, and if not simply update 
+// values of locals won't change between most opcodes (via CowVector).  When updating
+// a local we first check if the locals are currently shared, and if not simply update
 // them in place.  If they are shared then we will issue a copy.
 class InterpreterState {
 public:

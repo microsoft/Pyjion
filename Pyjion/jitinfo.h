@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __JITINFO_H__
-#define __JITINFO_H__
+#ifndef JITINFO_H
+#define JITINFO_H
 
 
 #define FEATURE_NO_HOST
@@ -82,9 +82,7 @@ public:
         if (m_dataAddr != nullptr) {
             ::GlobalFree(m_dataAddr);
         }
-        if (m_module != nullptr) {
-            delete m_module;
-        }
+        delete m_module;
     }
 
     void* get_code_addr() {

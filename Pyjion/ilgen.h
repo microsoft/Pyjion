@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef __ILGEN_H__
-#define __ILGEN_H__
+#ifndef ILGEN_H
+#define ILGEN_H
 
 #define FEATURE_NO_HOST
 #define USE_STL

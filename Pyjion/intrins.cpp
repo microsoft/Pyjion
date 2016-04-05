@@ -327,6 +327,13 @@ PyObject* PyJit_SetAdd(PyObject* set, PyObject* value) {
     return set;
 }
 
+int PyJit_UpdateSet(PyObject* set, PyObject* value) {
+    assert(PyAnySet_CheckExact(set));
+    auto res = _PySet_Update(set, value);
+    Py_DECREF(value);
+    return res;
+}
+
 PyObject* PyJit_MapAdd(PyObject*map, PyObject* value, PyObject*key) {
     int err = PyDict_SetItem(map, key, value);  /* v[w] = u */
     Py_DECREF(value);
@@ -1192,11 +1199,44 @@ PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg) {
     return value;
 }
 
+int PyJit_ExtendList(PyObject *list, PyObject *extension) {
+    assert(PyList_CheckExact(list));
+    auto res = _PyList_Extend((PyListObject*)list, extension);
+    Py_DECREF(extension);
+    int flag = 1;  // Assume error unless we prove to ourselves otherwise.
+    if (res == Py_None) {
+        flag = 0;
+        Py_DECREF(res);
+    }
+
+    return flag;
+}
+
+PyObject* PyJit_ListToTuple(PyObject *list) {
+    PyObject* res = PyList_AsTuple(list);
+    Py_DECREF(list);
+    return res;
+}
+
 int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map) {
     assert(PyDict_CheckExact(map));
     auto res = PyDict_SetItem(map, key, value);
     Py_DECREF(key);
     Py_DECREF(value);
+    return res;
+}
+
+int PyJit_DictUpdate(PyObject* dict, PyObject* other) {
+    assert(PyDict_CheckExact(dict));
+    auto res = PyDict_Update(dict, other);
+    if (res < 0) {
+        if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+            PyErr_Format(PyExc_TypeError,
+                "'%.200s' object is not a mapping",
+                other->ob_type->tp_name);
+        }
+    }
+    Py_DECREF(other);
     return res;
 }
 

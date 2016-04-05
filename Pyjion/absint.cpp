@@ -1573,6 +1573,12 @@ void AbstractInterpreter::build_tuple(size_t argCnt) {
     }
 }
 
+void AbstractInterpreter::extend_tuple(size_t argCnt) {
+    extend_list(argCnt);
+    m_comp->emit_list_to_tuple();
+    error_check("extend tuple failed");
+}
+
 void AbstractInterpreter::build_list(size_t argCnt) {
     m_comp->emit_new_list(argCnt);
     error_check("build list failed");
@@ -1582,6 +1588,39 @@ void AbstractInterpreter::build_list(size_t argCnt) {
     dec_stack(argCnt);
 }
 
+void AbstractInterpreter::extend_list_recursively(Local listTmp, size_t argCnt) {
+    if (argCnt == 0) {
+        return;
+    }
+
+    auto valueTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(valueTmp);
+    dec_stack();
+
+    extend_list_recursively(listTmp, --argCnt);
+
+    m_comp->emit_load_local(listTmp);
+    m_comp->emit_load_local(valueTmp);
+
+    m_comp->emit_list_extend();
+    int_error_check("list extend failed");
+
+    m_comp->emit_free_local(valueTmp);
+}
+
+void AbstractInterpreter::extend_list(size_t argCnt) {
+    _ASSERTE(argCnt > 0);
+
+    m_comp->emit_new_list(0);
+    error_check("new list failed");
+
+    auto listTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(listTmp);
+
+    extend_list_recursively(listTmp, argCnt);
+
+    m_comp->emit_load_and_free_local(listTmp);
+}
 
 void AbstractInterpreter::build_set(size_t argCnt) {
     m_comp->emit_new_set();
@@ -1623,6 +1662,39 @@ void AbstractInterpreter::build_set(size_t argCnt) {
     inc_stack();
 }
 
+void AbstractInterpreter::extend_set_recursively(Local setTmp, size_t argCnt) {
+    if (argCnt == 0) {
+        return;
+    }
+
+    auto valueTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(valueTmp);
+    dec_stack();
+
+    extend_set_recursively(setTmp, --argCnt);
+
+    m_comp->emit_load_local(setTmp);
+    m_comp->emit_load_local(valueTmp);
+
+    m_comp->emit_set_extend();
+    int_error_check("set extend failed");
+
+    m_comp->emit_free_local(valueTmp);
+}
+
+void AbstractInterpreter::extend_set(size_t argCnt) {
+    _ASSERTE(argCnt > 0);
+
+    m_comp->emit_new_set();
+    error_check("new set failed");
+
+    auto setTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(setTmp);
+
+    extend_set_recursively(setTmp, argCnt);
+
+    m_comp->emit_load_and_free_local(setTmp);
+}
 
 void AbstractInterpreter::build_map(size_t  argCnt) {
     m_comp->emit_new_dict(argCnt);
@@ -1640,6 +1712,40 @@ void AbstractInterpreter::build_map(size_t  argCnt) {
         }
         m_comp->emit_load_and_free_local(map);
     }
+}
+
+void AbstractInterpreter::extend_map_recursively(Local dictTmp, size_t argCnt) {
+    if (argCnt == 0) {
+        return;
+    }
+
+    auto valueTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(valueTmp);
+    dec_stack();
+
+    extend_map_recursively(dictTmp, --argCnt);
+
+    m_comp->emit_load_local(dictTmp);
+    m_comp->emit_load_local(valueTmp);
+
+    m_comp->emit_map_extend();
+    int_error_check("map extend failed");
+
+    m_comp->emit_free_local(valueTmp);
+}
+
+void AbstractInterpreter::extend_map(size_t argCnt) {
+    _ASSERTE(argCnt > 0);
+
+    m_comp->emit_new_dict(0);
+    error_check("new map failed");
+
+    auto dictTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(dictTmp);
+
+    extend_map_recursively(dictTmp, argCnt);
+
+    m_comp->emit_load_and_free_local(dictTmp);
 }
 
 void AbstractInterpreter::make_function(int posdefaults, int kwdefaults, int num_annotations, bool isClosure) {
@@ -2087,12 +2193,24 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 build_tuple(oparg);
                 inc_stack();
                 break;
+            case BUILD_TUPLE_UNPACK:
+                extend_tuple(oparg);
+                inc_stack();
+                break;
             case BUILD_LIST:
                 build_list(oparg);
                 inc_stack();
                 break;
+            case BUILD_LIST_UNPACK:
+                extend_list(oparg);
+                inc_stack();
+                break;
             case BUILD_MAP:
                 build_map(oparg);
+                inc_stack();
+                break;
+            case BUILD_MAP_UNPACK:
+                extend_map(oparg);
                 inc_stack();
                 break;
             case STORE_SUBSCR:
@@ -2114,6 +2232,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 inc_stack();
                 break;
             case BUILD_SET: build_set(oparg); break;
+            case BUILD_SET_UNPACK:
+                extend_set(oparg);
+                inc_stack();
+                break;
             case UNARY_POSITIVE: unary_positive(opcodeIndex); break;
             case UNARY_NEGATIVE: unary_negative(opcodeIndex); break;
             case UNARY_NOT: unary_not(curByte); break;
