@@ -68,21 +68,23 @@ index beabfeb..f5eeb99a 100644
  PyObject *
  PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
  {
-+    if (f->f_code->co_jitted != NULL) {
-+        return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
-+    }
++    if (!throwflag) {
++        if (f->f_code->co_jitted != NULL) {
++             return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
++        }
 +
-+    if ((!f->f_code->co_jitted != Py_JIT_FAILED) && (f->f_code->co_runcount++ > PyJIT_HOT_CODE)) {
-+        PyThreadState *tstate = PyThreadState_GET();
-+        if (tstate->interp->jitcompile != NULL) {
-+            f->f_code->co_jitted = tstate->interp->jitcompile((PyObject*)f->f_code);
-+            if (f->f_code->co_jitted != NULL) {
-+                // execute the jitted code...
-+                return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
++        if ((!f->f_code->co_jitted != Py_JIT_FAILED) && (f->f_code->co_runcount++ > PyJIT_HOT_CODE)) {
++            PyThreadState *tstate = PyThreadState_GET();
++            if (tstate->interp->jitcompile != NULL) {
++                f->f_code->co_jitted = tstate->interp->jitcompile((PyObject*)f->f_code);
++                if (f->f_code->co_jitted != NULL) {
++                    // execute the jitted code...
++                    return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
++                }
++
++                // no longer try and compile this method...
++                f->f_code->co_jitted = Py_JIT_FAILED;
 +            }
-+
-+            // no longer try and compile this method...
-+            f->f_code->co_jitted = Py_JIT_FAILED;
 +        }
 +    }
 +
