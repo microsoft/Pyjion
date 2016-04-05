@@ -38,7 +38,7 @@
 class EmissionTest {
 private:
     py_ptr<PyCodeObject> m_code;
-    py_ptr<PyJittedCode> m_jittedcode;
+    py_ptr<PyjionJittedCode> m_jittedcode;
 
     PyObject* run() {
         auto sysModule = PyObject_ptr(PyImport_ImportModule("sys"));
@@ -61,10 +61,11 @@ public:
         if (m_code.get() == nullptr) {
             FAIL("failed to compile code");
         }
-        m_jittedcode.reset(JitCompile(m_code.get()));
-        if (m_jittedcode.get() == nullptr) {
+        m_code->co_extra = (PyObject *)jittedcode_new_direct();
+        if (!jit_compile(m_code.get())) {
             FAIL("failed to JIT code");
         }
+        m_jittedcode.reset((PyjionJittedCode *)m_code->co_extra);
     }
 
     std::string returns() {

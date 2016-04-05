@@ -26,7 +26,6 @@
 #include "pyjit.h"
 #include "pycomp.h"
 
-unordered_map<PyJittedCode*, JittedCode*> g_jittedCode;
 unordered_map<PyjionJittedCode*, JittedCode*> g_pyjionJittedCode;
 
 PyObject* __stdcall Jit_EvalHelper(void* state, PyFrameObject*frame) {
@@ -50,10 +49,43 @@ PyObject* __stdcall Jit_EvalHelper(void* state, PyFrameObject*frame) {
     return _Py_CheckFunctionResult(NULL, res, "Jit_EvalHelper");
 }
 
-extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
-    if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
-        return nullptr;
+extern "C" __declspec(dllexport) void JitInit() {
+    g_jit = getJit();
+
+    g_emptyTuple = PyTuple_New(0);
+}
+
+__declspec(dllexport) PyjionJittedCode *jittedcode_new_direct() {
+    PyjionJittedCode *new_ob = PyObject_New(PyjionJittedCode, &PyjionJittedCode_Type);
+    if (new_ob == NULL) {
+        return NULL;
     }
+
+    new_ob->j_run_count = 0;
+    new_ob->j_failed = false;
+    new_ob->j_evalfunc = nullptr;
+    new_ob->j_evalstate = nullptr;
+
+    return new_ob;
+}
+
+static PyObject *
+jittedcode_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    if (PyTuple_GET_SIZE(args) || (kwargs && PyDict_Size(kwargs))) {
+        PyErr_SetString(PyExc_TypeError, "JittedCode takes no arguments");
+        return NULL;
+    }
+
+    return (PyObject *)jittedcode_new_direct();
+}
+
+__declspec(dllexport) bool jit_compile(PyCodeObject* code) {
+    if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
+        return false;
+    }
+
+    auto jittedCode = (PyjionJittedCode *)code->co_extra;
+
 #ifdef DEBUG_TRACE
     static int compileCount = 0, failCount = 0;
     printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n",
@@ -72,48 +104,45 @@ extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code) {
 #ifdef DEBUG_TRACE
         printf("Compilation failure #%d\r\n", ++failCount);
 #endif
-        return nullptr;
+        jittedCode->j_failed = true;
+        return false;
     }
 
-    auto jittedCode = (PyJittedCode*)PyJittedCode_New();
-    if (jittedCode == nullptr) {
-        // OOM
-        delete res;
-        return nullptr;
-    }
-
-    g_jittedCode[jittedCode] = res;
+    g_pyjionJittedCode[jittedCode] = res;
     jittedCode->j_evalfunc = &Jit_EvalHelper; //(Py_EvalFunc)res->get_code_addr();
     jittedCode->j_evalstate = res->get_code_addr();
-    return jittedCode;
+    return true;
 }
 
-extern "C" __declspec(dllexport) void JitFree(PyJittedCode* function) {
-    auto find = g_jittedCode.find(function);
-    if (find != g_jittedCode.end()) {
-        auto code = find->second;
+static PY_UINT64_T HOT_CODE = 20000;
 
-        delete code;
-        g_jittedCode.erase(function);
+extern "C" __declspec(dllexport) PyObject *EvalFrame(PyFrameObject *f, int throwflag) {
+    PyjionJittedCode *jitted = (PyjionJittedCode *)f->f_code->co_extra;
+    if (jitted == NULL) {
+        jitted = jittedcode_new_direct();
+        f->f_code->co_extra = (PyObject *)jitted;
+        jitted->j_run_count++;
     }
-}
+    else if (!throwflag && !jitted->j_failed) {
+        if (jitted->j_evalfunc != nullptr) {
+            return jitted->j_evalfunc(jitted->j_evalstate, f);
+        }
+        else if (jitted->j_run_count++ > HOT_CODE) {
+            if (jit_compile(f->f_code)) {
+                // execute the jitted code...
+                return jitted->j_evalfunc(jitted->j_evalstate, f);
+            }
 
-extern "C" __declspec(dllexport) void JitInit() {
-    g_jit = getJit();
-
-    g_emptyTuple = PyTuple_New(0);
-}
-
-static PyObject *
-jittedcode_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    if (PyTuple_GET_SIZE(args) || (kwargs && PyDict_Size(kwargs))) {
-        PyErr_SetString(PyExc_TypeError, "JittedCode takes no arguments");
-        return NULL;
+            // no longer try and compile this method...
+            jitted->j_failed = true;
+        }
     }
-    return (PyObject *)PyObject_New(PyjionJittedCode, &PyjionJittedCode_Type);
+
+    return PyEval_EvalFrameEx_NoJit(f, throwflag);
 }
 
-extern "C" void PyjionJitFree(PyjionJittedCode* function) {
+
+void PyjionJitFree(PyjionJittedCode* function) {
     auto find = g_pyjionJittedCode.find(function);
     if (find != g_pyjionJittedCode.end()) {
         auto code = find->second;
