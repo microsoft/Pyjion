@@ -203,6 +203,10 @@ public:
         push_back(CEE_LDIND_I4);
     }
 
+    void ld_ind_r8() {
+        push_back(CEE_LDIND_R8);
+    }
+
     void branch(BranchType branchType, Label label) {
         auto info = &m_labels[label.m_index];
         if (info->m_location == -1) {

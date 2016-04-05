@@ -164,6 +164,9 @@
 #define METHOD_GREATER_THAN_EQUALS_INT_TOKEN	0x0000006A
 #define METHOD_PERIODIC_WORK                    0x0000006B
 
+#define METHOD_UNBOX_LONG_TAGGED                0x0000006C
+#define METHOD_UNBOX_FLOAT                      0x0000006D
+
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
 #define METHOD_CALL1_TOKEN		0x00010001
@@ -374,6 +377,8 @@ public:
     virtual void emit_int(int value);
     virtual void emit_float(double value);
     virtual void emit_tagged_int(ssize_t value);
+    virtual void emit_unbox_int_tagged();
+    virtual void emit_unbox_float();
     virtual void emit_ptr(void *value);
     virtual void emit_bool(bool value);
     virtual void emit_py_object(PyObject* value);

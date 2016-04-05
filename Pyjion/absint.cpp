@@ -42,6 +42,7 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* co
         m_retValue = comp->emit_define_local();
         m_errorCheckLocal = comp->emit_define_local();
     }
+    init_starting_state();
 }
 
 AbstractInterpreter::~AbstractInterpreter() {
@@ -162,6 +163,17 @@ bool AbstractInterpreter::preprocess() {
     return true;
 }
 
+void AbstractInterpreter::set_local_type(int index, AbstractValueKind kind) {
+    auto& lastState = m_startStates[0];
+    if (kind == AVK_Integer || kind == AVK_Float) {
+        // Replace our starting state with a local which has a known source
+        // so that we know it's boxed...
+        auto localInfo = AbstractLocalInfo(to_abstract(kind));
+        localInfo.ValueInfo.Sources = new_source(new LocalSource());
+        lastState.replace_local(index, localInfo);
+    }
+}
+
 void AbstractInterpreter::init_starting_state() {
     InterpreterState lastState = InterpreterState(m_code->co_nlocals);
 
@@ -191,8 +203,6 @@ bool AbstractInterpreter::interpret() {
     if (!preprocess()) {
         return false;
     }
-
-    init_starting_state();
 
     // walk all the blocks in the code one by one, analyzing them, and enqueing any
     // new blocks that we encounter from branches.
@@ -946,7 +956,43 @@ AbstractValue* AbstractInterpreter::to_abstract(PyObject*value) {
     else if (PyComplex_CheckExact(value)) {
         return &Complex;
     }
+    else if (PyFunction_Check(value)) {
+        return &Function;
+    }
 
+
+    return &Any;
+}
+
+AbstractValue* AbstractInterpreter::to_abstract(AbstractValueKind kind) {
+    switch (kind) {
+        case AVK_None:
+            return &None;
+        case AVK_Integer:
+            return &Integer;
+        case AVK_String:
+            return &String;
+        case AVK_List:
+            return &List;
+        case AVK_Dict:
+            return &Dict;
+        case AVK_Tuple:
+            return &Tuple;
+        case AVK_Bool:
+            return &Bool;
+        case AVK_Float:
+            return &Float;
+        case AVK_Bytes:
+            return &Bytes;
+        case AVK_Set:
+            return &Set;
+        case AVK_Complex:
+            return &Complex;
+        case AVK_Function:
+            return &Function;
+        case AVK_Slice:
+            return &Slice;
+    }
 
     return &Any;
 }
@@ -1781,6 +1827,22 @@ JittedCode* AbstractInterpreter::compile_worker() {
             vector<bool>()
         )
     );
+
+    for (size_t i = 0; i < m_code->co_argcount + m_code->co_kwonlyargcount; i++) {
+        auto local = get_local_info(0, i);
+        if (!local.ValueInfo.needs_boxing()) {
+            m_comp->emit_load_fast(i);
+
+            if (local.ValueInfo.Value->kind() == AVK_Float) {
+                m_comp->emit_unbox_float();
+                m_comp->emit_store_local(get_optimized_local(i, AVK_Float));
+            }
+            else if (local.ValueInfo.Value->kind() == AVK_Integer) {
+                m_comp->emit_unbox_int_tagged();
+                m_comp->emit_store_local(get_optimized_local(i, AVK_Any));
+            }
+        }
+    }
     
     for (int curByte = 0; curByte < m_size; curByte++) {
         auto opcodeIndex = curByte;

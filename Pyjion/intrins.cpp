@@ -2082,6 +2082,15 @@ inline bool LongOverflow(PyObject* obj, tagged_ptr* value) {
     return overflow || !can_tag(*value);
 }
 
+PyObject* PyJit_UnboxInt_Tagged(PyObject* value) {
+    int overflow;
+    auto intValue = AS_LONG_AND_OVERFLOW(value, &overflow);
+    if (overflow || !can_tag(intValue)) {
+        return value;
+    }
+    return TAG_IT(intValue);
+}
+
 inline PyObject* PyJit_Tagged_Add(tagged_ptr left, tagged_ptr right) {
     tagged_ptr res;
 #ifdef _MSC_VER

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+VisualStudioVersion = 14.0.24704.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Pyjion", "Pyjion\Pyjion.vcxproj", "{0B2F9AA3-F525-4042-B8C9-74F8B10F9D62}"
 EndProject
@@ -55,8 +55,8 @@ Global
 		{ADFE2428-2595-4535-822D-4E70405F7D58}.Debug|Win32.Build.0 = Debug|Win32
 		{ADFE2428-2595-4535-822D-4E70405F7D58}.Debug|x64.ActiveCfg = Debug|x64
 		{ADFE2428-2595-4535-822D-4E70405F7D58}.Debug|x64.Build.0 = Debug|x64
-		{ADFE2428-2595-4535-822D-4E70405F7D58}.Release|Mixed Platforms.ActiveCfg = Release|Win32
-		{ADFE2428-2595-4535-822D-4E70405F7D58}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{ADFE2428-2595-4535-822D-4E70405F7D58}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{ADFE2428-2595-4535-822D-4E70405F7D58}.Release|Mixed Platforms.Build.0 = Release|x64
 		{ADFE2428-2595-4535-822D-4E70405F7D58}.Release|Win32.ActiveCfg = Release|Win32
 		{ADFE2428-2595-4535-822D-4E70405F7D58}.Release|Win32.Build.0 = Release|Win32
 		{ADFE2428-2595-4535-822D-4E70405F7D58}.Release|x64.ActiveCfg = Release|x64

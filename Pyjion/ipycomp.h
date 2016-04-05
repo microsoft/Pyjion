@@ -109,6 +109,12 @@ public:
     virtual void emit_float(double value) = 0;
     // Emits a unboxed tagged integer value onto the stack
     virtual void emit_tagged_int(ssize_t value) = 0;
+    // Takes a Python long off the stack and converts it to a tagged int, or leaves
+    // it as an object if the long doesn't fix in a tagged int.
+    virtual void emit_unbox_int_tagged() = 0;
+    // Takes a Python float off the stack and converts it to a native double
+    virtual void emit_unbox_float() = 0;
+
     // Emits an unboxed bool onto the stack
     virtual void emit_bool(bool value) = 0;
     // Emits a pointer value onto the stack
