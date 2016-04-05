@@ -1,5 +1,5 @@
 diff --git a/Python/ceval.c b/Python/ceval.c
-index beabfeb..f5eeb99a 100644
+index beabfeb..1d2c630 100644
 --- a/Python/ceval.c
 +++ b/Python/ceval.c
 @@ -770,6 +770,55 @@ static int unpack_iterable(PyObject *, int, int, PyObject **);
@@ -58,7 +58,7 @@ index beabfeb..f5eeb99a 100644
  
  PyObject *
  PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
-@@ -793,9 +842,37 @@ PyEval_EvalFrame(PyFrameObject *f) {
+@@ -793,9 +842,39 @@ PyEval_EvalFrame(PyFrameObject *f) {
      return PyEval_EvalFrameEx(f, 0);
  }
  
@@ -98,7 +98,7 @@ index beabfeb..f5eeb99a 100644
  #ifdef DXPAIRS
      int lastopcode = 0;
  #endif
-@@ -1262,25 +1339,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
+@@ -1262,25 +1341,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                      goto error;
              }
  #ifdef WITH_THREAD
