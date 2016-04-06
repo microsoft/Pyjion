@@ -1684,7 +1684,9 @@ void PyJitTest() {
         puts(curCase.m_code);
         printf("\r\n");
         auto codeObj = CompileCode(curCase.m_code);
-        auto addr = JitCompile(codeObj);
+        auto addr = jittedcode_new_direct();
+        codeObj->co_extra = (PyObject *)addr;
+        jit_compile(codeObj);
 
         for (auto curInput = 0; curInput < curCase.m_inputs.size(); curInput++) {
             auto input = curCase.m_inputs[curInput];
