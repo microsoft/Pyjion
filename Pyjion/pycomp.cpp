@@ -745,6 +745,16 @@ void PythonCompiler::emit_int(int value) {
     m_il.ld_i4(value);
 }
 
+void PythonCompiler::emit_unbox_int_tagged() {
+    m_il.emit_call(METHOD_UNBOX_LONG_TAGGED);
+}
+
+void PythonCompiler::emit_unbox_float() {
+    m_il.ld_i(offsetof(PyFloatObject, ob_fval));
+    m_il.add();
+    m_il.ld_ind_r8();
+}
+
 void PythonCompiler::emit_tagged_int(ssize_t value) {
     m_il.ld_i((size_t)((value << 1) | 0x01));
 }
@@ -1286,6 +1296,7 @@ GLOBAL_METHOD(METHOD_FLOAT_MODULUS_TOKEN, static_cast<double(*)(double, double)>
 GLOBAL_METHOD(METHOD_FLOAT_FROM_DOUBLE, PyFloat_FromDouble, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_DOUBLE));
 GLOBAL_METHOD(METHOD_BOOL_FROM_LONG, PyBool_FromLong, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_INT));
 GLOBAL_METHOD(METHOD_BOX_TAGGED_PTR, PyJit_BoxTaggedPointer, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_UNBOX_LONG_TAGGED, PyJit_UnboxInt_Tagged, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_PYERR_SETSTRING, PyErr_SetString, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 

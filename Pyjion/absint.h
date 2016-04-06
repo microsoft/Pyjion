@@ -229,6 +229,7 @@ public:
     bool interpret();
     void dump();
 
+    void set_local_type(int index, AbstractValueKind kind);
     // Returns information about the specified local variable at a specific
     // byte code index.
     AbstractLocalInfo get_local_info(size_t byteCodeIndex, size_t localIndex);
@@ -248,6 +249,7 @@ public:
 
 private:
     AbstractValue* to_abstract(PyObject* obj);
+    AbstractValue* to_abstract(AbstractValueKind kind);
     bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
     bool update_start_state(InterpreterState& newState, size_t index);
     void init_starting_state();

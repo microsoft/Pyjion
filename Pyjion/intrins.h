@@ -256,6 +256,7 @@ void PyJit_DecRef(PyObject* value);
 
 void PyJit_FloatDivideByZero();
 
+PyObject* PyJit_UnboxInt_Tagged(PyObject* value);
 PyObject* PyJit_Add_Int(PyObject *left, PyObject *right);
 PyObject* PyJit_Subtract_Int(PyObject *left, PyObject *right);
 PyObject* PyJit_BinaryAnd_Int(PyObject *left, PyObject *right);
