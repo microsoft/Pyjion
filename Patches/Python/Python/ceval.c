@@ -1,5 +1,5 @@
 diff --git a/Python/ceval.c b/Python/ceval.c
-index beabfeb..f5eeb99a 100644
+index beabfeb..d9a7839 100644
 --- a/Python/ceval.c
 +++ b/Python/ceval.c
 @@ -770,6 +770,55 @@ static int unpack_iterable(PyObject *, int, int, PyObject **);
@@ -58,31 +58,32 @@ index beabfeb..f5eeb99a 100644
  
  PyObject *
  PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
-@@ -793,9 +842,37 @@ PyEval_EvalFrame(PyFrameObject *f) {
+@@ -793,9 +842,38 @@ PyEval_EvalFrame(PyFrameObject *f) {
      return PyEval_EvalFrameEx(f, 0);
  }
  
-+static PyObject *Py_JIT_FAILED = 1;
-+PY_UINT64_T PyJIT_HOT_CODE = 20000;
++PyObject *Py_JIT_FAILED = (PyObject *)1;
++const PY_UINT64_T PyJIT_HOT_CODE = 20000;
 +
  PyObject *
  PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
  {
-+    if (f->f_code->co_jitted != NULL) {
-+        return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
-+    }
++    if (f->f_code->co_jitted != Py_JIT_FAILED) {
++        if (f->f_code->co_jitted != NULL) {
++            return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
++        }
++        else if (f->f_code->co_runcount++ > PyJIT_HOT_CODE) {
++            PyThreadState *tstate = PyThreadState_GET();
++            if (tstate->interp->jitcompile != NULL) {
++                f->f_code->co_jitted = tstate->interp->jitcompile((PyObject*)f->f_code);
++                if (f->f_code->co_jitted != NULL) {
++                    // execute the jitted code...
++                    return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
++                }
 +
-+    if ((!f->f_code->co_jitted != Py_JIT_FAILED) && (f->f_code->co_runcount++ > PyJIT_HOT_CODE)) {
-+        PyThreadState *tstate = PyThreadState_GET();
-+        if (tstate->interp->jitcompile != NULL) {
-+            f->f_code->co_jitted = tstate->interp->jitcompile((PyObject*)f->f_code);
-+            if (f->f_code->co_jitted != NULL) {
-+                // execute the jitted code...
-+                return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
++                // no longer try and compile this method...
++                f->f_code->co_jitted = Py_JIT_FAILED;
 +            }
-+
-+            // no longer try and compile this method...
-+            f->f_code->co_jitted = Py_JIT_FAILED;
 +        }
 +    }
 +
@@ -96,7 +97,7 @@ index beabfeb..f5eeb99a 100644
  #ifdef DXPAIRS
      int lastopcode = 0;
  #endif
-@@ -1262,25 +1339,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
+@@ -1262,25 +1340,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                      goto error;
              }
  #ifdef WITH_THREAD
