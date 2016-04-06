@@ -1,5 +1,5 @@
 diff --git a/Python/ceval.c b/Python/ceval.c
-index beabfeb..df7fdb5 100644
+index beabfeb..e304a26 100644
 --- a/Python/ceval.c
 +++ b/Python/ceval.c
 @@ -770,6 +770,55 @@ static int unpack_iterable(PyObject *, int, int, PyObject **);
@@ -68,7 +68,7 @@ index beabfeb..df7fdb5 100644
  PyObject *
  PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
  {
-+    if (!throwflag || f->f_code->co_jitted != Py_JIT_FAILED) {
++    if (!throwflag && f->f_code->co_jitted != Py_JIT_FAILED) {
 +        if (f->f_code->co_jitted != NULL) {
 +            return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
 +        }
