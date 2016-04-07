@@ -117,24 +117,26 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
 static PY_UINT64_T HOT_CODE = 20000;
 
 extern "C" __declspec(dllexport) PyObject *EvalFrame(PyFrameObject *f, int throwflag) {
-    PyjionJittedCode *jitted = (PyjionJittedCode *)f->f_code->co_extra;
-    if (jitted == NULL) {
-        jitted = jittedcode_new_direct();
+    if (f->f_code->co_extra == nullptr) {
+        auto jitted = jittedcode_new_direct();
         f->f_code->co_extra = (PyObject *)jitted;
         jitted->j_run_count++;
     }
-    else if (!throwflag && !jitted->j_failed) {
-        if (jitted->j_evalfunc != nullptr) {
-            return jitted->j_evalfunc(jitted->j_evalstate, f);
-        }
-        else if (jitted->j_run_count++ > HOT_CODE) {
-            if (jit_compile(f->f_code)) {
-                // execute the jitted code...
+    else if (!throwflag) {
+        auto jitted = (PyjionJittedCode *)f->f_code->co_extra;
+        if (!jitted->j_failed) {
+            if (jitted->j_evalfunc != nullptr) {
                 return jitted->j_evalfunc(jitted->j_evalstate, f);
             }
+            else if (jitted->j_run_count++ > HOT_CODE) {
+                if (jit_compile(f->f_code)) {
+                    // execute the jitted code...
+                    return jitted->j_evalfunc(jitted->j_evalstate, f);
+                }
 
-            // no longer try and compile this method...
-            jitted->j_failed = true;
+                // no longer try and compile this method...
+                jitted->j_failed = true;
+            }
         }
     }
 
