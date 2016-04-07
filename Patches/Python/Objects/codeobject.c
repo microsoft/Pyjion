@@ -1,5 +1,5 @@
 diff --git a/Objects/codeobject.c b/Objects/codeobject.c
-index 353f414..5f41c45 100644
+index 353f414..d76a13b 100644
 --- a/Objects/codeobject.c
 +++ b/Objects/codeobject.c
 @@ -152,6 +152,8 @@ PyCode_New(int argcount, int kwonlyargcount,
@@ -11,15 +11,17 @@ index 353f414..5f41c45 100644
      return co;
  }
  
-@@ -370,6 +372,7 @@ code_dealloc(PyCodeObject *co)
+@@ -370,6 +372,9 @@ code_dealloc(PyCodeObject *co)
      Py_XDECREF(co->co_filename);
      Py_XDECREF(co->co_name);
      Py_XDECREF(co->co_lnotab);
-+    Py_XDECREF(co->co_jitted);
++    if (co->co_jitted != Py_JIT_FAILED) {
++        Py_XDECREF(co->co_jitted);
++    }
      if (co->co_cell2arg != NULL)
          PyMem_FREE(co->co_cell2arg);
      if (co->co_zombieframe != NULL)
-@@ -542,6 +545,69 @@ PyTypeObject PyCode_Type = {
+@@ -542,6 +547,69 @@ PyTypeObject PyCode_Type = {
      code_new,                           /* tp_new */
  };
  
