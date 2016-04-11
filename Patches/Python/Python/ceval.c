@@ -1,5 +1,5 @@
 diff --git a/Python/ceval.c b/Python/ceval.c
-index beabfeb..e304a26 100644
+index beabfeb..4058aec 100644
 --- a/Python/ceval.c
 +++ b/Python/ceval.c
 @@ -770,6 +770,55 @@ static int unpack_iterable(PyObject *, int, int, PyObject **);
@@ -58,33 +58,14 @@ index beabfeb..e304a26 100644
  
  PyObject *
  PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
-@@ -793,9 +842,38 @@ PyEval_EvalFrame(PyFrameObject *f) {
-     return PyEval_EvalFrameEx(f, 0);
- }
- 
-+PyObject *Py_JIT_FAILED = (PyObject *)1;
-+const PY_UINT64_T PyJIT_HOT_CODE = 20000;
-+
+@@ -796,6 +845,19 @@ PyEval_EvalFrame(PyFrameObject *f) {
  PyObject *
  PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
  {
-+    if (!throwflag && f->f_code->co_jitted != Py_JIT_FAILED) {
-+        if (f->f_code->co_jitted != NULL) {
-+            return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
-+        }
-+        else if (f->f_code->co_runcount++ > PyJIT_HOT_CODE) {
-+            PyThreadState *tstate = PyThreadState_GET();
-+            if (tstate->interp->jitcompile != NULL) {
-+                f->f_code->co_jitted = tstate->interp->jitcompile((PyObject*)f->f_code);
-+                if (f->f_code->co_jitted != NULL) {
-+                    // execute the jitted code...
-+                    return f->f_code->co_jitted->j_evalfunc(f->f_code->co_jitted->j_evalstate, f);
-+                }
++    PyThreadState *tstate = PyThreadState_GET();
 +
-+                // no longer try and compile this method...
-+                f->f_code->co_jitted = Py_JIT_FAILED;
-+            }
-+        }
++    if (tstate->interp->eval_frame != NULL) {
++        return tstate->interp->eval_frame(f, throwflag);
 +    }
 +
 +    return PyEval_EvalFrameEx_NoJit(f, throwflag);
@@ -97,7 +78,7 @@ index beabfeb..e304a26 100644
  #ifdef DXPAIRS
      int lastopcode = 0;
  #endif
-@@ -1262,25 +1340,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
+@@ -1262,25 +1324,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                      goto error;
              }
  #ifdef WITH_THREAD

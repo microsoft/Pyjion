@@ -46,9 +46,25 @@
 #include <vector>
 #include <unordered_map>
 
+#include <frameobject.h>
 #include <Python.h>
 
-extern "C" __declspec(dllexport) PyJittedCode* JitCompile(PyCodeObject* code);
 extern "C" __declspec(dllexport) void JitInit();
+extern "C" __declspec(dllexport) PyObject *EvalFrame(PyFrameObject *, int);
+
+extern PyTypeObject PyjionJittedCode_Type;
+
+/* Jitted code object.  This object is returned from the JIT implementation.  The JIT can allocate
+a jitted code object and fill in the state for which is necessary for it to perform an evaluation. */
+typedef struct {
+    PyObject_HEAD
+    PY_UINT64_T j_run_count;
+    bool j_failed;
+    Py_EvalFunc j_evalfunc;
+    void* j_evalstate;          /* opaque value, allows the JIT to track any relevant state */
+} PyjionJittedCode;
+
+__declspec(dllexport) PyjionJittedCode *jittedcode_new_direct();
+__declspec(dllexport) bool jit_compile(PyCodeObject* code);
 
 #endif
