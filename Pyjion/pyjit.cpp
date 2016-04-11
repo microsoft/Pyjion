@@ -317,10 +317,7 @@ extern "C" __declspec(dllexport) PyObject *EvalFrame(PyFrameObject *f, int throw
     }
     else if (!throwflag) {
         auto jitted = (PyjionJittedCode *)f->f_code->co_extra;
-        if (Py_TYPE(jitted) != &PyjionJittedCode_Type) {
-            return NULL;
-        }
-        else if (!jitted->j_failed) {
+        if (Py_TYPE(jitted) == &PyjionJittedCode_Type && !jitted->j_failed) {
             if (jitted->j_evalfunc != nullptr) {
                 return jitted->j_evalfunc(jitted->j_evalstate, f);
             }
