@@ -73,7 +73,7 @@ static PyObject *
 jittedcode_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
     if (PyTuple_GET_SIZE(args) || (kwargs && PyDict_Size(kwargs))) {
         PyErr_SetString(PyExc_TypeError, "JittedCode takes no arguments");
-        return NULL;
+        return nullptr;
     }
 
     return (PyObject *)jittedcode_new_direct();
@@ -118,34 +118,6 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
     return true;
 }
 
-static PY_UINT64_T HOT_CODE = 20000;
-
-extern "C" __declspec(dllexport) PyObject *EvalFrame(PyFrameObject *f, int throwflag) {
-    if (f->f_code->co_extra == nullptr) {
-        auto jitted = jittedcode_new_direct();
-        f->f_code->co_extra = (PyObject *)jitted;
-        jitted->j_run_count++;
-    }
-    else if (!throwflag) {
-        auto jitted = (PyjionJittedCode *)f->f_code->co_extra;
-        if (!jitted->j_failed) {
-            if (jitted->j_evalfunc != nullptr) {
-                return jitted->j_evalfunc(jitted->j_evalstate, f);
-            }
-            else if (jitted->j_run_count++ > HOT_CODE) {
-                if (jit_compile(f->f_code)) {
-                    // execute the jitted code...
-                    return jitted->j_evalfunc(jitted->j_evalstate, f);
-                }
-
-                // no longer try and compile this method...
-                jitted->j_failed = true;
-            }
-        }
-    }
-
-    return PyEval_EvalFrameEx_NoJit(f, throwflag);
-}
 #else
 
 // Tracks types for a function call.  Each argument has a SpecializedTreeNode with
@@ -254,7 +226,7 @@ PyTypeObject* GetArgType(int arg, PyObject** locals) {
     return type;
 }
 
-PyObject* __stdcall Jit_EvalTrace(void* state, PyFrameObject*frame) {
+PyObject* __stdcall Jit_EvalTrace(void* state, PyFrameObject *frame) {
     // Walk our tree of argument types to find the SpecializedTreeNode which
     // corresponds with our sets of arguments here.
     auto trace = (TraceInfo*)state;
@@ -305,7 +277,7 @@ PyObject* __stdcall Jit_EvalTrace(void* state, PyFrameObject*frame) {
 
 __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
     if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
-        return nullptr;
+        return false;
     }
 #ifdef DEBUG_TRACE
     static int compileCount = 0, failCount = 0;
@@ -319,14 +291,10 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
 
     TraceInfo* trace = new TraceInfo(code);
     if (trace == nullptr) {
-        return nullptr;
-    }
-    PyjionJittedCode* res = jittedcode_new_direct();
-    if (res == nullptr) {
-        delete trace;
         return false;
     }
 
+    auto res = (PyjionJittedCode *)code->co_extra;
     res->j_evalfunc = &Jit_EvalTrace;
     res->j_evalstate = trace;
     code->co_extra = (PyObject *)res;
@@ -334,6 +302,42 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
 }
 
 #endif
+
+static PY_UINT64_T HOT_CODE = 20000;
+
+extern "C" __declspec(dllexport) PyObject *EvalFrame(PyFrameObject *f, int throwflag) {
+    if (f->f_code->co_extra == nullptr) {
+        auto jitted = jittedcode_new_direct();
+        if (jitted == nullptr) {
+            return NULL;
+        }
+
+        f->f_code->co_extra = (PyObject *)jitted;
+        jitted->j_run_count++;
+    }
+    else if (!throwflag) {
+        auto jitted = (PyjionJittedCode *)f->f_code->co_extra;
+        if (Py_TYPE(jitted) != &PyjionJittedCode_Type) {
+            return NULL;
+        }
+        else if (!jitted->j_failed) {
+            if (jitted->j_evalfunc != nullptr) {
+                return jitted->j_evalfunc(jitted->j_evalstate, f);
+            }
+            else if (jitted->j_run_count++ > HOT_CODE) {
+                if (jit_compile(f->f_code)) {
+                    // execute the jitted code...
+                    return jitted->j_evalfunc(jitted->j_evalstate, f);
+                }
+
+                // no longer try and compile this method...
+                jitted->j_failed = true;
+            }
+        }
+    }
+
+    return PyEval_EvalFrameEx_NoJit(f, throwflag);
+}
 
 void PyjionJitFree(PyjionJittedCode* function) {
 #ifdef NO_TRACE

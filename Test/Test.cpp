@@ -1676,7 +1676,7 @@ void PyJitTest() {
     };
 
 
-    auto sysModule = PyImport_ImportModule("sys");;
+    auto sysModule = PyImport_ImportModule("sys");
 
     for (int i = 0; i < _countof(cases); i++) {
         auto curCase = cases[i];
@@ -1685,8 +1685,13 @@ void PyJitTest() {
         printf("\r\n");
         auto codeObj = CompileCode(curCase.m_code);
         auto addr = jittedcode_new_direct();
+        if (addr == nullptr) {
+            _ASSERT(FALSE);
+        }
         codeObj->co_extra = (PyObject *)addr;
-        jit_compile(codeObj);
+        if (!jit_compile(codeObj) || addr->j_evalfunc == nullptr) {
+            _ASSERT(FALSE);
+        }
 
         for (auto curInput = 0; curInput < curCase.m_inputs.size(); curInput++) {
             auto input = curCase.m_inputs[curInput];
