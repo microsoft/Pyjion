@@ -32,7 +32,7 @@ PyObject* __stdcall Jit_EvalHelper(void* state, PyFrameObject*frame) {
     PyThreadState *tstate = PyThreadState_GET();
     if (tstate->use_tracing) {
         if (tstate->c_tracefunc != NULL) {
-            return PyEval_EvalFrameEx_NoJit(frame, 0);
+            return PyEval_EvalFrameDefault(frame, 0);
         }
     }
 
@@ -261,7 +261,7 @@ PyObject* __stdcall Jit_EvalTrace(void* state, PyFrameObject *frame) {
 #ifdef DEBUG_TRACE
             printf("Compilation failure #%d\r\n", ++failCount);
 #endif
-            return PyEval_EvalFrameEx_NoJit(frame, 0);
+            return PyEval_EvalFrameDefault(frame, 0);
         }
 
         // Update the jitted information for this tree node
@@ -272,7 +272,7 @@ PyObject* __stdcall Jit_EvalTrace(void* state, PyFrameObject *frame) {
         return Jit_EvalHelper(curNode->addr, frame);
     }
 
-    return PyEval_EvalFrameEx_NoJit(frame, 0);
+    return PyEval_EvalFrameDefault(frame, 0);
 }
 
 __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
@@ -333,7 +333,7 @@ extern "C" __declspec(dllexport) PyObject *EvalFrame(PyFrameObject *f, int throw
         }
     }
 
-    return PyEval_EvalFrameEx_NoJit(f, throwflag);
+    return PyEval_EvalFrameDefault(f, throwflag);
 }
 
 void PyjionJitFree(PyjionJittedCode* function) {

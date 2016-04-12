@@ -1,5 +1,5 @@
 diff --git a/Include/ceval.h b/Include/ceval.h
-index b5373a9..59c1171 100644
+index b5373a9..c23b562 100644
 --- a/Include/ceval.h
 +++ b/Include/ceval.h
 @@ -10,6 +10,11 @@ extern "C" {
@@ -30,7 +30,7 @@ index b5373a9..59c1171 100644
  PyAPI_FUNC(PyObject *) PyEval_GetCallStats(PyObject *);
  PyAPI_FUNC(PyObject *) PyEval_EvalFrame(struct _frame *);
  PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx(struct _frame *f, int exc);
-+PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx_NoJit(struct _frame *f, int exc);
++PyAPI_FUNC(PyObject *) PyEval_EvalFrameDefault(struct _frame *f, int exc);
  
  /* Interface for threads.
  

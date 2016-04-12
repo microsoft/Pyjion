@@ -1,5 +1,5 @@
 diff --git a/Python/ceval.c b/Python/ceval.c
-index beabfeb..4058aec 100644
+index beabfeb..97361c3 100644
 --- a/Python/ceval.c
 +++ b/Python/ceval.c
 @@ -770,6 +770,55 @@ static int unpack_iterable(PyObject *, int, int, PyObject **);
@@ -68,12 +68,12 @@ index beabfeb..4058aec 100644
 +        return tstate->interp->eval_frame(f, throwflag);
 +    }
 +
-+    return PyEval_EvalFrameEx_NoJit(f, throwflag);
++    return PyEval_EvalFrameDefault(f, throwflag);
 +}
 +
 +
 +PyObject *
-+PyEval_EvalFrameEx_NoJit(PyFrameObject *f, int throwflag)
++PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
 +{
  #ifdef DXPAIRS
      int lastopcode = 0;
