@@ -29,6 +29,7 @@ copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\gcinfo\lib\%__BuildType%
 popd
 
 :BuildPython
+:: Keep BuildDebugPython.bat in sync w/ any relevant changes made here.
 pushd Python\PCBuild
 
 call get_externals.bat
@@ -40,7 +41,7 @@ if /i "%__BuildArch%" == "x64" set arch=amd64
 set SUFFIX=
 if /i "%__BuildType%" == "Debug" set SUFFIX=_d
 
-copy %arch%\python36%SUFFIX%.lib ..\..\Libs\%__BuildType%\%__BuildArch%\
+copy %arch%\python35%SUFFIX%.lib ..\..\Libs\%__BuildType%\%__BuildArch%\
 popd
 
 :Done

@@ -49,6 +49,12 @@ Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Pyth
 1. Copy `x64\Debug\pyjit.dll` to `Python\PCbuild\amd64\` (initially done by `CopyFiles.bat`, so only do as necessary after rebuilding Pyjion)
 2. Go into the `Python` directory and launch `python.bat`
 
+#### Faster development loop
+Once you have done the above steps you can avoid running them again during development in most situations.
+The commands discussed in this section assume they are run from a Developer Command Prompt for VS for access to `msbuild`.
+
+The `BuildDebugPython.bat` file will build CPython in debug mode for x64 as well as copy the appropriate files where they need to be to run Pyjion's tests.
+The `DebugBuild.bat` file will build Pyjion in debug mode for x64 and copy the appropriate files to CPython for use in testing.
 
 ### Known Issues
 You'll need to run `git clean -d -f -x` in CoreCLR when switching between release and debug builds.
