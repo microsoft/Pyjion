@@ -58,10 +58,10 @@ tracing support.
 It also opens up the possibility of debugging where the frame
 evaluation function only performs special debugging work when it
 detects it is about to execute a specific code object. In that
-instance the bytecode could be theoretically rewritten to inject a
-breakpoint function call at the proper point for help in debugging all
-while not having to do a heavy-handed approach as required by
-``sys.settrace()``.
+instance the bytecode could be theoretically rewritten in-place to
+inject a breakpoint function call at the proper point for help in
+debugging all while not having to do a heavy-handed approach as
+required by ``sys.settrace()``.
 
 To help facilitate this JIT use-case, we are also proposing the adding
 of a "scratch space" on code objects via a new field. This will allow
@@ -93,13 +93,12 @@ CPython itself. Third-party code is free to use the field as desired.
 The field will be freed like all other fields on ``PyCodeObject``
 during deallocation using ``Py_XDECREF()``.
 
-There is no attempt to try and have the field work with multiple
-third-party projects simultaneously to simplify usage and to minimize
-over-extending ``PyCodeObject`` with more fields than necessary (and
-hence raising memory usage). If two or more projects wish to use the
-field it will be up to them to coordinate the multiple uses of the
-field (e.g. using a dictionary in the field, creating a common object
-type that can be shared, etc.).
+It is not recommended that multiple users attempt to use the
+``co_extra`` simultaneously. While a dictionary could theoretically be
+set to the field and various users could use a key specific to the
+project, there is still the issue of key collisions as well as
+performance degradation from using a dictionary lookup on every frame
+evaluation.
 
 
 Expanding ``PyInterpreterState``
@@ -166,6 +165,10 @@ all code objects were alive at once.
 
 Example Usage
 =============
+A JIT for CPython
+-----------------
+Pyjion
+//////
 
 The Pyjion project [#pyjion]_ has used this proposed API to implement
 a JIT for CPython using the CoreCLR's JIT [#coreclr]_. Each code
@@ -203,7 +206,7 @@ implementing their own JITs for CPython by utilizing the proposed API.
 
 
 Other JITs
-----------
+//////////
 
 It should be mentioned that the Pyston team was consulted on an
 earlier version of this PEP that was more JIT-specific and they were
@@ -212,9 +215,19 @@ control over memory layout they had no interest in directly supporting
 CPython itself. An informal discusion with a developer on the PyPy
 team led to a similar comment.
 
-
 XXX Numba?
-XXX PTVS?
+
+Debugging
+---------
+
+In conversations with the Python Tools for Visual Studio team (PTVS)
+[#ptvs]_, they thought they would find these API changes useful for
+implementing more performant debugging. As mentioned in the Rationale_
+section, this API would allow for switching on debugging functionality
+only in frames where it was needed. This could allow for either
+skipping information that ``sys.settrace()`` normally provides and
+even go as far as to dynamically rewrite bytecode prior to execution
+to inject e.g. breakpoints in the bytecode.
 
 
 Implementation
@@ -300,6 +313,9 @@ References
 
 .. [#pypy] PyPy
    (http://pypy.org/)
+
+.. [#ptvs] Python Tools for Visual Studio
+   (http://microsoft.github.io/PTVS/)
 
 
 Copyright
