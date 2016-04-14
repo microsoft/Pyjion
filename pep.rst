@@ -117,18 +117,18 @@ The entrypoint for the frame evalution function is per-interpreter::
 
 By default, the ``eval_frame`` field will be initialized to a function
 pointer that represents what ``PyEval_EvalFrameEx()`` currently is
-(called ``PyEval_EvalFrameStandard()``, discussed later in this PEP).
+(called ``PyEval_EvalFrameDefault()``, discussed later in this PEP).
 Third-party code may then set their own frame evaluation function
 instead to control the execution of Python code. Pointer comparison
 can be used to detect if the field is set to
-``PyEval_EvalFrameStandard()`` and thus has not been mutated yet.
+``PyEval_EvalFrameDefault()`` and thus has not been mutated yet.
 
 
 Changes to ``Python/ceval.c``
 -----------------------------
 
 ``PyEval_EvalFrameEx()`` [#pyeval_evalframeex]_ as it currently stands
-will be renamed to ``PyEval_EvalFrameStandard()``. The new
+will be renamed to ``PyEval_EvalFrameDefault()``. The new
 ``PyEval_EvalFrameEx()`` will then become::
 
     PyObject *
@@ -192,7 +192,7 @@ The frame evaluation function has (roughly) the following algorithm::
                 else:
                     pyjion_code.jit_failed = True
         pyjion_code.exec_count += 1
-        return PyEval_EvalFrameStandard(frame, throw_flag)
+        return PyEval_EvalFrameDefault(frame, throw_flag)
 
 The key point, though, is that all of this work and logic is separate
 from CPython and yet with the proposed API changes it is able to
