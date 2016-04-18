@@ -149,7 +149,8 @@ As this PEP is proposing an API to add pluggability, performance
 impact is considered only in the case where no third-party code has
 made any changes.
 
-XXX pybench
+Several runs of pybench [#pybench]_ consistently showed no performance
+cost from the API change alone.
 
 A run of the Python benchmark suite [#py-benchmarks]_ showed no
 measurable cost in performance.
@@ -215,7 +216,9 @@ control over memory layout they had no interest in directly supporting
 CPython itself. An informal discusion with a developer on the PyPy
 team led to a similar comment.
 
-XXX Numba?
+Numba [#numba]_, on the other hand, suggested that they would be
+interested in the proposed change in a post-1.0 future for
+themselves [#numba-interest]_.
 
 Debugging
 ---------
@@ -301,6 +304,10 @@ References
 
 .. [#numba] Numba
    (http://numba.pydata.org/)
+
+.. [#numba-interest]  numba-users mailing list:
+   "Would the C API for a JIT entrypoint being proposed by Pyjion help out Numba?"
+   (https://groups.google.com/a/continuum.io/forum/#!topic/numba-users/yRl_0t8-m1g)
 
 .. [#code-object-count] [Python-Dev] Opcode cache in ceval loop
    (https://mail.python.org/pipermail/python-dev/2016-February/143025.html)
