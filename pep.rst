@@ -259,8 +259,8 @@ Make the proposed API a compile-time option
 -------------------------------------------
 
 While the API is small and seems to show no performance impact beyond
-a slight increase in memory usage, some my view it as still too costly
-to have available by default.
+a slight increase in memory usage, some may view it as still too
+costly to have available by default.
 
 
 Rejected Ideas
