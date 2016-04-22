@@ -258,9 +258,9 @@ void PythonCompiler::emit_store_fast(int local) {
     decref();
 }
 
-void PythonCompiler::emit_rot_two() {
-    auto top = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-    auto second = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+void PythonCompiler::emit_rot_two(LocalKind kind) {
+    auto top = m_il.define_local(Parameter(to_clr_type(kind)));
+    auto second = m_il.define_local(Parameter(to_clr_type(kind)));
 
     m_il.st_loc(top);
     m_il.st_loc(second);
