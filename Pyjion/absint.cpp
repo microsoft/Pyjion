@@ -689,6 +689,13 @@ bool AbstractInterpreter::interpret() {
                         sources
                         );
 
+                    // TODO: The code generator currently assumes it is *always* dealing
+                    // with an object (i.e. not an unboxed value).  Support should be
+                    // added to the code generator for dealing with unboxed values.  The
+                    // code below that forces an escape should then be removed.
+                    if (opcode == UNARY_INVERT)
+                        one.escapes();
+
                     lastState.push(AbstractValueWithSources(unaryRes, sources));
                     break;
                 }
