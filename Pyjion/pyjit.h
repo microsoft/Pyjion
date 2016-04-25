@@ -62,6 +62,7 @@ typedef struct {
     bool j_failed;
     Py_EvalFunc j_evalfunc;
     void* j_evalstate;          /* opaque value, allows the JIT to track any relevant state */
+    PY_UINT64_T j_specialization_threshold;
 } PyjionJittedCode;
 
 __declspec(dllexport) PyjionJittedCode *jittedcode_new_direct();
