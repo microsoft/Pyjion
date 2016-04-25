@@ -82,7 +82,7 @@ class IPythonCompiler {
 public:
     /*****************************************************
      * Basic Python stack manipulations */
-    virtual void emit_rot_two() = 0;
+    virtual void emit_rot_two(LocalKind kind = LK_Pointer) = 0;
     virtual void emit_rot_three() = 0;
     // Pops the top value from the stack and decrements its refcount
     virtual void emit_pop_top() = 0;
