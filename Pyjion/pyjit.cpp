@@ -65,6 +65,7 @@ __declspec(dllexport) PyjionJittedCode *jittedcode_new_direct() {
     new_ob->j_failed = false;
     new_ob->j_evalfunc = nullptr;
     new_ob->j_evalstate = nullptr;
+    new_ob->j_specialization_threshold = 500;
 
     return new_ob;
 }
@@ -244,7 +245,8 @@ PyObject* __stdcall Jit_EvalTrace(void* state, PyFrameObject *frame) {
     }
 
     // No specialized function yet, let's see if we should create one...
-    if (curNode->hitCount > 500) {
+    auto jittedCode = (PyjionJittedCode *)trace->code->co_extra;
+    if (curNode->hitCount > jittedCode->j_specialization_threshold) {
         // Compile and run the now compiled code...
         PythonCompiler jitter(trace->code);
         AbstractInterpreter interp(trace->code, &jitter);

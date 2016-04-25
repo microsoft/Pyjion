@@ -1688,6 +1688,9 @@ void PyJitTest() {
         if (addr == nullptr) {
             _ASSERT(FALSE);
         }
+        // For the purpose of exercising the JIT machinery while testing, the
+        // code should be JITed everytime.
+        addr->j_specialization_threshold = 0;
         codeObj->co_extra = (PyObject *)addr;
         if (!jit_compile(codeObj) || addr->j_evalfunc == nullptr) {
             _ASSERT(FALSE);
