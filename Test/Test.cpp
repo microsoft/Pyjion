@@ -1682,6 +1682,15 @@ void PyJitTest() {
                 TestInput("(2.2, 1)", vector<PyObject*>({ PyLong_FromLong(1), PyFloat_FromDouble(2.2) })),
             })
         ),
+        TestCase(
+            "def f(a, b, c):\n    (a, b, c) = (b, c, a)\n    return (a, b, c)",
+            vector<TestInput>({
+                TestInput("(2, 3, 1)", vector<PyObject*>({ PyLong_FromLong(1), PyLong_FromLong(2), PyLong_FromLong(3) })),
+                TestInput("(2.2, 3.3, 1.1)", vector<PyObject*>({ PyFloat_FromDouble(1.1), PyFloat_FromDouble(2.2), PyFloat_FromDouble(3.3) })),
+                TestInput("('def', 'ghi', 'abc')", vector<PyObject*>({ PyUnicode_FromString("abc"), PyUnicode_FromString("def"), PyUnicode_FromString("ghi") })),
+                TestInput("(2.2, 3, 1)", vector<PyObject*>({ PyLong_FromLong(1), PyFloat_FromDouble(2.2), PyLong_FromLong(3) })),
+            })
+        ),
     };
 
 
@@ -1990,6 +1999,76 @@ void AbsIntTest() {
             new BoxVerifier(18, true), // ROT_TWO
             new BoxVerifier(19, true), // STORE_FAST  0 (x)
             new BoxVerifier(22, true), // STORE_FAST  1 (y)
+        }),
+        // Swap three ints...
+        AITestCase(
+        "def f():\n    x = 1\n    y = 2\n    z = 3\n    (x, y, z) = (y, z, x)",
+        {
+            new BoxVerifier(0, false),  // LOAD_CONST  1 (1)
+            new BoxVerifier(3, false),  // STORE_FAST  0 (x)
+            new BoxVerifier(6, false),  // LOAD_CONST  2 (2)
+            new BoxVerifier(9, false),  // STORE_FAST  1 (y)
+            new BoxVerifier(12, false), // LOAD_CONST  3 (3)
+            new BoxVerifier(15, false), // STORE_FAST  2 (z)
+            new BoxVerifier(18, false), // LOAD_FAST   1 (y)
+            new BoxVerifier(21, false), // LOAD_FAST   2 (z)
+            new BoxVerifier(24, false), // LOAD_FAST   0 (x)
+            new BoxVerifier(27, false), // ROT_THREE
+            new BoxVerifier(28, false), // ROT_TWO
+            new BoxVerifier(29, false), // STORE_FAST  0 (x)
+            new BoxVerifier(32, false), // STORE_FAST  1 (y)
+            new BoxVerifier(35, false), // STORE_FAST  2 (z)
+        }),
+        // Swap three floats...
+        AITestCase(
+        "def f():\n    x = 1.1\n    y = 2.2\n    z = 3.3\n    (x, y, z) = (y, z, x)",
+        {
+            new BoxVerifier(0, false),  // LOAD_CONST  1 (1.1)
+            new BoxVerifier(3, false),  // STORE_FAST  0 (x)
+            new BoxVerifier(6, false),  // LOAD_CONST  2 (2.2)
+            new BoxVerifier(9, false),  // STORE_FAST  1 (y)
+            new BoxVerifier(12, false), // LOAD_CONST  3 (3.3)
+            new BoxVerifier(15, false), // STORE_FAST  2 (z)
+            new BoxVerifier(18, false), // LOAD_FAST   1 (y)
+            new BoxVerifier(21, false), // LOAD_FAST   2 (z)
+            new BoxVerifier(24, false), // LOAD_FAST   0 (x)
+            new BoxVerifier(27, false), // ROT_THREE
+            new BoxVerifier(28, false), // ROT_TWO
+            new BoxVerifier(29, false), // STORE_FAST  0 (x)
+            new BoxVerifier(32, false), // STORE_FAST  1 (y)
+            new BoxVerifier(35, false), // STORE_FAST  2 (z)
+        }),
+        // Swap three objects of unknown type...
+        AITestCase(
+        "def f(x, y, z):\n    (x, y, z) = (y, z, x)",
+        {
+            new BoxVerifier(0, true),  // LOAD_FAST   1 (y)
+            new BoxVerifier(3, true),  // LOAD_FAST   2 (z)
+            new BoxVerifier(6, true),  // LOAD_FAST   0 (x)
+            new BoxVerifier(9, true),  // ROT_THREE
+            new BoxVerifier(10, true), // ROT_TWO
+            new BoxVerifier(11, true), // STORE_FAST  0 (x)
+            new BoxVerifier(14, true), // STORE_FAST  1 (y)
+            new BoxVerifier(17, true), // STORE_FAST  2 (z)
+        }),
+        // Mix floats and ints...
+        AITestCase(
+        "def f():\n    x = 1.1\n    y = 2\n    z = 3.3\n    (x, y, z) = (y, z, x)",
+        {
+            new BoxVerifier(0, true),  // LOAD_CONST  1 (1.1)
+            new BoxVerifier(3, true),  // STORE_FAST  0 (x)
+            new BoxVerifier(6, true),  // LOAD_CONST  2 (2)
+            new BoxVerifier(9, true),  // STORE_FAST  1 (y)
+            new BoxVerifier(12, true), // LOAD_CONST  3 (3.3)
+            new BoxVerifier(15, true), // STORE_FAST  2 (z)
+            new BoxVerifier(18, true), // LOAD_FAST   1 (y)
+            new BoxVerifier(21, true), // LOAD_FAST   2 (z)
+            new BoxVerifier(24, true), // LOAD_FAST   0 (x)
+            new BoxVerifier(27, true), // ROT_THREE
+            new BoxVerifier(28, true), // ROT_TWO
+            new BoxVerifier(29, true), // STORE_FAST  0 (x)
+            new BoxVerifier(32, true), // STORE_FAST  1 (y)
+            new BoxVerifier(35, true), // STORE_FAST  2 (z)
         }),
     };
 
