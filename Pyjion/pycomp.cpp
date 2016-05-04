@@ -272,10 +272,10 @@ void PythonCompiler::emit_rot_two(LocalKind kind) {
     m_il.free_local(second);
 }
 
-void PythonCompiler::emit_rot_three() {
-    auto top = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-    auto second = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-    auto third = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+void PythonCompiler::emit_rot_three(LocalKind kind) {
+    auto top = m_il.define_local(Parameter(to_clr_type(kind)));
+    auto second = m_il.define_local(Parameter(to_clr_type(kind)));
+    auto third = m_il.define_local(Parameter(to_clr_type(kind)));
 
     m_il.st_loc(top);
     m_il.st_loc(second);

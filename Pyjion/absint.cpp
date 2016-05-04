@@ -252,12 +252,21 @@ bool AbstractInterpreter::interpret() {
                 }
                 case ROT_THREE:
                 {
-                    // ROT_THREE currently assumes we have native ints on the stack,
-                    // so we force escape here...  We should fix that up in the future
-                    // and use pop_no_escape
-                    auto top = lastState.pop();
-                    auto second = lastState.pop();
-                    auto third = lastState.pop();
+                    auto top = lastState.pop_no_escape();
+                    auto second = lastState.pop_no_escape();
+                    auto third = lastState.pop_no_escape();
+
+                    auto sources = AbstractSource::combine(
+                        top.Sources,
+                        AbstractSource::combine(second.Sources, third.Sources));
+                    m_opcodeSources[opcodeIndex] = sources;
+
+                    if (top.Value->kind() != second.Value->kind()
+                        || top.Value->kind() != third.Value->kind()) {
+                        top.escapes();
+                        second.escapes();
+                        third.escapes();
+                    }
 
                     lastState.push(top);
                     lastState.push(third);
@@ -2004,17 +2013,24 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case ROT_THREE: 
             {
-                bool top = m_stack.back();
-                m_stack.pop_back();
-                bool second = m_stack.back();
-                m_stack.pop_back();
-                bool third = m_stack.back();
-                m_stack.pop_back();
+                std::swap(m_stack[m_stack.size() - 1], m_stack[m_stack.size() - 2]);
+                std::swap(m_stack[m_stack.size() - 2], m_stack[m_stack.size() - 3]);
 
-                m_stack.push_back(top);
-                m_stack.push_back(third);
-                m_stack.push_back(second);
+                if (!should_box(opcodeIndex)) {
+                    auto stackInfo = get_stack_info(opcodeIndex);
+                    auto top_kind = stackInfo[stackInfo.size() - 1].Value->kind();
+                    auto second_kind = stackInfo[stackInfo.size() - 2].Value->kind();
+                    auto third_kind = stackInfo[stackInfo.size() - 3].Value->kind();
 
+                    if (top_kind == AVK_Float && second_kind == AVK_Float && third_kind == AVK_Float) {
+                        m_comp->emit_rot_three(LK_Float);
+                        break;
+                    }
+                    else if (top_kind == AVK_Integer && second_kind == AVK_Integer && third_kind == AVK_Integer) {
+                        m_comp->emit_rot_three(LK_Int);
+                        break;
+                    }
+                }
                 m_comp->emit_rot_three();
                 break;
             }
