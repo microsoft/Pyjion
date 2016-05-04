@@ -24,10 +24,8 @@ arbitrary data for use by the frame evaluation function.
 Rationale
 =========
 
-Adding more flexibility to Python is always a laudable goal when it
-doesn't come at a performance, maintenance, or mental comprehension
-cost. One place where flexibility has been left out is in the direct
-execution of Python code. While Python's C API [#c-api]_ allows for
+One place where flexibility has been lacking in Python is in the direct
+execution of Python code. While CPython's C API [#c-api]_ allows for
 constructing the data going into a frame object and then evaluating it
 via ``PyEval_EvalFrameEx()`` [#pyeval_evalframeex]_, control over the
 execution of Python code comes down to individual objects instead of a
@@ -60,10 +58,10 @@ evaluation function only performs special debugging work when it
 detects it is about to execute a specific code object. In that
 instance the bytecode could be theoretically rewritten in-place to
 inject a breakpoint function call at the proper point for help in
-debugging all while not having to do a heavy-handed approach as
+debugging while not having to do a heavy-handed approach as
 required by ``sys.settrace()``.
 
-To help facilitate this JIT use-case, we are also proposing the adding
+To help facilitate these use-cases, we are also proposing the adding
 of a "scratch space" on code objects via a new field. This will allow
 per-code object data to be stored with the code object itself for easy
 retrieval by the frame evaluation function as necessary. The field
@@ -98,7 +96,8 @@ It is not recommended that multiple users attempt to use the
 set to the field and various users could use a key specific to the
 project, there is still the issue of key collisions as well as
 performance degradation from using a dictionary lookup on every frame
-evaluation.
+evaluation. Users are expected to do a type check to make sure that
+the field has not been previously set by someone else.
 
 
 Expanding ``PyInterpreterState``
@@ -118,7 +117,7 @@ By default, the ``eval_frame`` field will be initialized to a function
 pointer that represents what ``PyEval_EvalFrameEx()`` currently is
 (called ``PyEval_EvalFrameDefault()``, discussed later in this PEP).
 Third-party code may then set their own frame evaluation function
-instead to control the execution of Python code. Pointer comparison
+instead to control the execution of Python code. A pointer comparison
 can be used to detect if the field is set to
 ``PyEval_EvalFrameDefault()`` and thus has not been mutated yet.
 
@@ -138,8 +137,8 @@ will be renamed to ``PyEval_EvalFrameDefault()``. The new
     }
 
 This allows third-party code to place themselves directly in the path
-of Python code execution for it to do what it desires to influence
-execution.
+of Python code execution while being backwards-compatible with code
+already using the pre-existing C API.
 
 
 Performance impact
@@ -161,15 +160,18 @@ interpreters executing in a single process that means the impact of
 According to [#code-object-count]_, a run of the Python test suite
 results in about 72,395 code objects being created. On a 64-bit
 CPU that would result in 4,633,280 bytes of extra memory being used if
-all code objects were alive at once.
+all code objects were alive at once and had nothing set in their
+``co_extra`` fields.
 
 
 Example Usage
 =============
+
 A JIT for CPython
 -----------------
+
 Pyjion
-//////
+''''''
 
 The Pyjion project [#pyjion]_ has used this proposed API to implement
 a JIT for CPython using the CoreCLR's JIT [#coreclr]_. Each code
@@ -207,11 +209,11 @@ implementing their own JITs for CPython by utilizing the proposed API.
 
 
 Other JITs
-//////////
+''''''''''
 
 It should be mentioned that the Pyston team was consulted on an
 earlier version of this PEP that was more JIT-specific and they were
-not interested in utilizing the changes proposed. Because they want
+not interested in utilizing the changes proposed because they want
 control over memory layout they had no interest in directly supporting
 CPython itself. An informal discusion with a developer on the PyPy
 team led to a similar comment.
@@ -220,6 +222,7 @@ Numba [#numba]_, on the other hand, suggested that they would be
 interested in the proposed change in a post-1.0 future for
 themselves [#numba-interest]_.
 
+
 Debugging
 ---------
 
@@ -227,7 +230,7 @@ In conversations with the Python Tools for Visual Studio team (PTVS)
 [#ptvs]_, they thought they would find these API changes useful for
 implementing more performant debugging. As mentioned in the Rationale_
 section, this API would allow for switching on debugging functionality
-only in frames where it was needed. This could allow for either
+only in frames where it is needed. This could allow for either
 skipping information that ``sys.settrace()`` normally provides and
 even go as far as to dynamically rewrite bytecode prior to execution
 to inject e.g. breakpoints in the bytecode.
@@ -237,7 +240,7 @@ Implementation
 ==============
 
 A set of patches implementing the proposed API is available through
-the Pyjion project [#pyjion]_. In its current form it does do more
+the Pyjion project [#pyjion]_. In its current form it has more
 changes to CPython than just this proposed API, but that is for ease
 of development instead of strict requirements to accomplish its goals.
 
@@ -245,22 +248,15 @@ of development instead of strict requirements to accomplish its goals.
 Open Issues
 ===========
 
-Provisionally accept the proposed changes
------------------------------------------
+Allow ``eval_frame`` to be ``NULL``
+-----------------------------------
 
-While PEP 411 introduced the concept of provisionally accepted
-packages in Python's standard library, the concept has yet to be
-applied to CPython's C API. Due to the unknown payoff from adding this
-API to CPython, it may make sense to provisionally accept this PEP
-with a goal to validate its usefulness based on whether usage emerges.
-
-
-Make the proposed API a compile-time option
--------------------------------------------
-
-While the API is small and seems to show no performance impact beyond
-a slight increase in memory usage, some may view it as still too
-costly to have available by default.
+Currently the frame evaluation function is expected to always be set.
+It could very easily simply default to ``NULL`` instead which would
+signal to use ``PyEval_EvalFrameDefault()``. The current proposal of
+not special-casing the field seemed the most straight-forward, but it
+does require that the field not accidentally be cleared, else a crash
+may occur.
 
 
 Rejected Ideas
