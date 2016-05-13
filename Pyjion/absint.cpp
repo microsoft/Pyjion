@@ -2285,7 +2285,11 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         if (byte == BINARY_AND || byte == INPLACE_AND || byte == INPLACE_OR || byte == BINARY_OR ||
                             byte == INPLACE_LSHIFT || byte == BINARY_LSHIFT || byte == INPLACE_RSHIFT || byte == BINARY_RSHIFT ||
                             byte == INPLACE_XOR || byte == BINARY_XOR) {
-                            // TODO: Report error
+                            char buf[181];
+                            sprintf_s(buf, "unsupported operand type(s) for %s: 'float' and 'int'", op_to_string(byte));
+                            m_comp->emit_pyerr_setstring(PyExc_TypeError, buf);
+                            branch_raise();
+                            break;
                         }
                         if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE ||
                             byte == INPLACE_FLOOR_DIVIDE || byte == BINARY_FLOOR_DIVIDE ||
@@ -2723,13 +2727,13 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     // anyway.
                     if (m_offsetStack.find(curByte) != m_offsetStack.end()) {
                         dec_stack(3);
-                        free_iter_locals_on_exception();
-                        m_comp->emit_restore_err();
+free_iter_locals_on_exception();
+m_comp->emit_restore_err();
 
-                        unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
-                        clean_stack_for_reraise();
+unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
+clean_stack_for_reraise();
 
-                        m_comp->emit_branch(BranchAlways, get_ehblock().ReRaise);
+m_comp->emit_branch(BranchAlways, get_ehblock().ReRaise);
                     }
                 }
             }
@@ -2768,58 +2772,79 @@ JittedCode* AbstractInterpreter::compile_worker() {
         }
 
 
-    // for each exception handler we need to load the exception
-    // information onto the stack, and then branch to the correct
-    // handler.  When we take an error we'll branch down to this
-    // little stub and then back up to the correct handler.
-    if (m_allHandlers.size() != 0) {
-        // TODO: Unify the first handler with this loop
-        for (size_t i = 1; i < m_allHandlers.size(); i++) {
-            auto& handler = m_allHandlers[i];
+        // for each exception handler we need to load the exception
+        // information onto the stack, and then branch to the correct
+        // handler.  When we take an error we'll branch down to this
+        // little stub and then back up to the correct handler.
+        if (m_allHandlers.size() != 0) {
+            // TODO: Unify the first handler with this loop
+            for (size_t i = 1; i < m_allHandlers.size(); i++) {
+                auto& handler = m_allHandlers[i];
 
-            emit_raise_and_free(i);
+                emit_raise_and_free(i);
 
-            if (handler.ErrorTarget.m_index != -1) {
-                m_comp->emit_prepare_exception(
-                    handler.ExVars.PrevExc,
-                    handler.ExVars.PrevExcVal,
-                    handler.ExVars.PrevTraceback
-                );
-                if (handler.Flags & EHF_TryFinally) {
-                    auto tmpEx = m_comp->emit_spill();
+                if (handler.ErrorTarget.m_index != -1) {
+                    m_comp->emit_prepare_exception(
+                        handler.ExVars.PrevExc,
+                        handler.ExVars.PrevExcVal,
+                        handler.ExVars.PrevTraceback
+                        );
+                    if (handler.Flags & EHF_TryFinally) {
+                        auto tmpEx = m_comp->emit_spill();
 
-                    auto targetHandler = i;
-                    while (m_allHandlers[targetHandler].BackHandler != -1) {
-                        targetHandler = m_allHandlers[targetHandler].BackHandler;
+                        auto targetHandler = i;
+                        while (m_allHandlers[targetHandler].BackHandler != -1) {
+                            targetHandler = m_allHandlers[targetHandler].BackHandler;
+                        }
+                        auto& vars = m_allHandlers[targetHandler].ExVars;
+
+                        m_comp->emit_store_local(vars.FinallyValue);
+                        m_comp->emit_store_local(vars.FinallyTb);
+
+                        m_comp->emit_load_and_free_local(tmpEx);
                     }
-                    auto& vars = m_allHandlers[targetHandler].ExVars;
-
-                    m_comp->emit_store_local(vars.FinallyValue);
-                    m_comp->emit_store_local(vars.FinallyTb);
-
-                    m_comp->emit_load_and_free_local(tmpEx);
+                    m_comp->emit_branch(BranchAlways, handler.ErrorTarget);
                 }
-                m_comp->emit_branch(BranchAlways, handler.ErrorTarget);
             }
         }
+
+        // label we branch to for error handling when we have no EH handlers, return NULL.
+        emit_raise_and_free(0);
+
+        m_comp->emit_null();
+        auto finalRet = m_comp->emit_define_label();
+        m_comp->emit_branch(BranchAlways, finalRet);
+
+        m_comp->emit_mark_label(m_retLabel);
+        m_comp->emit_load_local(m_retValue);
+
+        m_comp->emit_mark_label(finalRet);
+        m_comp->emit_pop_frame();
+
+        m_comp->emit_ret();
+
+        return m_comp->emit_compile();
+}
+
+const char* AbstractInterpreter::op_to_string(int op) {
+    switch(op) {
+        case BINARY_AND: 
+        case INPLACE_AND:
+            return "&";
+        case  INPLACE_OR:
+        case  BINARY_OR:
+            return "|";
+        case  INPLACE_LSHIFT: 
+        case  BINARY_LSHIFT: 
+            return "<<";
+        case  INPLACE_RSHIFT:
+        case  BINARY_RSHIFT:
+            return ">>";
+        case  INPLACE_XOR:
+        case  BINARY_XOR:
+            return "^";
     }
-
-    // label we branch to for error handling when we have no EH handlers, return NULL.
-    emit_raise_and_free(0);
-
-    m_comp->emit_null();
-    auto finalRet = m_comp->emit_define_label();
-    m_comp->emit_branch(BranchAlways, finalRet);
-
-    m_comp->emit_mark_label(m_retLabel);
-    m_comp->emit_load_local(m_retValue);
-
-    m_comp->emit_mark_label(finalRet);
-    m_comp->emit_pop_frame();
-
-    m_comp->emit_ret();
-
-    return m_comp->emit_compile();
+    return "?";
 }
 
 void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {

@@ -248,6 +248,7 @@ public:
     bool has_info(size_t byteCodeIndex);
 
 private:
+    const char * op_to_string(int op);
     AbstractValue* to_abstract(PyObject* obj);
     AbstractValue* to_abstract(AbstractValueKind kind);
     bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
