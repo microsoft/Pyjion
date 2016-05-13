@@ -2049,13 +2049,13 @@ PyObject* PyJit_IsNot(PyObject* lhs, PyObject* rhs) {
     return res;
 }
 
-bool PyJit_Is_Bool(PyObject* lhs, PyObject* rhs) {
+int PyJit_Is_Bool(PyObject* lhs, PyObject* rhs) {
     Py_DECREF(lhs);
     Py_DECREF(rhs);
     return lhs == rhs;
 }
 
-bool PyJit_IsNot_Bool(PyObject* lhs, PyObject* rhs) {
+int PyJit_IsNot_Bool(PyObject* lhs, PyObject* rhs) {
     Py_DECREF(lhs);
     Py_DECREF(rhs);
     return lhs != rhs;
@@ -2360,7 +2360,7 @@ PyObject* PyJit_BoxTaggedPointer(PyObject* value) {
 }																						\
 
 #define TAGGED_COMPARE(name, cmp) \
-	bool PyJit_##name##_Int(PyObject *left, PyObject *right) {							\
+int PyJit_##name##_Int(PyObject *left, PyObject *right) {							\
 	tagged_ptr leftI = (tagged_ptr)left;												\
 	tagged_ptr rightI = (tagged_ptr)right;												\
 	size_t tempNumber[NUMBER_SIZE];														\
@@ -2409,10 +2409,10 @@ TAGGED_COMPARE(Equals, == )
 TAGGED_COMPARE(NotEquals, != )
 TAGGED_COMPARE(GreaterThan, > )
 TAGGED_COMPARE(LessThan, < )
-    TAGGED_COMPARE(GreaterThanEquals, >= )
-    TAGGED_COMPARE(LessThanEquals, <= )
+TAGGED_COMPARE(GreaterThanEquals, >= )
+TAGGED_COMPARE(LessThanEquals, <= )
 
-    PyObject* PyJit_UnaryNegative_Int(PyObject*value) {
+PyObject* PyJit_UnaryNegative_Int(PyObject*value) {
     tagged_ptr valueI = (tagged_ptr)value;
     size_t tempNumber[NUMBER_SIZE];
 
@@ -2429,7 +2429,7 @@ TAGGED_COMPARE(LessThan, < )
     return PyNumber_Negative(value);
 }
 
-bool PyJit_UnaryNot_Int_PushBool(PyObject*value) {
+int PyJit_UnaryNot_Int_PushBool(PyObject*value) {
     tagged_ptr valueI = (tagged_ptr)value;
     if (IS_TAGGED(valueI)) {
         auto untagged = UNTAG_IT(valueI);
@@ -2437,4 +2437,16 @@ bool PyJit_UnaryNot_Int_PushBool(PyObject*value) {
     }
 
     return Py_SIZE(value) == 0;
+}
+
+int PyJit_Int_ToFloat(PyObject* in, double*out) {
+    tagged_ptr inI = (tagged_ptr)in;
+    if (IS_TAGGED(inI)) {
+        INIT_TMP_NUMBER(tmpIn, UNTAG_IT(inI));
+        *out = PyLong_AsDouble(tmpIn);      
+    }
+    else {
+        *out = PyLong_AsDouble(in);
+    }
+    return *out == -1.0 && PyErr_Occurred();
 }

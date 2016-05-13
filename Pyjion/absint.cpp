@@ -2278,7 +2278,45 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     auto two = stackInfo[stackInfo.size() - 2];
 
                     // Currently we only optimize floating point numbers..
-                    if (one.Value->kind() == AVK_Float && two.Value->kind() == AVK_Float) {
+                    if (one.Value->kind() == AVK_Integer && two.Value->kind() == AVK_Float) {
+                        _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT);
+                        _ASSERTE(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
+
+                        if (byte == BINARY_AND || byte == INPLACE_AND || byte == INPLACE_OR || byte == BINARY_OR ||
+                            byte == INPLACE_LSHIFT || byte == BINARY_LSHIFT || byte == INPLACE_RSHIFT || byte == BINARY_RSHIFT ||
+                            byte == INPLACE_XOR || byte == BINARY_XOR) {
+                            // TODO: Report error
+                        }
+                        if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE ||
+                            byte == INPLACE_FLOOR_DIVIDE || byte == BINARY_FLOOR_DIVIDE ||
+                            byte == INPLACE_MODULO || byte == BINARY_MODULO) {
+                            m_comp->emit_dup();
+                            m_comp->emit_unary_not_tagged_int_push_bool();
+                            auto noErr = m_comp->emit_define_label();
+                            m_comp->emit_branch(BranchFalse, noErr);
+                            m_comp->emit_pyerr_setstring(PyExc_ZeroDivisionError, "float division by zero");
+                            branch_raise();
+
+                            m_comp->emit_mark_label(noErr);
+                        }
+
+                        // Convert int to float
+                        auto floatValue = m_comp->emit_define_local(LK_Float);
+                        m_comp->emit_load_local_addr(floatValue);
+                        m_comp->emit_tagged_int_to_float();
+
+                        dec_stack(1);   // we've consumed the int
+
+                        int_error_check("int too big for float");
+
+                        m_comp->emit_load_and_free_local(floatValue);
+
+                        m_comp->emit_binary_float(byte);
+
+                        dec_stack(1);
+                        inc_stack(1, STACK_KIND_VALUE);
+                        break;
+                    }else if (one.Value->kind() == AVK_Float && two.Value->kind() == AVK_Float) {
                         _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
                         _ASSERTE(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
 

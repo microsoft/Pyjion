@@ -171,6 +171,8 @@
 #define METHOD_UNBOX_LONG_TAGGED                0x00000070
 #define METHOD_UNBOX_FLOAT                      0x00000071
 
+#define METHOD_INT_TO_FLOAT					    0x00000072
+
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
 #define METHOD_CALL1_TOKEN		0x00010001
@@ -334,6 +336,7 @@ public:
     virtual void emit_store_local(Local local);
 
     virtual void emit_load_local(Local local);
+    virtual void emit_load_local_addr(Local local);
     virtual void emit_load_and_free_local(Local local);
     virtual Local emit_define_local(bool cache);
     virtual Local emit_define_local(LocalKind kind = LK_Pointer);
@@ -357,6 +360,7 @@ public:
     virtual void emit_binary_float(int opcode);
     virtual void emit_binary_tagged_int(int opcode);
     virtual void emit_binary_object(int opcode);
+    virtual void emit_tagged_int_to_float();
 
     virtual void emit_in_push_int();
     virtual void emit_in();
