@@ -77,6 +77,13 @@ funding before finishing their work after having to spend a large amount of
 time fixing issues in LLVM's JIT compiler (which has greatly improved over the
 subsequent years).
 
+#### [Nuitka](http://nuitka.net/) and [Shedskin](https://github.com/shedskin/shedskin)?
+Both [Nuitka](http://nuitka.net/) and
+[Shedskin](https://github.com/shedskin/shedskin) are Python-to-C++ transpilers,
+which means they translate Python code into equivalent C++ code. Being a JIT,
+Pyjion is not a transpiler.
+
+
 ### Are you going to support OS X and/or Linux?
 Yes! Goals #1 and #3 are entirely platform-agnostic while goal #2 of using
 CoreCLR as a JIT compiler is not an impedence to supporting OS X or Linux as

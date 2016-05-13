@@ -1,2 +1,6 @@
 @echo off
+echo Building Pyjion ...
 MSBuild.exe .\Pyjion.sln /p:Configuration=Debug;Platform=x64 /m
+
+echo Copying x64\Debug\pyjit.dll to add the JIT to Python ...
+copy x64\Debug\pyjit.dll Python\PCbuild\amd64

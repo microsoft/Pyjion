@@ -237,9 +237,9 @@ class PythonCompiler : public IPythonCompiler {
 public:
     PythonCompiler(PyCodeObject *code);
 
-    virtual void emit_rot_two();
+    virtual void emit_rot_two(LocalKind kind = LK_Pointer);
 
-    virtual void emit_rot_three();
+    virtual void emit_rot_three(LocalKind kind = LK_Pointer);
 
     virtual void emit_pop_top();
 
