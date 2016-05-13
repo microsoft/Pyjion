@@ -62,8 +62,8 @@ class InterpreterState;
 // Once we've processed all of the blocks of code in this manner the analysis
 // is complete.
 
-#define STACK_KIND_OBJECT true
-#define STACK_KIND_VALUE  false
+#define STACK_KIND_OBJECT true      // A Python object, or a tagged int which might be an object
+#define STACK_KIND_VALUE  false     // A non-boxed value, currently just floating point
 
 enum EhFlags {
     EHF_None = 0,

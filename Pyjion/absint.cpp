@@ -2313,21 +2313,23 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                     // Currently we only optimize floating point numbers..
                     if (one.Value->kind() == AVK_Integer && two.Value->kind() == AVK_Float) {
-                        _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT);
+                        // tagged ints might be objects, so we track the stack kind as object
+                        _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT); 
                         _ASSERTE(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
 
                         if (byte == BINARY_AND || byte == INPLACE_AND || byte == INPLACE_OR || byte == BINARY_OR ||
                             byte == INPLACE_LSHIFT || byte == BINARY_LSHIFT || byte == INPLACE_RSHIFT || byte == BINARY_RSHIFT ||
                             byte == INPLACE_XOR || byte == BINARY_XOR) {
-                            char buf[181];
+                            char buf[100];
                             sprintf_s(buf, "unsupported operand type(s) for %s: 'float' and 'int'", op_to_string(byte));
                             m_comp->emit_pyerr_setstring(PyExc_TypeError, buf);
                             branch_raise();
                             break;
-                        }
-                        if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE ||
+                        } else if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE ||
                             byte == INPLACE_FLOOR_DIVIDE || byte == BINARY_FLOOR_DIVIDE ||
                             byte == INPLACE_MODULO || byte == BINARY_MODULO) {
+                            // Check and see if the right hand side is zero, and if so, raise
+                            // an exception.
                             m_comp->emit_dup();
                             m_comp->emit_unary_not_tagged_int_push_bool();
                             auto noErr = m_comp->emit_define_label();
@@ -2354,7 +2356,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         dec_stack(1);
                         inc_stack(1, STACK_KIND_VALUE);
                         break;
-                    }else if (one.Value->kind() == AVK_Float && two.Value->kind() == AVK_Float) {
+                    } else if (one.Value->kind() == AVK_Float && two.Value->kind() == AVK_Float) {
                         _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
                         _ASSERTE(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
 
