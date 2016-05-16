@@ -147,6 +147,8 @@ public:
     virtual void emit_store_local(Local local) = 0;
     // Loads the local onto the top of the stack
     virtual void emit_load_local(Local local) = 0;
+    // Loads the address of a local onto the top of the stack
+    virtual void emit_load_local_addr(Local local) = 0;
     // Loads a local onto the stack and makes the local available for re-use
     virtual void emit_load_and_free_local(Local local) = 0;
     // Defines a pointer local, optionally not pulling it from the cache of available locals
@@ -330,6 +332,8 @@ public:
     virtual void emit_binary_object(int opcode) = 0;
 
     virtual void emit_binary_tagged_int(int opcode) = 0;
+
+    virtual void emit_tagged_int_to_float() = 0;
 
     // Does an in/contains check and pushes a Python object onto the stack as the result, or NULL if there was an error
     virtual void emit_in() = 0;

@@ -674,6 +674,10 @@ void PythonCompiler::emit_load_local(Local local) {
     m_il.ld_loc(local);
 }
 
+void PythonCompiler::emit_load_local_addr(Local local) {
+    m_il.ld_loca(local);
+}
+
 void PythonCompiler::emit_pop() {
     m_il.pop();
 }
@@ -1119,6 +1123,10 @@ JittedCode* PythonCompiler::emit_compile() {
 
 }
 
+void PythonCompiler::emit_tagged_int_to_float() {
+    m_il.emit_call(METHOD_INT_TO_FLOAT);
+}
+
 /************************************************************************
 * End Compiler interface implementation
 */
@@ -1323,3 +1331,5 @@ GLOBAL_METHOD(METHOD_NOT_EQUALS_INT_TOKEN, PyJit_NotEquals_Int, CORINFO_TYPE_BOO
 GLOBAL_METHOD(METHOD_GREATER_THAN_INT_TOKEN, PyJit_GreaterThan_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
 GLOBAL_METHOD(METHOD_GREATER_THAN_EQUALS_INT_TOKEN, PyJit_GreaterThanEquals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
 GLOBAL_METHOD(METHOD_PERIODIC_WORK, _PyEval_PeriodicWork, CORINFO_TYPE_BOOL)
+
+GLOBAL_METHOD(METHOD_INT_TO_FLOAT, PyJit_Int_ToFloat, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_DOUBLE), Parameter(CORINFO_TYPE_NATIVEINT))

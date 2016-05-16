@@ -238,8 +238,8 @@ int PyJit_DeleteName(PyFrameObject* f, PyObject* name);
 PyObject* PyJit_Is(PyObject* lhs, PyObject* rhs);
 PyObject* PyJit_IsNot(PyObject* lhs, PyObject* rhs);
 
-bool PyJit_Is_Bool(PyObject* lhs, PyObject* rhs);
-bool PyJit_IsNot_Bool(PyObject* lhs, PyObject* rhs);
+int PyJit_Is_Bool(PyObject* lhs, PyObject* rhs);
+int PyJit_IsNot_Bool(PyObject* lhs, PyObject* rhs);
 
 PyObject* Call0(PyObject *target);
 PyObject* Call1(PyObject *target, PyObject* arg0);
@@ -272,12 +272,14 @@ PyObject* PyJit_Power_Int(PyObject *left, PyObject *right);
 
 PyObject* PyJit_BoxTaggedPointer(PyObject* value);
 PyObject* PyJit_UnaryNegative_Int(PyObject*value);
-bool PyJit_UnaryNot_Int_PushBool(PyObject*value);
+int PyJit_UnaryNot_Int_PushBool(PyObject*value);
 
-bool PyJit_Equals_Int(PyObject *left, PyObject *right);
-bool PyJit_LessThan_Int(PyObject *left, PyObject *right);
-bool PyJit_LessThanEquals_Int(PyObject *left, PyObject *right);
-bool PyJit_NotEquals_Int(PyObject *left, PyObject *right);
-bool PyJit_GreaterThan_Int(PyObject *left, PyObject *right);
-bool PyJit_GreaterThanEquals_Int(PyObject *left, PyObject *right);
+int PyJit_Equals_Int(PyObject *left, PyObject *right);
+int PyJit_LessThan_Int(PyObject *left, PyObject *right);
+int PyJit_LessThanEquals_Int(PyObject *left, PyObject *right);
+int PyJit_NotEquals_Int(PyObject *left, PyObject *right);
+int PyJit_GreaterThan_Int(PyObject *left, PyObject *right);
+int PyJit_GreaterThanEquals_Int(PyObject *left, PyObject *right);
+
+int PyJit_Int_ToFloat(PyObject* in, double*out);
 #endif

@@ -10,17 +10,17 @@ Git commit hash that represents the build of Pyjion used (as found by
 
 ## Latest run
 ```
-C:\Source\benchmarks>py -3 perf.py -r --csv ..\Pyjion5\Perf\2016-04-06.csv --benchmarks=all,-chameleon_v2,-hexiom2 C:\Source\Pyjion5\Python\PCbuild\nojit\python.exe C:\Source\Pyjion5\Python\PCbuild\amd64\python.exe
+C:\Source\benchmarks>py -3 perf.py -r --csv ..\Pyjion5\Perf\2016-05-13.csv --benchmarks=all,-chameleon_v2,-hexiom2 C:\Source\Pyjion5\Python\PCbuild\nojit\python.exe C:\Source\Pyjion5\Python\PCbuild\amd64\python.exe
 INFO:root:Automatically selected timer: perf_counter
-INFO:root:Skipping benchmark rietveld; not compatible with Python 3.5
-INFO:root:Skipping benchmark slowunpickle; not compatible with Python 3.5
 INFO:root:Skipping benchmark html5lib_warmup; not compatible with Python 3.5
-INFO:root:Skipping benchmark bzr_startup; not compatible with Python 3.5
+INFO:root:Skipping benchmark slowunpickle; not compatible with Python 3.5
 INFO:root:Skipping benchmark slowpickle; not compatible with Python 3.5
 INFO:root:Skipping benchmark slowspitfire; not compatible with Python 3.5
+INFO:root:Skipping benchmark spambayes; not compatible with Python 3.5
+INFO:root:Skipping benchmark bzr_startup; not compatible with Python 3.5
+INFO:root:Skipping benchmark rietveld; not compatible with Python 3.5
 INFO:root:Skipping benchmark html5lib; not compatible with Python 3.5
 INFO:root:Skipping benchmark pybench; not compatible with Python 3.5
-INFO:root:Skipping benchmark spambayes; not compatible with Python 3.5
 INFO:root:Skipping benchmark hg_startup; not compatible with Python 3.5
 [ 1/41] 2to3...
 INFO:root:Running `C:\Source\Pyjion5\Python\PCbuild\amd64\python.exe lib3/2to3/2to3 -f all lib/2to3`
@@ -152,203 +152,179 @@ Report on Windows dinov1  10.0.10586 AMD64 Intel64 Family 6 Model 44 Stepping 2,
 Total CPU cores: 8
 
 ### 2to3 ###
-Min: 12.342356 -> 334.583629: 27.11x slower
-Avg: 12.550288 -> 339.405125: 27.04x slower
-Significant (t=-140.37)
-Stddev: 0.19301 -> 5.20306: 26.9573x larger
+Min: 12.115672 -> 53.077635: 4.38x slower
+Avg: 12.183010 -> 53.180146: 4.37x slower
+Significant (t=-748.60)
+Stddev: 0.07164 -> 0.09931: 1.3862x larger
 
 ### call_method ###
-Min: 0.489932 -> 1.018983: 2.08x slower
-Avg: 0.524157 -> 1.089300: 2.08x slower
-Significant (t=-141.23)
-Stddev: 0.03192 -> 0.06152: 1.9273x larger
+Min: 0.478239 -> 0.440329: 1.09x faster
+Avg: 0.485248 -> 0.445719: 1.09x faster
+Significant (t=46.08)
+Stddev: 0.01410 -> 0.00467: 3.0169x smaller
 
 ### call_method_slots ###
-Min: 0.500812 -> 1.014403: 2.03x slower
-Avg: 0.515659 -> 1.091850: 2.12x slower
-Significant (t=-174.00)
-Stddev: 0.00833 -> 0.05675: 6.8136x larger
+Min: 0.477080 -> 0.437468: 1.09x faster
+Avg: 0.485912 -> 0.443677: 1.10x faster
+Significant (t=63.83)
+Stddev: 0.00811 -> 0.00809: 1.0026x smaller
 
 ### call_method_unknown ###
-Min: 0.499555 -> 1.686318: 3.38x slower
-Avg: 0.514263 -> 1.801308: 3.50x slower
-Significant (t=-176.69)
-Stddev: 0.00450 -> 0.12609: 28.0335x larger
+Min: 0.496415 -> 0.447550: 1.11x faster
+Avg: 0.504634 -> 0.460771: 1.10x faster
+Significant (t=22.54)
+Stddev: 0.00914 -> 0.03244: 3.5512x larger
 
 ### call_simple ###
-Min: 0.412433 -> 0.477337: 1.16x slower
-Avg: 0.420309 -> 0.526400: 1.25x slower
-Significant (t=-101.69)
-Stddev: 0.00301 -> 0.01782: 5.9156x larger
+Min: 0.411499 -> 0.376116: 1.09x faster
+Avg: 0.419098 -> 0.381976: 1.10x faster
+Significant (t=44.53)
+Stddev: 0.01151 -> 0.00871: 1.3213x smaller
 
 ### chaos ###
-Min: 0.526826 -> 0.638008: 1.21x slower
-Avg: 0.537415 -> 0.701176: 1.30x slower
-Significant (t=-171.90)
-Stddev: 0.00409 -> 0.00861: 2.1058x larger
+Min: 0.529725 -> 0.508128: 1.04x faster
+Avg: 0.538782 -> 0.515974: 1.04x faster
+Significant (t=13.77)
+Stddev: 0.01030 -> 0.01297: 1.2603x larger
 
 ### django_v3 ###
-Min: 0.958868 -> 7.305971: 7.62x slower
-Avg: 0.979457 -> 7.367174: 7.52x slower
-Significant (t=-1369.64)
-Stddev: 0.00793 -> 0.04596: 5.7933x larger
+Min: 0.962259 -> 1.973536: 2.05x slower
+Avg: 0.974137 -> 2.000700: 2.05x slower
+Significant (t=-312.54)
+Stddev: 0.02231 -> 0.02410: 1.0803x larger
 
 ### etree_generate ###
-Min: 0.531633 -> 3.110812: 5.85x slower
-Avg: 0.547371 -> 3.160219: 5.77x slower
-Significant (t=-1417.84)
-Stddev: 0.00594 -> 0.01744: 2.9355x larger
+Min: 0.555797 -> 0.878412: 1.58x slower
+Avg: 0.580327 -> 0.894168: 1.54x slower
+Significant (t=-83.09)
+Stddev: 0.03371 -> 0.01705: 1.9775x smaller
 
 ### etree_iterparse ###
-Min: 0.725201 -> 12.410611: 17.11x slower
-Avg: 0.748303 -> 12.507122: 16.71x slower
-Significant (t=-3390.54)
-Stddev: 0.00874 -> 0.03356: 3.8394x larger
-
-### etree_parse ###
-Min: 0.469335 -> 0.509480: 1.09x slower
-Avg: 0.480375 -> 0.524586: 1.09x slower
-Significant (t=-55.20)
-Stddev: 0.00550 -> 0.00582: 1.0589x larger
+Min: 0.744044 -> 2.469276: 3.32x slower
+Avg: 0.758416 -> 2.527216: 3.33x slower
+Significant (t=-266.50)
+Stddev: 0.00904 -> 0.06575: 7.2708x larger
 
 ### etree_process ###
-Min: 0.446792 -> 2.110003: 4.72x slower
-Avg: 0.461770 -> 2.157288: 4.67x slower
-Significant (t=-906.59)
-Stddev: 0.01052 -> 0.01546: 1.4699x larger
-
-### fastpickle ###
-Min: 0.789316 -> 0.812318: 1.03x slower
-Avg: 0.806700 -> 0.830384: 1.03x slower
-Significant (t=-25.98)
-Stddev: 0.00700 -> 0.00584: 1.1981x smaller
+Min: 0.455153 -> 0.655453: 1.44x slower
+Avg: 0.465813 -> 0.681561: 1.46x slower
+Significant (t=-50.27)
+Stddev: 0.01111 -> 0.04145: 3.7317x larger
 
 ### float ###
-Min: 0.495348 -> 0.586380: 1.18x slower
-Avg: 0.517097 -> 0.601411: 1.16x slower
-Significant (t=-70.16)
-Stddev: 0.01015 -> 0.00644: 1.5754x smaller
+Min: 0.517170 -> 0.478662: 1.08x faster
+Avg: 0.528597 -> 0.490600: 1.08x faster
+Significant (t=40.38)
+Stddev: 0.00535 -> 0.00774: 1.4455x larger
 
 ### formatted_logging ###
-Min: 0.727788 -> 0.745749: 1.02x slower
-Avg: 0.741796 -> 0.997155: 1.34x slower
-Significant (t=-76.83)
-Stddev: 0.00493 -> 0.03287: 6.6701x larger
+Min: 0.736918 -> 0.756467: 1.03x slower
+Avg: 0.749573 -> 0.771023: 1.03x slower
+Significant (t=-14.29)
+Stddev: 0.01237 -> 0.00850: 1.4545x smaller
 
 ### go ###
-Min: 0.967717 -> 1.297788: 1.34x slower
-Avg: 0.988757 -> 1.328556: 1.34x slower
-Significant (t=-286.16)
-Stddev: 0.00734 -> 0.00933: 1.2706x larger
-
-### json_dump_v2 ###
-Min: 4.728246 -> 5.931067: 1.25x slower
-Avg: 4.788513 -> 5.989510: 1.25x slower
-Significant (t=-350.81)
-Stddev: 0.02435 -> 0.02406: 1.0122x smaller
+Min: 0.967658 -> 0.871361: 1.11x faster
+Avg: 0.978361 -> 0.894362: 1.09x faster
+Significant (t=112.95)
+Stddev: 0.00443 -> 0.00597: 1.3492x larger
 
 ### json_load ###
-Min: 0.741040 -> 0.772750: 1.04x slower
-Avg: 0.758066 -> 0.829820: 1.09x slower
-Significant (t=-67.69)
-Stddev: 0.00552 -> 0.00905: 1.6379x larger
+Min: 0.764063 -> 0.785226: 1.03x slower
+Avg: 0.775503 -> 0.792612: 1.02x slower
+Significant (t=-25.77)
+Stddev: 0.00571 -> 0.00340: 1.6801x smaller
 
 ### mako_v2 ###
-Min: 0.068379 -> 0.075004: 1.10x slower
-Avg: 0.071573 -> 0.078239: 1.09x slower
-Significant (t=-95.28)
-Stddev: 0.00164 -> 0.00149: 1.0980x smaller
+Min: 0.072189 -> 0.073789: 1.02x slower
+Avg: 0.074399 -> 0.076339: 1.03x slower
+Significant (t=-36.85)
+Stddev: 0.00111 -> 0.00124: 1.1175x larger
 
 ### meteor_contest ###
-Min: 0.323812 -> 0.373890: 1.15x slower
-Avg: 0.332440 -> 0.392416: 1.18x slower
-Significant (t=-93.76)
-Stddev: 0.00522 -> 0.00370: 1.4127x smaller
+Min: 0.331122 -> 0.306164: 1.08x faster
+Avg: 0.342458 -> 0.313908: 1.09x faster
+Significant (t=16.03)
+Stddev: 0.01397 -> 0.01105: 1.2646x smaller
 
-### normal_startup ###
-Min: 0.924916 -> 1.038923: 1.12x slower
-Avg: 0.937876 -> 1.050537: 1.12x slower
-Significant (t=-86.34)
-Stddev: 0.00951 -> 0.00894: 1.0632x smaller
+### nbody ###
+Min: 0.456943 -> 0.461399: 1.01x slower
+Avg: 0.463576 -> 0.474350: 1.02x slower
+Significant (t=-3.93)
+Stddev: 0.00746 -> 0.02638: 3.5380x larger
 
 ### nqueens ###
-Min: 0.456231 -> 40.414209: 88.58x slower
-Avg: 0.469850 -> 40.692625: 86.61x slower
-Significant (t=-1064.20)
-Stddev: 0.00483 -> 0.37793: 78.2330x larger
+Min: 0.456503 -> 5.844960: 12.80x slower
+Avg: 0.466118 -> 6.422858: 13.78x slower
+Significant (t=-128.84)
+Stddev: 0.00829 -> 0.46225: 55.7447x larger
 
 ### pathlib ###
-Min: 0.461617 -> 0.477238: 1.03x slower
-Avg: 0.469790 -> 1.027322: 2.19x slower
-Significant (t=-231.79)
-Stddev: 0.00366 -> 0.05366: 14.6753x larger
+Min: 0.466209 -> 0.505793: 1.08x slower
+Avg: 0.474145 -> 0.590590: 1.25x slower
+Significant (t=-137.63)
+Stddev: 0.00606 -> 0.01792: 2.9569x larger
+
+### pickle_list ###
+Min: 0.450111 -> 0.439026: 1.03x faster
+Avg: 0.454997 -> 0.443361: 1.03x faster
+Significant (t=37.54)
+Stddev: 0.00237 -> 0.00199: 1.1920x smaller
 
 ### pidigits ###
-Min: 0.409860 -> 0.445579: 1.09x slower
-Avg: 0.422306 -> 0.538591: 1.28x slower
-Significant (t=-44.29)
-Stddev: 0.00795 -> 0.02502: 3.1491x larger
+Min: 0.417503 -> 0.433454: 1.04x slower
+Avg: 0.423859 -> 0.438408: 1.03x slower
+Significant (t=-15.25)
+Stddev: 0.00874 -> 0.00383: 2.2800x smaller
 
 ### raytrace ###
-Min: 2.384660 -> 3.441256: 1.44x slower
-Avg: 2.423691 -> 3.494174: 1.44x slower
-Significant (t=-537.58)
-Stddev: 0.01222 -> 0.01572: 1.2863x larger
+Min: 2.400198 -> 2.188586: 1.10x faster
+Avg: 2.426518 -> 2.228595: 1.09x faster
+Significant (t=41.24)
+Stddev: 0.01697 -> 0.04490: 2.6457x larger
 
 ### regex_compile ###
-Min: 0.605274 -> 0.738788: 1.22x slower
-Avg: 0.619787 -> 0.793985: 1.28x slower
-Significant (t=-41.38)
-Stddev: 0.00499 -> 0.04180: 8.3806x larger
-
-### regex_v8 ###
-Min: 0.076342 -> 0.076527: 1.00x slower
-Avg: 0.078724 -> 0.081784: 1.04x slower
-Significant (t=-9.71)
-Stddev: 0.00228 -> 0.00218: 1.0457x smaller
+Min: 0.610075 -> 0.590271: 1.03x faster
+Avg: 0.617661 -> 0.602807: 1.02x faster
+Significant (t=5.59)
+Stddev: 0.00480 -> 0.02612: 5.4446x larger
 
 ### richards ###
-Min: 0.283325 -> 0.371891: 1.31x slower
-Avg: 0.291840 -> 0.384265: 1.32x slower
-Significant (t=-218.60)
-Stddev: 0.00299 -> 0.00299: 1.0028x larger
+Min: 0.279421 -> 0.223735: 1.25x faster
+Avg: 0.283808 -> 0.227727: 1.25x faster
+Significant (t=163.70)
+Stddev: 0.00222 -> 0.00261: 1.1797x larger
 
 ### silent_logging ###
-Min: 0.121146 -> 0.190932: 1.58x slower
-Avg: 0.125954 -> 0.204959: 1.63x slower
-Significant (t=-221.26)
-Stddev: 0.00143 -> 0.00327: 2.2797x larger
-
-### simple_logging ###
-Min: 0.641986 -> 0.656115: 1.02x slower
-Avg: 0.656170 -> 0.875481: 1.33x slower
-Significant (t=-74.50)
-Stddev: 0.00452 -> 0.02909: 6.4341x larger
+Min: 0.122719 -> 0.111339: 1.10x faster
+Avg: 0.126007 -> 0.114450: 1.10x faster
+Significant (t=47.85)
+Stddev: 0.00139 -> 0.00197: 1.4203x larger
 
 ### spectral_norm ###
-Min: 0.584597 -> 0.707676: 1.21x slower
-Avg: 0.598195 -> 0.730366: 1.22x slower
-Significant (t=-51.50)
-Stddev: 0.00546 -> 0.02507: 4.5949x larger
+Min: 0.571884 -> 0.343651: 1.66x faster
+Avg: 0.577222 -> 0.350683: 1.65x faster
+Significant (t=224.37)
+Stddev: 0.00262 -> 0.00975: 3.7191x larger
 
 ### startup_nosite ###
-Min: 0.610495 -> 0.705637: 1.16x slower
-Avg: 0.618553 -> 0.717202: 1.16x slower
-Significant (t=-109.85)
-Stddev: 0.00866 -> 0.00929: 1.0727x larger
+Min: 0.614642 -> 0.666916: 1.09x slower
+Avg: 0.639071 -> 0.678824: 1.06x slower
+Significant (t=-16.63)
+Stddev: 0.03336 -> 0.00549: 6.0789x smaller
 
 ### tornado_http ###
-Min: 0.740326 -> 0.766377: 1.04x slower
-Avg: 0.753335 -> 2.597251: 3.45x slower
-Significant (t=-23.61)
-Stddev: 0.00679 -> 1.10450: 162.6085x larger
+Min: 0.746220 -> 0.789006: 1.06x slower
+Avg: 0.769729 -> 1.965457: 2.55x slower
+Significant (t=-15.37)
+Stddev: 0.00869 -> 1.10034: 126.5668x larger
 
 ### unpickle_list ###
-Min: 0.629430 -> 0.611556: 1.03x faster
-Avg: 0.662157 -> 0.645913: 1.03x faster
-Significant (t=4.98)
-Stddev: 0.01909 -> 0.02647: 1.3864x larger
+Min: 0.618535 -> 0.610952: 1.01x faster
+Avg: 0.659739 -> 0.621155: 1.06x faster
+Significant (t=10.38)
+Stddev: 0.03700 -> 0.00337: 10.9645x smaller
 
 The following not significant results are hidden, use -v to show them:
-fannkuch, fastunpickle, nbody, pickle_dict, pickle_list, regex_effbot, telco, unpack_sequence.
+etree_parse, fannkuch, fastpickle, fastunpickle, json_dump_v2, normal_startup, pickle_dict, regex_effbot, regex_v8, simple_logging, telco, unpack_sequence.
 ```
