@@ -7,8 +7,8 @@ Author: Brett Cannon <brett@python.org>,
 Status: Draft
 Type: Standards Track
 Content-Type: text/x-rst
-Created: DD-Mmm-YYYY
-Post-History: DD-Mmm-YYYY
+Created: 16-May-2016
+Post-History: 16-May-2016
 
 
 Abstract
@@ -159,7 +159,7 @@ interpreters executing in a single process that means the impact of
 ``co_extra`` being added to ``PyCodeObject`` is the only worry.
 According to [#code-object-count]_, a run of the Python test suite
 results in about 72,395 code objects being created. On a 64-bit
-CPU that would result in 4,633,280 bytes of extra memory being used if
+CPU that would result in 579,160 bytes of extra memory being used if
 all code objects were alive at once and had nothing set in their
 ``co_extra`` fields.
 
