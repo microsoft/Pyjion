@@ -4,6 +4,7 @@
 [submodule "CoreCLR"]
 	path = CoreCLR
 	url = https://github.com/dotnet/coreclr.git
+	branch = release/1.0.0-rc2
 [submodule "Tests/Catch"]
 	path = Tests/Catch
 	url = https://github.com/philsquared/Catch.git
