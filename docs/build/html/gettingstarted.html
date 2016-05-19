@@ -41,19 +41,24 @@
   <div class="section" id="getting-started">
 <h1>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this headline">¶</a></h1>
 <p>This project depends on submodules for Python, the CoreCLR project and Test/Catch</p>
+<p>To recursively clone the project use</p>
+<div class="highlight-bash"><div class="highlight"><pre>git clone --recursive https://github.com/microsoft/Pyjion.git
+</pre></div>
+</div>
 <p>If you did not clone the repository with &#8211;recursive, you can still download submodules within git.</p>
-<blockquote>
-<div>git pull &#8211;recurse-submodules</div></blockquote>
+<div class="highlight-bash"><div class="highlight"><pre>git pull --recurse-submodules
+</pre></div>
+</div>
 <div class="section" id="installing-dependencies">
 <h2>Installing dependencies<a class="headerlink" href="#installing-dependencies" title="Permalink to this headline">¶</a></h2>
 <p>Before you build the project, you need to install dependencies and have them avaialable in your PATH.</p>
 <ul class="simple">
-<li><cite>CMake</cite> -</li>
+<li><a class="reference external" href="https://cmake.org/download/">CMake</a> - You need CMake installed before building</li>
 </ul>
 </div>
 <div class="section" id="building">
 <h2>Building<a class="headerlink" href="#building" title="Permalink to this headline">¶</a></h2>
-<p>Follow the &lt;building&gt; guide to build the binaries to be installed into your Python distribution.</p>
+<p>Follow the <a class="reference internal" href="building.html"><em>building guide</em></a> to build the binaries to be installed into your Python distribution.</p>
 </div>
 </div>
 

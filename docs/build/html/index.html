@@ -24,7 +24,7 @@
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <link rel="top" title="Pyjion 1.0 documentation" href="#" />
-    <link rel="next" title="Pyjion" href="" />
+    <link rel="next" title="Getting Started" href="gettingstarted.html" />
    
   
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
@@ -39,38 +39,35 @@
             
   <div class="section" id="pyjion">
 <h1>Pyjion<a class="headerlink" href="#pyjion" title="Permalink to this headline">¶</a></h1>
-<p>Designing a JIT API for CPython</p>
+<p>Pyjion is an implementation and technical proof of concept for a JIT API for CPython.</p>
+<div class="section" id="project-goals">
+<h2>Project Goals<a class="headerlink" href="#project-goals" title="Permalink to this headline">¶</a></h2>
 <p>There are three goals for this project.</p>
-<p>Add a C API to CPython for plugging in a JIT
-Develop a JIT module using CoreCLR utilizing the C API mentioned in goal #1
-Develop a C++ framework that any JIT targetting the API in goal #1 can use to make development easier</p>
-<p>#1 is to make it so that CPython can have a JIT plugged in as desired (CPython is the Python implementation you download from <a class="reference external" href="https://www.python.org/">https://www.python.org/</a>). That would allow for an ecosystem of JIT implementations for Python where users can choose the JIT that works best for their use-case. And by using CPython we hope to have compatibility with all code that it can run (both Python code as well as C extension modules).</p>
-<p>#2 is to develop a JIT for CPython using the JIT provided by the CoreCLR. It&#8217;s cross-platform, liberally licensed, and the original creator of Pyjion has a lot of experience with it.</p>
-<p>#3 is to abstract out all of the common bits required to write a JIT implementation for CPython. The idea is to create a framework where JIT implementations only have to worry about JIT-specific stuff like how to do addition and not when to do addition.</p>
+<ol class="arabic simple">
+<li><strong>Add a C API to CPython for plugging in a JIT</strong> - make it so that CPython can have a JIT plugged in as desired (CPython is the Python implementation you download from <a class="reference external" href="https://www.python.org/">https://www.python.org/</a>). That would allow for an ecosystem of JIT implementations for Python where users can choose the JIT that works best for their use-case. And by using CPython we hope to have compatibility with all code that it can run (both Python code as well as C extension modules).</li>
+<li><strong>Develop a JIT module using CoreCLR utilizing the C API mentioned in goal #1</strong> -  develop a JIT for CPython using the JIT provided by the CoreCLR. It&#8217;s cross-platform, liberally licensed, and the original creator of Pyjion has a lot of experience with it.</li>
+<li><strong>Develop a C++ framework that any JIT targetting the API in goal #1 can use to make development easier</strong> - abstract out all of the common bits required to write a JIT implementation for CPython. The idea is to create a framework where JIT implementations only have to worry about JIT-specific stuff like how to do addition and not when to do addition.</li>
+</ol>
+<p>Follow the <a class="reference internal" href="gettingstarted.html"><em>Getting Started</em></a> guide for a walkthrough of how to use this project.</p>
+</div>
 </div>
 <div class="section" id="documentation">
 <h1>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="main">
 <h2>Main<a class="headerlink" href="#main" title="Permalink to this headline">¶</a></h2>
 <div class="toctree-wrapper compound">
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="">Pyjion</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#documentation">Documentation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#main">Main</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="gettingstarted.html">Getting Started</a></li>
-<li class="toctree-l3"><a class="reference internal" href="building.html">Building</a></li>
-<li class="toctree-l3"><a class="reference internal" href="using.html">Using Pyjion</a></li>
-</ul>
-</li>
-</ul>
-</li>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="gettingstarted.html#installing-dependencies">Installing dependencies</a></li>
 <li class="toctree-l2"><a class="reference internal" href="gettingstarted.html#building">Building</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="building.html">Building</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="building.html#windows">Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="building.html#windows">Windows</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building.html#building-the-dependencies">Building the dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="building.html#building-the-project">Building the project</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="using.html">Using Pyjion</a></li>
@@ -87,7 +84,10 @@ Develop a C++ framework that any JIT targetting the API in goal #1 can use to ma
         <div class="sphinxsidebarwrapper">
   <h3><a href="#">Table Of Contents</a></h3>
   <ul>
-<li><a class="reference internal" href="#">Pyjion</a></li>
+<li><a class="reference internal" href="#">Pyjion</a><ul>
+<li><a class="reference internal" href="#project-goals">Project Goals</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#documentation">Documentation</a><ul>
 <li><a class="reference internal" href="#main">Main</a></li>
 </ul>
@@ -97,7 +97,7 @@ Develop a C++ framework that any JIT targetting the API in goal #1 can use to ma
 <h3>Related Topics</h3>
 <ul>
   <li><a href="#">Documentation overview</a><ul>
-      <li>Next: <a href="" title="next chapter">Pyjion</a></li>
+      <li>Next: <a href="gettingstarted.html" title="next chapter">Getting Started</a></li>
   </ul></li>
 </ul>
 </div>

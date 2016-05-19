@@ -42,7 +42,44 @@
 <h1>Building<a class="headerlink" href="#building" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="windows">
 <h2>Windows<a class="headerlink" href="#windows" title="Permalink to this headline">¶</a></h2>
-<p>Linux</p>
+<div class="section" id="building-the-dependencies">
+<h3>Building the dependencies<a class="headerlink" href="#building-the-dependencies" title="Permalink to this headline">¶</a></h3>
+<p>With the dependencies listed in the getting started guide, you also need MSBuild, which comes with Visual Studio. The instructions here can be used with the free Community edition of Visual Studio.</p>
+<p>Before you can build Pyjion, you need to build the dependent projects (CoreCLR and Python) that were pulled in as submodules. This is a helper script <code class="docutils literal"><span class="pre">BuildDeps.bat</span></code> in the root of the project to do this.</p>
+<p><code class="docutils literal"><span class="pre">BuildDeps.bat</span></code> uses the build.cmd command that comes inside Visual Studio build tools, the easiest way to call this is within the <strong>Developer Command Prompt for VS20xx</strong>, located in your start menu.</p>
+<p>Open the command prompt and run <code class="docutils literal"><span class="pre">BuildDeps.bat</span></code>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If you get an error saying CMake is not installed, check that you have installed it and also look at $PATH to check that <code class="docutils literal"><span class="pre">C:\Program</span> <span class="pre">Files</span> <span class="pre">(x86)\CMake\bin</span></code> is in your PATH list. Close the command window and open it again.</p>
+</div>
+<p>You should then get an output similar to the following, this will take <strong>at least 5-10 minutes to complete</strong> as you are building CoreCLR and Python from source:</p>
+<div class="highlight-python"><div class="highlight"><pre>Commencing CoreCLR Repo build
+
+Checking pre-requisites...
+
+Commencing build of native components for Windows_NT.x64.Debug
+
+-- The C compiler identification is MSVC 19.0.23506.0
+-- The CXX compiler identification is MSVC 19.0.23506.0
+-- Check for working C compiler using: Visual Studio 14 2015 Win64
+-- Check for working C compiler using: Visual Studio 14 2015 Win64 -- works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working CXX compiler using: Visual Studio 14 2015 Win64
+-- Check for working CXX compiler using: Visual Studio 14 2015 Win64 -- works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- The ASM_MASM compiler identification is MSVC
+-- Found assembler: C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin/x86_amd64/ml64.exe
+-- Configuring done
+</pre></div>
+</div>
+</div>
+<div class="section" id="building-the-project">
+<h3>Building the project<a class="headerlink" href="#building-the-project" title="Permalink to this headline">¶</a></h3>
+</div>
 </div>
 </div>
 
@@ -55,7 +92,11 @@
   <h3><a href="index.html">Table Of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Building</a><ul>
-<li><a class="reference internal" href="#windows">Windows</a></li>
+<li><a class="reference internal" href="#windows">Windows</a><ul>
+<li><a class="reference internal" href="#building-the-dependencies">Building the dependencies</a></li>
+<li><a class="reference internal" href="#building-the-project">Building the project</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
