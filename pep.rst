@@ -141,6 +141,15 @@ of Python code execution while being backwards-compatible with code
 already using the pre-existing C API.
 
 
+Updating ``python-gdb.py``
+--------------------------
+
+The generated ``python-gdb.py`` file used for Python support in GDB
+makes some hard-coded assumptions about ``PyEval_EvalFrameEx()``, e.g.
+the names of local variables. It will need to be updated to work with
+the proposed changes.
+
+
 Performance impact
 ==================
 
