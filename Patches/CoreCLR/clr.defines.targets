@@ -1,5 +1,5 @@
 diff --git a/clr.defines.targets b/clr.defines.targets
-index 879de92..fe2b3b6 100644
+index 078f572..6e04c7c 100644
 --- a/clr.defines.targets
 +++ b/clr.defines.targets
 @@ -18,7 +18,7 @@
