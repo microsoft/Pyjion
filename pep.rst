@@ -141,6 +141,15 @@ of Python code execution while being backwards-compatible with code
 already using the pre-existing C API.
 
 
+Updating ``python-gdb.py``
+--------------------------
+
+The generated ``python-gdb.py`` file used for Python support in GDB
+makes some hard-coded assumptions about ``PyEval_EvalFrameEx()``, e.g.
+the names of local variables. It will need to be updated to work with
+the proposed changes.
+
+
 Performance impact
 ==================
 
@@ -221,6 +230,11 @@ team led to a similar comment.
 Numba [#numba]_, on the other hand, suggested that they would be
 interested in the proposed change in a post-1.0 future for
 themselves [#numba-interest]_.
+
+The experimental Coconut JIT [#coconut]_ could have benefitted from
+this PEP. In private conversations with Coconut's creator we were told
+that our API was probably superior to the one they developed for
+Coconut to add JIT support to CPython.
 
 
 Debugging
@@ -319,6 +333,9 @@ References
 
 .. [#ptvs] Python Tools for Visual Studio
    (http://microsoft.github.io/PTVS/)
+
+.. [#coconut] Coconut
+   (https://github.com/davidmalcolm/coconut)
 
 
 Copyright
