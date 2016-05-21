@@ -6,6 +6,7 @@ echo Disabling COM interop support in CoreCLR...
 pushd CoreCLR
 git apply ..\Patches\CoreCLR\src\inc\utilcode.h
 git apply ..\Patches\CoreCLR\src\utilcode\CMakeLists.txt
+git apply ..\Patches\CoreCLR\src\utilcode\longfilepathwrappers.cpp
 git apply ..\Patches\CoreCLR\src\utilcode\util.cpp
 git apply ..\Patches\CoreCLR\src\CMakeLists.txt
 git apply ..\Patches\CoreCLR\build.cmd
