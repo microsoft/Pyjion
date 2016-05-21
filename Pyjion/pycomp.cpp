@@ -81,7 +81,7 @@ void CeeInit() {
     CoreClrCallbacks cccallbacks;
     cccallbacks.m_hmodCoreCLR = (HINSTANCE)GetModuleHandleW(NULL);
     cccallbacks.m_pfnIEE = IEE;
-    cccallbacks.m_pfnGetCORSystemDirectory = GetCORSystemDirectoryInternal;
+    //cccallbacks.m_pfnGetCORSystemDirectory = GetCORSystemDirectoryInternal;
     cccallbacks.m_pfnGetCLRFunction = GetCLRFunction;
 
     InitUtilcode(cccallbacks);
