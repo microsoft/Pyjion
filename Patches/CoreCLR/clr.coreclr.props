@@ -1,5 +1,5 @@
 diff --git a/clr.coreclr.props b/clr.coreclr.props
-index a335486..4568d24 100644
+index a335486..510a296 100644
 --- a/clr.coreclr.props
 +++ b/clr.coreclr.props
 @@ -10,7 +10,7 @@
@@ -27,3 +27,12 @@ index a335486..4568d24 100644
      <FeatureHostAssemblyResolver>true</FeatureHostAssemblyResolver>
      <FeatureLazyCOWPages Condition="('$(TargetArch)' == 'i386') or ('$(TargetArch)' == 'arm')">true</FeatureLazyCOWPages>
      <FeatureLatin1>true</FeatureLatin1>
+@@ -76,7 +76,7 @@
+     <FeatureManagedEtwChannels>true</FeatureManagedEtwChannels>
+     <FeatureHostedBinder>true</FeatureHostedBinder>
+     <BinderDebugLog Condition="'$(_BuildType)'=='dbg'">true</BinderDebugLog>
+-    <FeatureAppX>true</FeatureAppX>
++    <FeatureAppX>false</FeatureAppX>
+     <FeatureWinMDResilient>true</FeatureWinMDResilient>
+     <!-- 
+         FeatureImplicitTls has been verified to be functionally correct on x86 & amd64.

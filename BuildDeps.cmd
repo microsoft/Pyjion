@@ -19,7 +19,7 @@ goto Usage
 
 :BuildCoreCLR
 pushd coreclr
-call build.cmd %__BuildArch% %__BuildType%
+call build.cmd %__BuildArch% %__BuildType% skipmscorlib skiptests
 IF ERRORLEVEL 1 goto Error
 
 mkdir ..\Libs\%__BuildType%\%__BuildArch%\
