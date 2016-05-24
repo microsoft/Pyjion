@@ -29,9 +29,7 @@
 #include <frameobject.h>
 #include <opcode.h>
 
-HRESULT __stdcall GetCORSystemDirectoryInternal(__out_ecount_part_opt(cchBuffer, *pdwLength) LPWSTR pBuffer,
-    DWORD  cchBuffer,
-    __out_opt DWORD* pdwLength) {
+HRESULT __stdcall GetCORSystemDirectoryInternal(SString& pbuffer) {
     printf("get cor system\n");
     return S_OK;
 }
@@ -81,7 +79,7 @@ void CeeInit() {
     CoreClrCallbacks cccallbacks;
     cccallbacks.m_hmodCoreCLR = (HINSTANCE)GetModuleHandleW(NULL);
     cccallbacks.m_pfnIEE = IEE;
-    //cccallbacks.m_pfnGetCORSystemDirectory = GetCORSystemDirectoryInternal;
+    cccallbacks.m_pfnGetCORSystemDirectory = GetCORSystemDirectoryInternal;
     cccallbacks.m_pfnGetCLRFunction = GetCLRFunction;
 
     InitUtilcode(cccallbacks);
