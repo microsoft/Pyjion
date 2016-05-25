@@ -371,7 +371,7 @@ class CCorJitHost : public ICorJitHost {
 
 	int getIntConfigValue(const wchar_t * name, int defaultValue)
 	{
-		return 0;
+		return defaultValue;
 	}
 
 	const wchar_t * getStringConfigValue(const wchar_t * name)

@@ -272,7 +272,6 @@ public:
     }
 
     virtual WORD getRelocTypeHint(void * target) {
-        printf("getRelocTypeHint\r\n");
         return -1;
     }
 
