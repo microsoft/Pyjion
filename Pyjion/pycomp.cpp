@@ -75,6 +75,8 @@ IExecutionEngine* __stdcall IEE() {
     return &g_execEngine;
 }
 
+CCorJitHost g_jitHost;
+
 void CeeInit() {
     CoreClrCallbacks cccallbacks;
     cccallbacks.m_hmodCoreCLR = (HINSTANCE)GetModuleHandleW(NULL);
@@ -86,6 +88,8 @@ void CeeInit() {
     // TODO: We should re-enable contracts and handle exceptions from OOM
     // and just fail the whole compilation if we hit that.  Right now we
     // just leak an exception out across the JIT boundary.
+
+	jitStartup(&g_jitHost);
 #if _DEBUG
     DisableThrowCheck();
 #endif
