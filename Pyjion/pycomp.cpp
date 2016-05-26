@@ -29,9 +29,7 @@
 #include <frameobject.h>
 #include <opcode.h>
 
-HRESULT __stdcall GetCORSystemDirectoryInternal(__out_ecount_part_opt(cchBuffer, *pdwLength) LPWSTR pBuffer,
-    DWORD  cchBuffer,
-    __out_opt DWORD* pdwLength) {
+HRESULT __stdcall GetCORSystemDirectoryInternal(SString& pbuffer) {
     printf("get cor system\n");
     return S_OK;
 }
@@ -77,6 +75,8 @@ IExecutionEngine* __stdcall IEE() {
     return &g_execEngine;
 }
 
+CCorJitHost g_jitHost;
+
 void CeeInit() {
     CoreClrCallbacks cccallbacks;
     cccallbacks.m_hmodCoreCLR = (HINSTANCE)GetModuleHandleW(NULL);
@@ -88,6 +88,8 @@ void CeeInit() {
     // TODO: We should re-enable contracts and handle exceptions from OOM
     // and just fail the whole compilation if we hit that.  Right now we
     // just leak an exception out across the JIT boundary.
+
+	jitStartup(&g_jitHost);
 #if _DEBUG
     DisableThrowCheck();
 #endif

@@ -1,8 +1,8 @@
 diff --git a/src/inc/utilcode.h b/src/inc/utilcode.h
-index fa0e1b1..9722315 100644
+index b9985a8..cade9e5 100644
 --- a/src/inc/utilcode.h
 +++ b/src/inc/utilcode.h
-@@ -9,6 +9,8 @@
+@@ -8,6 +8,8 @@
  //
  //*****************************************************************************
  

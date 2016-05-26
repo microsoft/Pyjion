@@ -1,9 +1,9 @@
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 31c37e5..c56a892 100644
+index 4ae4a7c..b76de27 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -38,22 +38,10 @@ endif(CLR_CMAKE_PLATFORM_UNIX)
-
+@@ -125,25 +125,12 @@ endif(CLR_CMAKE_PLATFORM_UNIX)
+ 
  add_subdirectory(utilcode)
  add_subdirectory(gcinfo)
 -add_subdirectory(coreclr)
@@ -20,10 +20,13 @@ index 31c37e5..c56a892 100644
 -add_subdirectory(tools)
 -add_subdirectory(unwinder)
 -add_subdirectory(ildasm)
--
+-add_subdirectory(ilasm)
+ 
 -if(WIN32)
-+
 +if(FALSE)
    add_subdirectory(ipcman)
- endif(WIN32)
-
+-endif(WIN32)
++endif(FALSE)
+ 
+ if(CLR_CMAKE_PLATFORM_UNIX)
+     add_subdirectory(palrt)
