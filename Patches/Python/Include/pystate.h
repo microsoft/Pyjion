@@ -1,5 +1,5 @@
 diff --git a/Include/pystate.h b/Include/pystate.h
-index 6000b81..3809aa8 100644
+index 6000b81..c89e3df 100644
 --- a/Include/pystate.h
 +++ b/Include/pystate.h
 @@ -12,6 +12,10 @@ extern "C" {
@@ -8,8 +8,8 @@ index 6000b81..3809aa8 100644
  struct _is; /* Forward */
 +struct _frame; /* Forward declaration for PyFrameObject. */
 +
-+typedef void(__stdcall *JitInitFunction)();
-+typedef PyObject*(__stdcall *EvalFrameFunction)(struct _frame *, int);
++typedef void(*JitInitFunction)(void);
++typedef PyObject*(*EvalFrameFunction)(struct _frame *, int);
  
  #ifdef Py_LIMITED_API
  typedef struct _is PyInterpreterState;

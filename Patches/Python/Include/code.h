@@ -1,5 +1,5 @@
 diff --git a/Include/code.h b/Include/code.h
-index 56e6ec1..b28025a 100644
+index 56e6ec1..018aa0d 100644
 --- a/Include/code.h
 +++ b/Include/code.h
 @@ -7,6 +7,10 @@
@@ -8,7 +8,7 @@ index 56e6ec1..b28025a 100644
  
 +struct _frame;
 +
-+typedef PyObject* (__stdcall*  Py_EvalFunc)(void*, struct _frame*);
++typedef PyObject* (*Py_EvalFunc)(void*, struct _frame*);
 +
  /* Bytecode object */
  typedef struct {
