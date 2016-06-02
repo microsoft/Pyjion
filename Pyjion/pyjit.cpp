@@ -32,8 +32,9 @@
 //#define NO_TRACE
 //#define TRACE_TREE
 
+HINSTANCE            g_pMSCorEE;
 
-PyObject* __stdcall Jit_EvalHelper(void* state, PyFrameObject*frame) {
+PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     PyThreadState *tstate = PyThreadState_GET();
     if (tstate->use_tracing) {
         if (tstate->c_tracefunc != NULL) {
@@ -264,14 +265,14 @@ PyTypeObject* GetArgType(int arg, PyObject** locals) {
     return type;
 }
 
-PyObject* __stdcall Jit_EvalGeneric(void* state, PyFrameObject*frame) {
+PyObject* Jit_EvalGeneric(void* state, PyFrameObject*frame) {
     auto trace = (TraceInfo*)state;
     return Jit_EvalHelper(trace->Generic, frame);
 }
 
 #define MAX_TRACE 5
 
-PyObject* __stdcall Jit_EvalTrace(void* state, PyFrameObject *frame) {
+PyObject* Jit_EvalTrace(void* state, PyFrameObject *frame) {
     // Walk our tree of argument types to find the SpecializedTreeNode which
     // corresponds with our sets of arguments here.
     auto trace = (TraceInfo*)state;

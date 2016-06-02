@@ -1,8 +1,8 @@
 diff --git a/Python/ceval.c b/Python/ceval.c
-index beabfeb..6be7e7e 100644
+index beabfeb..00f318f 100644
 --- a/Python/ceval.c
 +++ b/Python/ceval.c
-@@ -770,6 +770,55 @@ static int unpack_iterable(PyObject *, int, int, PyObject **);
+@@ -770,6 +770,57 @@ static int unpack_iterable(PyObject *, int, int, PyObject **);
  static int _Py_TracingPossible = 0;
  
  
@@ -31,6 +31,8 @@ index beabfeb..6be7e7e 100644
 +#endif
 +
 +int _PyEval_PeriodicWork(void) {
++	PyThreadState* tstate;
++
 +    if (_Py_atomic_load_relaxed(&eval_breaker)) {
 +        if (_Py_atomic_load_relaxed(&pendingcalls_to_do)) {
 +            if (Py_MakePendingCalls() < 0) {
@@ -38,7 +40,7 @@ index beabfeb..6be7e7e 100644
 +            }
 +        }
 +
-+        PyThreadState* tstate = PyThreadState_GET();
++        tstate = PyThreadState_GET();
 +#ifdef WITH_THREAD
 +        PULSE_GIL(tstate);
 +#endif
@@ -58,7 +60,7 @@ index beabfeb..6be7e7e 100644
  
  PyObject *
  PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
-@@ -796,6 +845,14 @@ PyEval_EvalFrame(PyFrameObject *f) {
+@@ -796,6 +847,14 @@ PyEval_EvalFrame(PyFrameObject *f) {
  PyObject *
  PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
  {
@@ -73,7 +75,7 @@ index beabfeb..6be7e7e 100644
  #ifdef DXPAIRS
      int lastopcode = 0;
  #endif
-@@ -1262,25 +1319,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
+@@ -1262,25 +1321,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                      goto error;
              }
  #ifdef WITH_THREAD
@@ -100,3 +102,12 @@ index beabfeb..6be7e7e 100644
  #endif
              /* Check for asynchronous exceptions. */
              if (tstate->async_exc != NULL) {
+@@ -3734,7 +3775,7 @@ too_many_positional(PyCodeObject *co, int given, int defcount, PyObject **fastlo
+    PyEval_EvalFrame() and PyEval_EvalCodeEx() you will need to adjust
+    the test in the if statements in Misc/gdbinit (pystack and pystackv). */
+ 
+-static PyObject *
++PyObject *
+ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
+            PyObject **args, int argcount, PyObject **kws, int kwcount,
+            PyObject **defs, int defcount, PyObject *kwdefs, PyObject *closure,

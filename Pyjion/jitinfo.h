@@ -1906,7 +1906,6 @@ public:
     virtual unsigned getMethodHash(
         CORINFO_METHOD_HANDLE       ftn         /* IN */
         ) {
-        printf("getMethodHash\r\n");
         return 0;
     }
 
