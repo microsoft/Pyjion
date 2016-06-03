@@ -32,17 +32,17 @@ execution of Python code comes down to individual objects instead of a
 hollistic control of execution at the frame level.
 
 While wanting to have influence over frame evaluation may seem a bit
-too low-level, it does open the possibility for things such as a JIT
-to be introduced into CPython without CPython itself having to provide
-one. By allowing external C code to control frame evaluation, a JIT
-can participate in the execution of Python code at the key point where
-evaluation occurs. This then allows for a JIT to conditionally
-recompile Python bytecode to machine code as desired while still
-allowing for executing regular CPython bytecode when running the JIT
-is not desired. This can be accomplished by allowing interpreters to
-specify what function to call to evaluate a frame. And by placing the
-API at the frame evaluation level it allows for a complete view of the
-execution environment of the code for the JIT.
+too low-level, it does open the possibility for things such as a
+method-level JIT to be introduced into CPython without CPython itself
+having to provide one. By allowing external C code to control frame
+evaluation, a JIT can participate in the execution of Python code at
+the key point where evaluation occurs. This then allows for a JIT to
+conditionally recompile Python bytecode to machine code as desired
+while still allowing for executing regular CPython bytecode when
+running the JIT is not desired. This can be accomplished by allowing
+interpreters to specify what function to call to evaluate a frame. And
+by placing the API at the frame evaluation level it allows for a
+complete view of the execution environment of the code for the JIT.
 
 This ability to specify a frame evaluation function also allows for
 other use-cases beyond just opening CPython up to a JIT. For instance,
@@ -88,8 +88,13 @@ One field is to be added to the ``PyCodeObject`` struct
 
 The ``co_extra`` will be ``NULL`` by default and will not be used by
 CPython itself. Third-party code is free to use the field as desired.
-The field will be freed like all other fields on ``PyCodeObject``
-during deallocation using ``Py_XDECREF()``.
+Values stored in the field are expected to not be required in order
+for the code object to function, allowing the loss of the data of the
+field to be acceptable (this keeps the code object as immutable from
+a functionality point-of-view; this is slightly contentious and so is
+listed as an open issue in `Is co_extra needed?`_). The field will be
+freed like all other fields on ``PyCodeObject`` during deallocation
+using ``Py_XDECREF()``.
 
 It is not recommended that multiple users attempt to use the
 ``co_extra`` simultaneously. While a dictionary could theoretically be
@@ -249,6 +254,10 @@ skipping information that ``sys.settrace()`` normally provides and
 even go as far as to dynamically rewrite bytecode prior to execution
 to inject e.g. breakpoints in the bytecode.
 
+It also turns out that Google has provided a very similar API
+internally for years. It has been used for performant debugging
+purposes.
+
 
 Implementation
 ==============
@@ -271,6 +280,33 @@ signal to use ``PyEval_EvalFrameDefault()``. The current proposal of
 not special-casing the field seemed the most straight-forward, but it
 does require that the field not accidentally be cleared, else a crash
 may occur.
+
+
+Is co_extra needed?
+-------------------
+
+While discussing this PEP at PyCon US 2016, some core developers
+expressed their worry of the ``co_extra`` field making code objects
+mutable. The thinking seemed to be that having a field that was
+mutated after the creation of the code object made the object seem
+mutable, even though no other aspect of code objects changed.
+
+The view of this PEP is that the `co_extra` field doesn't change the
+fact that code objects are immutable. The field is specified in this
+PEP as to not contain information required to make the code object
+usable, making it more of a caching field. It could be viewed as
+similar to the UTF-8 cache that string objects have internally;
+strings are still considered immutable even though they have a field
+that is conditionally set.
+
+The field is also not strictly necessary. While the field greatly
+simplifies attaching extra information to code objects, other options
+such as keeping a mapping of code object memory addresses to what
+would have been kept in ``co_extra`` or perhaps using a weak reference
+of the data on the code object and then iterating through the weak
+references until the attached data is found is possible. But obviously
+all of these solutions are not as simple or performant as adding the
+``co_extra`` field.
 
 
 Rejected Ideas
