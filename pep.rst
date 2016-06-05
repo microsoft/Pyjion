@@ -40,7 +40,7 @@ the key point where evaluation occurs. This then allows for a JIT to
 conditionally recompile Python bytecode to machine code as desired
 while still allowing for executing regular CPython bytecode when
 running the JIT is not desired. This can be accomplished by allowing
-interpreters to holt function to call to evaluate a frame. And
+interpreters to specify what function to call to evaluate a frame. And
 by placing the API at the frame evaluation level it allows for a
 complete view of the execution environment of the code for the JIT.
 
