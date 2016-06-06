@@ -29,7 +29,7 @@ execution of Python code. While CPython's C API [#c-api]_ allows for
 constructing the data going into a frame object and then evaluating it
 via ``PyEval_EvalFrameEx()`` [#pyeval_evalframeex]_, control over the
 execution of Python code comes down to individual objects instead of a
-hollistic control of execution at the frame level.
+holistic control of execution at the frame level.
 
 While wanting to have influence over frame evaluation may seem a bit
 too low-level, it does open the possibility for things such as a
