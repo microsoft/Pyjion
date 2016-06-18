@@ -29,7 +29,7 @@ addition and not _when_ to do addition.
 ### Is there a Python Enhancement Proposal (PEP) for this?
 We have written a
 [PEP](https://github.com/python/peps/blob/master/pep-0523.txt),
-but it has not been accepted yet to the Python develoment team.
+but it has not been accepted yet to the Python development team.
 
 ### How do you pronounce "Pyjion"?
 Like the word "pigeon". @DinoV wanted a name that had something with "Python"
