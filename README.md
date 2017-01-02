@@ -2,11 +2,9 @@
 Designing a JIT API for CPython
 
 ## A note on development
-Development is on hold at least until Python 3.6.0 is released. This is due to the
-fact that Python 3.6 not only changes the bytecode format for Python (which we
-JIT compile), but it also alleviates the need to patch Python itself going forward.
-This means that until Python 3.6.0 is out and we are able to update Pyjion to work
-with that release, development has been paused.
+This is a side project at work for the project maintainers, and so progress can be
+sporadic. In spite of that we do accept contributions at any time and will attempt
+to respond to them promptly.
 
 ## FAQ
 
