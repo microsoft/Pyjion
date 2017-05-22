@@ -114,18 +114,15 @@
 #define METHOD_COMPARE_EXCEPTIONS				0x00000039
 #define METHOD_UNBOUND_LOCAL					0x0000003A
 #define METHOD_DEBUG_TRACE						0x0000003B
-#define METHOD_FUNC_SET_DEFAULTS				0x0000003C
 #define	METHOD_CALLNKW_TOKEN					0x0000003D
 #define	METHOD_DEBUG_DUMP_FRAME					0x0000003E
 #define METHOD_UNWIND_EH						0x0000003F
 #define METHOD_PY_PUSHFRAME						0x00000041
 #define METHOD_PY_POPFRAME						0x00000042
 #define METHOD_PY_IMPORTNAME					0x00000043
-#define METHOD_PY_FANCYCALL						0x00000044
+
 #define METHOD_PY_IMPORTFROM					0x00000045
 #define METHOD_PY_IMPORTSTAR					0x00000046
-#define METHOD_PY_FUNC_SET_ANNOTATIONS			0x00000047
-#define METHOD_PY_FUNC_SET_KW_DEFAULTS			0x00000048
 #define METHOD_IS								0x00000049
 #define METHOD_ISNOT							0x0000004A
 #define METHOD_IS_BOOL							0x0000004B
@@ -173,6 +170,7 @@
 
 #define METHOD_INT_TO_FLOAT					    0x00000072
 
+#define METHOD_STOREMAP_NO_DECREF_TOKEN			0x00000073
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
 #define METHOD_CALL1_TOKEN		0x00010001
@@ -184,9 +182,22 @@
 #define METHOD_CALL7_TOKEN		0x00010007
 #define METHOD_CALL8_TOKEN		0x00010008
 #define METHOD_CALL9_TOKEN		0x00010009
-#define METHOD_CALLN_TOKEN		0x00010100
 
-#define METHOD_CALL0_OPT_TOKEN		0x00010200
+#define METHOD_CALL_ARGS		0x0001000A
+#define METHOD_CALL_KWARGS		0x0001000B
+
+#define METHOD_CALLN_TOKEN		0x000101FF
+
+#define METHOD_KWCALL0_TOKEN		0x00010300
+#define METHOD_KWCALL1_TOKEN		0x00010301
+#define METHOD_KWCALL2_TOKEN		0x00010302
+#define METHOD_KWCALL3_TOKEN		0x00010303
+#define METHOD_KWCALL4_TOKEN		0x00010304
+#define METHOD_KWCALLN_TOKEN		0x000103FF
+
+#define METHOD_CALL0_OPT_TOKEN	0x00010200
+
+
 
 // Py* helpers
 #define METHOD_PYTUPLE_NEW			0x00020000
@@ -271,6 +282,7 @@ public:
 
     virtual void emit_new_tuple(size_t size);
     virtual void emit_tuple_store(size_t size);
+	virtual void emit_tuple_load(size_t index);
 
     virtual void emit_new_list(size_t argCnt);
     virtual void emit_list_store(size_t argCnt);
@@ -280,6 +292,7 @@ public:
     virtual void emit_new_set();
     virtual void emit_set_extend();
     virtual void emit_dict_store();
+	virtual void emit_dict_store_no_decref();
 
     virtual void emit_new_dict(size_t size);
     virtual void emit_map_extend();
@@ -312,16 +325,21 @@ public:
 
     virtual void emit_unpack_ex(Local sequence, size_t leftSize, size_t rightSize, Local sequenceStorage, Local list, Local remainder);
 
-    virtual void emit_fancy_call();
+
     // Emits a call for the specified argument count.  If the compiler
     // can't emit a call with this number of args then it returns false,
     // and emit_call_with_tuple is used to call with a variable sized
     // tuple instead.
     virtual bool emit_call(size_t argCnt);
     virtual void emit_call_with_tuple();
-    virtual void emit_call_with_kws();
 
-    virtual void emit_new_function();
+	virtual bool emit_kwcall(size_t argCnt);
+	virtual void emit_kwcall_with_tuple();
+
+	virtual void emit_call_args();
+	virtual void emit_call_kwargs();
+	
+	virtual void emit_new_function();
     virtual void emit_set_closure();
     virtual void emit_set_annotations();
     virtual void emit_set_kw_defaults();

@@ -161,18 +161,19 @@ static int
 import_all_from(PyObject *locals, PyObject *v);
 int PyJit_ImportStar(PyObject*from, PyFrameObject* f);
 
-PyObject* PyJit_FancyCall(PyObject* func, PyObject*args, PyObject*kwargs, PyObject* stararg, PyObject* kwdict);
+PyObject* PyJit_CallArgs(PyObject* func, PyObject*callargs);
+PyObject* PyJit_CallKwArgs(PyObject* func, PyObject*callargs, PyObject*kwargs);
+
+PyObject* PyJit_KwCall1(PyObject *target, PyObject* arg0, PyObject* names);
+PyObject* PyJit_KwCall2(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* names);
+PyObject* PyJit_KwCall3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* names);
+PyObject* PyJit_KwCall4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3, PyObject* names);
+PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names);
 
 void PyJit_DebugDumpFrame(PyFrameObject* frame);
 
 void PyJit_PushFrame(PyFrameObject* frame);
 void PyJit_PopFrame(PyFrameObject* frame);
-
-int PyJit_FunctionSetDefaults(PyObject* defs, PyObject* func);
-
-int PyJit_FunctionSetAnnotations(PyObject* values, PyObject* names, PyObject* func);
-
-int PyJit_FunctionSetKwDefaults(PyObject* defs, PyObject* func);
 
 void PyJit_EhTrace(PyFrameObject *f);
 
@@ -185,6 +186,7 @@ int PyJit_ExtendList(PyObject *list, PyObject *extension);
 PyObject* PyJit_ListToTuple(PyObject *list);
 
 int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map);
+int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map);
 
 int PyJit_DictUpdate(PyObject *dict, PyObject* other);
 

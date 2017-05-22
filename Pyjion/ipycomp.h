@@ -217,6 +217,7 @@ public:
     virtual void emit_new_tuple(size_t size) = 0;
     // Stores all of the values on the stack into a tuple
     virtual void emit_tuple_store(size_t size) = 0;
+	virtual void emit_tuple_load(size_t index) = 0;
     // Convert a list to a tuple
     virtual void emit_list_to_tuple() = 0;
 
@@ -238,8 +239,10 @@ public:
 
     // Creates a new dictionary
     virtual void emit_new_dict(size_t size) = 0;
-    // Stores a key/value pair into a set
+    // Stores a key/value pair into a dict
     virtual void emit_dict_store() = 0;
+	// Stores a key/value pair into a dict w/o doing a decref on the key/value
+	virtual void emit_dict_store_no_decref() = 0;
     // Adds a single key/value pair to a dict
     virtual void emit_map_add() = 0;
     // Extends a map by another mapping
@@ -274,10 +277,14 @@ public:
     virtual bool emit_call(size_t argCnt) = 0;
     // Emits a call with the arguments to be invoked in a tuple object
     virtual void emit_call_with_tuple() = 0;
-    // Emits a call with the arguments in a tuple and kw arguments in a dict
-    virtual void emit_call_with_kws() = 0;
-    // Emits a call which includes *args or **args
-    virtual void emit_fancy_call() = 0;
+
+	virtual bool emit_kwcall(size_t argCnt) = 0;
+	virtual void emit_kwcall_with_tuple() = 0;
+
+    // Emits a call which includes *args 
+	virtual void emit_call_args() = 0;
+	// Emits a call which includes *args and **kwargs
+	virtual void emit_call_kwargs() = 0;
 
     /*****************************************************
      * Function creation */

@@ -49,23 +49,34 @@
 #include <frameobject.h>
 #include <Python.h>
 
+class PyjionJittedCode;
+
 extern "C" __declspec(dllexport) void JitInit();
-extern "C" __declspec(dllexport) PyObject *EvalFrame(PyFrameObject *, int);
+extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *, int);
+extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
 
-extern PyTypeObject PyjionJittedCode_Type;
+typedef PyObject* (*Py_EvalFunc)(void*, struct _frame*);
 
+void PyjionJitFree(void* obj);
 /* Jitted code object.  This object is returned from the JIT implementation.  The JIT can allocate
 a jitted code object and fill in the state for which is necessary for it to perform an evaluation. */
-typedef struct {
-    PyObject_HEAD
-    PY_UINT64_T j_run_count;
-    bool j_failed;
-    Py_EvalFunc j_evalfunc;
-    void* j_evalstate;          /* opaque value, allows the JIT to track any relevant state */
-    PY_UINT64_T j_specialization_threshold;
-} PyjionJittedCode;
 
-__declspec(dllexport) PyjionJittedCode *jittedcode_new_direct();
+class PyjionJittedCode {
+public:
+	PY_UINT64_T j_run_count;
+	bool j_failed;
+	Py_EvalFunc j_evalfunc;
+	void* j_evalstate;          /* opaque value, allows the JIT to track any relevant state */
+	PY_UINT64_T j_specialization_threshold;
+
+	PyjionJittedCode() {
+		this->j_run_count = 0;
+		this->j_failed = false;
+		this->j_evalfunc = nullptr;
+		this->j_evalstate = nullptr;
+		this->j_specialization_threshold = 500;
+	}
+};
 __declspec(dllexport) bool jit_compile(PyCodeObject* code);
 
 #endif

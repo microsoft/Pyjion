@@ -1702,14 +1702,13 @@ void PyJitTest() {
         puts(curCase.m_code);
         printf("\r\n");
         auto codeObj = CompileCode(curCase.m_code);
-        auto addr = jittedcode_new_direct();
+		auto addr = PyJit_EnsureExtra((PyObject*)codeObj);
         if (addr == nullptr) {
             _ASSERT(FALSE);
         }
         // For the purpose of exercising the JIT machinery while testing, the
         // code should be JITed everytime.
         addr->j_specialization_threshold = 0;
-        codeObj->co_extra = (PyObject *)addr;
         if (!jit_compile(codeObj) || addr->j_evalfunc == nullptr) {
             _ASSERT(FALSE);
         }
@@ -1790,30 +1789,30 @@ void AbsIntTest() {
         "def f():\n    x = 1\n    del x",
         {
             new VariableVerifier(0, 0, AVK_Undefined, true),    // LOAD_CONST 1
-            new VariableVerifier(3, 0, AVK_Undefined, true),    // STORE_FAST
-            new VariableVerifier(6, 0, AVK_Integer, false),     // DELETE_FAST
-            new VariableVerifier(9, 0, AVK_Undefined, true),    // LOAD_CONST None
+            new VariableVerifier(2, 0, AVK_Undefined, true),    // STORE_FAST
+            new VariableVerifier(4, 0, AVK_Integer, false),     // DELETE_FAST
+            new VariableVerifier(8, 0, AVK_Undefined, true),    // LOAD_CONST None
         }),
         // Delete / Undefined merging...
         AITestCase(
         "def f():\n    x = 1\n    if abc:\n        del x\n        y = 1",
         {
             new VariableVerifier(0,  0, AVK_Undefined, true),    // LOAD_CONST 1
-            new VariableVerifier(3,  0, AVK_Undefined, true),    // STORE_FAST
-            new VariableVerifier(6,  0, AVK_Integer, false),     // LOAD_GLOBAL abc
-            new VariableVerifier(12, 0, AVK_Integer, false),     // DELETE_FAST
-            new VariableVerifier(15, 0, AVK_Undefined, true),    // LOAD_CONST 1
-            new VariableVerifier(21, 0, AVK_Any, true),          // LOAD_CONST None
+            new VariableVerifier(2,  0, AVK_Undefined, true),    // STORE_FAST
+            new VariableVerifier(4,  0, AVK_Integer, false),     // LOAD_GLOBAL abc
+            new VariableVerifier(8,  0, AVK_Integer, false),     // DELETE_FAST
+            new VariableVerifier(10, 0, AVK_Undefined, true),    // LOAD_CONST 1
+            new VariableVerifier(14, 0, AVK_Any, true),          // LOAD_CONST None
         }),
         // Type tracking / merging...
         AITestCase(
         "def f():\n    if abc:\n        x = 1\n    else:\n        x = 'abc'\n        y = 1",
         {
-            new VariableVerifier(9, 0, AVK_Undefined, true),    // STORE_FAST x
-            new VariableVerifier(12, 0, AVK_Integer),           // JUMP_FORWARD
-            new VariableVerifier(18, 0, AVK_Undefined, true),   // STORE_FAST x
-            new VariableVerifier(21, 0, AVK_String),            // LOAD_CONST
-            new VariableVerifier(27, 0, AVK_Any),               // LOAD_CONST None
+            new VariableVerifier(6, 0, AVK_Undefined, true),    // STORE_FAST x
+            new VariableVerifier(8, 0, AVK_Integer),           // JUMP_FORWARD
+            new VariableVerifier(12, 0, AVK_Undefined, true),   // STORE_FAST x
+            new VariableVerifier(14, 0, AVK_String),            // LOAD_CONST
+            new VariableVerifier(18, 0, AVK_Any),               // LOAD_CONST None
         }),
 
         // Escape tests
@@ -1822,10 +1821,10 @@ void AbsIntTest() {
         {
             new ReturnVerifier(AVK_Float),
             new BoxVerifier(0, false),  // LOAD_CONST 0
-            new BoxVerifier(6, false),  // LOAD_CONST 0.0
-            new BoxVerifier(15, false),  // LOAD_FAST k
-            new BoxVerifier(18, false),  // LOAD_CONST 256
-            new BoxVerifier(27, false),  // LOAD_FAST pi
+            new BoxVerifier(4, false),  // LOAD_CONST 0.0
+            new BoxVerifier(10, false),  // LOAD_FAST k
+            new BoxVerifier(12, false),  // LOAD_CONST 256
+            new BoxVerifier(18, false),  // LOAD_FAST pi
         }),
         // Can't optimize due to float int comparison:
         AITestCase(
@@ -1833,10 +1832,10 @@ void AbsIntTest() {
         {
             new ReturnVerifier(AVK_Float),
             new BoxVerifier(0, true),  // LOAD_CONST 0
-            new BoxVerifier(6, true),  // LOAD_CONST 0.0
-            new BoxVerifier(15, true),  // LOAD_FAST k
-            new BoxVerifier(18, true),  // LOAD_CONST 256
-            new BoxVerifier(27, true),  // LOAD_FAST pi
+            new BoxVerifier(4, true),  // LOAD_CONST 0.0
+            new BoxVerifier(10, true),  // LOAD_FAST k
+            new BoxVerifier(12, true),  // LOAD_CONST 256
+            new BoxVerifier(18, true),  // LOAD_FAST pi
         }),
         // Can't optimize because pi is assigned an int initially
         AITestCase(
@@ -1844,108 +1843,108 @@ void AbsIntTest() {
         {
             new ReturnVerifier(AVK_Any),
             new BoxVerifier(0, true),  // LOAD_CONST 0
-            new BoxVerifier(6, true),  // LOAD_CONST 0.0
-            new BoxVerifier(15, true),  // LOAD_FAST k
-            new BoxVerifier(18, true),  // LOAD_CONST 256
-            new BoxVerifier(27, true),  // LOAD_FAST pi
+            new BoxVerifier(4, true),  // LOAD_CONST 0.0
+            new BoxVerifier(10, true),  // LOAD_FAST k
+            new BoxVerifier(12, true),  // LOAD_CONST 256
+            new BoxVerifier(18, true),  // LOAD_FAST pi
         }),
         AITestCase(
         "def f():\n    x = 1\n    y = 2\n    return min(x, y)",
         {
             new BoxVerifier(0, true),  // LOAD_CONST 1
-            new BoxVerifier(6, true),  // LOAD_CONST 2
-            new BoxVerifier(15, true),  // LOAD_FAST x
-            new BoxVerifier(18, true),  // LOAD_FAST y
+            new BoxVerifier(4, true),  // LOAD_CONST 2
+            new BoxVerifier(10, true),  // LOAD_FAST x
+            new BoxVerifier(12, true),  // LOAD_FAST y
             new ReturnVerifier(AVK_Any)
         }),
         AITestCase(
         "def f():\n    x = 1\n    return x",
         {
             new BoxVerifier(0, false),  // LOAD_CONST 1
-            new BoxVerifier(9, false)
+            new BoxVerifier(6, false)
         }),
         AITestCase(
         "def f():\n    x = 1\n    return abs",
         {
             new BoxVerifier(0, false),  // LOAD_CONST 1
-            new BoxVerifier(9, true)
+            new BoxVerifier(6, true)
         }),
 
         // Locations are tracked independently...
         AITestCase(
         "def f():\n    if abc:\n         x = 1\n         while x < 100:\n              x += 1\n    else:\n         x = 1\n         y = 2\n         return min(x, y)",
         {
-            new BoxVerifier(6, false),  // LOAD_CONST 1
-            new BoxVerifier(15, false),  // LOAD_FAST x
-            new BoxVerifier(18, false),  // LOAD_CONST 100
-            new BoxVerifier(21, false),  // COMPARE_OP <
-            new BoxVerifier(27, false),  // LOAD_FAST x
-            new BoxVerifier(30, false),  // LOAD_CONST 1
-            new BoxVerifier(44, true),  // LOAD_CONST 1
-            new BoxVerifier(50, true),  // LOAD_CONST 3
-            new BoxVerifier(59, true),  // LOAD_FAST x
-            new BoxVerifier(62, true),  // LOAD_FAST y
+            new BoxVerifier(4, false),  // LOAD_CONST 1
+            new BoxVerifier(10, false),  // LOAD_FAST x
+            new BoxVerifier(12, false),  // LOAD_CONST 100
+            new BoxVerifier(14, false),  // COMPARE_OP <
+            new BoxVerifier(18, false),  // LOAD_FAST x
+            new BoxVerifier(20, false),  // LOAD_CONST 1
+            new BoxVerifier(32, true),  // LOAD_CONST 1
+            new BoxVerifier(36, true),  // LOAD_CONST 3
+            new BoxVerifier(42, true),  // LOAD_FAST x
+            new BoxVerifier(44, true),  // LOAD_FAST y
         }),
         AITestCase(
         "def f():\n    if abc:\n         x = 1\n         while x < 100:\n              x += 1\n    else:\n         x = 1\n         y = 2\n         while x < y:\n            return min(x, y)",
         {
-            new BoxVerifier(6, true),  // LOAD_CONST 1
-            new BoxVerifier(15, true),  // LOAD_FAST x
-            new BoxVerifier(18, true),  // LOAD_CONST 100
-            new BoxVerifier(21, true),  // COMPARE_OP <
-            new BoxVerifier(27, true),  // LOAD_FAST x
-            new BoxVerifier(30, true),  // LOAD_CONST 1
-            new BoxVerifier(44, true),  // LOAD_CONST 1
-            new BoxVerifier(50, true),  // LOAD_CONST 3
-            new BoxVerifier(59, true),  // LOAD_FAST x
-            new BoxVerifier(62, true),  // LOAD_FAST y
-            new BoxVerifier(65, true),  // COMPARE_OP <
+            new BoxVerifier(4, true),  // LOAD_CONST 1
+            new BoxVerifier(10, true),  // LOAD_FAST x
+            new BoxVerifier(12, true),  // LOAD_CONST 100
+            new BoxVerifier(14, true),  // COMPARE_OP <
+            new BoxVerifier(18, true),  // LOAD_FAST x
+            new BoxVerifier(20, true),  // LOAD_CONST 1
+            new BoxVerifier(32, true),  // LOAD_CONST 1
+            new BoxVerifier(36, true),  // LOAD_CONST 3
+            new BoxVerifier(42, true),  // LOAD_FAST x
+            new BoxVerifier(44, true),  // LOAD_FAST y
+            new BoxVerifier(46, true),  // COMPARE_OP <
         }),
         // Values flowing across a branch...
         AITestCase(
             "def f():\n    x = 1 if abc else 2",
             {
-                new BoxVerifier(6, false),  // LOAD_CONST 1
-                new BoxVerifier(12, false),  // LOAD_CONST 2
+                new BoxVerifier(4, false),  // LOAD_CONST 1
+                new BoxVerifier(8, false),  // LOAD_CONST 2
             }
         ),
         AITestCase(
         "def f():\n    x = 1 if abc else 2.0",
         {
-            new BoxVerifier(6, true),  // LOAD_CONST 1
-            new BoxVerifier(12, true),  // LOAD_CONST 2
+            new BoxVerifier(4, true),  // LOAD_CONST 1
+            new BoxVerifier(8, true),  // LOAD_CONST 2
         }),
         // Merging w/ unknown value
         AITestCase(
         "def f():\n    x = g()\n    x = 1",
         {
-            new BoxVerifier(6, true),  // STORE_FAST x
-            new BoxVerifier(9, false),  // LOAD_CONST 1
-            new BoxVerifier(12, false),  // STORE_FAST x
+            new BoxVerifier(4, true),  // STORE_FAST x
+            new BoxVerifier(6, false),  // LOAD_CONST 1
+            new BoxVerifier(8, false),  // STORE_FAST x
         }),
         // Merging w/ deleted value...
         AITestCase(
         "def f():\n    x = 1\n    del x\n    x = 2",
         {
             new BoxVerifier(0, true),  // LOAD_CONST 1
-            new BoxVerifier(9, false),  // LOAD_CONST 2
+            new BoxVerifier(6, false),  // LOAD_CONST 2
         }),
         // Distinct assignments of different types...
         AITestCase(
         "def f():\n    x = 1\n    x += 2\n    x = 1.0\n    x += 2.0",
         {
             new BoxVerifier(0, false),  // LOAD_CONST 1
-            new BoxVerifier(3, false),  // STORE_FAST x
-            new BoxVerifier(6, false),  // LOAD_FAST 2
-            new BoxVerifier(9, false),  // LOAD_CONST 2
-            new BoxVerifier(12, false),  // INPLACE_ADD
-            new BoxVerifier(13, false),  // STORE_FAST x
-            new BoxVerifier(16, false),  // LOAD_CONST 1
-            new BoxVerifier(19, false),  // STORE_FAST x
-            new BoxVerifier(22, false),  // LOAD_FAST 2
-            new BoxVerifier(25, false),  // LOAD_CONST 2
-            new BoxVerifier(28, false),  // INPLACE_ADD
-            new BoxVerifier(29, false),  // STORE_FAST x
+            new BoxVerifier(2, false),  // STORE_FAST x
+            new BoxVerifier(4, false),  // LOAD_FAST 2
+            new BoxVerifier(6, false),  // LOAD_CONST 2
+            new BoxVerifier(8, false),  // INPLACE_ADD
+            new BoxVerifier(10, false),  // STORE_FAST x
+            new BoxVerifier(12, false),  // LOAD_CONST 1
+            new BoxVerifier(14, false),  // STORE_FAST x
+            new BoxVerifier(16, false),  // LOAD_FAST 2
+            new BoxVerifier(18, false),  // LOAD_CONST 2
+            new BoxVerifier(20, false),  // INPLACE_ADD
+            new BoxVerifier(22, false),  // STORE_FAST x
         }
         ),
         // Swap two ints...
@@ -1953,122 +1952,122 @@ void AbsIntTest() {
         "def f():\n    x = 1\n    y = 2\n    (x, y) = (y, x)",
         {
             new BoxVerifier(0, false),  // LOAD_CONST  1 (1)
-            new BoxVerifier(3, false),  // STORE_FAST  0 (x)
-            new BoxVerifier(6, false),  // LOAD_CONST  2 (2)
-            new BoxVerifier(9, false),  // STORE_FAST  1 (y)
-            new BoxVerifier(12, false), // LOAD_FAST   1 (y)
-            new BoxVerifier(15, false), // LOAD_FAST   0 (x)
-            new BoxVerifier(18, false), // ROT_TWO
-            new BoxVerifier(19, false), // STORE_FAST  0 (x)
-            new BoxVerifier(22, false), // STORE_FAST  1 (y)
+            new BoxVerifier(2, false),  // STORE_FAST  0 (x)
+            new BoxVerifier(4, false),  // LOAD_CONST  2 (2)
+            new BoxVerifier(6, false),  // STORE_FAST  1 (y)
+            new BoxVerifier(8, false), // LOAD_FAST   1 (y)
+            new BoxVerifier(10, false), // LOAD_FAST   0 (x)
+            new BoxVerifier(12, false), // ROT_TWO
+            new BoxVerifier(14, false), // STORE_FAST  0 (x)
+            new BoxVerifier(16, false), // STORE_FAST  1 (y)
         }),
         // Swap two floats...
         AITestCase(
         "def f():\n    x = 1.1\n    y = 2.2\n    (x, y) = (y, x)",
         {
             new BoxVerifier(0, false),  // LOAD_CONST  1 (1.1)
-            new BoxVerifier(3, false),  // STORE_FAST  0 (x)
-            new BoxVerifier(6, false),  // LOAD_CONST  2 (2.2)
-            new BoxVerifier(9, false),  // STORE_FAST  1 (y)
-            new BoxVerifier(12, false), // LOAD_FAST   1 (y)
-            new BoxVerifier(15, false), // LOAD_FAST   0 (x)
-            new BoxVerifier(18, false), // ROT_TWO
-            new BoxVerifier(19, false), // STORE_FAST  0 (x)
-            new BoxVerifier(22, false), // STORE_FAST  1 (y)
+            new BoxVerifier(2, false),  // STORE_FAST  0 (x)
+            new BoxVerifier(4, false),  // LOAD_CONST  2 (2.2)
+            new BoxVerifier(6, false),  // STORE_FAST  1 (y)
+            new BoxVerifier(8, false), // LOAD_FAST   1 (y)
+            new BoxVerifier(10, false), // LOAD_FAST   0 (x)
+            new BoxVerifier(12, false), // ROT_TWO
+            new BoxVerifier(14, false), // STORE_FAST  0 (x)
+            new BoxVerifier(16, false), // STORE_FAST  1 (y)
         }),
         // Swap two objects of unknown type...
         AITestCase(
         "def f(x, y):\n    (x, y) = (y, x)",
         {
             new BoxVerifier(0, true),  // LOAD_FAST   1 (y)
-            new BoxVerifier(3, true),  // LOAD_FAST   0 (x)
-            new BoxVerifier(6, true),  // ROT_TWO
-            new BoxVerifier(7, true),  // STORE_FAST  0 (x)
-            new BoxVerifier(10, true), // STORE_FAST  1 (y)
+            new BoxVerifier(2, true),  // LOAD_FAST   0 (x)
+            new BoxVerifier(4, true),  // ROT_TWO
+            new BoxVerifier(6, true),  // STORE_FAST  0 (x)
+            new BoxVerifier(8, true), // STORE_FAST  1 (y)
         }),
         // Mix floats and ints...
         AITestCase(
         "def f():\n    x = 1\n    y = 2.2\n    (x, y) = (y, x)",
         {
             new BoxVerifier(0, true),  // LOAD_CONST  1 (1)
-            new BoxVerifier(3, true),  // STORE_FAST  0 (x)
-            new BoxVerifier(6, true),  // LOAD_CONST  2 (2.2)
-            new BoxVerifier(9, true),  // STORE_FAST  1 (y)
-            new BoxVerifier(12, true), // LOAD_FAST   1 (y)
-            new BoxVerifier(15, true), // LOAD_FAST   0 (x)
-            new BoxVerifier(18, true), // ROT_TWO
-            new BoxVerifier(19, true), // STORE_FAST  0 (x)
-            new BoxVerifier(22, true), // STORE_FAST  1 (y)
+            new BoxVerifier(2, true),  // STORE_FAST  0 (x)
+            new BoxVerifier(4, true),  // LOAD_CONST  2 (2.2)
+            new BoxVerifier(6, true),  // STORE_FAST  1 (y)
+            new BoxVerifier(8, true), // LOAD_FAST   1 (y)
+            new BoxVerifier(10, true), // LOAD_FAST   0 (x)
+            new BoxVerifier(12, true), // ROT_TWO
+            new BoxVerifier(14, true), // STORE_FAST  0 (x)
+            new BoxVerifier(16, true), // STORE_FAST  1 (y)
         }),
         // Swap three ints...
         AITestCase(
         "def f():\n    x = 1\n    y = 2\n    z = 3\n    (x, y, z) = (y, z, x)",
         {
             new BoxVerifier(0, false),  // LOAD_CONST  1 (1)
-            new BoxVerifier(3, false),  // STORE_FAST  0 (x)
-            new BoxVerifier(6, false),  // LOAD_CONST  2 (2)
-            new BoxVerifier(9, false),  // STORE_FAST  1 (y)
-            new BoxVerifier(12, false), // LOAD_CONST  3 (3)
-            new BoxVerifier(15, false), // STORE_FAST  2 (z)
-            new BoxVerifier(18, false), // LOAD_FAST   1 (y)
-            new BoxVerifier(21, false), // LOAD_FAST   2 (z)
-            new BoxVerifier(24, false), // LOAD_FAST   0 (x)
-            new BoxVerifier(27, false), // ROT_THREE
-            new BoxVerifier(28, false), // ROT_TWO
-            new BoxVerifier(29, false), // STORE_FAST  0 (x)
-            new BoxVerifier(32, false), // STORE_FAST  1 (y)
-            new BoxVerifier(35, false), // STORE_FAST  2 (z)
+            new BoxVerifier(2, false),  // STORE_FAST  0 (x)
+            new BoxVerifier(4, false),  // LOAD_CONST  2 (2)
+            new BoxVerifier(6, false),  // STORE_FAST  1 (y)
+            new BoxVerifier(8, false), // LOAD_CONST  3 (3)
+            new BoxVerifier(10, false), // STORE_FAST  2 (z)
+            new BoxVerifier(12, false), // LOAD_FAST   1 (y)
+            new BoxVerifier(14, false), // LOAD_FAST   2 (z)
+            new BoxVerifier(16, false), // LOAD_FAST   0 (x)
+            new BoxVerifier(18, false), // ROT_THREE
+            new BoxVerifier(20, false), // ROT_TWO
+            new BoxVerifier(22, false), // STORE_FAST  0 (x)
+            new BoxVerifier(24, false), // STORE_FAST  1 (y)
+            new BoxVerifier(26, false), // STORE_FAST  2 (z)
         }),
         // Swap three floats...
         AITestCase(
         "def f():\n    x = 1.1\n    y = 2.2\n    z = 3.3\n    (x, y, z) = (y, z, x)",
         {
             new BoxVerifier(0, false),  // LOAD_CONST  1 (1.1)
-            new BoxVerifier(3, false),  // STORE_FAST  0 (x)
-            new BoxVerifier(6, false),  // LOAD_CONST  2 (2.2)
-            new BoxVerifier(9, false),  // STORE_FAST  1 (y)
-            new BoxVerifier(12, false), // LOAD_CONST  3 (3.3)
-            new BoxVerifier(15, false), // STORE_FAST  2 (z)
-            new BoxVerifier(18, false), // LOAD_FAST   1 (y)
-            new BoxVerifier(21, false), // LOAD_FAST   2 (z)
-            new BoxVerifier(24, false), // LOAD_FAST   0 (x)
-            new BoxVerifier(27, false), // ROT_THREE
-            new BoxVerifier(28, false), // ROT_TWO
-            new BoxVerifier(29, false), // STORE_FAST  0 (x)
-            new BoxVerifier(32, false), // STORE_FAST  1 (y)
-            new BoxVerifier(35, false), // STORE_FAST  2 (z)
+            new BoxVerifier(2, false),  // STORE_FAST  0 (x)
+            new BoxVerifier(4, false),  // LOAD_CONST  2 (2.2)
+            new BoxVerifier(6, false),  // STORE_FAST  1 (y)
+            new BoxVerifier(8, false), // LOAD_CONST  3 (3.3)
+            new BoxVerifier(10, false), // STORE_FAST  2 (z)
+            new BoxVerifier(12, false), // LOAD_FAST   1 (y)
+            new BoxVerifier(14, false), // LOAD_FAST   2 (z)
+            new BoxVerifier(16, false), // LOAD_FAST   0 (x)
+            new BoxVerifier(18, false), // ROT_THREE
+            new BoxVerifier(20, false), // ROT_TWO
+            new BoxVerifier(22, false), // STORE_FAST  0 (x)
+            new BoxVerifier(24, false), // STORE_FAST  1 (y)
+            new BoxVerifier(26, false), // STORE_FAST  2 (z)
         }),
         // Swap three objects of unknown type...
         AITestCase(
         "def f(x, y, z):\n    (x, y, z) = (y, z, x)",
         {
             new BoxVerifier(0, true),  // LOAD_FAST   1 (y)
-            new BoxVerifier(3, true),  // LOAD_FAST   2 (z)
-            new BoxVerifier(6, true),  // LOAD_FAST   0 (x)
-            new BoxVerifier(9, true),  // ROT_THREE
-            new BoxVerifier(10, true), // ROT_TWO
-            new BoxVerifier(11, true), // STORE_FAST  0 (x)
-            new BoxVerifier(14, true), // STORE_FAST  1 (y)
-            new BoxVerifier(17, true), // STORE_FAST  2 (z)
+            new BoxVerifier(2, true),  // LOAD_FAST   2 (z)
+            new BoxVerifier(4, true),  // LOAD_FAST   0 (x)
+            new BoxVerifier(6, true),  // ROT_THREE
+            new BoxVerifier(8, true), // ROT_TWO
+            new BoxVerifier(10, true), // STORE_FAST  0 (x)
+            new BoxVerifier(12, true), // STORE_FAST  1 (y)
+            new BoxVerifier(14, true), // STORE_FAST  2 (z)
         }),
         // Mix floats and ints...
         AITestCase(
         "def f():\n    x = 1.1\n    y = 2\n    z = 3.3\n    (x, y, z) = (y, z, x)",
         {
             new BoxVerifier(0, true),  // LOAD_CONST  1 (1.1)
-            new BoxVerifier(3, true),  // STORE_FAST  0 (x)
-            new BoxVerifier(6, true),  // LOAD_CONST  2 (2)
-            new BoxVerifier(9, true),  // STORE_FAST  1 (y)
-            new BoxVerifier(12, true), // LOAD_CONST  3 (3.3)
-            new BoxVerifier(15, true), // STORE_FAST  2 (z)
-            new BoxVerifier(18, true), // LOAD_FAST   1 (y)
-            new BoxVerifier(21, true), // LOAD_FAST   2 (z)
-            new BoxVerifier(24, true), // LOAD_FAST   0 (x)
-            new BoxVerifier(27, true), // ROT_THREE
-            new BoxVerifier(28, true), // ROT_TWO
-            new BoxVerifier(29, true), // STORE_FAST  0 (x)
-            new BoxVerifier(32, true), // STORE_FAST  1 (y)
-            new BoxVerifier(35, true), // STORE_FAST  2 (z)
+            new BoxVerifier(2, true),  // STORE_FAST  0 (x)
+            new BoxVerifier(4, true),  // LOAD_CONST  2 (2)
+            new BoxVerifier(6, true),  // STORE_FAST  1 (y)
+            new BoxVerifier(8, true), // LOAD_CONST  3 (3.3)
+            new BoxVerifier(10, true), // STORE_FAST  2 (z)
+            new BoxVerifier(12, true), // LOAD_FAST   1 (y)
+            new BoxVerifier(14, true), // LOAD_FAST   2 (z)
+            new BoxVerifier(16, true), // LOAD_FAST   0 (x)
+            new BoxVerifier(18, true), // ROT_THREE
+            new BoxVerifier(20, true), // ROT_TWO
+            new BoxVerifier(22, true), // STORE_FAST  0 (x)
+            new BoxVerifier(24, true), // STORE_FAST  1 (y)
+            new BoxVerifier(26, true), // STORE_FAST  2 (z)
         }),
     };
 
@@ -2092,7 +2091,7 @@ int main() {
     Py_Initialize();
     JitInit();
 
-    AbsIntTest();
+    //AbsIntTest();
 
     PyJitTest();
 

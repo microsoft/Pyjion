@@ -38,7 +38,7 @@ using namespace msl::utilities;
 
 //#define DEBUG_TRACE
 PyObject* g_emptyTuple;
-
+#include <dictobject.h>
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
 
@@ -872,99 +872,89 @@ int PyJit_ImportStar(PyObject*from, PyFrameObject* f) {
     return err;
 }
 
-PyObject* PyJit_FancyCall(PyObject* func, PyObject*args, PyObject*kwargs, PyObject* stararg, PyObject* kwdict) {
-    // any of these arguments can be null...
-    PyObject *result = nullptr;
-    size_t nstar;
-    // Convert stararg to tuple if necessary...
-    if (stararg != nullptr) {
-        if (!PyTuple_Check(stararg)) {
-            auto newStarArg = PySequence_Tuple(stararg);
-            if (newStarArg == NULL) {
-                if (PyErr_ExceptionMatches(PyExc_TypeError)) {
-                    PyErr_Format(PyExc_TypeError,
-                        "%.200s%.200s argument after * "
-                        "must be a sequence, not %.200s",
-                        PyEval_GetFuncName(func),
-                        PyEval_GetFuncDesc(func),
-                        stararg->ob_type->tp_name);
-                }
-                goto ext_call_fail;
-            }
-            Py_DECREF(stararg);
-            stararg = newStarArg;
-        }
-        nstar = PyTuple_GET_SIZE(stararg);
-    }
+PyObject* PyJit_CallKwArgs(PyObject* func, PyObject*callargs, PyObject*kwargs) {
+	PyObject* result = nullptr;
+	if (!PyDict_CheckExact(kwargs)) {
+		PyObject *d = PyDict_New();
+		if (d == NULL)
+			goto error;
+		if (PyDict_Update(d, kwargs) != 0) {
+			Py_DECREF(d);
+			/* PyDict_Update raises attribute
+			* error (percolated from an attempt
+			* to get 'keys' attribute) instead of
+			* a type error if its second argument
+			* is not a mapping.
+			*/
+			if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+				PyErr_Format(PyExc_TypeError,
+					"%.200s%.200s argument after ** "
+					"must be a mapping, not %.200s",
+					PyEval_GetFuncName(func),
+					PyEval_GetFuncDesc(func),
+					kwargs->ob_type->tp_name);
+			}
+			goto error;
+		}
+		Py_DECREF(kwargs);
+		kwargs = d;
+	}
 
-    if (kwdict != nullptr) {
-        if (kwargs == nullptr) {
-            // we haven't allocated the dict for the call yet, do so now
-            kwargs = PyDict_New();
-            if (kwargs == nullptr) {
-                goto ext_call_fail;
-            }
-        } // else we allocated it in the generated code
+	if (!PyTuple_CheckExact(callargs)) {
+		if (Py_TYPE(callargs)->tp_iter == NULL &&
+			!PySequence_Check(callargs)) {
+			PyErr_Format(PyExc_TypeError,
+				"%.200s%.200s argument after * "
+				"must be an iterable, not %.200s",
+				PyEval_GetFuncName(func),
+				PyEval_GetFuncDesc(func),
+				callargs->ob_type->tp_name);
+			goto error;
+		}
 
-        if (PyDict_Update(kwargs, kwdict) != 0) {
-            /* PyDict_Update raises attribute
-            * error (percolated from an attempt
-            * to get 'keys' attribute) instead of
-            * a type error if its second argument
-            * is not a mapping.
-            */
-            if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
-                PyErr_Format(PyExc_TypeError,
-                    "%.200s%.200s argument after ** "
-                    "must be a mapping, not %.200s",
-                    PyEval_GetFuncName(func),
-                    PyEval_GetFuncDesc(func),
-                    kwdict->ob_type->tp_name);
-            }
-            goto ext_call_fail;
-        }
-    }
+		auto tmp = PySequence_Tuple(callargs);
+		if (tmp == nullptr) {
+			goto error;
+		}
+		Py_DECREF(callargs);
+		callargs = tmp;
+	}
 
-    // Compute the final arg list...
-    if (args == nullptr) {
-        if (stararg != nullptr) {
-            args = stararg;
-            stararg = nullptr;
-        }
-        else {
-            args = PyTuple_New(0);
-        }
-    }
-    else if (stararg != nullptr) {
-        // need to concat values together...
-        auto finalArgs = PyTuple_New(PyTuple_GET_SIZE(args) + nstar);
-        for (int i = 0; i < PyTuple_GET_SIZE(args); i++) {
-            auto item = PyTuple_GET_ITEM(args, i);
-            Py_INCREF(item);
-            PyTuple_SET_ITEM(finalArgs, i, item);
-        }
-        for (int i = 0; i < PyTuple_GET_SIZE(stararg); i++) {
-            auto item = PyTuple_GET_ITEM(stararg, i);
-            Py_INCREF(item);
-            PyTuple_SET_ITEM(
-                finalArgs,
-                i + PyTuple_GET_SIZE(args),
-                item
-                );
-        }
-        Py_DECREF(args);
-        args = finalArgs;
-    }
+	result = PyObject_Call(func, callargs, kwargs);
+error:
+	Py_DECREF(func);
+	Py_DECREF(callargs);
+	Py_DECREF(kwargs);
+	return result;
+}
 
-    result = PyObject_Call(func, args, kwargs);
+PyObject* PyJit_CallArgs(PyObject* func, PyObject*callargs) {
+	PyObject* result = nullptr;
+	if (!PyTuple_CheckExact(callargs)) {
+		if (Py_TYPE(callargs)->tp_iter == NULL &&
+			!PySequence_Check(callargs)) {
+			PyErr_Format(PyExc_TypeError,
+				"%.200s%.200s argument after * "
+				"must be an iterable, not %.200s",
+				PyEval_GetFuncName(func),
+				PyEval_GetFuncDesc(func),
+				callargs->ob_type->tp_name);
+			goto error;
+		}
+		auto tmp = PySequence_Tuple(callargs);
+		if (tmp == nullptr) {
+			goto error;
+			return nullptr;
+		}
+		Py_DECREF(callargs);
+		callargs = tmp;
+	}
 
-ext_call_fail:
-    Py_XDECREF(func);
-    Py_XDECREF(args);
-    Py_XDECREF(kwargs);
-    Py_XDECREF(stararg);
-    Py_XDECREF(kwdict);
-    return result;
+	result = PyObject_Call(func, callargs, nullptr);
+error:
+	Py_DECREF(func);
+	Py_DECREF(callargs);
+	return result;
 }
 
 void PyJit_DebugDumpFrame(PyFrameObject* frame) {
@@ -998,69 +988,6 @@ void PyJit_PushFrame(PyFrameObject* frame) {
 
 void PyJit_PopFrame(PyFrameObject* frame) {
     PyThreadState_Get()->frame = frame->f_back;
-}
-
-int PyJit_FunctionSetDefaults(PyObject* defs, PyObject* func) {
-    if (PyFunction_SetDefaults(func, defs) != 0) {
-        /* Can't happen unless
-        PyFunction_SetDefaults changes. */
-        Py_DECREF(defs);
-        Py_DECREF(func);
-        return 1;
-    }
-    Py_DECREF(defs);
-    return 0;
-}
-
-int PyJit_FunctionSetAnnotations(PyObject* values, PyObject* names, PyObject* func) {
-    PyObject *anns = PyDict_New();
-    if (anns == NULL) {
-        Py_DECREF(values);
-        Py_DECREF(names);
-        Py_DECREF(func);
-        return 1;
-    }
-
-    auto name_ix = PyTuple_Size(names);
-    while (name_ix > 0) {
-        PyObject *name, *value;
-        int err;
-        --name_ix;
-        name = PyTuple_GET_ITEM(names, name_ix);
-        value = PyTuple_GET_ITEM(values, name_ix);
-        err = PyDict_SetItem(anns, name, value);
-        if (err != 0) {
-            Py_DECREF(anns);
-            Py_DECREF(func);
-            Py_DECREF(values);
-            return err;
-        }
-    }
-
-    if (PyFunction_SetAnnotations(func, anns) != 0) {
-        /* Can't happen unless
-        PyFunction_SetAnnotations changes. */
-        Py_DECREF(anns);
-        Py_DECREF(func);
-        Py_DECREF(values);
-        return 1;
-    }
-    Py_DECREF(anns);
-    Py_DECREF(names);
-    Py_DECREF(values);
-    return 0;
-}
-
-int PyJit_FunctionSetKwDefaults(PyObject* defs, PyObject* func) {
-    if (PyFunction_SetKwDefaults(func, defs) != 0) {
-        /* Can't happen unless
-        PyFunction_SetKwDefaults changes. */
-        Py_DECREF(func);
-        Py_DECREF(defs);
-        return 1;
-    }
-    Py_DECREF(defs);
-    return 0;
 }
 
 void PyJit_EhTrace(PyFrameObject *f) {
@@ -1226,6 +1153,12 @@ int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map) {
     return res;
 }
 
+int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map) {
+	assert(PyDict_CheckExact(map));
+	auto res = PyDict_SetItem(map, key, value);
+	return res;
+}
+
 int PyJit_DictUpdate(PyObject* dict, PyObject* other) {
     assert(PyDict_CheckExact(dict));
     auto res = PyDict_Update(dict, other);
@@ -1293,6 +1226,44 @@ int PyJit_StoreGlobal(PyObject* v, PyFrameObject* f, PyObject* name) {
 int PyJit_DeleteGlobal(PyFrameObject* f, PyObject* name) {
     return PyDict_DelItem(f->f_globals, name);
 }
+
+PyObject *
+_PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key)
+{
+#if FALSE
+	Py_ssize_t ix;
+	Py_hash_t hash;
+	PyObject **value_addr;
+
+	if (!PyUnicode_CheckExact(key) ||
+		(hash = ((PyASCIIObject *)key)->hash) == -1)
+	{
+		hash = PyObject_Hash(key);
+		if (hash == -1)
+			return NULL;
+	}
+
+	/* namespace 1: globals */
+	ix = globals->ma_keys->dk_lookup(globals, key, hash, &value_addr, NULL);
+	if (ix == DKIX_ERROR)
+		return NULL;
+	if (ix != DKIX_EMPTY && *value_addr != NULL)
+		return *value_addr;
+
+	/* namespace 2: builtins */
+	ix = builtins->ma_keys->dk_lookup(builtins, key, hash, &value_addr, NULL);
+	if (ix < 0)
+		return NULL;
+	return *value_addr;
+#endif
+	auto res = PyDict_GetItem((PyObject*)globals, key);
+	if (res != nullptr) {
+		return res;
+	}
+
+	return PyDict_GetItem((PyObject*)builtins, key);
+}
+
 
 PyObject* PyJit_LoadGlobal(PyFrameObject* f, PyObject* name) {
     PyObject* v;
@@ -2031,6 +2002,57 @@ PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
 error:
     Py_DECREF(target);
     return res;
+}
+
+PyObject* PyJit_KwCall1(PyObject *target, PyObject* arg0, PyObject* names) {
+	return nullptr;
+}
+
+PyObject* PyJit_KwCall2(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* names) {
+	return nullptr;
+}
+
+PyObject* PyJit_KwCall3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* names) {
+	return nullptr;
+}
+
+PyObject* PyJit_KwCall4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3, PyObject* names) {
+	return nullptr;
+}
+
+PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names) {
+	PyObject* result = nullptr, *kwArgs = nullptr;
+
+	auto argCount = PyTuple_Size(args) - PyTuple_Size(names);
+	PyObject* posArgs;
+	posArgs = PyTuple_New(argCount);
+	if (posArgs == nullptr) {
+		goto error;
+	}
+	for (auto i = 0; i < argCount; i++) {
+		PyTuple_SET_ITEM(posArgs, i, PyTuple_GET_ITEM(args, i));
+	}
+	kwArgs = PyDict_New();
+	if (kwArgs == nullptr) {
+		goto error;
+	}
+
+	for (auto i = 0; i < PyTuple_GET_SIZE(names); i++) {
+		PyDict_SetItem(
+			kwArgs, 
+			PyTuple_GET_ITEM(names, i), 
+			PyTuple_GET_ITEM(args, i + argCount)
+		);	
+	}
+
+	result = PyObject_Call(target, posArgs, kwArgs);
+error:
+	Py_XDECREF(kwArgs);
+	Py_XDECREF(posArgs);
+	Py_DECREF(target);
+	Py_DECREF(args);
+	Py_DECREF(names);
+	return result;
 }
 
 PyObject* PyJit_Is(PyObject* lhs, PyObject* rhs) {

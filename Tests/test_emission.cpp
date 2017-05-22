@@ -61,11 +61,11 @@ public:
         if (m_code.get() == nullptr) {
             FAIL("failed to compile code");
         }
-        m_code->co_extra = (PyObject *)jittedcode_new_direct();
+		auto jitted = PyJit_EnsureExtra((PyObject*)*m_code);
         if (!jit_compile(m_code.get())) {
             FAIL("failed to JIT code");
         }
-        m_jittedcode.reset((PyjionJittedCode *)m_code->co_extra);
+        m_jittedcode.reset(jitted);
     }
 
     std::string returns() {
