@@ -57,6 +57,8 @@ extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* c
 
 typedef PyObject* (*Py_EvalFunc)(void*, struct _frame*);
 
+static PY_UINT64_T HOT_CODE = 20000;
+
 void PyjionJitFree(void* obj);
 /* Jitted code object.  This object is returned from the JIT implementation.  The JIT can allocate
 a jitted code object and fill in the state for which is necessary for it to perform an evaluation. */
@@ -74,7 +76,7 @@ public:
 		this->j_failed = false;
 		this->j_evalfunc = nullptr;
 		this->j_evalstate = nullptr;
-		this->j_specialization_threshold = 500;
+		this->j_specialization_threshold = HOT_CODE;
 	}
 };
 __declspec(dllexport) bool jit_compile(PyCodeObject* code);
