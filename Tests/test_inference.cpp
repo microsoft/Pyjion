@@ -4345,7 +4345,7 @@ TEST_CASE("set binary op type inference", "[set][binary op][inference]") {
 				new VariableVerifier(6, 0, AVK_Set),                // x assigned
 				new VariableVerifier(10, 1, AVK_Undefined, true),    // y not assigned yet
 				new VariableVerifier(12, 1, AVK_Set),               // y assigned
-				new VariableVerifier(18, 0, AVK_Set, true),			// x still assigned
+				new VariableVerifier(18, 0, AVK_Set),				// x still assigned
 				new VariableVerifier(20, 0, AVK_Set),               // x assigndd with new value
 			}
         ));
@@ -4359,7 +4359,7 @@ TEST_CASE("set binary op type inference", "[set][binary op][inference]") {
 				new VariableVerifier(6, 0, AVK_Set),                // x assigned
 				new VariableVerifier(10, 1, AVK_Undefined, true),    // y not assigned yet
 				new VariableVerifier(12, 1, AVK_Set),               // y assigned
-				new VariableVerifier(18, 0, AVK_Set, true),			// x still assigned
+				new VariableVerifier(18, 0, AVK_Set),				// x still assigned
 				new VariableVerifier(20, 0, AVK_Set),               // x assigndd with new value
 			}
         ));
@@ -4373,7 +4373,7 @@ TEST_CASE("set binary op type inference", "[set][binary op][inference]") {
 				new VariableVerifier(6, 0, AVK_Set),                // x assigned
 				new VariableVerifier(10, 1, AVK_Undefined, true),    // y not assigned yet
 				new VariableVerifier(12, 1, AVK_Set),               // y assigned
-				new VariableVerifier(18, 0, AVK_Set, true),			// x still assigned
+				new VariableVerifier(18, 0, AVK_Set),				// x still assigned
 				new VariableVerifier(20, 0, AVK_Set),               // x assigndd with new value
 			}
         ));
@@ -4387,7 +4387,7 @@ TEST_CASE("set binary op type inference", "[set][binary op][inference]") {
 				new VariableVerifier(6, 0, AVK_Set),                // x assigned
 				new VariableVerifier(10, 1, AVK_Undefined, true),    // y not assigned yet
 				new VariableVerifier(12, 1, AVK_Set),               // y assigned
-				new VariableVerifier(18, 0, AVK_Set, true),			// x still assigned
+				new VariableVerifier(18, 0, AVK_Set),				// x still assigned
 				new VariableVerifier(20, 0, AVK_Set),               // x assigndd with new value
 			}
         ));
@@ -4525,9 +4525,9 @@ TEST_CASE("Function unary op type inference", "[function][unary op][inference]")
     SECTION("not function  # type: function") {
         auto t = InferenceTest("def f():\n    def g(): pass\n    x = not g");
         REQUIRE(t.kind(2, 0) == AVK_Undefined);   // STORE_FAST 0
-		REQUIRE(t.kind(4, 0) == AVK_Function);   // LOAD_FAST 0
-		REQUIRE(t.kind(8, 1) == AVK_Undefined);  // STORE_FAST 1
-		REQUIRE(t.kind(10, 1) == AVK_Bool);       // LOAD_CONST 0
+		REQUIRE(t.kind(8, 0) == AVK_Function);   // LOAD_FAST 0
+		REQUIRE(t.kind(12, 1) == AVK_Undefined);  // STORE_FAST 1
+		REQUIRE(t.kind(14, 1) == AVK_Bool);       // LOAD_CONST 0
     }
 }
 
@@ -4544,8 +4544,8 @@ TEST_CASE("Generalized unpacking within a list", "[list][BUILD_LIST_UNPACK][infe
 TEST_CASE("Generalized unpacking within a tuple", "[tuple][BUILD_TUPLE_UNPACK][inference]") {
     SECTION("(1, *(2,) 3)  # type: tuple") {
         auto t = InferenceTest("def f():\n  z = (1, *(2,), 3)");
-        REQUIRE(t.kind(10, 0) == AVK_Undefined);  // STORE_FAST 0
-        REQUIRE(t.kind(12, 0) == AVK_Tuple);      // LOAD_CONST 0
+        REQUIRE(t.kind(8, 0) == AVK_Undefined);  // STORE_FAST 0
+        REQUIRE(t.kind(10, 0) == AVK_Tuple);      // LOAD_CONST 0
     }
 }
 
