@@ -44,6 +44,7 @@
     <RootNamespace>JitTest</RootNamespace>
     <ProjectName>Pyjion</ProjectName>
     <Platform>x64</Platform>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -92,13 +93,13 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <TargetExt>.dll</TargetExt>
-    <TargetName>pyjit</TargetName>
+    <TargetExt>.pyd</TargetExt>
+    <TargetName>pyjion_d</TargetName>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform);$(MSBuildProjectDirectory)\..\Python\PCbuild\amd64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <TargetExt>.dll</TargetExt>
-    <TargetName>pyjit</TargetName>
+    <TargetExt>.pyd</TargetExt>
+    <TargetName>pyjion</TargetName>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(MSBuildProjectDirectory)\..\libs\$(Configuration)\$(Platform);$(MSBuildProjectDirectory)\..\Python\PCbuild\amd64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
