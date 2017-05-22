@@ -2030,7 +2030,9 @@ PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names) {
 		goto error;
 	}
 	for (auto i = 0; i < argCount; i++) {
-		PyTuple_SET_ITEM(posArgs, i, PyTuple_GET_ITEM(args, i));
+		auto item = PyTuple_GET_ITEM(args, i);
+		Py_INCREF(item);
+		PyTuple_SET_ITEM(posArgs, i, item);
 	}
 	kwArgs = PyDict_New();
 	if (kwArgs == nullptr) {
