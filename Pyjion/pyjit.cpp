@@ -54,13 +54,14 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     return _Py_CheckFunctionResult(NULL, res, "Jit_EvalHelper");
 }
 
-static Py_ssize_t g_extraIndex;
+static Py_ssize_t g_extraSlot;
+
 extern "C" __declspec(dllexport) void JitInit() {
-    g_jit = getJit();
+	g_extraSlot = TlsAlloc();
+
+	g_jit = getJit();
 
     g_emptyTuple = PyTuple_New(0);
-
-	g_extraIndex = _PyEval_RequestCodeExtraIndex(PyjionJitFree);
 }
 
 #ifdef NO_TRACE
@@ -295,14 +296,14 @@ PyObject* Jit_EvalTrace(void* state, PyFrameObject *frame) {
                 }
             }
         }
-
+		/*
         printf("Tracing %s from %s line %d %s\r\n",
             PyUnicode_AsUTF8(frame->f_code->co_name),
             PyUnicode_AsUTF8(frame->f_code->co_filename),
             frame->f_code->co_firstlineno,
             isSpecialized ? "specialized" : ""
             );
-
+			*/
         if (res == nullptr) {
 #ifdef DEBUG_TRACE
             printf("Compilation failure #%d\r\n", ++failCount);
@@ -360,7 +361,7 @@ PyObject* Jit_EvalTrace(void* state, PyFrameObject *frame) {
     }
 #endif
 
-	if (target != nullptr) {
+	if (target != nullptr && !trace->jittedCode->j_failed) {
 		if (target->addr != nullptr) {
 			// we have a specialized function for this, just invoke it
 			return Jit_EvalHelper(target->addr, frame);
@@ -401,9 +402,11 @@ PyObject* Jit_EvalTrace(void* state, PyFrameObject *frame) {
 #endif
 
 			if (res == nullptr) {
-#ifdef DEBUG_TRACE
+#if DEBUG_TRACE
+				static int failCount;
 				printf("Compilation failure #%d\r\n", ++failCount);
 #endif
+				trace->jittedCode->j_failed = true;
 				return _PyEval_EvalFrameDefault(frame, 0);
 			}
 
@@ -416,6 +419,13 @@ PyObject* Jit_EvalTrace(void* state, PyFrameObject *frame) {
 				trace->Generic = target->addr;
 				trace->jittedCode->j_evalfunc = Jit_EvalGeneric;
 			}
+			/*
+			printf("Entering %s from %s line %d %s\r\n",
+				PyUnicode_AsUTF8(frame->f_code->co_name),
+				PyUnicode_AsUTF8(frame->f_code->co_filename),
+				frame->f_code->co_firstlineno,
+				isSpecialized ? "specialized" : ""
+			);*/
 
 			// And finally dispatch to the newly compiled code
 			return Jit_EvalHelper(target->addr, frame);
@@ -426,7 +436,7 @@ PyObject* Jit_EvalTrace(void* state, PyFrameObject *frame) {
 }
 
 __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
-    if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
+	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
         return false;
     }
 #ifdef DEBUG_TRACE
@@ -454,15 +464,33 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
 
 
 extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject) {
+	ssize_t index = (ssize_t)TlsGetValue(g_extraSlot);
+	if (index == 0) {
+		index = _PyEval_RequestCodeExtraIndex(PyjionJitFree);
+		if (index == -1) {
+			return nullptr;
+		}
+
+		TlsSetValue(g_extraSlot, (LPVOID)((index << 1) | 0x01));
+	}
+	else {
+		index = index >> 1;
+	}
+
 	PyjionJittedCode *jitted = nullptr;
-	if (_PyCode_GetExtra(codeObject, g_extraIndex, (void**)&jitted)) {
+	if (_PyCode_GetExtra(codeObject, index, (void**)&jitted)) {
+		PyErr_Clear();
+		printf("Error getting extra %d\r\n", index);
 		return nullptr;
 	}
 
 	if (jitted == nullptr) {
 	    jitted = new PyjionJittedCode();
 		if (jitted != nullptr) {
-			if (_PyCode_SetExtra(codeObject, g_extraIndex, jitted)) {
+			if (_PyCode_SetExtra(codeObject, index, jitted)) {
+				PyErr_Clear();
+				printf("Error setting extra %d\r\n", index);
+
 				delete jitted;
 				return nullptr;
 			}
@@ -473,24 +501,28 @@ extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* c
 
 extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int throwflag) {
 	auto jitted = PyJit_EnsureExtra((PyObject*)f->f_code);
-	if (jitted != nullptr) {
-		if (!throwflag) {
-			if (!jitted->j_failed) {
-				if (jitted->j_evalfunc != nullptr) {
-					return jitted->j_evalfunc(jitted->j_evalstate, f);
-				}
-				else if (jitted->j_run_count++ > jitted->j_specialization_threshold) {
-					if (jit_compile(f->f_code)) {
-						// execute the jitted code...
-						return jitted->j_evalfunc(jitted->j_evalstate, f);
-					}
 
-					// no longer try and compile this method...
-					jitted->j_failed = true;
-				}
+	if (jitted != nullptr && !throwflag && !!jitted->j_failed) {
+		if (jitted->j_evalfunc != nullptr) {
+			return jitted->j_evalfunc(jitted->j_evalstate, f);
+		}
+		else if (jitted->j_run_count++ > jitted->j_specialization_threshold) {
+			if (jit_compile(f->f_code)) {
+				// execute the jitted code...
+				return jitted->j_evalfunc(jitted->j_evalstate, f);
 			}
+
+			// no longer try and compile this method...
+			jitted->j_failed = true;
 		}
 	}
+	/*
+	printf("Falling to EFD %s from %s line %d %s %p\r\n",
+		PyUnicode_AsUTF8(f->f_code->co_name),
+		PyUnicode_AsUTF8(f->f_code->co_filename),
+		f->f_code->co_firstlineno,
+		jitted
+	);*/
 
     return _PyEval_EvalFrameDefault(f, throwflag);
 }
