@@ -95,9 +95,16 @@ bool AbstractInterpreter::preprocess() {
 			blockStarts.pop_back();
 			m_blockStarts[opcodeIndex] = blockStart.BlockStart;
 		}
-
+processOpCode:
         switch (byte) {
-            case YIELD_FROM:
+			case EXTENDED_ARG:
+			{
+				curByte += sizeof(_Py_CODEUNIT);
+				oparg = (oparg << 8) | _Py_OPARG(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
+				byte = _Py_OPCODE(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
+				goto processOpCode;
+			}
+			case YIELD_FROM:
             case YIELD_VALUE:
                 return false;
 
