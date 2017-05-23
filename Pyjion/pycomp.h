@@ -171,6 +171,10 @@
 #define METHOD_INT_TO_FLOAT					    0x00000072
 
 #define METHOD_STOREMAP_NO_DECREF_TOKEN			0x00000073
+#define METHOD_FORMAT_VALUE						0x00000074
+#define METHOD_FORMAT_OBJECT					0x00000075
+
+
 // call helpers
 #define METHOD_CALL0_TOKEN		0x00010000
 #define METHOD_CALL1_TOKEN		0x00010001
@@ -185,6 +189,7 @@
 
 #define METHOD_CALL_ARGS		0x0001000A
 #define METHOD_CALL_KWARGS		0x0001000B
+#define METHOD_PYUNICODE_JOINARRAY  0x0002000C
 
 #define METHOD_CALLN_TOKEN		0x000101FF
 
@@ -209,6 +214,9 @@
 #define METHOD_PYITER_NEXT			0x00020006
 #define METHOD_PYCELL_GET			0x00020007
 #define METHOD_PYERR_RESTORE		0x00020008
+#define METHOD_PYOBJECT_STR			0x00020009
+#define METHOD_PYOBJECT_REPR		0x0002000A
+#define METHOD_PYOBJECT_ASCII		0x0002000B
 
 // Misc helpers
 #define METHOD_LOADGLOBAL_TOKEN		0x00030000
@@ -294,6 +302,13 @@ public:
     virtual void emit_dict_store();
 	virtual void emit_dict_store_no_decref();
 
+	virtual void emit_unicode_joinarray();
+	virtual void emit_format_value();
+	virtual void emit_pyobject_str();
+	virtual void emit_pyobject_repr();
+	virtual void emit_pyobject_ascii();
+	virtual void emit_pyobject_format();
+
     virtual void emit_new_dict(size_t size);
     virtual void emit_map_extend();
 
@@ -322,6 +337,7 @@ public:
 
     virtual void emit_unpack_sequence(Local sequence, Local sequenceStorage, Label success, size_t size);
     virtual void emit_load_array(int index);
+	virtual void emit_store_to_array(Local array, int index);
 
     virtual void emit_unpack_ex(Local sequence, size_t leftSize, size_t rightSize, Local sequenceStorage, Local list, Local remainder);
 

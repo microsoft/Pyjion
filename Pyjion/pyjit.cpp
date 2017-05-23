@@ -543,14 +543,87 @@ void PyjionJitFree(void* obj) {
 	delete obj;
 }
 
+static PyObject *pyjion_enable(PyObject *self, PyObject* args) {
+	auto ts = PyThreadState_Get();
+	auto prev = ts->interp->eval_frame;
+	ts->interp->eval_frame = PyJit_EvalFrame;
+	return prev == PyJit_EvalFrame ? Py_False : Py_True;
+}
+
+static PyObject *pyjion_disable(PyObject *self, PyObject* args) {
+	auto ts = PyThreadState_Get();
+	auto prev = ts->interp->eval_frame;
+	ts->interp->eval_frame = _PyEval_EvalFrameDefault;
+	return prev == PyJit_EvalFrame ? Py_True : Py_False;
+}
+
+static PyObject *pyjion_status(PyObject *self, PyObject* args) {
+	auto ts = PyThreadState_Get();
+	auto prev = ts->interp->eval_frame;
+	return prev == PyJit_EvalFrame ? Py_True : Py_False;
+}
+
+static PyObject *pyjion_info(PyObject *self, PyObject* func) {
+	PyObject* code;
+	if (PyFunction_Check(func)) {
+		code = ((PyFunctionObject*)func)->func_code;
+	}
+	else if (PyCode_Check(func)) {
+		code = func;
+	}
+	else {
+		PyErr_SetString(PyExc_TypeError, "Expected function or code");
+		return nullptr;
+	}
+	auto res = PyDict_New();
+	if (res == nullptr) {
+		return nullptr;
+	}
+
+	PyjionJittedCode* jitted = PyJit_EnsureExtra(code);
+
+	PyDict_SetItemString(res, "failed", jitted->j_failed ? Py_True : Py_False);
+	PyDict_SetItemString(res, "compiled", jitted->j_evalfunc != nullptr ? Py_True : Py_False);
+	
+	auto runCount = PyLong_FromLong(jitted->j_run_count);
+	PyDict_SetItemString(res, "run_count", runCount);
+	Py_DECREF(runCount);
+	
+	return res;
+}
+
 static PyMethodDef PyjionMethods[] = {
+	{ 
+		"enable",  
+		pyjion_enable, 
+		METH_NOARGS, 
+		"Enable the JIT.  Returns True if the JIT was enabled, False if it was already enabled." 
+	},
+	{ 
+		"disable", 
+		pyjion_disable, 
+		METH_NOARGS, 
+		"Disable the JIT.  Returns True if the JIT was disabled, False if it was already disabled." 
+	},
+	{
+		"status",
+		pyjion_status,
+		METH_NOARGS,
+		"Gets the current status of the JIT.  Returns True if it is enabled or False if it is disabled."
+	},
+	{
+		"info",
+		pyjion_info,
+		METH_O,
+		"Returns a dictionary describing information about a function or code objects current JIT status."
+	},
 	{NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
 static struct PyModuleDef pyjionmodule = {
 	PyModuleDef_HEAD_INIT,
 	"pyjion",   /* name of module */
-	"Pyjion JIT for CPython 3.6.x", /* module documentation, may be NULL */
+	"Pyjion - A Just in Time Compiler for CPython 3.6.x", /* module documentation, may be NULL */
 	-1,       /* size of per-interpreter state of the module,
 			  or -1 if the module keeps state in global variables. */
 	PyjionMethods

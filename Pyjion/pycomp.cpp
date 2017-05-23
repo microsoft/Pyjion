@@ -385,6 +385,30 @@ void PythonCompiler::emit_new_set() {
     m_il.emit_call(METHOD_PYSET_NEW);
 }
 
+void PythonCompiler::emit_pyobject_str() {
+	m_il.emit_call(METHOD_PYOBJECT_STR);
+}
+
+void PythonCompiler::emit_pyobject_repr() {
+	m_il.emit_call(METHOD_PYOBJECT_REPR);
+}
+
+void PythonCompiler::emit_pyobject_ascii() {
+	m_il.emit_call(METHOD_PYOBJECT_ASCII);
+}
+
+void PythonCompiler::emit_pyobject_format() {
+	m_il.emit_call(METHOD_FORMAT_OBJECT);
+}
+
+void PythonCompiler::emit_unicode_joinarray() {
+	m_il.emit_call(METHOD_PYUNICODE_JOINARRAY);
+}
+
+void PythonCompiler::emit_format_value() {
+	m_il.emit_call(METHOD_FORMAT_VALUE);
+}
+
 void PythonCompiler::emit_set_extend() {
     m_il.emit_call(METHOD_SETUPDATE_TOKEN);
 }
@@ -610,6 +634,16 @@ void PythonCompiler::emit_load_array(int index) {
     m_il.ld_i((index * sizeof(size_t)));
     m_il.add();
     m_il.ld_ind_i();
+}
+
+// Stores the value on the stack into the array at the specified index
+void PythonCompiler::emit_store_to_array(Local array, int index) {
+	auto tmp = emit_spill();
+	emit_load_local(array);
+	m_il.ld_i((index * sizeof(size_t)));
+	m_il.add();
+	emit_load_and_free_local(tmp);
+	m_il.st_ind_i();
 }
 
 Local PythonCompiler::emit_define_local(LocalKind kind) {
@@ -1225,6 +1259,10 @@ GLOBAL_METHOD(METHOD_PYDICT_NEWPRESIZED, &_PyDict_NewPresized, CORINFO_TYPE_NATI
 GLOBAL_METHOD(METHOD_PYTUPLE_NEW, &PyTuple_New, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_PYSET_NEW, &PySet_New, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 
+GLOBAL_METHOD(METHOD_PYOBJECT_STR, &PyObject_Str, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PYOBJECT_REPR, &PyObject_Repr, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PYOBJECT_ASCII, &PyObject_ASCII, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+
 GLOBAL_METHOD(METHOD_PYOBJECT_ISTRUE, &PyObject_IsTrue, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_PYITER_NEXT, &PyIter_Next, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 
@@ -1391,3 +1429,6 @@ GLOBAL_METHOD(METHOD_GREATER_THAN_EQUALS_INT_TOKEN, PyJit_GreaterThanEquals_Int,
 //GLOBAL_METHOD(METHOD_PERIODIC_WORK, _PyEval_PeriodicWork, CORINFO_TYPE_BOOL)
 
 GLOBAL_METHOD(METHOD_INT_TO_FLOAT, PyJit_Int_ToFloat, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_DOUBLE), Parameter(CORINFO_TYPE_NATIVEINT))
+GLOBAL_METHOD(METHOD_PYUNICODE_JOINARRAY, &PyJit_UnicodeJoinArray, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_FORMAT_VALUE, &PyJit_FormatValue, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_FORMAT_OBJECT, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));

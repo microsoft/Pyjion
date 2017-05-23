@@ -232,12 +232,24 @@ public:
 
     // Creates a new set
     virtual void emit_new_set() = 0;
-    // Extends a set with a single iterable
+	// Extends a set with a single iterable
     virtual void emit_set_extend() = 0;
     // Adds a single item to a set
     virtual void emit_set_add() = 0;
 
-    // Creates a new dictionary
+	// Joins an array of string values into a single string (takes string values and length)
+	virtual void emit_unicode_joinarray() = 0;
+	virtual void emit_format_value() = 0;
+	// Calls PyObject_Str on the value
+	virtual void emit_pyobject_str() = 0;
+	// Calls PyObject_Repr on the value
+	virtual void emit_pyobject_repr() = 0;
+	// Calls PyObject_Ascii on the value
+	virtual void emit_pyobject_ascii() = 0;
+	// Calls PyObject_Ascii on the value
+	virtual void emit_pyobject_format() = 0;
+
+	// Creates a new dictionary
     virtual void emit_new_dict(size_t size) = 0;
     // Stores a key/value pair into a dict
     virtual void emit_dict_store() = 0;
@@ -269,6 +281,7 @@ public:
     virtual void emit_unpack_ex(Local sequence, size_t leftSize, size_t rightSize, Local sequenceStorage, Local list, Local remainder) = 0;
     // Loads an element from the array on the stack
     virtual void emit_load_array(int index) = 0;
+	virtual void emit_store_to_array(Local array, int index) = 0;
 
     // Emits a call for the specified argument count.  If the compiler
     // can't emit a call with this number of args then it returns false,

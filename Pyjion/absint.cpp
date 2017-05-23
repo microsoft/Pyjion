@@ -113,13 +113,14 @@ processOpCode:
                     m_sequenceLocals[curByte] = m_comp->emit_allocate_stack_array(((oparg & 0xFF) + (oparg >> 8)) * sizeof(void*));
                 }
                 break;
-            case UNPACK_SEQUENCE:
+			case BUILD_STRING:
+			case UNPACK_SEQUENCE:
                 // we need a buffer for the slow case, but we need 
                 // to avoid allocating it in loops.
                 if (m_comp != nullptr) {
                     m_sequenceLocals[curByte] = m_comp->emit_allocate_stack_array(oparg * sizeof(void*));
                 }
-                break;
+                break;			
             case DELETE_FAST:
                 if (oparg < m_code->co_argcount) {
                     // this local is deleted, so we need to check for assignment
@@ -878,13 +879,24 @@ bool AbstractInterpreter::interpret() {
                     }
                     break;
                 }
-                case SETUP_WITH:
+				case FORMAT_VALUE:
+					if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
+						// format spec
+						lastState.pop();
+					}
+					lastState.pop();
+					lastState.push(&String);
+					break;
+				case BUILD_STRING:
+					for (auto i = 0; i < oparg; i++) {
+						lastState.pop();
+					}
+					lastState.push(&String);
+					break;
+				case SETUP_WITH:
                 case YIELD_VALUE:
                     return false;
-				case FORMAT_VALUE:
 				case BUILD_TUPLE_UNPACK_WITH_CALL:
-				case BUILD_STRING:
-					return false;
 				case BUILD_CONST_KEY_MAP:
 					lastState.pop(); //keys
 					for (auto i = 0; i < oparg; i++) {
@@ -2743,10 +2755,88 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case WITH_CLEANUP_START:
             case WITH_CLEANUP_FINISH:
                 return nullptr;
-			case FORMAT_VALUE:
 			case BUILD_TUPLE_UNPACK_WITH_CALL:
-			case BUILD_STRING:
 				return nullptr;
+			case FORMAT_VALUE:
+			{
+				Local fmtSpec;
+				if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
+					// format spec
+					fmtSpec = m_comp->emit_spill();
+					dec_stack();
+				}
+
+				int which_conversion = oparg & FVC_MASK;
+
+				dec_stack();
+				if (which_conversion) {
+					// Save the original value so we can decref it...
+					m_comp->emit_dup();
+					auto tmp = m_comp->emit_spill();
+
+					// Convert it
+					switch (which_conversion) {
+						case FVC_STR:   m_comp->emit_pyobject_str();   break;
+						case FVC_REPR:  m_comp->emit_pyobject_repr();  break;
+						case FVC_ASCII: m_comp->emit_pyobject_ascii(); break;
+					}
+
+					// Decref the original value
+					m_comp->emit_load_and_free_local(tmp);
+					m_comp->emit_pop_top();
+
+					// Custom error handling in case we have a spilled spec
+					// we need to free as well.
+					auto noErr = m_comp->emit_define_label();
+					m_comp->emit_dup();
+					m_comp->emit_store_local(m_errorCheckLocal);
+					m_comp->emit_null();
+					m_comp->emit_branch(BranchNotEqual, noErr);
+
+					if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
+						m_comp->emit_load_local(fmtSpec);
+						m_comp->emit_pop_top();
+					}
+
+					branch_raise("conversion failed");
+					m_comp->emit_mark_label(noErr);
+					m_comp->emit_load_local(m_errorCheckLocal);
+				}
+
+				if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
+					// format spec
+					m_comp->emit_load_and_free_local(fmtSpec);
+					m_comp->emit_pyobject_format();
+
+					error_check("format object");
+				}
+				else if (!which_conversion) {
+					// TODO: This could also be avoided if we knew we had a string on the stack
+
+					// If we did a conversion we know we have a string...
+					// Otherwise we need to convert
+					m_comp->emit_format_value();
+				}
+
+				inc_stack();
+				break;
+				}
+			case BUILD_STRING:
+				{
+					Local stackArray = m_sequenceLocals[curByte];
+					Local tmp;
+					for (auto i = 0; i < oparg; i++) {
+						m_comp->emit_store_to_array(stackArray, oparg - i - 1);
+					}
+
+					// Array
+					m_comp->emit_load_local(stackArray);
+					// Count
+					m_comp->emit_ptr((void*)oparg);
+
+					m_comp->emit_unicode_joinarray();
+				}
+				break;
 			case BUILD_CONST_KEY_MAP:
 				{
 					auto names = m_comp->emit_spill();

@@ -2474,3 +2474,30 @@ int PyJit_Int_ToFloat(PyObject* in, double*out) {
     }
     return *out == -1.0 && PyErr_Occurred();
 }
+
+PyObject* PyJit_UnicodeJoinArray(PyObject** items, Py_ssize_t count) {
+	auto empty = PyUnicode_New(0, 0);
+	auto res = _PyUnicode_JoinArray(empty, items, count);
+	for (auto i = 0; i < count; i++) {
+		Py_DECREF(items[i]);
+	}
+	Py_DECREF(empty);
+	return res;
+}
+
+PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec) {
+	auto res = PyObject_Format(item, fmtSpec);
+	Py_DECREF(item);
+	Py_DECREF(fmtSpec);
+	return res;
+}
+
+PyObject* PyJit_FormatValue(PyObject* item) {
+	if (PyUnicode_CheckExact(item)) {
+		return item;
+	}
+
+	auto res = PyObject_Format(item, nullptr);
+	Py_DECREF(item);
+	return res;
+}

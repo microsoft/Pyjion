@@ -213,7 +213,31 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
-        TestCase(
+		TestCase(
+			"def f(): return f'abc {42}'",
+			TestInput("'abc 42'")
+		),
+		TestCase(
+			"def f(): return f'abc {42:3}'",
+			TestInput("'abc  42'")
+		),
+		TestCase(
+			"def f(): return f'abc {\"abc\"!a}'",
+			TestInput("\"abc 'abc'\"")
+		),
+		TestCase(
+			"def f(): return f'abc {\"abc\"!a:6}'",
+			TestInput("\"abc 'abc' \"")
+		),
+		TestCase(
+			"def f(): return f'abc {\"abc\"!r:6}'",
+			TestInput("\"abc 'abc' \"")
+		),
+		TestCase(
+			"def f(): return f'abc {\"abc\"!s}'",
+			TestInput("'abc abc'")
+		),
+		TestCase(
             "def f():\n    for b in range(1):\n        x = b & 1 and -1.0 or 1.0\n    return x",
             TestInput("1.0")
         ),
