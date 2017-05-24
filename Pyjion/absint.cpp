@@ -2827,6 +2827,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 					Local tmp;
 					for (auto i = 0; i < oparg; i++) {
 						m_comp->emit_store_to_array(stackArray, oparg - i - 1);
+						dec_stack();
 					}
 
 					// Array
@@ -2835,6 +2836,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
 					m_comp->emit_ptr((void*)oparg);
 
 					m_comp->emit_unicode_joinarray();
+
+					inc_stack();
 				}
 				break;
 			case BUILD_CONST_KEY_MAP:

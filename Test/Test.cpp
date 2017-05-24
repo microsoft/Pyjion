@@ -214,6 +214,10 @@ void PyJitTest() {
 
     TestCase cases[] = {
 		TestCase(
+			"def f(): print(f'x {42}')",
+			TestInput("None")
+		),
+		TestCase(
 			"def f(): return f'abc {42}'",
 			TestInput("'abc 42'")
 		),
