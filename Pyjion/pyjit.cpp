@@ -253,7 +253,7 @@ PyObject* Jit_EvalGeneric(void* state, PyFrameObject*frame) {
 #define MAX_TRACE 5
 
 PyObject* Jit_EvalTrace(void* state, PyFrameObject *frame) {
-    // Walk our tree of argument types to find the SpecializedTreeNode which
+	// Walk our tree of argument types to find the SpecializedTreeNode which
     // corresponds with our sets of arguments here.
     auto trace = (TraceInfo*)state;
 
@@ -480,7 +480,6 @@ extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* c
 	PyjionJittedCode *jitted = nullptr;
 	if (_PyCode_GetExtra(codeObject, index, (void**)&jitted)) {
 		PyErr_Clear();
-		printf("Error getting extra %d\r\n", index);
 		return nullptr;
 	}
 
@@ -489,7 +488,6 @@ extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* c
 		if (jitted != nullptr) {
 			if (_PyCode_SetExtra(codeObject, index, jitted)) {
 				PyErr_Clear();
-				printf("Error setting extra %d\r\n", index);
 
 				delete jitted;
 				return nullptr;
@@ -500,15 +498,18 @@ extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* c
 }
 
 extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int throwflag) {
-	auto jitted = PyJit_EnsureExtra((PyObject*)f->f_code);
+	auto err = GetLastError();
 
-	if (jitted != nullptr && !throwflag && !!jitted->j_failed) {
+	auto jitted = PyJit_EnsureExtra((PyObject*)f->f_code);
+	if (jitted != nullptr && !throwflag && !jitted->j_failed) {
 		if (jitted->j_evalfunc != nullptr) {
+			SetLastError(err);
 			return jitted->j_evalfunc(jitted->j_evalstate, f);
 		}
 		else if (jitted->j_run_count++ > jitted->j_specialization_threshold) {
 			if (jit_compile(f->f_code)) {
 				// execute the jitted code...
+				SetLastError(err);
 				return jitted->j_evalfunc(jitted->j_evalstate, f);
 			}
 
@@ -516,6 +517,7 @@ extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int
 			jitted->j_failed = true;
 		}
 	}
+	SetLastError(err);
 	/*
 	printf("Falling to EFD %s from %s line %d %s %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),
