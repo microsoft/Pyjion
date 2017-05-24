@@ -2090,7 +2090,7 @@ void PyJit_DecRef(PyObject* value) {
         // Tagged pointer
         return;
     }
-    Py_DecRef(value);
+	Py_XDECREF(value);
 }
 
 void PyJit_FloatDivideByZero() {
