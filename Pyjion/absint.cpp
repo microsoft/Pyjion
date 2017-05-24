@@ -897,6 +897,8 @@ bool AbstractInterpreter::interpret() {
                 case YIELD_VALUE:
                     return false;
 				case BUILD_TUPLE_UNPACK_WITH_CALL:
+				case BUILD_MAP_UNPACK_WITH_CALL:
+					return false;
 				case BUILD_CONST_KEY_MAP:
 					lastState.pop(); //keys
 					for (auto i = 0; i < oparg; i++) {
@@ -1517,26 +1519,45 @@ void AbstractInterpreter::branch_raise(char *reason) {
     }
 #endif
 
-    auto count = clear_value_stack();
+	// number of stack entries we need to clear...
+	size_t count = m_stack.size() - entry_stack.size();	
+	
+	auto cur = m_stack.rbegin();
+	for (; cur != m_stack.rend() && count >= 0; cur++) {
+		if (*cur == STACK_KIND_VALUE) {
+			count--;
+			m_comp->emit_pop();
+		}
+		else {
+			break;
+		}
+	}
 
-    if (count == 0) {
-        // No values on the stack, we can just branch directly to the raise label
-        m_comp->emit_branch(BranchAlways, ehBlock.Raise);
-    }
-    else {
-        // We don't currently expect to have stacks w/ mixed value and object types...
-        // If we hit this then we need to support cleaning those up too.
-        for (auto value : m_stack) {
-            _ASSERTE(value != STACK_KIND_VALUE);
-        }
+	if (!count) {
+		// No values on the stack, we can just branch directly to the raise label
+		m_comp->emit_branch(BranchAlways, ehBlock.Raise);
+		return;
+	}
 
-        auto& labels = get_raise_and_free_labels(ehBlock.RaiseAndFreeId);
+	vector<Label>& labels = get_raise_and_free_labels(ehBlock.RaiseAndFreeId);
+	ensure_labels(labels, count);
+	ensure_raise_and_free_locals(count);
 
-        ensure_labels(labels, count);
+	// continue walking our stack iterator
+	for (auto i = 0; i < count; cur++, i++) {
+		if (*cur == STACK_KIND_VALUE) {
+			// pop off the stack value...
+			m_comp->emit_pop();
 
-        spill_stack_for_raise(count);
-        m_comp->emit_branch(BranchAlways, labels[count - 1]);
-    }
+			// and store null into our local that needs to be freed
+			m_comp->emit_null();
+			m_comp->emit_store_local(m_raiseAndFreeLocals[count]);
+		}
+		else {
+			m_comp->emit_store_local(m_raiseAndFreeLocals[count]);
+		}
+	}
+	m_comp->emit_branch(BranchAlways, labels[count - 1]);
 }
 
 void AbstractInterpreter::clean_stack_for_reraise() {
@@ -2755,6 +2776,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case WITH_CLEANUP_START:
             case WITH_CLEANUP_FINISH:
                 return nullptr;
+			case BUILD_MAP_UNPACK_WITH_CALL:
 			case BUILD_TUPLE_UNPACK_WITH_CALL:
 				return nullptr;
 			case FORMAT_VALUE:
@@ -3344,7 +3366,7 @@ JittedCode* AbstractInterpreter::compile() {
 }
 
 bool AbstractInterpreter::can_skip_lasti_update(int opcodeIndex) {
-    switch (m_byteCode[opcodeIndex]) {
+    switch (_Py_OPCODE(m_byteCode[opcodeIndex / sizeof(_Py_CODEUNIT)])) {
         case DUP_TOP:
         case SETUP_EXCEPT:
         case NOP:
