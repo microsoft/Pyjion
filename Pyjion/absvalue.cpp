@@ -675,6 +675,7 @@ AbstractValueKind StringValue::kind() {
 AbstractValue* StringValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
     // String interpolation always returns a `str` (when successful).
     if (op == BINARY_MODULO || op == INPLACE_MODULO) {
+		other.escapes();
         return this;
     }
 

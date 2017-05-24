@@ -1859,8 +1859,8 @@ void AbstractInterpreter::free_iter_locals_on_exception() {
 }
 
 void AbstractInterpreter::periodic_work() {
-    //m_comp->emit_periodic_work();
-    //int_error_check("periodic work");
+    m_comp->emit_periodic_work();
+    int_error_check("periodic work");
 }
 
 // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.

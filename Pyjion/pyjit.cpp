@@ -349,7 +349,7 @@ PyObject* Jit_EvalTrace(void* state, PyFrameObject *frame) {
     }
 
     // record the new trace...
-    if (trace->opt.size() < MAX_TRACE) {
+    if (target == nullptr && trace->opt.size() < MAX_TRACE) {
         int argCount = frame->f_code->co_argcount + frame->f_code->co_kwonlyargcount;
         vector<PyTypeObject*> types;
         for (int i = 0; i < argCount; i++) {
@@ -358,12 +358,18 @@ PyObject* Jit_EvalTrace(void* state, PyFrameObject *frame) {
         }
 		target = new SpecializedTreeNode(types);
         trace->opt.push_back(target);
-    }
+	}
 #endif
 
 	if (target != nullptr && !trace->jittedCode->j_failed) {
 		if (target->addr != nullptr) {
 			// we have a specialized function for this, just invoke it
+			/*printf("Invoking trace %s from %s line %d %p\r\n",
+				PyUnicode_AsUTF8(frame->f_code->co_name),
+				PyUnicode_AsUTF8(frame->f_code->co_filename),
+				frame->f_code->co_firstlineno,
+				target->addr
+			);*/
 			return Jit_EvalHelper(target->addr, frame);
 		}
 
@@ -428,10 +434,22 @@ PyObject* Jit_EvalTrace(void* state, PyFrameObject *frame) {
 			);*/
 
 			// And finally dispatch to the newly compiled code
+			/*printf("Invoking trace %s from %s line %d %p\r\n",
+				PyUnicode_AsUTF8(frame->f_code->co_name),
+				PyUnicode_AsUTF8(frame->f_code->co_filename),
+				frame->f_code->co_firstlineno,
+				target->addr
+			);*/
 			return Jit_EvalHelper(target->addr, frame);
 		}
 	}
 	
+	/*printf("Invoking default %s from %s line %d %s %p\r\n",
+		PyUnicode_AsUTF8(frame->f_code->co_name),
+		PyUnicode_AsUTF8(frame->f_code->co_filename),
+		frame->f_code->co_firstlineno,
+		target->addr
+	);*/
 	return _PyEval_EvalFrameDefault(frame, 0);
 }
 
@@ -504,12 +522,24 @@ extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int
 	if (jitted != nullptr && !throwflag && !jitted->j_failed) {
 		if (jitted->j_evalfunc != nullptr) {
 			SetLastError(err);
+			/*printf("Calling %s from %s line %d %p\r\n",
+				PyUnicode_AsUTF8(f->f_code->co_name),
+				PyUnicode_AsUTF8(f->f_code->co_filename),
+				f->f_code->co_firstlineno,
+				jitted
+			);*/
 			return jitted->j_evalfunc(jitted->j_evalstate, f);
 		}
-		else if (jitted->j_run_count++ > jitted->j_specialization_threshold) {
+		else if (jitted->j_run_count++ >= jitted->j_specialization_threshold) {
 			if (jit_compile(f->f_code)) {
 				// execute the jitted code...
 				SetLastError(err);
+				/*printf("Calling %s from %s line %d %p\r\n",
+					PyUnicode_AsUTF8(f->f_code->co_name),
+					PyUnicode_AsUTF8(f->f_code->co_filename),
+					f->f_code->co_firstlineno,
+					jitted
+				);*/
 				return jitted->j_evalfunc(jitted->j_evalstate, f);
 			}
 

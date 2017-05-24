@@ -284,6 +284,7 @@ int PyJit_GreaterThan_Int(PyObject *left, PyObject *right);
 int PyJit_GreaterThanEquals_Int(PyObject *left, PyObject *right);
 
 int PyJit_Int_ToFloat(PyObject* in, double*out);
+int _PyJit_PeriodicWork();
 
 PyObject* PyJit_UnicodeJoinArray(PyObject** items, Py_ssize_t count);
 PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec);

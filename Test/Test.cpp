@@ -214,6 +214,10 @@ void PyJitTest() {
 
     TestCase cases[] = {
 		TestCase(
+			"def f(): 1.0 / 0",
+			TestInput("<NULL>")
+		),
+		TestCase(
 			"def f(): print(f'x {42}')",
 			TestInput("None")
 		),

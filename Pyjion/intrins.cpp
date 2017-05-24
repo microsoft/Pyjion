@@ -2475,6 +2475,17 @@ int PyJit_Int_ToFloat(PyObject* in, double*out) {
     return *out == -1.0 && PyErr_Occurred();
 }
 
+static int g_counter;
+int _PyJit_PeriodicWork() {
+	if (g_counter++ > 1000) {
+		// Pulse the GIL
+		g_counter = 0;
+		Py_BEGIN_ALLOW_THREADS
+		Py_END_ALLOW_THREADS
+	}
+	return 0;
+}
+
 PyObject* PyJit_UnicodeJoinArray(PyObject** items, Py_ssize_t count) {
 	auto empty = PyUnicode_New(0, 0);
 	auto res = _PyUnicode_JoinArray(empty, items, count);
