@@ -2233,7 +2233,7 @@ inline PyObject* PyJit_Tagged_Modulo(tagged_ptr left, tagged_ptr right) {
 
     tagged_ptr res;
 #ifdef _MSC_VER
-    if (right > 0 && SafeModulus(left, right, res)) {
+    if (right > 0 && left > 0 && SafeModulus(left, right, res)) {
 #else
 #error No support for this compiler
 #endif
