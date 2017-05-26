@@ -1552,10 +1552,10 @@ void AbstractInterpreter::branch_raise(char *reason) {
 
 			// and store null into our local that needs to be freed
 			m_comp->emit_null();
-			m_comp->emit_store_local(m_raiseAndFreeLocals[count]);
+			m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
 		}
 		else {
-			m_comp->emit_store_local(m_raiseAndFreeLocals[count]);
+			m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
 		}
 	}
 	m_comp->emit_branch(BranchAlways, labels[count - 1]);
