@@ -213,6 +213,16 @@ void PyJitTest() {
     PyList_SetItem(list, 0, PyLong_FromLong(42));
 
     TestCase cases[] = {
+		// EXTENDED_ARG FOR_ITER:
+		TestCase(
+			"def f():\n"
+			"        x = 1\n"
+			"        for w in 1, 2, 3, 4:\n"
+			"            x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2;\n"
+			"            x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2; x += 2;\n"
+			"        return x\n",
+			TestInput("369")
+		),
 		TestCase(
 			"def f(): 1.0 / 0",
 			TestInput("<NULL>")

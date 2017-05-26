@@ -2136,7 +2136,13 @@ inline PyObject* safe_return(PyObject* tmpLeft, tagged_ptr left, PyObject* tmpRi
         return (PyObject*)right;
     }
     else {
-        return res;
+		int overflow;
+		auto value = PyLong_AsLongAndOverflow(res, &overflow);
+		if (overflow || !can_tag(value)) {
+			return res;
+		}
+		Py_DECREF(res);
+		return TAG_IT(value);
     }
 }
 
@@ -2227,7 +2233,7 @@ inline PyObject* PyJit_Tagged_Modulo(tagged_ptr left, tagged_ptr right) {
 
     tagged_ptr res;
 #ifdef _MSC_VER
-    if (SafeModulus(left, right, res)) {
+    if (right > 0 && SafeModulus(left, right, res)) {
 #else
 #error No support for this compiler
 #endif
@@ -2477,12 +2483,18 @@ int PyJit_Int_ToFloat(PyObject* in, double*out) {
 
 static int g_counter;
 int _PyJit_PeriodicWork() {
-	if (g_counter++ > 1000) {
+	g_counter++;
+	if (!(g_counter & 0xfff)) {
 		// Pulse the GIL
 		g_counter = 0;
 		Py_BEGIN_ALLOW_THREADS
 		Py_END_ALLOW_THREADS
 	}
+
+	if (!(g_counter & 0xffff)) {
+		return Py_MakePendingCalls();
+	}
+
 	return 0;
 }
 

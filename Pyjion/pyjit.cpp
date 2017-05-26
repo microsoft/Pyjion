@@ -624,6 +624,27 @@ static PyObject *pyjion_info(PyObject *self, PyObject* func) {
 	return res;
 }
 
+static PyObject *pyjion_set_threshold(PyObject *self, PyObject* args) {
+	if (!PyLong_Check(args)) {
+		PyErr_SetString(PyExc_TypeError, "Expected int for new threshold");
+		return nullptr;
+	}
+
+	auto newValue = PyLong_AsLongLong(args);
+	if (newValue < 0) {
+		PyErr_SetString(PyExc_ValueError, "Expected positive threshold");
+		return nullptr;
+	}
+
+	auto prev = PyLong_FromLongLong(HOT_CODE);
+	HOT_CODE = PyLong_AsLongLong(args);
+	return prev;
+}
+
+static PyObject *pyjion_get_threshold(PyObject *self, PyObject* args) {
+	return PyLong_FromLongLong(HOT_CODE);
+}
+
 static PyMethodDef PyjionMethods[] = {
 	{ 
 		"enable",  
@@ -648,6 +669,18 @@ static PyMethodDef PyjionMethods[] = {
 		pyjion_info,
 		METH_O,
 		"Returns a dictionary describing information about a function or code objects current JIT status."
+	},
+	{
+		"set_threshold",
+		pyjion_set_threshold,
+		METH_O,
+		"Sets the number of times a method needs to be executed before the JIT is triggered."
+	},
+	{
+		"get_threshold",
+		pyjion_get_threshold,
+		METH_O,
+		"Gets the number of times a method needs to be executed before the JIT is triggered."
 	},
 	{NULL, NULL, 0, NULL}        /* Sentinel */
 };

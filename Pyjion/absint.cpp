@@ -33,6 +33,9 @@
 #define NUM_ARGS(n) ((n)&0xFF)
 #define NUM_KW_ARGS(n) (((n)>>8) & 0xff)
 
+#define GET_OPARG(index)  _Py_OPARG(m_byteCode[index/sizeof(_Py_CODEUNIT)])
+#define GET_OPCODE(index) _Py_OPCODE(m_byteCode[index/sizeof(_Py_CODEUNIT)])
+
 AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* comp) : m_code(code), m_comp(comp) {
     m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
     m_size = PyBytes_Size(code->co_code);
@@ -55,8 +58,6 @@ AbstractInterpreter::~AbstractInterpreter() {
     }
 }
 
-#define NEXTARG() *(unsigned short*)&m_byteCode[curByte + 1]; curByte+= 2
-
 bool AbstractInterpreter::preprocess() {
     if (m_code->co_flags & (CO_COROUTINE | CO_GENERATOR)) {
         // Don't compile co-routines or generators.  We can't rely on
@@ -72,10 +73,9 @@ bool AbstractInterpreter::preprocess() {
     vector<bool> ehKind;
     vector<AbsIntBlockInfo> blockStarts;
     for (size_t curByte = 0; curByte < m_size; curByte += sizeof(_Py_CODEUNIT)) {
-        _Py_CODEUNIT word = m_byteCode[curByte / sizeof(_Py_CODEUNIT)];
 		auto opcodeIndex = curByte;
-		auto byte = _Py_OPCODE(word);
-		oparg = _Py_OPARG(word); 
+		auto byte = GET_OPCODE(curByte);
+		oparg = GET_OPARG(curByte); 
 
 		// POP_BLOCK can be removed because it is unreachable, e.g. if you do:
 		// def f():
@@ -88,20 +88,20 @@ bool AbstractInterpreter::preprocess() {
 		// In Python 3.5 you would always have POP_BLOCK's, but in 3.6 the POP_BLOCK
 		// that should come after return x / y is gone.  So we need to check
 		// the opcode offsets and apply the block pops here.
-
+	processOpCode:
 		while (blockStarts.size() != 0 && 
 			opcodeIndex >= blockStarts[blockStarts.size() - 1].BlockEnd) {
 			auto blockStart = blockStarts.back();
 			blockStarts.pop_back();
 			m_blockStarts[opcodeIndex] = blockStart.BlockStart;
 		}
-processOpCode:
+
         switch (byte) {
 			case EXTENDED_ARG:
 			{
 				curByte += sizeof(_Py_CODEUNIT);
-				oparg = (oparg << 8) | _Py_OPARG(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
-				byte = _Py_OPCODE(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
+				oparg = (oparg << 8) | GET_OPARG(curByte);
+				byte = GET_OPCODE(curByte);
 				goto processOpCode;
 			}
 			case YIELD_FROM:
@@ -174,7 +174,7 @@ processOpCode:
             }
             break;
             case JUMP_FORWARD:
-                m_jumpsTo.insert(oparg + curByte + 1);
+                m_jumpsTo.insert(oparg + curByte + sizeof(_Py_CODEUNIT));
                 break;
             case JUMP_ABSOLUTE:
             case JUMP_IF_FALSE_OR_POP:
@@ -244,16 +244,17 @@ bool AbstractInterpreter::interpret() {
 
             auto opcodeIndex = curByte;
 
-            auto opcode = _Py_OPCODE(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
-			oparg = _Py_OPARG(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
+            auto opcode = GET_OPCODE(curByte);
+			oparg = GET_OPARG(curByte);
 
         processOpCode:
             switch (opcode) {
                 case EXTENDED_ARG:
                 {
 					curByte += sizeof(_Py_CODEUNIT);
-					oparg = (oparg << 8) | _Py_OPARG(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
-					opcode = _Py_OPCODE(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
+					oparg = (oparg << 8) | GET_OPARG(curByte);
+					opcode = GET_OPCODE(curByte);
+					update_start_state(lastState, curByte);
                     goto processOpCode;
                 }
                 case NOP: break;
@@ -1053,8 +1054,8 @@ void AbstractInterpreter::dump() {
         m_code->co_firstlineno
         );
     for (size_t curByte = 0; curByte < m_size; curByte+=sizeof(_Py_CODEUNIT)) {
-        auto opcode = _Py_OPCODE(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
-		int oparg = _Py_OPARG(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
+        auto opcode = GET_OPCODE(curByte);
+		int oparg = GET_OPARG(curByte);
 		
 		auto byteIndex = curByte;
 
@@ -1106,7 +1107,7 @@ void AbstractInterpreter::dump() {
                     byteIndex,
                     opcode_name(opcode),
                     oparg,
-                    oparg + curByte + 1
+                    oparg + curByte + sizeof(_Py_CODEUNIT)
                     );
                 break;
             case LOAD_FAST:
@@ -1191,7 +1192,7 @@ bool AbstractInterpreter::should_box(size_t opcodeIndex) {
 }
 
 bool AbstractInterpreter::can_skip_lasti_update(size_t opcodeIndex) {
-    switch (m_byteCode[opcodeIndex]) {
+    switch (GET_OPCODE(opcodeIndex)) {
         case BINARY_TRUE_DIVIDE:
         case BINARY_FLOOR_DIVIDE:
         case BINARY_POWER:
@@ -1863,14 +1864,28 @@ void AbstractInterpreter::periodic_work() {
     int_error_check("periodic work");
 }
 
+int AbstractInterpreter::get_extended_opcode(int curByte) {
+	auto opcode = GET_OPCODE(curByte);
+	while (opcode == EXTENDED_ARG) {
+		curByte += 2;
+		opcode = GET_OPCODE(curByte);
+	}
+	return opcode;
+}
+
 // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
 // If the value on the stack is -1, we branch to the current error handler.
 // Otherwise branches based if the current value is true/false based upon the current opcode 
 void AbstractInterpreter::branch_or_error(int& curByte) {
-    auto jmpType = m_byteCode[curByte + 1];
-    curByte++;
+	curByte += sizeof(_Py_CODEUNIT);
+	auto jmpType = GET_OPCODE(curByte);
+	auto oparg = GET_OPARG(curByte);
+	while (jmpType == EXTENDED_ARG) {
+		curByte += sizeof(_Py_CODEUNIT);
+		oparg = (oparg << 8) | GET_OPARG(curByte);
+		jmpType = GET_OPCODE(curByte);
+	}
     mark_offset_label(curByte);
-    auto oparg = NEXTARG();
 
     raise_on_negative_one();
 
@@ -1904,10 +1919,16 @@ void AbstractInterpreter::raise_on_negative_one() {
 // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
 // Branches based if the current value is true/false based upon the current opcode 
 void AbstractInterpreter::branch(int& curByte) {
-    auto jmpType = m_byteCode[curByte + 1];
-    curByte++;
-    mark_offset_label(curByte);
-    auto oparg = NEXTARG();
+	curByte += sizeof(_Py_CODEUNIT);
+	auto jmpType = GET_OPCODE(curByte);
+	auto oparg = GET_OPARG(curByte);
+	while (jmpType == EXTENDED_ARG) {
+		curByte += sizeof(_Py_CODEUNIT);
+		oparg = (oparg << 8) | GET_OPARG(curByte);
+		jmpType = GET_OPCODE(curByte);
+	}
+
+	mark_offset_label(curByte);
 
     if (oparg <= curByte) {
         periodic_work();
@@ -1955,20 +1976,23 @@ JittedCode* AbstractInterpreter::compile_worker() {
     }
     
 	for (int curByte = 0; curByte < m_size; curByte += sizeof(_Py_CODEUNIT)) {
-		auto opcodeIndex = curByte;
-        auto word = m_byteCode[curByte/sizeof(_Py_CODEUNIT)];
-		auto byte = _Py_OPCODE(word);
-		auto oparg = _Py_OPARG(word);
+		_ASSERTE(curByte % sizeof(_Py_CODEUNIT) == 0);
 
-        // See FOR_ITER for special handling of the offset label
-        if (byte != FOR_ITER) {
+		auto opcodeIndex = curByte;
+
+		auto byte = GET_OPCODE(curByte);
+		auto oparg = GET_OPARG(curByte);
+
+	processOpCode:
+		// See FOR_ITER for special handling of the offset label
+        if (get_extended_opcode(curByte) != FOR_ITER) {
             mark_offset_label(curByte);
         }
 
-        auto curStackDepth = m_offsetStack.find(curByte);
+		auto curStackDepth = m_offsetStack.find(curByte);
         if (curStackDepth != m_offsetStack.end()) {
             m_stack = curStackDepth->second;
-        }
+		}
 
 		if (m_blockStack.size() > 1 && 
 			curByte >= m_blockStack.back().EndOffset &&
@@ -1981,7 +2005,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
             m_comp->emit_lasti_update(curByte);
         }
 
-    processOpCode:
         switch (byte) {
             case NOP: break;
             case ROT_TWO: 
@@ -1997,7 +2020,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         m_comp->emit_rot_two(LK_Float);
                         break;
                     } else if (top_kind == AVK_Integer && second_kind == AVK_Integer) {
-                        m_comp->emit_rot_two(LK_Int);
+                        m_comp->emit_rot_two(LK_Pointer);
                         break;
                     }
                 }
@@ -2020,7 +2043,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         break;
                     }
                     else if (top_kind == AVK_Integer && second_kind == AVK_Integer && third_kind == AVK_Integer) {
-                        m_comp->emit_rot_three(LK_Int);
+                        m_comp->emit_rot_three(LK_Pointer);
                         break;
                     }
                 }
@@ -2424,8 +2447,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case EXTENDED_ARG:
             {
 				curByte += sizeof(_Py_CODEUNIT);
-				oparg = (oparg << 8) | _Py_OPARG(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
-				byte = _Py_OPCODE(m_byteCode[curByte / sizeof(_Py_CODEUNIT)]);
+				oparg = (oparg << 8) | GET_OPARG(curByte);
+				byte = GET_OPCODE(curByte);
+				
                 goto processOpCode;
             }
             case MAKE_FUNCTION:
@@ -2451,7 +2475,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 /*
                 bool optFor = false;
                 Local loopOpt1, loopOpt2;
-                if (m_byteCode[curByte + 1] == FOR_ITER) {
+                if (GET_OPCODE(curByte + sizeof(_Py_CODEUNIT)) == FOR_ITER) {
                 for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != (-1); blockIndex--) {
                 if (m_blockStack[blockIndex].Kind == SETUP_LOOP) {
                 // save our iter variable so we can free it on break, continue, return, and
@@ -2491,7 +2515,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 }
                 for_iter(
 					curByte + oparg + sizeof(_Py_CODEUNIT), 
-					curByte, 
+					opcodeIndex, 
 					loopBlock
 				);
                 break;
@@ -3307,9 +3331,10 @@ void AbstractInterpreter::unary_negative(int opcodeIndex) {
 }
 
 bool AbstractInterpreter::can_optimize_pop_jump(int opcodeIndex) {
-    if (m_byteCode[opcodeIndex + 1] == POP_JUMP_IF_TRUE || m_byteCode[opcodeIndex + 1] == POP_JUMP_IF_FALSE) {
-        return m_jumpsTo.find(opcodeIndex + 1) == m_jumpsTo.end();
-    }
+	/*auto opcode = GET_OPCODE(opcodeIndex + sizeof(_Py_CODEUNIT));
+    if (opcode == POP_JUMP_IF_TRUE || opcode == POP_JUMP_IF_FALSE) {
+        return m_jumpsTo.find(opcodeIndex + sizeof(_Py_CODEUNIT)) == m_jumpsTo.end();
+    }*/
     return false;
 }
 
@@ -3366,7 +3391,7 @@ JittedCode* AbstractInterpreter::compile() {
 }
 
 bool AbstractInterpreter::can_skip_lasti_update(int opcodeIndex) {
-    switch (_Py_OPCODE(m_byteCode[opcodeIndex / sizeof(_Py_CODEUNIT)])) {
+    switch (GET_OPCODE(opcodeIndex)) {
         case DUP_TOP:
         case SETUP_EXCEPT:
         case NOP:
@@ -3620,7 +3645,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
             }
             break;
         case PyCmp_EXC_MATCH:
-            if (m_byteCode[i + 1] == POP_JUMP_IF_FALSE) {
+            if (get_extended_opcode(i + sizeof(_Py_CODEUNIT)) == POP_JUMP_IF_FALSE) {
                 m_comp->emit_compare_exceptions_int();
                 dec_stack(2);
                 branch_or_error(i);
@@ -3705,7 +3730,9 @@ void AbstractInterpreter::load_fast(int local, int opcodeIndex) {
         }
         else if (kind == AVK_Integer) {
             m_comp->emit_load_local(get_optimized_local(local, AVK_Any));
-            inc_stack();
+			m_comp->emit_dup();
+			m_comp->emit_incref(true);
+			inc_stack();
             return;
         }
     }

@@ -240,9 +240,6 @@
 #define LD_FIELD(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); m_il.ld_ind_i();
 #define ST_FIELD(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); m_il.st_ind_i();
 
-
-#define NEXTARG() *(unsigned short*)&m_byteCode[i + 1]; i+= 2
-
 extern ICorJitCompiler* g_jit;
 class PythonCompiler : public IPythonCompiler {
     PyCodeObject *m_code;

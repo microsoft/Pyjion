@@ -332,6 +332,9 @@ private:
 
     void inc_stack(size_t size = 1, bool kind = STACK_KIND_OBJECT);
 
+	// Gets the next opcode skipping for EXTENDED_ARG
+	int get_extended_opcode(int curByte);
+
     // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
     // If the value on the stack is -1, we branch to the current error handler.
     // Otherwise branches based if the current value is true/false based upon the current opcode
