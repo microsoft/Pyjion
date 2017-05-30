@@ -108,7 +108,7 @@ public:
     // Emits an unboxed floating point value onto the stack
     virtual void emit_float(double value) = 0;
     // Emits a unboxed tagged integer value onto the stack
-    virtual void emit_tagged_int(ssize_t value) = 0;
+    virtual void emit_tagged_int(size_t value) = 0;
     // Takes a Python long off the stack and converts it to a tagged int, or leaves
     // it as an object if the long doesn't fix in a tagged int.
     virtual void emit_unbox_int_tagged() = 0;
@@ -119,8 +119,6 @@ public:
     virtual void emit_bool(bool value) = 0;
     // Emits a pointer value onto the stack
     virtual void emit_ptr(void* value) = 0;
-    // Emits the address of a Python object on the stack, bumping its ref count
-    virtual void emit_py_object(PyObject* value) = 0;
     // Emits a null pointer onto the stack
     virtual void emit_null() = 0;
 
@@ -180,23 +178,23 @@ public:
      // Loads/stores/deletes from the frame objects fast local variables
     virtual void emit_load_fast(int local) = 0;
     virtual void emit_store_fast(int local) = 0;
-    virtual void emit_delete_fast(int index, PyObject* name) = 0;
+    virtual void emit_delete_fast(int index) = 0;
     virtual void emit_unbound_local_check() = 0;
 
     // Loads/stores/deletes by name for values not known to be in fast locals
-    virtual void emit_load_name(PyObject* name) = 0;
-    virtual void emit_store_name(PyObject* name) = 0;
-    virtual void emit_delete_name(PyObject* name) = 0;
+    virtual void emit_load_name(void* name) = 0;
+    virtual void emit_store_name(void* name) = 0;
+    virtual void emit_delete_name(void* name) = 0;
 
     // Loads/stores/deletes an attribute on an object
-    virtual void emit_load_attr(PyObject* name) = 0;
-    virtual void emit_store_attr(PyObject* name) = 0;
-    virtual void emit_delete_attr(PyObject* name) = 0;
+    virtual void emit_load_attr(void* name) = 0;
+    virtual void emit_store_attr(void* name) = 0;
+    virtual void emit_delete_attr(void* name) = 0;
 
     // Loads/stores/deletes a global variable
-    virtual void emit_load_global(PyObject* name) = 0;
-    virtual void emit_store_global(PyObject* name) = 0;
-    virtual void emit_delete_global(PyObject* name) = 0;
+    virtual void emit_load_global(void* name) = 0;
+    virtual void emit_store_global(void* name) = 0;
+    virtual void emit_delete_global(void* name) = 0;
 
     // Loads/stores/deletes a cell variable for closures.
     virtual void emit_load_deref(int index) = 0;
@@ -267,9 +265,9 @@ public:
     virtual void emit_is_true() = 0;
 
     // Imports the specified name
-    virtual void emit_import_name(PyObject* name) = 0;
+    virtual void emit_import_name(void* name) = 0;
     // Imports the specified name from a module
-    virtual void emit_import_from(PyObject* name) = 0;
+    virtual void emit_import_from(void* name) = 0;
     // Does ... import *
     virtual void emit_import_star() = 0;
 
@@ -396,7 +394,7 @@ public:
     // Compares to see if an exception is handled, pushing an int on the stack indicating true (1), false (0), or error (-1)
     virtual void emit_compare_exceptions_int() = 0;
     // Sets the current exception type and text
-    virtual void emit_pyerr_setstring(PyObject* exception, const char*msg) = 0;
+    virtual void emit_pyerr_setstring(void* exception, const char*msg) = 0;
 
     virtual void emit_incref(bool maybeTagged = false) = 0; 
 

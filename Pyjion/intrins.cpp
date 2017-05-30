@@ -373,7 +373,8 @@ PyObject* PyJit_Power(PyObject *left, PyObject *right) {
 }
 
 PyObject* PyJit_Modulo(PyObject *left, PyObject *right) {
-    auto res = PyUnicode_CheckExact(left) ?
+    auto res = (PyUnicode_CheckExact(left) && (
+		!PyUnicode_Check(right) || PyUnicode_CheckExact(right))) ?
         PyUnicode_Format(left, right) :
         PyNumber_Remainder(left, right);
 

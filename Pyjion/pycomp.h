@@ -39,12 +39,8 @@
 #include <cstdlib>
 #include <intrin.h>
 
-#include <Python.h>
-
 #include <vector>
 #include <unordered_map>
-
-#include <Python.h>
 
 #include "ipycomp.h"
 #include "jitinfo.h"
@@ -245,8 +241,6 @@ class PythonCompiler : public IPythonCompiler {
     PyCodeObject *m_code;
     // pre-calculate some information...
     ILGenerator m_il;
-    unsigned char *m_byteCode;
-    size_t m_size;
     UserModule* m_module;
     Local m_lasti;
 
@@ -263,7 +257,7 @@ public:
 
     virtual void emit_dup_top_two();
 
-    virtual void emit_load_name(PyObject* name);
+    virtual void emit_load_name(void* name);
     virtual void emit_is_true();
 
     virtual void emit_push_frame();
@@ -275,15 +269,15 @@ public:
 
     virtual void emit_ret();
 
-    virtual void emit_store_name(PyObject* name);
-    virtual void emit_delete_name(PyObject* name);
-    virtual void emit_store_attr(PyObject* name);
-    virtual void emit_delete_attr(PyObject* name);
-    virtual void emit_load_attr(PyObject* name);
-    virtual void emit_store_global(PyObject* name);
-    virtual void emit_delete_global(PyObject* name);
-    virtual void emit_load_global(PyObject* name);
-    virtual void emit_delete_fast(int index, PyObject* name);
+    virtual void emit_store_name(void* name);
+    virtual void emit_delete_name(void* name);
+    virtual void emit_store_attr(void* name);
+    virtual void emit_delete_attr(void* name);
+    virtual void emit_load_attr(void* name);
+    virtual void emit_store_global(void* name);
+    virtual void emit_delete_global(void* name);
+    virtual void emit_load_global(void* name);
+    virtual void emit_delete_fast(int index);
 
     virtual void emit_new_tuple(size_t size);
     virtual void emit_tuple_store(size_t size);
@@ -326,8 +320,8 @@ public:
     virtual void emit_unary_not_tagged_int_push_bool();
     virtual void emit_unary_invert();
 
-    virtual void emit_import_name(PyObject* name);
-    virtual void emit_import_from(PyObject* name);
+    virtual void emit_import_name(void* name);
+    virtual void emit_import_from(void* name);
     virtual void emit_import_star();
 
     virtual void emit_load_build_class();
@@ -419,17 +413,16 @@ public:
 
     virtual void emit_int(int value);
     virtual void emit_float(double value);
-    virtual void emit_tagged_int(ssize_t value);
+    virtual void emit_tagged_int(size_t value);
     virtual void emit_unbox_int_tagged();
     virtual void emit_unbox_float();
     virtual void emit_ptr(void *value);
     virtual void emit_bool(bool value);
-    virtual void emit_py_object(PyObject* value);
 
     virtual void emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback);
     virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback);
     virtual void emit_restore_err();
-    virtual void emit_pyerr_setstring(PyObject* exception, const char*msg);
+    virtual void emit_pyerr_setstring(void* exception, const char*msg);
 
     virtual void emit_compare_exceptions();
     virtual void emit_compare_exceptions_int();

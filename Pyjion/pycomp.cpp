@@ -26,8 +26,6 @@
 #include "pycomp.h"
 #include <corjit.h>
 #include <openum.h>
-#include <frameobject.h>
-#include <opcode.h>
 
 HRESULT __stdcall GetCORSystemDirectoryInternal(SString& pbuffer) {
     printf("get cor system\n");
@@ -113,8 +111,6 @@ PythonCompiler::PythonCompiler(PyCodeObject *code) :
     m_il(m_module = new UserModule(g_module),
         CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) }) {
     this->m_code = code;
-    this->m_byteCode = (unsigned char *)((PyBytesObject*)code->co_code)->ob_sval;
-    this->m_size = PyBytes_Size(code->co_code);
     m_lasti = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 }
 
@@ -434,59 +430,59 @@ void PythonCompiler::emit_is_true() {
     m_il.emit_call(METHOD_PYOBJECT_ISTRUE);
 }
 
-void PythonCompiler::emit_load_name(PyObject* name) {
+void PythonCompiler::emit_load_name(void* name) {
     load_frame();
     m_il.ld_i(name);
     m_il.emit_call(METHOD_LOADNAME_TOKEN);
 }
 
-void PythonCompiler::emit_store_name(PyObject* name) {
+void PythonCompiler::emit_store_name(void* name) {
     load_frame();
     m_il.ld_i(name);
     m_il.emit_call(METHOD_STORENAME_TOKEN);
 }
 
-void PythonCompiler::emit_delete_name(PyObject* name) {
+void PythonCompiler::emit_delete_name(void* name) {
     load_frame();
     m_il.ld_i(name);
     m_il.emit_call(METHOD_DELETENAME_TOKEN);
 }
 
-void PythonCompiler::emit_store_attr(PyObject* name) {
+void PythonCompiler::emit_store_attr(void* name) {
     m_il.ld_i(name);
     m_il.emit_call(METHOD_STOREATTR_TOKEN);
 }
 
-void PythonCompiler::emit_delete_attr(PyObject* name) {
+void PythonCompiler::emit_delete_attr(void* name) {
     m_il.ld_i(name);
     m_il.emit_call(METHOD_DELETEATTR_TOKEN);
 }
 
-void PythonCompiler::emit_load_attr(PyObject* name) {
+void PythonCompiler::emit_load_attr(void* name) {
     m_il.ld_i(name);
     m_il.emit_call(METHOD_LOADATTR_TOKEN);
 }
 
-void PythonCompiler::emit_store_global(PyObject* name) {
+void PythonCompiler::emit_store_global(void* name) {
     // value is on the stack
     load_frame();
     m_il.ld_i(name);
     m_il.emit_call(METHOD_STOREGLOBAL_TOKEN);
 }
 
-void PythonCompiler::emit_delete_global(PyObject* name) {
+void PythonCompiler::emit_delete_global(void* name) {
     load_frame();
     m_il.ld_i(name);
     m_il.emit_call(METHOD_DELETEGLOBAL_TOKEN);
 }
 
-void PythonCompiler::emit_load_global(PyObject* name) {
+void PythonCompiler::emit_load_global(void* name) {
     load_frame();
     m_il.ld_i(name);
     m_il.emit_call(METHOD_LOADGLOBAL_TOKEN);
 }
 
-void PythonCompiler::emit_delete_fast(int index, PyObject* name) {
+void PythonCompiler::emit_delete_fast(int index) {
     load_local(index);
     load_frame();
     m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + index * sizeof(size_t));
@@ -592,13 +588,13 @@ void PythonCompiler::emit_unary_invert() {
     m_il.emit_call(METHOD_UNARY_INVERT);
 }
 
-void PythonCompiler::emit_import_name(PyObject* name) {
+void PythonCompiler::emit_import_name(void* name) {
     m_il.ld_i(name);
     load_frame();
     m_il.emit_call(METHOD_PY_IMPORTNAME);
 }
 
-void PythonCompiler::emit_import_from(PyObject* name) {
+void PythonCompiler::emit_import_from(void* name) {
     m_il.dup();
     m_il.ld_i(name);
     m_il.emit_call(METHOD_PY_IMPORTFROM);
@@ -770,7 +766,7 @@ void PythonCompiler::emit_compare_exceptions_int() {
     m_il.emit_call(METHOD_COMPARE_EXCEPTIONS_INT);
 }
 
-void PythonCompiler::emit_pyerr_setstring(PyObject* exception, const char*msg) {
+void PythonCompiler::emit_pyerr_setstring(void* exception, const char*msg) {
     emit_ptr(exception);
     emit_ptr((void*)msg);
     m_il.emit_call(METHOD_PYERR_SETSTRING);
@@ -819,7 +815,7 @@ void PythonCompiler::emit_unbox_float() {
     m_il.ld_ind_r8();
 }
 
-void PythonCompiler::emit_tagged_int(ssize_t value) {
+void PythonCompiler::emit_tagged_int(size_t value) {
     m_il.ld_i((size_t)((value << 1) | 0x01));
 }
 
@@ -833,12 +829,6 @@ void PythonCompiler::emit_ptr(void* value) {
 
 void PythonCompiler::emit_bool(bool value) {
     m_il.ld_i4(value);
-}
-
-void PythonCompiler::emit_py_object(PyObject *value) {
-    m_il.ld_i(value);
-    m_il.dup();
-    emit_incref();
 }
 
 // Emits a call to create a new function, consuming the code object and

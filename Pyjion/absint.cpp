@@ -1635,10 +1635,55 @@ void AbstractInterpreter::build_set(size_t argCnt) {
     error_check("build set failed");
 
     if (argCnt != 0) {
-        auto valueTmp = m_comp->emit_define_local();
-        auto setTmp = m_comp->emit_define_local();
+		auto setTmp = m_comp->emit_define_local();
+		m_comp->emit_store_local(setTmp);
+		Local* tmps = new Local[argCnt];
+		Label* frees = new Label[argCnt];
+		for (auto i = 0; i < argCnt; i++) {
+			tmps[argCnt - (i + 1)] = m_comp->emit_spill();
+			dec_stack();
+		}
 
-        m_comp->emit_store_local(setTmp);
+		// load all the values into the set...
+		auto err = m_comp->emit_define_label();
+		for (int i = 0; i < argCnt; i++) {
+			m_comp->emit_load_local(setTmp);
+			m_comp->emit_load_local(tmps[i]);
+			m_comp->emit_set_add();
+			frees[i] = m_comp->emit_define_label();
+			m_comp->emit_branch(BranchFalse, frees[i]);
+		}
+
+		auto noErr = m_comp->emit_define_label();
+		m_comp->emit_branch(BranchAlways, noErr);
+
+		m_comp->emit_mark_label(err);
+		m_comp->emit_load_local(setTmp);
+		m_comp->emit_pop_top();
+		
+		// In the event of an error we need to free any
+		// args that weren't processed.  We'll always process
+		// the 1st value and dec ref it in the set add helper.
+		// tmps[0] = 'a', tmps[1] = 'b', tmps[2] = 'c'
+		// We'll process tmps[0], and if that fails, then we need
+		// to free tmps[1] and tmps[2] which correspond with frees[0]
+		// and frees[1]
+		for (int i = 1; i < argCnt; i++) {
+			m_comp->emit_mark_label(frees[i - 1]);
+			m_comp->emit_load_local(tmps[i]);
+			m_comp->emit_pop_top();
+		}
+
+		// And if the last one failed, then all of the values have been
+		// decref'd
+		m_comp->emit_mark_label(frees[argCnt - 1]);
+		branch_raise("set add failed");
+
+		m_comp->emit_mark_label(noErr);
+		delete[] frees;
+		delete[] tmps;
+		/*
+		auto valueTmp = m_comp->emit_define_local();
 
         for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
             // save the argument into a temporary...
@@ -1662,9 +1707,9 @@ void AbstractInterpreter::build_set(size_t argCnt) {
             m_comp->emit_mark_label(noErr);
 
         }
-
+		*/
         m_comp->emit_load_local(setTmp);
-        m_comp->emit_free_local(valueTmp);
+        //m_comp->emit_free_local(valueTmp);
         m_comp->emit_free_local(setTmp);
     }
     inc_stack();
@@ -2199,7 +2244,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case DELETE_FAST:
                 load_fast_worker(oparg, true);
                 m_comp->emit_pop_top();
-                m_comp->emit_delete_fast(oparg, PyTuple_GetItem(m_code->co_varnames, oparg));
+                m_comp->emit_delete_fast(oparg);
                 break;
             case STORE_FAST: store_fast(oparg, opcodeIndex); break;
             case LOAD_FAST: load_fast(oparg, opcodeIndex); break;
@@ -2691,7 +2736,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     dec_stack();
                     m_comp->emit_store_local(ehInfo.ExVars.FinallyExc);
                     m_comp->emit_load_local(ehInfo.ExVars.FinallyExc);
-                    m_comp->emit_py_object(Py_None);
+					m_comp->emit_ptr(Py_None);
+					m_comp->emit_dup();
+					m_comp->emit_incref();
                     m_comp->emit_branch(BranchEqual, noException);
 
                     if (flags & EHF_BlockBreaks) {
@@ -3457,7 +3504,9 @@ void AbstractInterpreter::load_const(int constIndex, int opcodeIndex) {
             }
         }
     }
-    m_comp->emit_py_object(constValue);
+	m_comp->emit_ptr(constValue);
+	m_comp->emit_dup();
+	m_comp->emit_incref();
     inc_stack();
 }
 
