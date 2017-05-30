@@ -537,7 +537,11 @@ AbstractValue* IntegerValue::binary(AbstractSource* selfSources, int op, Abstrac
             case INPLACE_RSHIFT:
             case INPLACE_SUBTRACT:
             case INPLACE_XOR:
-                return this;
+				if (selfSources != nullptr) {
+					selfSources->escapes();
+				}
+				other.escapes();
+				return this;
         }
     }
     else if (other_kind == AVK_Bytes) {

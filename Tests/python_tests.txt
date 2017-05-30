@@ -1,4 +1,4 @@
-# A list of all tests in Python 3.5.
+# A list of all tests in Python 3.6.
 # To run tests from PowerShell in a Pyjion checkout:
 #   .\Python\python.bat -m test -n -f Tests\python_tests.txt
 #
@@ -38,7 +38,7 @@ test_bytes
 test_bz2
 test_calendar
 test_call
-test_capi
+#test_capi  # Crashes due to thread local co extra storage
 test_cgi
 test_cgitb
 test_charmapcodec
@@ -187,7 +187,8 @@ test_imp
 test_import
 test_importlib
 test_index
-test_inspect
+# TODO: https://github.com/Microsoft/Pyjion/issues/93
+#test_inspect
 test_int
 test_int_literal
 test_io

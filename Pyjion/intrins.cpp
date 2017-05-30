@@ -2493,6 +2493,13 @@ int _PyJit_PeriodicWork() {
 	}
 
 	if (!(g_counter & 0xffff)) {
+		auto ts = PyThreadState_GET();
+		if (ts->async_exc != nullptr) {
+			PyErr_SetNone(ts->async_exc);
+			Py_DECREF(ts->async_exc);
+			ts->async_exc = nullptr;
+			return -1;
+		}
 		return Py_MakePendingCalls();
 	}
 
