@@ -49,17 +49,24 @@
 #include <frameobject.h>
 #include <Python.h>
 
+
+ //#define NO_TRACE
+ //#define TRACE_TREE
+
+struct SpecializedTreeNode;
 class PyjionJittedCode;
 
 extern "C" __declspec(dllexport) void JitInit();
 extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *, int);
 extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
 
-typedef PyObject* (*Py_EvalFunc)(void*, struct _frame*);
+class PyjionJittedCode;
+typedef PyObject* (*Py_EvalFunc)(PyjionJittedCode*, struct _frame*);
 
 static PY_UINT64_T HOT_CODE = 0;
 
 void PyjionJitFree(void* obj);
+
 /* Jitted code object.  This object is returned from the JIT implementation.  The JIT can allocate
 a jitted code object and fill in the state for which is necessary for it to perform an evaluation. */
 
@@ -68,16 +75,28 @@ public:
 	PY_UINT64_T j_run_count;
 	bool j_failed;
 	Py_EvalFunc j_evalfunc;
-	void* j_evalstate;          /* opaque value, allows the JIT to track any relevant state */
 	PY_UINT64_T j_specialization_threshold;
+	PyObject* j_code;
+#ifdef TRACE_TREE
+	SpecializedTreeNode* funcs;
+#else
+	std::vector<SpecializedTreeNode*> j_optimized;
+#endif
+	Py_EvalFunc j_generic;
 
-	PyjionJittedCode() {
-		this->j_run_count = 0;
-		this->j_failed = false;
-		this->j_evalfunc = nullptr;
-		this->j_evalstate = nullptr;
-		this->j_specialization_threshold = HOT_CODE;
+	PyjionJittedCode(PyObject* code) {
+		j_code = code;
+		j_run_count = 0;
+		j_failed = false;
+		j_evalfunc = nullptr;
+		j_specialization_threshold = HOT_CODE;
+#ifdef TRACE_TREE
+		funcs = new SpecializedTreeNode();
+#endif
+		j_generic = nullptr;
 	}
+
+	~PyjionJittedCode();
 };
 __declspec(dllexport) bool jit_compile(PyCodeObject* code);
 
