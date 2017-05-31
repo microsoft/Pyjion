@@ -43,7 +43,6 @@
 #include <intrin.h>
 
 #include <Python.h>
-#include <utilcode.h>
 #include <frameobject.h>
 #include <opcode.h>
 
@@ -51,7 +50,6 @@
 #include <unordered_map>
 
 #include <corjit.h>
-#include <utilcode.h>
 #include <openum.h>
 
 #include "codemodel.h"
@@ -64,14 +62,12 @@ class CorJitInfo : public ICorJitInfo, public JittedCode {
     CExecutionEngine& m_executionEngine;
     void* m_codeAddr;
     void* m_dataAddr;
-    PyCodeObject *m_code;
     UserModule* m_module;
 
 public:
 
-    CorJitInfo(CExecutionEngine& executionEngine, PyCodeObject* code, UserModule* module) : m_executionEngine(executionEngine) {
+    CorJitInfo(CExecutionEngine& executionEngine, UserModule* module) : m_executionEngine(executionEngine) {
         m_codeAddr = m_dataAddr = nullptr;
-        m_code = code;
         m_module = module;
     }
 

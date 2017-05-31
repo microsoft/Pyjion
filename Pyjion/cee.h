@@ -44,11 +44,9 @@
 #include <vector>
 #include <unordered_map>
 
+#include <clrhost.h>
 #include "corjit.h"
-#include "utilcode.h"
 #include "openum.h"
-
-using namespace std;
 
 class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager {
 public:
