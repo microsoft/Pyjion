@@ -877,8 +877,9 @@ PyObject* PyJit_CallKwArgs(PyObject* func, PyObject*callargs, PyObject*kwargs) {
 	PyObject* result = nullptr;
 	if (!PyDict_CheckExact(kwargs)) {
 		PyObject *d = PyDict_New();
-		if (d == NULL)
-			goto error;
+        if (d == NULL) {
+            goto error;
+        }
 		if (PyDict_Update(d, kwargs) != 0) {
 			Py_DECREF(d);
 			/* PyDict_Update raises attribute
@@ -1229,34 +1230,7 @@ int PyJit_DeleteGlobal(PyFrameObject* f, PyObject* name) {
 }
 
 PyObject *
-_PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key)
-{
-#if FALSE
-	Py_ssize_t ix;
-	Py_hash_t hash;
-	PyObject **value_addr;
-
-	if (!PyUnicode_CheckExact(key) ||
-		(hash = ((PyASCIIObject *)key)->hash) == -1)
-	{
-		hash = PyObject_Hash(key);
-		if (hash == -1)
-			return NULL;
-	}
-
-	/* namespace 1: globals */
-	ix = globals->ma_keys->dk_lookup(globals, key, hash, &value_addr, NULL);
-	if (ix == DKIX_ERROR)
-		return NULL;
-	if (ix != DKIX_EMPTY && *value_addr != NULL)
-		return *value_addr;
-
-	/* namespace 2: builtins */
-	ix = builtins->ma_keys->dk_lookup(builtins, key, hash, &value_addr, NULL);
-	if (ix < 0)
-		return NULL;
-	return *value_addr;
-#endif
+_PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key) {
 	auto res = PyDict_GetItem((PyObject*)globals, key);
 	if (res != nullptr) {
 		return res;

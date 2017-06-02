@@ -90,6 +90,16 @@ PyjionJittedCode::~PyjionJittedCode() {
 }
 
 PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
+#if DEBUG_CALL_TRACE
+    printf("Invoking trace %s from %s line %d %p %p\r\n",
+        PyUnicode_AsUTF8(frame->f_code->co_name),
+        PyUnicode_AsUTF8(frame->f_code->co_filename),
+        frame->f_code->co_firstlineno,
+        state,
+        frame
+    );
+#endif
+
     PyThreadState *tstate = PyThreadState_GET();
     if (tstate->use_tracing) {
         if (tstate->c_tracefunc != NULL) {
@@ -103,6 +113,10 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
 
 	frame->f_executing = 1;
     auto res = ((Py_EvalFunc)state)(nullptr, frame);
+
+#if DEBUG_CALL_TRACE
+    printf("Returning from %s", PyUnicode_AsUTF8(frame->f_code->co_name));
+#endif
 
     Py_LeaveRecursiveCall();
     frame->f_executing = 0;
@@ -271,14 +285,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
                 }
             }
         }
-		/*
-        printf("Tracing %s from %s line %d %s\r\n",
-            PyUnicode_AsUTF8(frame->f_code->co_name),
-            PyUnicode_AsUTF8(frame->f_code->co_filename),
-            frame->f_code->co_firstlineno,
-            isSpecialized ? "specialized" : ""
-            );
-			*/
+
         if (res == nullptr) {
 #ifdef DEBUG_TRACE
             printf("Compilation failure #%d\r\n", ++failCount);
@@ -339,15 +346,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 	if (target != nullptr && !trace->j_failed) {
 		if (target->addr != nullptr) {
 			// we have a specialized function for this, just invoke it
-			/*printf("Invoking trace %s from %s line %d %p %p\r\n",
-				PyUnicode_AsUTF8(frame->f_code->co_name),
-				PyUnicode_AsUTF8(frame->f_code->co_filename),
-				frame->f_code->co_firstlineno,
-				target->addr,
-				frame
-			);*/
 			auto res = Jit_EvalHelper(target->addr, frame);
-			//printf("Returning from %s", PyUnicode_AsUTF8(frame->f_code->co_name));
 			return res;
 		}
 
@@ -404,38 +403,28 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 				trace->j_evalfunc = Jit_EvalGeneric;
 			}
 			
-			/*printf("Entering %s from %s line %d %s\r\n",
-				PyUnicode_AsUTF8(frame->f_code->co_name),
-				PyUnicode_AsUTF8(frame->f_code->co_filename),
-				frame->f_code->co_firstlineno,
-				isSpecialized ? "specialized" : ""
-			);*/
-
-			// And finally dispatch to the newly compiled code
-			/*printf("Invoking trace %s from %s line %d %p\r\n",
-				PyUnicode_AsUTF8(frame->f_code->co_name),
-				PyUnicode_AsUTF8(frame->f_code->co_filename),
-				frame->f_code->co_firstlineno,
-				target->addr
-			);*/
 			return Jit_EvalHelper(target->addr, frame);
 		}
 	}
-	
-	/*printf("Invoking default %s from %s line %d %s %p %p\r\n",
+
+#ifdef DEBUG_CALL_TRACE
+	printf("Invoking default %s from %s line %d %s %p %p\r\n",
 		PyUnicode_AsUTF8(frame->f_code->co_name),
 		PyUnicode_AsUTF8(frame->f_code->co_filename),
 		frame->f_code->co_firstlineno,
 		target->addr,
 		frame
-	);*/
+	);
+#endif
 	auto res = _PyEval_EvalFrameDefault(frame, 0);
-	/*printf("Returning default %s from %s line %d %s %p\r\n",
+#ifdef DEBUG_CALL_TRACE
+    printf("Returning default %s from %s line %d %s %p\r\n",
 		PyUnicode_AsUTF8(frame->f_code->co_name),
 		PyUnicode_AsUTF8(frame->f_code->co_filename),
 		frame->f_code->co_firstlineno,
 		target->addr
-	);*/
+	);
+#endif
 	return res;
 }
 
@@ -508,25 +497,28 @@ extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int
 	if (jitted != nullptr && !throwflag) {
 		if (jitted->j_evalfunc != nullptr) {
 			SetLastError(err);
-			/*
+#if DEBUG_CALL_TRACE
 			printf("Calling %s from %s line %d %p\r\n",
 				PyUnicode_AsUTF8(f->f_code->co_name),
 				PyUnicode_AsUTF8(f->f_code->co_filename),
 				f->f_code->co_firstlineno,
 				jitted
-			);*/
+			);
+#endif
 			return jitted->j_evalfunc(jitted, f);
 		}
 		else if (!jitted->j_failed && jitted->j_run_count++ >= jitted->j_specialization_threshold) {
 			if (jit_compile(f->f_code)) {
 				// execute the jitted code...
 				SetLastError(err);
-				/*printf("Calling first %s from %s line %d %p\r\n",
+#ifdef DEBUG_CALL_TRACE
+				printf("Calling first %s from %s line %d %p\r\n",
 					PyUnicode_AsUTF8(f->f_code->co_name),
 					PyUnicode_AsUTF8(f->f_code->co_filename),
 					f->f_code->co_firstlineno,
 					jitted
-				);*/
+				);
+#endif
 				return jitted->j_evalfunc(jitted, f);
 			}
 
@@ -535,22 +527,24 @@ extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int
 		}
 	}
 	SetLastError(err);
-	/*
+#ifdef DEBUG_CALL_TRACE
 	printf("Falling to EFD %s from %s line %d %s %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),
 		PyUnicode_AsUTF8(f->f_code->co_filename),
 		f->f_code->co_firstlineno,
 		jitted
-	);*/
+	);
+#endif
 
 	auto res = _PyEval_EvalFrameDefault(f, throwflag);
-	/*
+#ifdef DEBUG_CALL_TRACE
 	printf("Returning EFD %s from %s line %d %s %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),
 		PyUnicode_AsUTF8(f->f_code->co_filename),
 		f->f_code->co_firstlineno,
 		jitted
-	);*/
+	);
+#endif
 	return res;
 }
 
@@ -572,20 +566,29 @@ static PyObject *pyjion_enable(PyObject *self, PyObject* args) {
 	auto ts = PyThreadState_Get();
 	auto prev = ts->interp->eval_frame;
 	ts->interp->eval_frame = PyJit_EvalFrame;
-	return prev == PyJit_EvalFrame ? Py_False : Py_True;
+    if (prev == PyJit_EvalFrame) {
+        Py_RETURN_FALSE;
+    }
+    Py_RETURN_TRUE;
 }
 
 static PyObject *pyjion_disable(PyObject *self, PyObject* args) {
 	auto ts = PyThreadState_Get();
 	auto prev = ts->interp->eval_frame;
 	ts->interp->eval_frame = _PyEval_EvalFrameDefault;
-	return prev == PyJit_EvalFrame ? Py_True : Py_False;
+    if (prev == PyJit_EvalFrame) {
+        Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
 }
 
 static PyObject *pyjion_status(PyObject *self, PyObject* args) {
 	auto ts = PyThreadState_Get();
 	auto prev = ts->interp->eval_frame;
-	return prev == PyJit_EvalFrame ? Py_True : Py_False;
+    if (prev == PyJit_EvalFrame) {
+        Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
 }
 
 static PyObject *pyjion_info(PyObject *self, PyObject* func) {
@@ -681,7 +684,7 @@ static PyMethodDef PyjionMethods[] = {
 static struct PyModuleDef pyjionmodule = {
 	PyModuleDef_HEAD_INIT,
 	"pyjion",   /* name of module */
-	"Pyjion - A Just in Time Compiler for CPython 3.6.x", /* module documentation, may be NULL */
+	"Pyjion - A Just-in-Time Compiler for CPython 3.6.x", /* module documentation, may be NULL */
 	-1,       /* size of per-interpreter state of the module,
 			  or -1 if the module keeps state in global variables. */
 	PyjionMethods

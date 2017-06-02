@@ -164,7 +164,9 @@ public:
 
     virtual BOOL logMsg(unsigned level, const char* fmt, va_list args) {
         if (level < 7) {
-            //vprintf(fmt, args);
+#if JIT_FAIL_LOG
+            vprintf(fmt, args);
+#endif
         }
         return TRUE;
     }
