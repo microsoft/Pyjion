@@ -108,7 +108,7 @@ public:
     // Emits an unboxed floating point value onto the stack
     virtual void emit_float(double value) = 0;
     // Emits a unboxed tagged integer value onto the stack
-    virtual void emit_tagged_int(ssize_t value) = 0;
+    virtual void emit_tagged_int(size_t value) = 0;
     // Takes a Python long off the stack and converts it to a tagged int, or leaves
     // it as an object if the long doesn't fix in a tagged int.
     virtual void emit_unbox_int_tagged() = 0;
@@ -119,8 +119,6 @@ public:
     virtual void emit_bool(bool value) = 0;
     // Emits a pointer value onto the stack
     virtual void emit_ptr(void* value) = 0;
-    // Emits the address of a Python object on the stack, bumping its ref count
-    virtual void emit_py_object(PyObject* value) = 0;
     // Emits a null pointer onto the stack
     virtual void emit_null() = 0;
 
@@ -180,23 +178,23 @@ public:
      // Loads/stores/deletes from the frame objects fast local variables
     virtual void emit_load_fast(int local) = 0;
     virtual void emit_store_fast(int local) = 0;
-    virtual void emit_delete_fast(int index, PyObject* name) = 0;
+    virtual void emit_delete_fast(int index) = 0;
     virtual void emit_unbound_local_check() = 0;
 
     // Loads/stores/deletes by name for values not known to be in fast locals
-    virtual void emit_load_name(PyObject* name) = 0;
-    virtual void emit_store_name(PyObject* name) = 0;
-    virtual void emit_delete_name(PyObject* name) = 0;
+    virtual void emit_load_name(void* name) = 0;
+    virtual void emit_store_name(void* name) = 0;
+    virtual void emit_delete_name(void* name) = 0;
 
     // Loads/stores/deletes an attribute on an object
-    virtual void emit_load_attr(PyObject* name) = 0;
-    virtual void emit_store_attr(PyObject* name) = 0;
-    virtual void emit_delete_attr(PyObject* name) = 0;
+    virtual void emit_load_attr(void* name) = 0;
+    virtual void emit_store_attr(void* name) = 0;
+    virtual void emit_delete_attr(void* name) = 0;
 
     // Loads/stores/deletes a global variable
-    virtual void emit_load_global(PyObject* name) = 0;
-    virtual void emit_store_global(PyObject* name) = 0;
-    virtual void emit_delete_global(PyObject* name) = 0;
+    virtual void emit_load_global(void* name) = 0;
+    virtual void emit_store_global(void* name) = 0;
+    virtual void emit_delete_global(void* name) = 0;
 
     // Loads/stores/deletes a cell variable for closures.
     virtual void emit_load_deref(int index) = 0;
@@ -217,6 +215,7 @@ public:
     virtual void emit_new_tuple(size_t size) = 0;
     // Stores all of the values on the stack into a tuple
     virtual void emit_tuple_store(size_t size) = 0;
+	virtual void emit_tuple_load(size_t index) = 0;
     // Convert a list to a tuple
     virtual void emit_list_to_tuple() = 0;
 
@@ -231,15 +230,29 @@ public:
 
     // Creates a new set
     virtual void emit_new_set() = 0;
-    // Extends a set with a single iterable
+	// Extends a set with a single iterable
     virtual void emit_set_extend() = 0;
     // Adds a single item to a set
     virtual void emit_set_add() = 0;
 
-    // Creates a new dictionary
+	// Joins an array of string values into a single string (takes string values and length)
+	virtual void emit_unicode_joinarray() = 0;
+	virtual void emit_format_value() = 0;
+	// Calls PyObject_Str on the value
+	virtual void emit_pyobject_str() = 0;
+	// Calls PyObject_Repr on the value
+	virtual void emit_pyobject_repr() = 0;
+	// Calls PyObject_Ascii on the value
+	virtual void emit_pyobject_ascii() = 0;
+	// Calls PyObject_Ascii on the value
+	virtual void emit_pyobject_format() = 0;
+
+	// Creates a new dictionary
     virtual void emit_new_dict(size_t size) = 0;
-    // Stores a key/value pair into a set
+    // Stores a key/value pair into a dict
     virtual void emit_dict_store() = 0;
+	// Stores a key/value pair into a dict w/o doing a decref on the key/value
+	virtual void emit_dict_store_no_decref() = 0;
     // Adds a single key/value pair to a dict
     virtual void emit_map_add() = 0;
     // Extends a map by another mapping
@@ -252,9 +265,9 @@ public:
     virtual void emit_is_true() = 0;
 
     // Imports the specified name
-    virtual void emit_import_name(PyObject* name) = 0;
+    virtual void emit_import_name(void* name) = 0;
     // Imports the specified name from a module
-    virtual void emit_import_from(PyObject* name) = 0;
+    virtual void emit_import_from(void* name) = 0;
     // Does ... import *
     virtual void emit_import_star() = 0;
 
@@ -266,6 +279,7 @@ public:
     virtual void emit_unpack_ex(Local sequence, size_t leftSize, size_t rightSize, Local sequenceStorage, Local list, Local remainder) = 0;
     // Loads an element from the array on the stack
     virtual void emit_load_array(int index) = 0;
+	virtual void emit_store_to_array(Local array, int index) = 0;
 
     // Emits a call for the specified argument count.  If the compiler
     // can't emit a call with this number of args then it returns false,
@@ -274,10 +288,14 @@ public:
     virtual bool emit_call(size_t argCnt) = 0;
     // Emits a call with the arguments to be invoked in a tuple object
     virtual void emit_call_with_tuple() = 0;
-    // Emits a call with the arguments in a tuple and kw arguments in a dict
-    virtual void emit_call_with_kws() = 0;
-    // Emits a call which includes *args or **args
-    virtual void emit_fancy_call() = 0;
+
+	virtual bool emit_kwcall(size_t argCnt) = 0;
+	virtual void emit_kwcall_with_tuple() = 0;
+
+    // Emits a call which includes *args 
+	virtual void emit_call_args() = 0;
+	// Emits a call which includes *args and **kwargs
+	virtual void emit_call_kwargs() = 0;
 
     /*****************************************************
      * Function creation */
@@ -376,7 +394,7 @@ public:
     // Compares to see if an exception is handled, pushing an int on the stack indicating true (1), false (0), or error (-1)
     virtual void emit_compare_exceptions_int() = 0;
     // Sets the current exception type and text
-    virtual void emit_pyerr_setstring(PyObject* exception, const char*msg) = 0;
+    virtual void emit_pyerr_setstring(void* exception, const char*msg) = 0;
 
     virtual void emit_incref(bool maybeTagged = false) = 0; 
 
