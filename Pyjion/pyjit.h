@@ -25,11 +25,9 @@
 
 #ifndef PYJIT_H
 #define PYJIT_H
-
 #define FEATURE_NO_HOST
 #define USE_STL
 #include <stdint.h>
-#include <windows.h>
 #include <wchar.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -37,17 +35,15 @@
 #include <limits.h>
 #include <string.h>
 #include <float.h>
-#include <share.h>
+//#include <share.h>
 #include <cstdlib>
-#include <intrin.h>
+//#include <intrin.h>
 
 #include <Python.h>
+#include <frameobject.h>
 
 #include <vector>
 #include <unordered_map>
-
-#include <frameobject.h>
-#include <Python.h>
 
 
  //#define NO_TRACE

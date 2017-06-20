@@ -26,9 +26,17 @@
 */
 
 #include "pyjit.h"
-#include "pycomp.h"
+
+#include <vector>
+#include "ipycomp.h"
+#include "absvalue.h"
+#include "absint.h"
+
+using namespace std;
 
 HINSTANCE            g_pMSCorEE;
+
+IPythonCompiler* CreateCLRCompiler(Module* intrins, Module* userModule);
 
 // Tracks types for a function call.  Each argument has a SpecializedTreeNode with
 // children for the subsequent arguments.  When we get to the leaves of the tree
@@ -111,6 +119,7 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
 }
 
 static DWORD g_extraSlot;
+PyObject* g_emptyTuple;
 
 extern "C" __declspec(dllexport) void JitInit() {
 	g_extraSlot = TlsAlloc();
@@ -141,9 +150,10 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
         failCount);
 #endif
 
-    PythonCompiler jitter(code);
-    AbstractInterpreter interp(code, &jitter);
+	IPythonCompiler* comp = CreateCLRCompiler();
+    AbstractInterpreter interp(code, comp);
     auto res = interp.compile();
+	delete comp;
 
     if (res == nullptr) {
 #ifdef DEBUG_TRACE
@@ -252,7 +262,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
     auto jittedCode = (PyjionJittedCode *)trace->code->co_extra;
     if (curNode->hitCount > jittedCode->j_specialization_threshold) {
         // Compile and run the now compiled code...
-        PythonCompiler jitter(trace->code);
+		IPythonCompiler* comp = CreateCLRCompiler();
         AbstractInterpreter interp(trace->code, &jitter);
 
         // provide the interpreter information about the specialized types
@@ -262,6 +272,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
         }
 
         auto res = interp.compile();
+		delete comp;
         bool isSpecialized = false;
         for (int i = 0; i < argCount; i++) {
             auto type = GetAbstractType(GetArgType(i, frame->f_localsplus));
@@ -356,8 +367,8 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 		// No specialized function yet, let's see if we should create one...
 		if (target->hitCount >= trace->j_specialization_threshold) {
 			// Compile and run the now compiled code...
-			PythonCompiler jitter((PyCodeObject*)trace->j_code);
-			AbstractInterpreter interp((PyCodeObject*)trace->j_code, &jitter);
+			IPythonCompiler* comp = CreateCLRCompiler();
+			AbstractInterpreter interp((PyCodeObject*)trace->j_code, comp);
 			int argCount = frame->f_code->co_argcount + frame->f_code->co_kwonlyargcount;
 
 			// provide the interpreter information about the specialized types
@@ -367,6 +378,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 			}
 
 			auto res = interp.compile();
+			delete comp;
 			bool isSpecialized = false;
 			for (int i = 0; i < argCount; i++) {
 				auto type = GetAbstractType(GetArgType(i, frame->f_localsplus));

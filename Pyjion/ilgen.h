@@ -47,7 +47,6 @@
 #include <corjit.h>
 #include <openum.h>
 
-#include "codemodel.h"
 #include "ipycomp.h"
 
 using namespace std;

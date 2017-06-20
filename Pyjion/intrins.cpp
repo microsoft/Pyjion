@@ -28,6 +28,8 @@
 #include "intrins.h"
 #include "taggedptr.h"
 #include <cstdint>
+#include <cstdlib>
+#include <x86intrin.h>
 
 #ifdef _MSC_VER
 
@@ -37,7 +39,7 @@ using namespace msl::utilities;
 #endif
 
 //#define DEBUG_TRACE
-PyObject* g_emptyTuple;
+extern PyObject* g_emptyTuple;
 #include <dictobject.h>
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
@@ -168,11 +170,11 @@ int PyJit_RichEquals_Long(PyObject *left, PyObject *right, void**state) {
 int PyJit_RichEquals_Generic(PyObject *left, PyObject *right, void**state) {
     if (left->ob_type == right->ob_type) {
         if (PyUnicode_CheckExact(left)) {
-            *state = &PyJit_RichEquals_Str;
+            *state = (void*)&PyJit_RichEquals_Str;
             return PyJit_RichEquals_Str(left, right, state);
         }
         else if (PyLong_CheckExact(left)) {
-            *state = &PyJit_RichEquals_Long;
+            *state = (void*)&PyJit_RichEquals_Long;
             return PyJit_RichEquals_Long(left, right, state);
         }
     }
@@ -1466,65 +1468,65 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
         if (it == nullptr) {
             goto Error;
         }
+		{
+			auto sp = tempStorage + leftSize + rightSize;
+			int i = 0;
+			for (; i < leftSize; i++) {
+				auto w = PyIter_Next(it);
+				if (w == NULL) {
+					/* Iterator done, via error or exhaustion. */
+					if (!PyErr_Occurred()) {
+						PyErr_Format(PyExc_ValueError,
+							"need more than %d value%s to unpack",
+							i, i == 1 ? "" : "s");
+					}
+					goto Error;
+				}
+				tempStorage[i] = w;
+			}
 
-        auto sp = tempStorage + leftSize + rightSize;
-        int i = 0;
-        for (; i < leftSize; i++) {
-            auto w = PyIter_Next(it);
-            if (w == NULL) {
-                /* Iterator done, via error or exhaustion. */
-                if (!PyErr_Occurred()) {
-                    PyErr_Format(PyExc_ValueError,
-                        "need more than %d value%s to unpack",
-                        i, i == 1 ? "" : "s");
-                }
-                goto Error;
-            }
-            tempStorage[i] = w;
-        }
+			if (listRes == nullptr) {
+				/* We better have exhausted the iterator now. */
+				auto w = PyIter_Next(it);
+				if (w == NULL) {
+					if (PyErr_Occurred())
+						goto Error;
+					Py_DECREF(it);
+					return tempStorage;
+				}
+				Py_DECREF(w);
+				PyErr_Format(PyExc_ValueError, "too many values to unpack "
+					"(expected %d)", leftSize);
+				goto Error;
+			}
+			else {
 
-        if (listRes == nullptr) {
-            /* We better have exhausted the iterator now. */
-            auto w = PyIter_Next(it);
-            if (w == NULL) {
-                if (PyErr_Occurred())
-                    goto Error;
-                Py_DECREF(it);
-                return tempStorage;
-            }
-            Py_DECREF(w);
-            PyErr_Format(PyExc_ValueError, "too many values to unpack "
-                "(expected %d)", leftSize);
-            goto Error;
-        }
-        else {
+				auto l = PySequence_List(it);
+				if (l == NULL)
+					goto Error;
+				*listRes = l;
+				i++;
 
-            auto l = PySequence_List(it);
-            if (l == NULL)
-                goto Error;
-            *listRes = l;
-            i++;
+				size_t ll = PyList_GET_SIZE(l);
+				if (ll < rightSize) {
+					PyErr_Format(PyExc_ValueError, "need more than %zd values to unpack",
+						leftSize + ll);
+					goto Error;
+				}
 
-            size_t ll = PyList_GET_SIZE(l);
-            if (ll < rightSize) {
-                PyErr_Format(PyExc_ValueError, "need more than %zd values to unpack",
-                    leftSize + ll);
-                goto Error;
-            }
-
-            /* Pop the "after-variable" args off the list. */
-            for (auto j = rightSize; j > 0; j--, i++) {
-                *--sp = PyList_GET_ITEM(l, ll - j);
-            }
-            /* Resize the list. */
-            Py_SIZE(l) = ll - rightSize;
-        }
-        Py_DECREF(it);
-        if (remainder != nullptr) {
-            *remainder = tempStorage + leftSize;
-        }
-        return tempStorage;
-
+				/* Pop the "after-variable" args off the list. */
+				for (auto j = rightSize; j > 0; j--, i++) {
+					*--sp = PyList_GET_ITEM(l, ll - j);
+				}
+				/* Resize the list. */
+				Py_SIZE(l) = ll - rightSize;
+			}
+			Py_DECREF(it);
+			if (remainder != nullptr) {
+				*remainder = tempStorage + leftSize;
+			}
+			return tempStorage;
+		}
     Error:
         for (int i = 0; i < leftSize; i++) {
             Py_XDECREF(tempStorage[i]);
@@ -1834,15 +1836,15 @@ PyObject* Call0_CFunction(PyObject *target, void** addr) {
 PyObject* Call0_Generic(PyObject *target, void** addr) {
     PyObject* res;
     if (PyFunction_Check(target)) {
-        *addr = &Call0_Function;
+        *addr = (void*)&Call0_Function;
         return Call0_Function(target, addr);
     }
     else if (PyCFunction_Check(target)) {
-        *addr = Call0_CFunction;
+        *addr = (void*)&Call0_CFunction;
         return Call0_CFunction(target, addr);
     }
     else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
-        *addr = Call0_Method;
+        *addr = (void*)&Call0_Method;
         return Call0_Method(target, addr);
     }
     else {
@@ -1870,20 +1872,21 @@ PyObject* Call1(PyObject *target, PyObject* arg0) {
         goto error;
     }
 
-
-    auto args = PyTuple_New(1);
-    if (args == nullptr) {
-        Py_DECREF(arg0);
-        goto error;
-    }
-    PyTuple_SET_ITEM(args, 0, arg0);
-    if (PyCFunction_Check(target)) {
-        res = PyCFunction_Call(target, args, nullptr);
-    }
-    else {
-        res = PyObject_Call(target, args, nullptr);
-    }
-    Py_DECREF(args);
+	{
+		auto args = PyTuple_New(1);
+		if (args == nullptr) {
+			Py_DECREF(arg0);
+			goto error;
+		}
+		PyTuple_SET_ITEM(args, 0, arg0);
+		if (PyCFunction_Check(target)) {
+			res = PyCFunction_Call(target, args, nullptr);
+		}
+		else {
+			res = PyObject_Call(target, args, nullptr);
+		}
+		Py_DECREF(args);
+	}
 error:
     Py_DECREF(target);
     return res;
@@ -1908,21 +1911,23 @@ PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1) {
     }
 
 
-    auto args = PyTuple_New(2);
-    if (args == nullptr) {
-        Py_DECREF(arg0);
-        Py_DECREF(arg1);
-        goto error;
-    }
-    PyTuple_SET_ITEM(args, 0, arg0);
-    PyTuple_SET_ITEM(args, 1, arg1);
-    if (PyCFunction_Check(target)) {
-        res = PyCFunction_Call(target, args, nullptr);
-    }
-    else {
-        res = PyObject_Call(target, args, nullptr);
-    }
-    Py_DECREF(args);
+	{
+		auto args = PyTuple_New(2);
+		if (args == nullptr) {
+			Py_DECREF(arg0);
+			Py_DECREF(arg1);
+			goto error;
+		}
+		PyTuple_SET_ITEM(args, 0, arg0);
+		PyTuple_SET_ITEM(args, 1, arg1);
+		if (PyCFunction_Check(target)) {
+			res = PyCFunction_Call(target, args, nullptr);
+		}
+		else {
+			res = PyObject_Call(target, args, nullptr);
+		}
+		Py_DECREF(args);
+	}
 error:
     Py_DECREF(target);
     return res;
@@ -1946,24 +1951,25 @@ PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
         res = Call4(func, self, arg0, arg1, arg2);
         goto error;
     }
-
-    auto args = PyTuple_New(3);
-    if (args == nullptr) {
-        Py_DECREF(arg0);
-        Py_DECREF(arg1);
-        Py_DECREF(arg2);
-        goto error;
-    }
-    PyTuple_SET_ITEM(args, 0, arg0);
-    PyTuple_SET_ITEM(args, 1, arg1);
-    PyTuple_SET_ITEM(args, 2, arg2);
-    if (PyCFunction_Check(target)) {
-        res = PyCFunction_Call(target, args, nullptr);
-    }
-    else {
-        res = PyObject_Call(target, args, nullptr);
-    }
-    Py_DECREF(args);
+	{
+		auto args = PyTuple_New(3);
+		if (args == nullptr) {
+			Py_DECREF(arg0);
+			Py_DECREF(arg1);
+			Py_DECREF(arg2);
+			goto error;
+		}
+		PyTuple_SET_ITEM(args, 0, arg0);
+		PyTuple_SET_ITEM(args, 1, arg1);
+		PyTuple_SET_ITEM(args, 2, arg2);
+		if (PyCFunction_Check(target)) {
+			res = PyCFunction_Call(target, args, nullptr);
+		}
+		else {
+			res = PyObject_Call(target, args, nullptr);
+		}
+		Py_DECREF(args);
+	}
 error:
     Py_DECREF(target);
     return res;
@@ -1980,7 +1986,7 @@ PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
         Py_DECREF(arg3);
         goto error;
     }
-
+	{
     auto args = PyTuple_New(4);
     if (args == nullptr) {
         Py_DECREF(arg0);
@@ -2000,6 +2006,7 @@ PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
         res = PyObject_Call(target, args, nullptr);
     }
     Py_DECREF(args);
+	}
 error:
     Py_DECREF(target);
     return res;
@@ -2108,7 +2115,7 @@ inline PyObject* init_number(size_t* data, tagged_ptr number) {
 
     // This won't overflow on min int because we never have min int due to the stolen bit
     auto size = 0;
-    auto tmpNumber = abs(number);
+    auto tmpNumber = labs(number);
     for (int i = 0; i < DIGITS_IN_TAGGED_PTR; i++) {
         ((PyLongObject*)value)->ob_digit[i] = tmpNumber & ((1 << PYLONG_BITS_IN_DIGIT) - 1);
         tmpNumber >>= PYLONG_BITS_IN_DIGIT;
@@ -2210,19 +2217,20 @@ inline PyObject* PyJit_Tagged_Multiply(tagged_ptr left, tagged_ptr right) {
 #elif __clang__ || __GNUC__
     if (!__builtin_mul_overflow(left, right, &res)) {
 #else
-#error No support for this compiler
+	#error No support for this compiler
+	if(false) {
 #endif
-    if (can_tag(res)) {
-        return TAG_IT(res);
-    }
-    // We overflowed by a single bit
-    return PyLong_FromLongLong(res);
+		if (can_tag(res)) {
+			return TAG_IT(res);
+		}
+		// We overflowed by a single bit
+		return PyLong_FromLongLong(res);
     }
 
-INIT_TMP_NUMBER(tmpLeft, left);
-INIT_TMP_NUMBER(tmpRight, right);
-// We overflowed big time...
-return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Multiply(tmpLeft, tmpRight));
+	INIT_TMP_NUMBER(tmpLeft, left);
+	INIT_TMP_NUMBER(tmpRight, right);
+	// We overflowed big time...
+	return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Multiply(tmpLeft, tmpRight));
 }
 
 
@@ -2236,19 +2244,20 @@ inline PyObject* PyJit_Tagged_Modulo(tagged_ptr left, tagged_ptr right) {
 #ifdef _MSC_VER
     if (right > 0 && left > 0 && SafeModulus(left, right, res)) {
 #else
-#error No support for this compiler
+	if (right > 0 && left > 0) {
+		res = left % right;
 #endif
-    if (can_tag(res)) {
-        return TAG_IT(res);
-    }
-    // We overflowed by a single bit
-    return NEW_LONG(res);
+		if (can_tag(res)) {
+			return TAG_IT(res);
+		}
+		// We overflowed by a single bit
+		return NEW_LONG(res);
     }
 
-INIT_TMP_NUMBER(tmpLeft, left);
-INIT_TMP_NUMBER(tmpRight, right);
+	INIT_TMP_NUMBER(tmpLeft, left);
+	INIT_TMP_NUMBER(tmpRight, right);
 
-return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Remainder(tmpLeft, tmpRight));
+	return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Remainder(tmpLeft, tmpRight));
 }
 
 inline PyObject* PyJit_Tagged_TrueDivide(tagged_ptr left, tagged_ptr right) {
@@ -2271,18 +2280,19 @@ inline PyObject* PyJit_Tagged_FloorDivide(tagged_ptr left, tagged_ptr right) {
 #ifdef _MSC_VER
     if (SafeDivide(left, right, res)) {
 #else
-#error No support for this compiler
+	if (left != PY_SSIZE_T_MIN || right != -1) {
+		res = left / right;
 #endif
-    if (can_tag(res)) {
-        return TAG_IT(res);
-    }
-    // We overflowed by a single bit
-    return NEW_LONG(res);
+		if (can_tag(res)) {
+			return TAG_IT(res);
+		}
+		// We overflowed by a single bit
+		return NEW_LONG(res);
     }
 
-INIT_TMP_NUMBER(tmpLeft, left);
-INIT_TMP_NUMBER(tmpRight, right);
-return safe_return(tmpLeft, left, tmpRight, right, PyNumber_FloorDivide(tmpLeft, tmpRight));
+	INIT_TMP_NUMBER(tmpLeft, left);
+	INIT_TMP_NUMBER(tmpRight, right);
+	return safe_return(tmpLeft, left, tmpRight, right, PyNumber_FloorDivide(tmpLeft, tmpRight));
 }
 
 inline PyObject* PyJit_Tagged_BinaryLShift(tagged_ptr left, tagged_ptr right) {
@@ -2532,3 +2542,231 @@ PyObject* PyJit_FormatValue(PyObject* item) {
 	Py_DECREF(item);
 	return res;
 }
+
+
+Module g_module;
+
+
+#define BASE_INDEX 0x1000
+
+class GlobalMethod {
+	Method m_method;
+public:
+	GlobalMethod(Method method) {
+		m_method = method;
+		auto token = BASE_INDEX + g_module.m_tokenToMethod.size();
+
+		g_module.m_tokenToMethod[token] = &m_method;
+		g_module.m_methodAddrToMethod[method.get_addr()] = &m_method;
+	}
+};
+
+#define GLOBAL_METHOD(addr, returnType, ...) \
+    GlobalMethod g ## addr(Method(&g_module, returnType, std::vector<Parameter>{__VA_ARGS__}, &addr));
+
+GLOBAL_METHOD(PyJit_Add, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_Subscr, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_Multiply, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_TrueDivide, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_FloorDivide, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_Power, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_Subtract, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_Modulo, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_MatrixMultiply, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_BinaryLShift, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_BinaryRShift, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_BinaryAnd, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_BinaryXor, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_BinaryOr, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyList_New, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_ExtendList, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_ListToTuple, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_StoreMap, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_StoreMapNoDecRef, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_DictUpdate, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_StoreSubscr, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_DeleteSubscr, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(_PyDict_NewPresized, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyTuple_New, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PySet_New, LK_Pointer, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyObject_Str, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyObject_Repr, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyObject_ASCII, LK_Pointer, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyObject_IsTrue, LK_Int, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyIter_Next, LK_Pointer, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_CellGet, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_RichCompare, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Int));
+GLOBAL_METHOD(PyJit_RichEquals_Generic, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_Contains, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_NotContains, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_Contains_Int, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_NotContains_Int, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_NewFunction, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_BuildClass, LK_Pointer, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_UnpackSequence, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_UnpackSequenceEx, LK_Pointer,
+	Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PySet_Add, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(Call0, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(Call1, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(Call2, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(Call3, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(Call4, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_CallN, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_CallNKW, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_KwCall1, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_KwCall2, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_KwCall3, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_KwCall4, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_KwCallN, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_StoreGlobal, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_DeleteGlobal, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_LoadGlobal, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_LoadAttr, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_StoreAttr, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_DeleteAttr, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_LoadName, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_StoreName, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_DeleteName, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_GetIter, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_IterNext, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_DecRef, LK_Void, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_CellSet, LK_Void, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_SetClosure, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_BuildSlice, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_UnaryPositive, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_UnaryNegative, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_UnaryNot, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_UnaryNot_Int, LK_Int, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_UnaryInvert, LK_Pointer, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_ListAppend, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_SetAdd, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_UpdateSet, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_MapAdd, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_InplacePower, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_InplaceMultiply, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceMatrixMultiply, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceTrueDivide, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceFloorDivide, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceModulo, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceAdd, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceSubtract, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceLShift, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceRShift, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceAnd, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceXor, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_InplaceOr, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_PrintExpr, LK_Int, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_LoadClassDeref, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_PrepareException, LK_Void, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer),
+	Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_Raise, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_EhTrace, LK_Void, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_CompareExceptions, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_CompareExceptions_Int, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_UnboundLocal, LK_Void, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_PyErrRestore, LK_Void, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_DebugTrace, LK_Void, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_DebugDumpFrame, LK_Void, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_PopFrame, LK_Void, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_PushFrame, LK_Void, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_UnwindEh, LK_Void, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_ImportName, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_CallArgs, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_CallKwArgs, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_ImportFrom, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_ImportStar, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+
+GLOBAL_METHOD(PyJit_Is, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_IsNot, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_Is_Bool, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_IsNot_Bool, LK_Int, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_GetIterOptimized, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_IterNextOptimized, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(Call0_Generic, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+double(*PyJit_Pow)(double, double) = pow;
+double(*PyJit_Floor)(double) = floor;
+double(*PyJit_FMod)(double, double) = fmod;
+
+GLOBAL_METHOD(PyJit_Pow, LK_Float, Parameter(LK_Float), Parameter(LK_Float));
+GLOBAL_METHOD(PyJit_Floor, LK_Float, Parameter(LK_Float));
+GLOBAL_METHOD(PyJit_FMod, LK_Float, Parameter(LK_Float), Parameter(LK_Float));
+GLOBAL_METHOD(PyFloat_FromDouble, LK_Pointer, Parameter(LK_Float));
+GLOBAL_METHOD(PyBool_FromLong, LK_Pointer, Parameter(LK_Int));
+GLOBAL_METHOD(PyJit_BoxTaggedPointer, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_UnboxInt_Tagged, LK_Pointer, Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyErr_SetString, LK_Void, Parameter(LK_Pointer), Parameter(LK_Pointer));
+
+GLOBAL_METHOD(PyJit_Add_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_TrueDivide_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_FloorDivide_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_Power_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_Modulo_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_BinaryLShift_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_BinaryRShift_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_BinaryAnd_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_BinaryXor_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_BinaryOr_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_Multiply_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_Subtract_Int, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer))
+
+GLOBAL_METHOD(PyJit_UnaryNegative_Int, LK_Pointer, Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_UnaryNot_Int_PushBool, LK_Bool, Parameter(LK_Pointer))
+
+GLOBAL_METHOD(PyJit_Equals_Int, LK_Bool, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_LessThan_Int, LK_Bool, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_LessThanEquals_Int, LK_Bool, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_NotEquals_Int, LK_Bool, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_GreaterThan_Int, LK_Bool, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_GreaterThanEquals_Int, LK_Bool, Parameter(LK_Pointer), Parameter(LK_Pointer))
+GLOBAL_METHOD(_PyJit_PeriodicWork, LK_Int)
+
+GLOBAL_METHOD(PyJit_Int_ToFloat, LK_Bool, Parameter(LK_Float), Parameter(LK_Pointer))
+GLOBAL_METHOD(PyJit_UnicodeJoinArray, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_FormatValue, LK_Pointer, Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_FormatObject, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
