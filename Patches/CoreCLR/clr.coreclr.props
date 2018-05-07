@@ -1,5 +1,5 @@
 diff --git a/clr.coreclr.props b/clr.coreclr.props
-index 2373b7b..2c0aa4e 100644
+index a335486..510a296 100644
 --- a/clr.coreclr.props
 +++ b/clr.coreclr.props
 @@ -10,7 +10,7 @@
@@ -11,20 +11,28 @@ index 2373b7b..2c0aa4e 100644
      <FeatureCoreclr>true</FeatureCoreclr>
      <FeatureCorruptingExceptions>true</FeatureCorruptingExceptions>
      <FeatureDbiDebugging>true</FeatureDbiDebugging>
-@@ -57,12 +57,12 @@
+@@ -53,11 +53,11 @@
      <FeatureReadyToRun Condition="'$(TargetArch)'!='arm64'">true</FeatureReadyToRun>
-
+ 
      <FeatureCoreSystem>true</FeatureCoreSystem>
 -    <FeatureClassicCominterop>true</FeatureClassicCominterop>
-+    <FeatureClassicCominterop>false</FeatureClassicCominterop>
-     <FeatureLegacySurface>true</FeatureLegacySurface>
 -    <FeatureCominterop>true</FeatureCominterop>
++    <FeatureClassicCominterop>false</FeatureClassicCominterop>
 +    <FeatureCominterop>false</FeatureCominterop>
      <FeatureICastable>true</FeatureICastable>
 -    <FeatureCominteropUnmanagedActivation>true</FeatureCominteropUnmanagedActivation>
 -    <FeatureCominteropWinRTManagedActivation>true</FeatureCominteropWinRTManagedActivation>
 +    <FeatureCominteropUnmanagedActivation>false</FeatureCominteropUnmanagedActivation>
 +    <FeatureCominteropWinRTManagedActivation>false</FeatureCominteropWinRTManagedActivation>
-     <FeatureCrypto>true</FeatureCrypto>
      <FeatureHostAssemblyResolver>true</FeatureHostAssemblyResolver>
      <FeatureLazyCOWPages Condition="('$(TargetArch)' == 'i386') or ('$(TargetArch)' == 'arm')">true</FeatureLazyCOWPages>
+     <FeatureLatin1>true</FeatureLatin1>
+@@ -76,7 +76,7 @@
+     <FeatureManagedEtwChannels>true</FeatureManagedEtwChannels>
+     <FeatureHostedBinder>true</FeatureHostedBinder>
+     <BinderDebugLog Condition="'$(_BuildType)'=='dbg'">true</BinderDebugLog>
+-    <FeatureAppX>true</FeatureAppX>
++    <FeatureAppX>false</FeatureAppX>
+     <FeatureWinMDResilient>true</FeatureWinMDResilient>
+     <!-- 
+         FeatureImplicitTls has been verified to be functionally correct on x86 & amd64.

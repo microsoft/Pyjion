@@ -1,6 +1,11 @@
 # Pyjion
 Designing a JIT API for CPython
 
+## A note on development
+This is a side project at work for the project maintainers, and so progress can be
+sporadic. In spite of that we do accept contributions at any time and will attempt
+to respond to them promptly.
+
 ## FAQ
 
 ### What are the goals of this project?
@@ -28,9 +33,8 @@ addition and not _when_ to do addition.
 
 ### Is there a Python Enhancement Proposal (PEP) for this?
 We have written a
-[draft PEP](https://github.com/Microsoft/Pyjion/blob/master/pep.rst),
-but it has not been officially proposed yet to the Python develoment
-team.
+[PEP](https://github.com/python/peps/blob/master/pep-0523.txt),
+it was accepted by the Python development team, and will be implemented in Python 3.6.
 
 ### How do you pronounce "Pyjion"?
 Like the word "pigeon". @DinoV wanted a name that had something with "Python"
@@ -101,3 +105,11 @@ it to only the platforms that the JIT supports.
 
 ### Does this help with using CPython w/ .NET or UWP?
 No.
+
+## Code of Conduct
+This project has adopted the
+[Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+For more information see the
+[Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
+or contact [opencode@microsoft.com](mailto:opencode@microsoft.com)
+with any additional questions or comments.

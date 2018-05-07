@@ -164,7 +164,9 @@ public:
 
     virtual BOOL logMsg(unsigned level, const char* fmt, va_list args) {
         if (level < 7) {
+#if JIT_FAIL_LOG
             vprintf(fmt, args);
+#endif
         }
         return TRUE;
     }
@@ -272,7 +274,6 @@ public:
     }
 
     virtual WORD getRelocTypeHint(void * target) {
-        printf("getRelocTypeHint\r\n");
         return -1;
     }
 
@@ -834,7 +835,8 @@ public:
     // If a method's attributes have (getMethodAttribs) CORINFO_FLG_INTRINSIC set,
     // getIntrinsicID() returns the intrinsic ID.
     virtual CorInfoIntrinsics getIntrinsicID(
-        CORINFO_METHOD_HANDLE       method
+        CORINFO_METHOD_HANDLE       method,
+		bool * pMustExpand = NULL
         ) {
         printf("getIntrinsicID\r\n"); return CORINFO_INTRINSIC_Object_GetType;
     }
@@ -1906,7 +1908,6 @@ public:
     virtual unsigned getMethodHash(
         CORINFO_METHOD_HANDLE       ftn         /* IN */
         ) {
-        printf("getMethodHash\r\n");
         return 0;
     }
 
@@ -1958,6 +1959,16 @@ public:
         printf("freeStringConfigValue\r\n");
     }
 #endif // RYUJIT_CTPBUILD
+
+
+	void CorJitInfo::getAddressOfPInvokeTarget(CORINFO_METHOD_HANDLE method, CORINFO_CONST_LOOKUP * pLookup)
+	{
+	}
+
+	DWORD CorJitInfo::getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes)
+	{
+		return 0;
+	}
 
 };
 

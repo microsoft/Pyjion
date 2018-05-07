@@ -163,7 +163,7 @@ class __declspec(dllexport) AbstractInterpreter {
 
     // ** Inputs:
     PyCodeObject* m_code;
-    unsigned char *m_byteCode;
+	_Py_CODEUNIT *m_byteCode;
     size_t m_size;
     Local m_errorCheckLocal;
 
@@ -249,6 +249,7 @@ public:
 
 private:
     const char * op_to_string(int op);
+	void compile_pop_block();
     AbstractValue* to_abstract(PyObject* obj);
     AbstractValue* to_abstract(AbstractValueKind kind);
     bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
@@ -266,7 +267,7 @@ private:
     AbstractSource* add_const_source(size_t opcodeIndex, size_t constIndex);
     AbstractSource* add_intermediate_source(size_t opcodeIndex);
 
-    void make_function(int posdefaults, int kwdefaults, int num_anotations, bool isClosure);
+    void make_function(int oparg);
     void fancy_call(int na, int nk, int flags);
     bool can_skip_lasti_update(int opcodeIndex);
     void build_tuple(size_t argCnt);
@@ -330,6 +331,9 @@ private:
     void dec_stack(size_t size = 1);
 
     void inc_stack(size_t size = 1, bool kind = STACK_KIND_OBJECT);
+
+	// Gets the next opcode skipping for EXTENDED_ARG
+	int get_extended_opcode(int curByte);
 
     // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
     // If the value on the stack is -1, we branch to the current error handler.

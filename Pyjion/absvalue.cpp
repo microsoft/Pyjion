@@ -537,7 +537,11 @@ AbstractValue* IntegerValue::binary(AbstractSource* selfSources, int op, Abstrac
             case INPLACE_RSHIFT:
             case INPLACE_SUBTRACT:
             case INPLACE_XOR:
-                return this;
+				if (selfSources != nullptr) {
+					selfSources->escapes();
+				}
+				other.escapes();
+				return this;
         }
     }
     else if (other_kind == AVK_Bytes) {
@@ -675,6 +679,7 @@ AbstractValueKind StringValue::kind() {
 AbstractValue* StringValue::binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
     // String interpolation always returns a `str` (when successful).
     if (op == BINARY_MODULO || op == INPLACE_MODULO) {
+		other.escapes();
         return this;
     }
 

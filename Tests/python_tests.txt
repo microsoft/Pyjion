@@ -1,4 +1,4 @@
-# A list of all tests in Python 3.5.
+# A list of all tests in Python 3.6.
 # To run tests from PowerShell in a Pyjion checkout:
 #   .\Python\python.bat -m test -n -f Tests\python_tests.txt
 #
@@ -16,6 +16,8 @@ test_argparse
 test_array
 test_asdl_parser
 test_ast
+# TODO: https://github.com/Microsoft/Pyjion/issues/86
+#test_asyncgen
 test_asynchat
 # TODO: https://github.com/Microsoft/Pyjion/issues/135
 ##test_asyncio
@@ -24,6 +26,7 @@ test_atexit
 test_audioop
 test_augassign
 test_base64
+test_baseexception
 test_bigaddrspace
 test_bigmem
 test_binascii
@@ -38,7 +41,7 @@ test_bytes
 test_bz2
 test_calendar
 test_call
-test_capi
+#test_capi  # Crashes due to thread local co extra storage
 test_cgi
 test_cgitb
 test_charmapcodec
@@ -105,6 +108,7 @@ test_descrtut
 test_dict
 test_dictcomps
 test_dictviews
+test_dict_version
 test_difflib
 test_dis
 test_distutils
@@ -112,6 +116,7 @@ test_distutils
 ##test_doctest
 test_doctest2
 test_docxmlrpc
+test_dtrace
 test_dummy_thread
 test_dummy_threading
 test_dynamic
@@ -126,6 +131,7 @@ test_eof
 ##test_epoll
 test_errno
 test_exceptions
+test_exception_hierarchy
 test_exception_variations
 test_extcall
 test_faulthandler
@@ -146,6 +152,7 @@ test_format
 test_fractions
 # TODO: https://github.com/Microsoft/Pyjion/issues/93
 ##test_frame
+test_fstring
 test_ftplib
 test_funcattrs
 test_functools
@@ -158,6 +165,7 @@ test_gc
 ##test_gdb
 # TODO: https://github.com/Microsoft/Pyjion/issues/86
 ##test_generators
+test_generator_stop
 test_genericpath
 test_genexps
 test_getargs2
@@ -187,7 +195,8 @@ test_imp
 test_import
 test_importlib
 test_index
-test_inspect
+# TODO: https://github.com/Microsoft/Pyjion/issues/93
+#test_inspect
 test_int
 test_int_literal
 test_io
@@ -248,6 +257,7 @@ test_opcodes
 ##test_openpty
 test_operator
 test_optparse
+test_ordered_dict
 test_os
 # Use of the 'audio' resource not enabled
 ##test_ossaudiodev
@@ -258,15 +268,6 @@ test_pathlib
 # TODO: https://github.com/Microsoft/Pyjion/issues/123
 ##test_pdb
 test_peepholer
-test_pep247
-test_pep277
-test_pep292
-test_pep3120
-test_pep3131
-test_pep3151
-test_pep352
-test_pep380
-test_pep479
 test_pickle
 test_pickletools
 # pipes module only works on posix
@@ -320,6 +321,7 @@ test_runpy
 test_sched
 test_scope
 test_script_helper
+test_secrets
 test_select
 test_selectors
 test_set
@@ -349,13 +351,14 @@ test_stat
 test_statistics
 test_strftime
 test_string
+test_string_literals
 test_stringprep
-test_strlit
 test_strptime
 test_strtod
 test_struct
 test_structmembers
 test_structseq
+test_subclassinit
 # Fails due to timeout issues.
 ##test_subprocess
 test_sunau
@@ -405,6 +408,7 @@ test_tracemalloc
 ##test_ttk_guionly
 test_ttk_textonly
 test_tuple
+test_turtle
 test_typechecks
 test_types
 test_typing
@@ -413,6 +417,8 @@ test_unary
 test_unicode
 test_unicodedata
 test_unicode_file
+test_unicode_file_functions
+test_unicode_identifiers
 test_unittest
 test_univnewlines
 test_unpack
@@ -429,6 +435,7 @@ test_urlparse
 test_userdict
 test_userlist
 test_userstring
+test_utf8source
 test_uu
 test_uuid
 # Test fails under debug builds due to IL-related output to stdout.
@@ -442,6 +449,7 @@ test_wave
 test_weakref
 test_weakset
 test_webbrowser
+test_winconsoleio
 test_winreg
 # Use of the 'audio' resource not enabled
 ##test_winsound
@@ -454,6 +462,7 @@ test_xmlrpc
 test_xml_dom_minicompat
 test_xml_etree
 test_xml_etree_c
+test_yield_from
 test_zipapp
 test_zipfile
 # test requires loads of disk-space bytes and a long time to run

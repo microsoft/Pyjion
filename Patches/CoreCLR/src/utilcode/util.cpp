@@ -1,5 +1,5 @@
 diff --git a/src/utilcode/util.cpp b/src/utilcode/util.cpp
-index d7d3a9f..972edd7 100644
+index f801f94..98e5e5d 100644
 --- a/src/utilcode/util.cpp
 +++ b/src/utilcode/util.cpp
 @@ -212,6 +212,7 @@ typedef HRESULT __stdcall DLLGETCLASSOBJECT(REFCLSID rclsid,
