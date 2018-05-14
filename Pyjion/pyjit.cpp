@@ -38,7 +38,9 @@
 
 using namespace std;
 
-//HINSTANCE            g_pMSCorEE;
+#ifndef PLATFORM_UNIX
+HINSTANCE            g_pMSCorEE;
+#endif
 
 IPythonCompiler* CreateCLRCompiler(IMethod* method);
 
