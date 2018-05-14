@@ -27,8 +27,9 @@
 #define ILGEN_H
 
 #define FEATURE_NO_HOST
-
+#define USE_STL
 #include <stdint.h>
+#include <windows.h>
 #include <wchar.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -40,55 +41,21 @@
 #include <cstdlib>
 #include <intrin.h>
 
+#include <vector>
+#include <unordered_map>
+
 #include <corjit.h>
 #include <openum.h>
 
+#include "codemodel.h"
 #include "ipycomp.h"
 
-template<typename T> struct simple_vector {
-	T* m_items;
-	size_t m_count, m_allocated;
-
-public:
-	simple_vector() {
-		m_items = nullptr;
-		m_count = m_allocated = 0;
-	}
-
-	size_t size() {
-		return m_count;
-	}
-
-	T& operator[](size_t n) {
-		return m_items[n];
-	}
-
-	void push_back(T item) {
-		if (m_count >= m_allocated) {
-			auto newCount = max(4, m_allocated * 2);
-			T* newItems = (T*)malloc(sizeof(T) * newCount);
-			
-			if (m_items != nullptr) {
-				memcpy(newItems, m_items, sizeof(T));
-				free(m_items);
-			}
-
-			m_items = newItems;
-			m_allocated = newCount;
-		}
-		m_items[m_count++] = item;
-	}
-
-	void pop_back() {
-		_ASSERTE(m_count > 0);
-		m_count--;
-	}
-};
+using namespace std;
 
 class LabelInfo {
 public:
     int m_location;
-    simple_vector<int> m_branchOffsets;
+    vector<int> m_branchOffsets;
 
     LabelInfo() {
         m_location = -1;
@@ -96,29 +63,31 @@ public:
 };
 
 
-
 class ILGenerator {
-    simple_vector<Parameter> m_params, m_locals;
-	simple_vector<Local> m_freedLocals[CORINFO_TYPE_COUNT];
-	IMethod* m_method;
+    vector<Parameter> m_params, m_locals;
+    CorInfoType m_retType;
+    Module* m_module;
+    unordered_map<CorInfoType, vector<Local>> m_freedLocals;
 
 public:
-    simple_vector<BYTE> m_il;
+    vector<byte> m_il;
     int m_localCount;
-	simple_vector<LabelInfo> m_labels;
+    vector<LabelInfo> m_labels;
 
 public:
 
-    ILGenerator(IMethod* method) {
-		m_method = method;
+    ILGenerator(Module* module, CorInfoType returnType, std::vector<Parameter> params) {
+        m_module = module;
+        m_retType = returnType;
+        m_params = params;
         m_localCount = 0;
     }
 
     Local define_local(Parameter param) {
-		auto& existing = m_freedLocals[param.m_type];
-        if (existing.size() != 0) {
-			auto res = existing[existing.size() - 1];
-            existing.pop_back();
+        auto existing = m_freedLocals.find(param.m_type);
+        if (existing != m_freedLocals.end() && existing->second.size() != 0) {
+            auto res = existing->second[existing->second.size() - 1];
+            existing->second.pop_back();
             return res;
         }
         return define_local_no_cache(param);
@@ -131,16 +100,24 @@ public:
 
     void free_local(Local local) {
         auto param = m_locals[local.m_index];
-        auto& localList = m_freedLocals[param.m_type];
+        auto existing = m_freedLocals.find(param.m_type);
+        vector<Local>* localList;
+        if (existing == m_freedLocals.end()) {
+            m_freedLocals[param.m_type] = vector<Local>();
+            localList = &(m_freedLocals.find(param.m_type)->second);
+        }
+        else {
+            localList = &(existing->second);
+        }
 #if _DEBUG
-        for (int i = 0; i < localList.size(); i++) {
-            if (localList[i].m_index == local.m_index) {
+        for (int i = 0; i < localList->size(); i++) {
+            if ((*localList)[i].m_index == local.m_index) {
                 // locals shouldn't be double freed...
                 assert(FALSE);
             }
         }
 #endif
-        localList.push_back(local);
+        localList->push_back(local);
     }
 
     Label define_label() {
@@ -165,7 +142,7 @@ public:
 
     void localloc() {
         push_back(CEE_PREFIX1);
-        push_back((char)CEE_LOCALLOC);
+        push_back((byte)CEE_LOCALLOC);
     }
 
     void ret() {
@@ -199,7 +176,7 @@ public:
                 }
                 else {
                     m_il.push_back(CEE_LDC_I4);
-                    m_il.push_back((char)CEE_STLOC);
+                    m_il.push_back((byte)CEE_STLOC);
                     emit_int(i);
                 }
         }
@@ -263,7 +240,7 @@ public:
                     m_il.push_back(CEE_BNE_UN_S);
                     break;
             }
-            m_il.push_back((char)offset - 2);
+            m_il.push_back((byte)offset - 2);
         }
         else {
             switch (branchType) {
@@ -308,7 +285,7 @@ public:
 
     void compare_eq() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((char)CEE_CEQ);
+        m_il.push_back((byte)CEE_CEQ);
     }
 
     void compare_ne() {
@@ -319,38 +296,38 @@ public:
 
     void compare_gt() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((char)CEE_CGT);
+        m_il.push_back((byte)CEE_CGT);
     }
 
     void compare_lt() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((char)CEE_CLT);
+        m_il.push_back((byte)CEE_CLT);
     }
 
     void compare_ge() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((char)CEE_CLT);
+        m_il.push_back((byte)CEE_CLT);
         ld_i4(0);
         compare_eq();
     }
 
     void compare_le() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((char)CEE_CGT);
+        m_il.push_back((byte)CEE_CGT);
         ld_i4(0);
         compare_eq();
     }
 
     void compare_ge_float() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((char)CEE_CLT_UN);
+        m_il.push_back((byte)CEE_CLT_UN);
         ld_i4(0);
         compare_eq();
     }
 
     void compare_le_float() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((char)CEE_CGT_UN);
+        m_il.push_back((byte)CEE_CGT_UN);
         ld_i4(0);
         compare_eq();
     }
@@ -431,7 +408,7 @@ public:
                 }
                 else {
                     m_il.push_back(CEE_PREFIX1);
-                    m_il.push_back((char)CEE_STLOC);
+                    m_il.push_back((byte)CEE_STLOC);
                     m_il.push_back(index & 0xff);
                     m_il.push_back((index >> 8) & 0xff);
                 }
@@ -452,7 +429,7 @@ public:
                 }
                 else {
                     m_il.push_back(CEE_PREFIX1);
-                    m_il.push_back((char)CEE_LDLOC);
+                    m_il.push_back((byte)CEE_LDLOC);
                     m_il.push_back(index & 0xff);
                     m_il.push_back((index >> 8) & 0xff);
                 }
@@ -467,16 +444,16 @@ public:
         }
         else {
             m_il.push_back(CEE_PREFIX1);
-            m_il.push_back((char)CEE_LDLOCA);
+            m_il.push_back((byte)CEE_LDLOCA);
             m_il.push_back(index & 0xff);
             m_il.push_back((index >> 8) & 0xff);
         }
     }
 
-    CORINFO_METHOD_INFO to_method(int stackSize) {
+    CORINFO_METHOD_INFO to_method(Method* addr, int stackSize) {
         CORINFO_METHOD_INFO methodInfo;
-        methodInfo.ftn = (CORINFO_METHOD_HANDLE)m_method;
-        methodInfo.scope = (CORINFO_MODULE_HANDLE)m_method->get_module();
+        methodInfo.ftn = (CORINFO_METHOD_HANDLE)addr;
+        methodInfo.scope = (CORINFO_MODULE_HANDLE)m_module;
         methodInfo.ILCode = &m_il[0];
         methodInfo.ILCodeSize = (unsigned int)m_il.size();
         methodInfo.maxStack = stackSize;
@@ -484,9 +461,9 @@ public:
         methodInfo.options = CORINFO_OPT_INIT_LOCALS;
         methodInfo.regionKind = CORINFO_REGION_JIT;
         methodInfo.args = CORINFO_SIG_INFO{ CORINFO_CALLCONV_DEFAULT };
-        methodInfo.args.args = (CORINFO_ARG_LIST_HANDLE)(m_method->get_param_count() == 0 ? nullptr : &m_method->get_params()[0]);
+        methodInfo.args.args = (CORINFO_ARG_LIST_HANDLE)(m_params.size() == 0 ? nullptr : &m_params[0]);
         methodInfo.args.numArgs = m_params.size();
-        methodInfo.args.retType = to_clr_type(m_method->get_return_type());
+        methodInfo.args.retType = m_retType;
         methodInfo.args.retTypeClass = nullptr;
         methodInfo.locals = CORINFO_SIG_INFO{ CORINFO_CALLCONV_DEFAULT };
         methodInfo.locals.args = (CORINFO_ARG_LIST_HANDLE)(m_locals.size() == 0 ? nullptr : &m_locals[0]);
@@ -494,10 +471,11 @@ public:
         return methodInfo;
     }
 
-    void* compile(ICorJitInfo* jitInfo, ICorJitCompiler* jit, int stackSize) {
+    Method compile(ICorJitInfo* jitInfo, ICorJitCompiler* jit, int stackSize) {
         BYTE* nativeEntry;
         ULONG nativeSizeOfCode;
-        CORINFO_METHOD_INFO methodInfo = to_method(stackSize);
+        auto res = Method(m_module, m_retType, m_params, nullptr);
+        CORINFO_METHOD_INFO methodInfo = to_method(&res, stackSize);
         CorJitResult result = jit->compileMethod(
             /*ICorJitInfo*/jitInfo,
             /*CORINFO_METHOD_INFO */&methodInfo,
@@ -506,9 +484,9 @@ public:
             &nativeSizeOfCode
             );
         if (result == CORJIT_OK) {
-            return nativeEntry;
+            res.m_addr = nativeEntry;
         }
-        return nullptr;
+        return res;
     }
 
     void add() {
@@ -545,7 +523,7 @@ public:
                 }
                 else {
                     m_il.push_back(CEE_PREFIX1);
-                    m_il.push_back((char)CEE_LDARG);
+                    m_il.push_back((byte)CEE_LDARG);
                     m_il.push_back(index & 0xff);
                     m_il.push_back((index >> 8) & 0xff);
                 }
@@ -561,7 +539,7 @@ private:
         m_il.push_back((value >> 24) & 0xff);
     }
 
-    void push_back(BYTE b) {
+    void push_back(byte b) {
         m_il.push_back(b);
     }
 

@@ -26,7 +26,7 @@
 #ifndef ABSVALUE_H
 #define ABSVALUE_H
 
-#include <Python.h>
+#include <python.h>
 #include <opcode.h>
 #include "cowvector.h"
 
@@ -54,14 +54,6 @@ enum AbstractValueKind {
     AVK_Complex
 };
 
-namespace std {
-	template <> struct hash<AbstractValueKind> {
-		unsigned operator()(const AbstractValueKind& arg) const {
-			return arg;
-		}
-	};
-}
-
 static bool is_known_type(AbstractValueKind kind) {
     switch (kind) {
         case AVK_Integer:
@@ -78,9 +70,6 @@ static bool is_known_type(AbstractValueKind kind) {
         case AVK_Slice:
         case AVK_Complex:
             return true;
-		case AVK_Any:
-		case AVK_Undefined:
-			return false;
     }
     return false;
 }
@@ -96,7 +85,7 @@ public:
 
     bool needs_boxing();
 
-    virtual const char* describe() {
+    virtual char* describe() {
         return "unknown source";
     }
 
@@ -123,7 +112,7 @@ struct AbstractSources {
 
 class ConstSource : public AbstractSource {
 public:
-    virtual const char* describe() {
+    virtual char* describe() {
         if (needs_boxing()) {
             return "Source: Const (escapes)";
         }
@@ -135,7 +124,7 @@ public:
 
 class LocalSource : public AbstractSource {
 public:
-    virtual const char* describe() {
+    virtual char* describe() {
         if (needs_boxing()) {
             return "Source: Local (escapes)";
         }
@@ -147,7 +136,7 @@ public:
 
 class IntermediateSource : public AbstractSource {
 public:
-    virtual const char* describe() {
+    virtual char* describe() {
         if (needs_boxing()) {
             return "Source: Intermediate (escapes)";
         }
@@ -168,7 +157,7 @@ public:
 
     virtual void escapes();
 
-    virtual const char* describe() {
+    virtual char* describe() {
         if (m_escapes) {
             return "Source: Tuple (escapes)";
         }
@@ -197,8 +186,7 @@ public:
     virtual const char* describe() {
         return "";
     }
-	virtual ~AbstractValue() {
-	}
+
 };
 
 struct AbstractValueWithSources {
