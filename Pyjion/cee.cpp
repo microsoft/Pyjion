@@ -1,6 +1,6 @@
 #include "cee.h"
+
 #include <clrhost.h>
-#include <palrt.h>
 #include <corjit.h>
 #include <openum.h>
 #include <utilcode.h>
@@ -30,12 +30,14 @@ void* __stdcall GetCLRFunction(LPCSTR functionName) {
 IExecutionEngine* __stdcall IEE() {
 	return &g_execEngine;
 }
-/*
+
+#ifndef PLATFORM_UNIX
 HRESULT __stdcall GetCORSystemDirectoryInternal(SString& pbuffer) {
 	printf("get cor system\n");
 	return S_OK;
 }
-*/
+#endif
+
 CCorJitHost g_pyjionjitHost;
 
 void CeeInit() {

@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # Build things which don't depend upon CoreCLR
-clang++-3.5 -std=c++11 intrins.cpp -I../Python/Include/ -I../Python/  -o intrins.o -c -fPIC -g
-clang++-3.5 -std=c++11 absvalue.cpp -I../Python/Include/ -I../Python/  -o absvalue.o -c -fPIC -g
-clang++-3.5 -std=c++11 absint.cpp -I../Python/Include/ -I../Python/  -o absint.o -c -fPIC -g 
-clang++-3.5 -std=c++11 jitinit.cpp -I../Python/Include/ -I../Python/  -o jitinit.o -c -fPIC -g
-clang++-3.5 -std=c++11 pyjit.cpp -I../Python/Include/ -I../Python/  -o pyjit.o -c -fPIC -g
+clang++-3.5 -DPLATFORM_UNIX=1 -std=c++11 intrins.cpp -I../Python/Include/ -I../Python/  -o intrins.o -c -fPIC -g
+clang++-3.5 -DPLATFORM_UNIX=1 -std=c++11 absvalue.cpp -I../Python/Include/ -I../Python/  -o absvalue.o -c -fPIC -g
+clang++-3.5 -DPLATFORM_UNIX=1 -std=c++11 absint.cpp -I../Python/Include/ -I../Python/  -o absint.o -c -fPIC -g 
+clang++-3.5 -DPLATFORM_UNIX=1 -std=c++11 jitinit.cpp -I../Python/Include/ -I../Python/  -o jitinit.o -c -fPIC -g
+clang++-3.5 -DPLATFORM_UNIX=1 -std=c++11 pyjit.cpp -I../Python/Include/ -I../Python/  -o pyjit.o -c -fPIC -g
 
 # Build the CoreCLR integration
-clang++-3.5 -DFEATURE_PAL_SXS   -DAMD64 -DBIT64=1 -DFEATURE_CORECLR -DFEATURE_PAL -DFEATURE_PAL_ANSI  -DLINUX64 -DPLATFORM_UNIX=1 -DUNICODE -DUNIX_AMD64_ABI -D_AMD64_ -D_TARGET_AMD64_=1 -D_UNICODE -D_WIN64  -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/prebuilt/inc -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc/rt  -I/mnt/c/Source/PyjionLinux/CoreCLR/src/inc   -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc/rt/cpp   -Wall -std=c++11 -g  -fno-omit-frame-pointer -fms-extensions -fstack-protector-strong -Werror -Wno-microsoft -nostdinc -o cee.o -c cee.cpp -c -fPIC -Wtautological-undefined-compare -Wno-invalid-noreturn -Wno-tautological-compare 
-clang++-3.5 -DFEATURE_PAL_SXS   -DAMD64 -DBIT64=1 -DFEATURE_CORECLR -DFEATURE_PAL -DFEATURE_PAL_ANSI  -DLINUX64 -DPLATFORM_UNIX=1 -DUNICODE -DUNIX_AMD64_ABI -D_AMD64_ -D_TARGET_AMD64_=1 -D_UNICODE -D_WIN64  -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/prebuilt/inc -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc/rt  -I/mnt/c/Source/PyjionLinux/CoreCLR/src/inc   -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc/rt/cpp   -Wall -std=c++11 -g  -fno-omit-frame-pointer -fms-extensions -fstack-protector-strong -Werror -Wno-microsoft -nostdinc -o pycomp.o -c pycomp.cpp -c -fPIC
+clang++-3.5 -DFEATURE_PAL_SXS   -DAMD64 -DBIT64=1 -DFEATURE_CORECLR -DFEATURE_PAL -DFEATURE_PAL_ANSI  -DLINUX64 -DPLATFORM_UNIX=1 -DUNICODE -DUNIX_AMD64_ABI -D_AMD64_ -D_TARGET_AMD64_=1 -D_UNICODE -D_WIN64  -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/prebuilt/inc -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc/rt  -I/mnt/c/Source/PyjionLinux/CoreCLR/src/inc   -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc/rt/cpp   -Wall -std=c++11 -g  -fno-omit-frame-pointer -fms-extensions -fstack-protector-strong -Werror -Wno-microsoft -nostdinc -o cee.o -c cee.cpp -c -fPIC -Wtautological-undefined-compare -Wno-invalid-noreturn -Wno-tautological-compare -Wno-invalid-noreturn
+clang++-3.5 -DFEATURE_PAL_SXS   -DAMD64 -DBIT64=1 -DFEATURE_CORECLR -DFEATURE_PAL -DFEATURE_PAL_ANSI  -DLINUX64 -DPLATFORM_UNIX=1 -DUNICODE -DUNIX_AMD64_ABI -D_AMD64_ -D_TARGET_AMD64_=1 -D_UNICODE -D_WIN64  -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/prebuilt/inc -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc/rt  -I/mnt/c/Source/PyjionLinux/CoreCLR/src/inc   -I/mnt/c/Source/PyjionLinux/CoreCLR/src/pal/inc/rt/cpp   -Wall -std=c++11 -g  -fno-omit-frame-pointer -fms-extensions -fstack-protector-strong -Werror -Wno-microsoft -nostdinc -o pycomp.o -c pycomp.cpp -c -fPIC -Wno-invalid-noreturn
 
 # And link it all together...
 clang++-3.5 -shared -o   pyjion.so absint.o  absvalue.o  intrins.o  jitinit.o  pycomp.o  pyjit.o cee.o  ../CoreCLR/bin/obj/Linux.x64.Debug/src/jit/dll/libClrJit.a ../CoreCLR/bin/obj/Linux.x64.Debug/src/gcinfo/lib/libgcinfo.a   ../CoreCLR/bin/obj/Linux.x64.Debug/src/utilcode/staticnohost/libutilcodestaticnohost.a ../CoreCLR/bin/obj/Linux.x64.Debug/src/dlls/mscorrc/full/libmscorrc_debug.a ../CoreCLR/bin/obj/Linux.x64.Debug/src/nativeresources/libnativeresourcestring.a ../CoreCLR/bin/obj/Linux.x64.Debug/src/pal/src/libcoreclrpal.a ../CoreCLR/bin/obj/Linux.x64.Debug/src/palrt/libpalrt.a  -lstdc++ -lc -lm  -lgcc_s -lgcc -lc   -lrt -ldl -luuid -lpthread -lutil   -lunwind-x86_64 -lunwind -Wl,-z,noexecstack

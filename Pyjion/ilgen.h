@@ -29,7 +29,6 @@
 #define FEATURE_NO_HOST
 
 #include <stdint.h>
-#include <windows.h>
 #include <wchar.h>
 #include <stdio.h>
 #include <stddef.h>

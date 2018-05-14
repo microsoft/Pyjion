@@ -29,7 +29,9 @@
 #include "taggedptr.h"
 #include <cstdint>
 #include <cstdlib>
+#ifdef PLATFORM_UNIX
 #include <x86intrin.h>
+#endif
 
 #ifdef _MSC_VER
 

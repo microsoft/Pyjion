@@ -32,6 +32,9 @@
 #include "absvalue.h"
 #include "absint.h"
 #include "intrins.h"
+#ifndef PLATFORM_UNIX
+#include <Windows.h>
+#endif
 
 using namespace std;
 

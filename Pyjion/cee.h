@@ -38,7 +38,7 @@
 #include <float.h>
 #include <cstdlib>
 
-#include <clrhost.h>
+#include <utilcode.h>
 #include "corjit.h"
 #include "openum.h"
 

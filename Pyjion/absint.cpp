@@ -46,7 +46,6 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, CompilerFactory* co
     m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
     m_size = PyBytes_Size(code->co_code);
     m_returnValue = &Undefined;
-
     if (compFactory != nullptr) {
 		m_module = new UserModule(g_module);
 		m_method = new Method(m_module, LK_Pointer, std::vector <Parameter> {Parameter(LK_Pointer), Parameter(LK_Pointer) }, nullptr);
@@ -58,6 +57,7 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, CompilerFactory* co
         m_errorCheckLocal = m_comp->emit_define_local();
     }
     init_starting_state();
+	dump();
 }
 
 void AbstractInterpreter::emit_lasti_init() {
