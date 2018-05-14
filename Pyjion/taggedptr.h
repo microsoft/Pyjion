@@ -57,7 +57,7 @@ inline bool can_tag(tagged_ptr value) {
 #define NUMBER_SIZE (((sizeof(PyVarObject) + sizeof(PY_UINT32_T) * DIGITS_IN_TAGGED_PTR) / sizeof(size_t)) + sizeof(size_t))
 #define INIT_TMP_NUMBER(name, value) \
 	size_t tmp_##name[NUMBER_SIZE];  \
-	PyObject* ##name = init_number(tmp_##name, value);
+	PyObject* name = init_number(tmp_##name, value); \
 
 
 #endif

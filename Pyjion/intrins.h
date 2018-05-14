@@ -28,6 +28,11 @@
 
 #include <Python.h>
 #include <frameobject.h>
+#include "ipycomp.h"
+
+#include <vector>
+#include <unordered_map>
+using namespace std;
 
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
@@ -289,4 +294,82 @@ int _PyJit_PeriodicWork();
 PyObject* PyJit_UnicodeJoinArray(PyObject** items, Py_ssize_t count);
 PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec);
 PyObject* PyJit_FormatValue(PyObject* item);
+
+extern double(*PyJit_Pow)(double, double);
+extern double(*PyJit_Floor)(double);
+extern double(*PyJit_FMod)(double, double);
+
+class Method : public IMethod {
+	IModule* m_module;
+public:
+	vector<Parameter> m_params;
+	LocalKind m_retType;
+	void* m_addr;
+
+	Method() {
+		m_module = nullptr;
+	}
+
+	~Method() {
+		if (m_module != nullptr) {
+			delete m_module;
+		}
+	}
+
+	virtual IModule* get_module() {
+		return m_module;
+	}
+
+	Method(IModule* module, LocalKind returnType, std::vector<Parameter> params, void* addr) {
+		m_retType = returnType;
+		m_params = params;
+		m_module = module;
+		m_addr = addr;
+	}
+
+	virtual void* get_addr() {
+		return m_addr;
+	}
+
+	virtual void* get_indirect_addr() {
+		return &m_addr;
+	}
+
+	virtual unsigned int get_param_count() {
+		return m_params.size();
+	}
+
+	virtual Parameter* get_params() {
+		if (m_params.size() == 0) {
+			return nullptr;
+		}
+		return &m_params[0];
+	}
+
+	virtual LocalKind get_return_type() {
+		return m_retType;
+	}
+};
+
+
+class Module : public IModule {
+public:
+	unordered_map<int, IMethod*> m_tokenToMethod;
+	unordered_map<void*, int> m_methodAddrToToken;
+
+	Module() {
+	}
+
+	virtual IMethod* ResolveMethod(int tokenId) {
+		return m_tokenToMethod[tokenId];
+	}
+
+	virtual int ResolveMethodToken(void* addr) {
+		return m_methodAddrToToken[addr];
+	}
+};
+
+extern Module g_module;
+
+
 #endif

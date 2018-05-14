@@ -25,11 +25,9 @@
 
 #ifndef PYJIT_H
 #define PYJIT_H
-
 #define FEATURE_NO_HOST
 #define USE_STL
 #include <stdint.h>
-#include <windows.h>
 #include <wchar.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -37,17 +35,15 @@
 #include <limits.h>
 #include <string.h>
 #include <float.h>
-#include <share.h>
+//#include <share.h>
 #include <cstdlib>
-#include <intrin.h>
+//#include <intrin.h>
 
 #include <Python.h>
+#include <frameobject.h>
 
 #include <vector>
 #include <unordered_map>
-
-#include <frameobject.h>
-#include <Python.h>
 
 
  //#define NO_TRACE
@@ -56,9 +52,15 @@
 struct SpecializedTreeNode;
 class PyjionJittedCode;
 
-extern "C" __declspec(dllexport) void JitInit();
-extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *, int);
-extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
+#ifndef PLATFORM_UNIX
+#define DLL_EXPORT __declspec(dllexport)
+#else
+#define DLL_EXPORT 
+#endif
+
+extern "C" DLL_EXPORT void JitInit();
+extern "C" DLL_EXPORT PyObject *PyJit_EvalFrame(PyFrameObject *, int);
+extern "C" DLL_EXPORT PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
 
 class PyjionJittedCode;
 typedef PyObject* (*Py_EvalFunc)(PyjionJittedCode*, struct _frame*);
@@ -98,6 +100,6 @@ public:
 
 	~PyjionJittedCode();
 };
-__declspec(dllexport) bool jit_compile(PyCodeObject* code);
+DLL_EXPORT bool jit_compile(PyCodeObject* code);
 
 #endif

@@ -26,9 +26,21 @@
 */
 
 #include "pyjit.h"
-#include "pycomp.h"
 
-HINSTANCE            g_pMSCorEE;
+#include <vector>
+#include "ipycomp.h"
+#include "absvalue.h"
+#include "absint.h"
+#include "intrins.h"
+#ifndef PLATFORM_UNIX
+#include <Windows.h>
+#endif
+
+using namespace std;
+
+//HINSTANCE            g_pMSCorEE;
+
+IPythonCompiler* CreateCLRCompiler(IMethod* method);
 
 // Tracks types for a function call.  Each argument has a SpecializedTreeNode with
 // children for the subsequent arguments.  When we get to the leaves of the tree
@@ -124,12 +136,11 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     return _Py_CheckFunctionResult(NULL, res, "Jit_EvalHelper");
 }
 
-static DWORD g_extraSlot;
+static ssize_t g_extraIndex;
+PyObject* g_emptyTuple;
 
-extern "C" __declspec(dllexport) void JitInit() {
-	g_extraSlot = TlsAlloc();
-
-	g_jit = getJit();
+extern "C" DLL_EXPORT void JitInit() {
+	g_extraIndex = _PyEval_RequestCodeExtraIndex(PyjionJitFree);
 
     g_emptyTuple = PyTuple_New(0);
 }
@@ -155,9 +166,10 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
         failCount);
 #endif
 
-    PythonCompiler jitter(code);
-    AbstractInterpreter interp(code, &jitter);
+	IPythonCompiler* comp = CreateCLRCompiler();
+    AbstractInterpreter interp(code, comp);
     auto res = interp.compile();
+	delete comp;
 
     if (res == nullptr) {
 #ifdef DEBUG_TRACE
@@ -236,7 +248,7 @@ PyTypeObject* GetArgType(int arg, PyObject** locals) {
 
 PyObject* Jit_EvalGeneric(PyjionJittedCode* state, PyFrameObject*frame) {
     auto trace = (PyjionJittedCode*)state;
-    return Jit_EvalHelper(trace->j_generic, frame);
+    return Jit_EvalHelper((void*)trace->j_generic, frame);
 }
 
 #define MAX_TRACE 5
@@ -266,7 +278,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
     auto jittedCode = (PyjionJittedCode *)trace->code->co_extra;
     if (curNode->hitCount > jittedCode->j_specialization_threshold) {
         // Compile and run the now compiled code...
-        PythonCompiler jitter(trace->code);
+		IPythonCompiler* comp = CreateCLRCompiler();
         AbstractInterpreter interp(trace->code, &jitter);
 
         // provide the interpreter information about the specialized types
@@ -276,6 +288,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
         }
 
         auto res = interp.compile();
+		delete comp;
         bool isSpecialized = false;
         for (int i = 0; i < argCount; i++) {
             auto type = GetAbstractType(GetArgType(i, frame->f_localsplus));
@@ -346,7 +359,15 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 	if (target != nullptr && !trace->j_failed) {
 		if (target->addr != nullptr) {
 			// we have a specialized function for this, just invoke it
-			auto res = Jit_EvalHelper(target->addr, frame);
+			/*printf("Invoking trace %s from %s line %d %p %p\r\n",
+				PyUnicode_AsUTF8(frame->f_code->co_name),
+				PyUnicode_AsUTF8(frame->f_code->co_filename),
+				frame->f_code->co_firstlineno,
+				target->addr,
+				frame
+			);*/
+			auto res = Jit_EvalHelper((void*)target->addr, frame);
+			//printf("Returning from %s", PyUnicode_AsUTF8(frame->f_code->co_name));
 			return res;
 		}
 
@@ -355,8 +376,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 		// No specialized function yet, let's see if we should create one...
 		if (target->hitCount >= trace->j_specialization_threshold) {
 			// Compile and run the now compiled code...
-			PythonCompiler jitter((PyCodeObject*)trace->j_code);
-			AbstractInterpreter interp((PyCodeObject*)trace->j_code, &jitter);
+			AbstractInterpreter interp((PyCodeObject*)trace->j_code, &CreateCLRCompiler);
 			int argCount = frame->f_code->co_argcount + frame->f_code->co_kwonlyargcount;
 
 			// provide the interpreter information about the specialized types
@@ -403,7 +423,21 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 				trace->j_evalfunc = Jit_EvalGeneric;
 			}
 			
-			return Jit_EvalHelper(target->addr, frame);
+			/*printf("Entering %s from %s line %d %s\r\n",
+				PyUnicode_AsUTF8(frame->f_code->co_name),
+				PyUnicode_AsUTF8(frame->f_code->co_filename),
+				frame->f_code->co_firstlineno,
+				isSpecialized ? "specialized" : ""
+			);*/
+
+			// And finally dispatch to the newly compiled code
+			/*printf("Invoking trace %s from %s line %d %p\r\n",
+				PyUnicode_AsUTF8(frame->f_code->co_name),
+				PyUnicode_AsUTF8(frame->f_code->co_filename),
+				frame->f_code->co_firstlineno,
+				target->addr
+			);*/
+			return Jit_EvalHelper((void*)target->addr, frame);
 		}
 	}
 
@@ -428,7 +462,8 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 	return res;
 }
 
-__declspec(dllexport) bool jit_compile(PyCodeObject* code) {
+DLL_EXPORT bool jit_compile(PyCodeObject* code) {
+	printf("jit_compile\n");
 	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0 ||
 		strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
         return false;
@@ -444,7 +479,7 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
 #endif
 
 	auto jittedCode = PyJit_EnsureExtra((PyObject*)code);
-
+	printf("ensured extra\r\n");
 	jittedCode->j_evalfunc = &Jit_EvalTrace;
     return true;
 }
@@ -452,22 +487,9 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
 #endif
 
 
-extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject) {
-	ssize_t index = (ssize_t)TlsGetValue(g_extraSlot);
-	if (index == 0) {
-		index = _PyEval_RequestCodeExtraIndex(PyjionJitFree);
-		if (index == -1) {
-			return nullptr;
-		}
-
-		TlsSetValue(g_extraSlot, (LPVOID)((index << 1) | 0x01));
-	}
-	else {
-		index = index >> 1;
-	}
-
+extern "C" DLL_EXPORT PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject) {
 	PyjionJittedCode *jitted = nullptr;
-	if (_PyCode_GetExtra(codeObject, index, (void**)&jitted)) {
+	if (_PyCode_GetExtra(codeObject, g_extraIndex, (void**)&jitted)) {
 		PyErr_Clear();
 		return nullptr;
 	}
@@ -475,7 +497,7 @@ extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* c
 	if (jitted == nullptr) {
 	    jitted = new PyjionJittedCode(codeObject);
 		if (jitted != nullptr) {
-			if (_PyCode_SetExtra(codeObject, index, jitted)) {
+			if (_PyCode_SetExtra(codeObject, g_extraIndex, jitted)) {
 				PyErr_Clear();
 
 				delete jitted;
@@ -490,13 +512,17 @@ extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* c
 // and dispatch to it if it's already compiled.  If it hasn't yet been compiled we'll
 // eventually compile it and invoke it.  If it's not time to compile it yet then we'll
 // invoke the default evaluation function.
-extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int throwflag) {
+extern "C" DLL_EXPORT PyObject *PyJit_EvalFrame(PyFrameObject *f, int throwflag) {
+#ifdef MS_WINDOWS
 	auto err = GetLastError();
+#endif
 
 	auto jitted = PyJit_EnsureExtra((PyObject*)f->f_code);
 	if (jitted != nullptr && !throwflag) {
 		if (jitted->j_evalfunc != nullptr) {
+#ifdef MS_WINDOWS			
 			SetLastError(err);
+#endif
 #if DEBUG_CALL_TRACE
 			printf("Calling %s from %s line %d %p\r\n",
 				PyUnicode_AsUTF8(f->f_code->co_name),
@@ -510,7 +536,9 @@ extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int
 		else if (!jitted->j_failed && jitted->j_run_count++ >= jitted->j_specialization_threshold) {
 			if (jit_compile(f->f_code)) {
 				// execute the jitted code...
+#ifdef MS_WINDOWS
 				SetLastError(err);
+#endif
 #ifdef DEBUG_CALL_TRACE
 				printf("Calling first %s from %s line %d %p\r\n",
 					PyUnicode_AsUTF8(f->f_code->co_name),
@@ -526,6 +554,7 @@ extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int
 			jitted->j_failed = true;
 		}
 	}
+#ifdef MS_WINDOWS
 	SetLastError(err);
 #ifdef DEBUG_CALL_TRACE
 	printf("Falling to EFD %s from %s line %d %s %p\r\n",
@@ -559,7 +588,7 @@ void PyjionJitFree(void* obj) {
         g_pyjionJittedCode.erase(function);
     }
 #endif
-	delete obj;
+	delete function;
 }
 
 static PyObject *pyjion_enable(PyObject *self, PyObject* args) {
@@ -694,7 +723,6 @@ PyMODINIT_FUNC PyInit_pyjion(void)
 {
 	// Install our frame evaluation function
 	JitInit();
-
 	auto ts = PyThreadState_Get();
 	ts->interp->eval_frame = PyJit_EvalFrame;
 
