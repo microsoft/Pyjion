@@ -28,7 +28,7 @@
 
 
 #define FEATURE_NO_HOST
-#define USE_STL
+
 #include <stdint.h>
 #include <wchar.h>
 #include <stdio.h>
@@ -38,8 +38,6 @@
 #include <string.h>
 #include <float.h>
 #include <cstdlib>
-#include <vector>
-#include <unordered_map>
 
 #include <corjit.h>
 #include <openum.h>
@@ -54,21 +52,21 @@ CorInfoType to_clr_type(LocalKind kind) {
     case LK_Float: return CORINFO_TYPE_DOUBLE;
     case LK_Int: return CORINFO_TYPE_INT;
     case LK_Bool: return CORINFO_TYPE_BOOL;
-    }
-    return CORINFO_TYPE_NATIVEINT;
+	default: return CORINFO_TYPE_NATIVEINT;
+    }    
 }
 
 class CorJitInfo : public ICorJitInfo, public JittedCode {
     CExecutionEngine& m_executionEngine;
     void* m_codeAddr;
     void* m_dataAddr;
-    UserModule* m_module;
+	IMethod* m_method;
 
 public:
 
-    CorJitInfo(CExecutionEngine& executionEngine, UserModule* module) : m_executionEngine(executionEngine) {
+    CorJitInfo(CExecutionEngine& executionEngine, IMethod* method) : m_executionEngine(executionEngine) {
         m_codeAddr = m_dataAddr = nullptr;
-        m_module = module;
+        m_method = method;
     }
 
     ~CorJitInfo() {
@@ -76,9 +74,9 @@ public:
             freeMem(m_codeAddr);
         }
         if (m_dataAddr != nullptr) {
-            ::GlobalFree(m_dataAddr);
+            free(m_dataAddr);
         }
-        delete m_module;
+        delete m_method;
     }
 
     void* get_code_addr() {
@@ -91,7 +89,7 @@ public:
     }
 
     void freeMem(PVOID code) {
-        HeapFree(m_executionEngine.m_codeHeap, 0, code);
+		m_executionEngine.FreeExecutable(code);
     }
 
     virtual void allocMem(
@@ -107,11 +105,10 @@ public:
         //printf("allocMem\r\n");
         // TODO: Alignment?
         //printf("Code size: %d\r\n", hotCodeSize);
-        auto code = HeapAlloc(m_executionEngine.m_codeHeap, 0, hotCodeSize);
+		auto code = m_executionEngine.AllocExecutable(hotCodeSize);
         *hotCodeBlock = m_codeAddr = code;
         if (roDataSize != 0) {
-            // TODO: This mem needs to be freed...
-            *roDataBlock = m_dataAddr = GlobalAlloc(0, roDataSize);
+            *roDataBlock = m_dataAddr = malloc(roDataSize);
         }
     }
 
@@ -357,14 +354,14 @@ public:
         void                  **ppIndirection = NULL
         ) {
         switch (ftnNum) {
-            case CORINFO_HELP_THROW: return &ThrowFunc;
-            case CORINFO_HELP_FAIL_FAST: return &FailFast;
+            case CORINFO_HELP_THROW: return (void*)&ThrowFunc;
+            case CORINFO_HELP_FAIL_FAST: return (void*)&FailFast;
             case CORINFO_HELP_DBLREM:
-                auto res = (double(*)(double, double))&fmod;
-                return res;
-        }
-        printf("unknown getHelperFtn\r\n");
-        return NULL;
+                return (void*)(double(*)(double, double))&fmod;
+			default:
+				printf("unknown getHelperFtn\r\n");
+				return NULL;
+		}
     }
 
     // return a callable address of the function (native code). This function
@@ -374,7 +371,7 @@ public:
         CORINFO_METHOD_HANDLE   ftn,                 /* IN  */
         CORINFO_CONST_LOOKUP *  pResult,             /* OUT */
         CORINFO_ACCESS_FLAGS    accessFlags = CORINFO_ACCESS_ANY) {
-        BaseMethod* method = (BaseMethod*)ftn;
+        IMethod* method = (IMethod*)ftn;
         auto indir = method->get_indirect_addr();
         if (indir != nullptr) {
             pResult->accessType = IAT_PVALUE;
@@ -558,7 +555,7 @@ public:
         //out params
         CORINFO_CALL_INFO       *pResult
         ) {
-        auto method = (BaseMethod*)pResolvedToken->hMethod;
+        auto method = (IMethod*)pResolvedToken->hMethod;
         pResult->hMethod = (CORINFO_METHOD_HANDLE)method;
 
         void *indir = method->get_indirect_addr();
@@ -734,7 +731,7 @@ public:
         CORINFO_SIG_INFO          *sig,        /* OUT */
         CORINFO_CLASS_HANDLE      memberParent = NULL /* IN */
         ) {
-        BaseMethod* m = (BaseMethod*)ftn;
+        IMethod* m = (IMethod*)ftn;
         //printf("getMethodSig %p\r\n", ftn);
 
         sig->retType = to_clr_type(m->get_return_type());
@@ -1075,8 +1072,8 @@ public:
 
     // Resolve metadata token into runtime method handles.
     virtual void resolveToken(/* IN, OUT */ CORINFO_RESOLVED_TOKEN * pResolvedToken) {
-        Module* mod = (Module*)pResolvedToken->tokenScope;
-        BaseMethod* method = mod->ResolveMethod(pResolvedToken->token);
+        IModule* mod = (IModule*)pResolvedToken->tokenScope;
+        IMethod* method = mod->ResolveMethod(pResolvedToken->token);
         pResolvedToken->hMethod = (CORINFO_METHOD_HANDLE)method;
         pResolvedToken->hClass = (CORINFO_CLASS_HANDLE)1; // this just suppresses a JIT assert
         //printf("resolveToken %d\r\n", pResolvedToken->token);
@@ -1100,7 +1097,7 @@ public:
         CORINFO_SIG_INFO           *sig         /* OUT */
         ) {
         printf("findSig %d\r\n", sigTOK);
-        auto mod = (Module*)module;
+        auto mod = (IModule*)module;
         auto method = mod->ResolveMethod(sigTOK);
 
         sig->retType = to_clr_type(method->get_return_type());

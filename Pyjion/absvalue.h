@@ -197,7 +197,8 @@ public:
     virtual const char* describe() {
         return "";
     }
-
+	virtual ~AbstractValue() {
+	}
 };
 
 struct AbstractValueWithSources {

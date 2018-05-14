@@ -24,8 +24,6 @@
 */
 
 #include "absint.h"
-#include "taggedptr.h"
-#include "intrins.h"
 #include <opcode.h>
 #include <deque>
 #include <unordered_map>
@@ -44,16 +42,16 @@
 #define ST_FIELD(type, field) m_comp->emit_ptr(offsetof(type, field)); m_comp->emit_add(); m_comp->emit_store_indirect_ptr();
 
 
-AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, CompilerFactory* compFactory) : m_code(code) 
-{
+AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, CompilerFactory* compFactory) : m_code(code) {
     m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
     m_size = PyBytes_Size(code->co_code);
     m_returnValue = &Undefined;
-	m_lasti = m_comp->emit_define_local(LK_Pointer);
 
     if (compFactory != nullptr) {
 		m_module = new UserModule(g_module);
-		m_comp = compFactory(m_module, LK_Pointer, std::vector <Parameter> {Parameter(LK_Pointer), Parameter(LK_Pointer) });
+		m_method = new Method(m_module, LK_Pointer, std::vector <Parameter> {Parameter(LK_Pointer), Parameter(LK_Pointer) }, nullptr);
+		m_comp = compFactory(m_method);
+		m_lasti = m_comp->emit_define_local(LK_Pointer);
 
         m_retLabel = m_comp->emit_define_label();
         m_retValue = m_comp->emit_define_local();
@@ -992,6 +990,7 @@ void AbstractInterpreter::emit_incref(bool maybeTagged) {
 
 AbstractInterpreter::~AbstractInterpreter() {
     // clean up any dynamically allocated objects...
+	// TODO: Free m_comp
     for (auto source : m_sources) {
         delete source;
     }
@@ -1984,6 +1983,10 @@ AbstractValue* AbstractInterpreter::to_abstract(AbstractValueKind kind) {
             return &Function;
         case AVK_Slice:
             return &Slice;
+		case AVK_Any:
+			return &Any;
+		case AVK_Undefined:
+			return &Undefined;
     }
 
     return &Any;
@@ -2452,18 +2455,23 @@ void AbstractInterpreter::ensure_labels(vector<Label>& labels, size_t count) {
     }
 }
 
+void AbstractInterpreter::emit_debug_msg(const char * msg) {
+	m_comp->emit_ptr((void*)msg);
+	m_comp->emit_call(PyJit_DebugTrace);
+}
+
 void AbstractInterpreter::branch_raise(const char *reason) {
     auto& ehBlock = get_ehblock();
     auto& entry_stack = ehBlock.EntryStack;
 
 #if DEBUG_TRACE
     if (reason != nullptr) {
-        m_comp->emit_debug_msg(reason);
+        emit_debug_msg(reason);
     }
 #endif
 
 	// number of stack entries we need to clear...
-	size_t count = m_stack.size() - entry_stack.size();	
+	ssize_t count = m_stack.size() - entry_stack.size();	
 	
 	auto cur = m_stack.rbegin();
 	for (; cur != m_stack.rend() && count >= 0; cur++) {
@@ -4188,6 +4196,8 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
                 m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
                 emit_pop_top();
                 return;
+			default:
+				break;
         }
     }
     
@@ -4241,6 +4251,7 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
                 emit_unary_not_tagged_int_push_bool();
                 m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
                 break;
+			default: break;
         }
     }
 
@@ -4316,6 +4327,8 @@ void AbstractInterpreter::unary_negative(int opcodeIndex) {
                 emit_unary_negative_tagged_int();
                 inc_stack();
                 break;
+			default:
+				break;
         }
     }
 
@@ -4668,7 +4681,17 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
                     assert(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
                     assert(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
 
-                    m_comp->emit_compare_float(compareType);
+					CompareType ct;
+					switch (compareType) {
+					case Py_EQ:  ct = CT_Equal; break;
+					case Py_LT: ct = CT_LessThan; break;
+					case Py_LE: ct = CT_LessThanEqual; break;
+					case Py_NE: ct = CT_NotEqual; break;
+					case Py_GT: ct = CT_GreaterThan; break;
+					case Py_GE: ct = CT_GreaterThanEqual; break;
+					}
+
+                    m_comp->emit_compare_float(ct);
                     dec_stack();
 
                     if (can_optimize_pop_jump(i)) {
@@ -4865,6 +4888,8 @@ LocalKind get_optimized_local_kind(AbstractValueKind kind) {
     switch (kind) {
         case AVK_Float:
             return LK_Float;
+		default:
+			break;
     }
     return LK_Pointer;
 }
@@ -4901,7 +4926,7 @@ void AbstractInterpreter::debug_log(const char* fmt, ...) {
     char* buffer = new char[bufferSize];
     vsnprintf(buffer, bufferSize, fmt, args);
     va_end(args);
-    m_comp->emit_debug_msg(buffer);
+    emit_debug_msg(buffer);
 }
 
 EhFlags operator | (EhFlags lhs, EhFlags rhs) {

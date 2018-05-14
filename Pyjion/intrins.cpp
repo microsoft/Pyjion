@@ -1231,7 +1231,7 @@ int PyJit_DeleteGlobal(PyFrameObject* f, PyObject* name) {
 }
 
 PyObject *
-_PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key)
+_PyJit_Dict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key)
 {
 #if FALSE
 	Py_ssize_t ix;
@@ -1272,7 +1272,7 @@ PyObject* PyJit_LoadGlobal(PyFrameObject* f, PyObject* name) {
     PyObject* v;
     if (PyDict_CheckExact(f->f_globals)
         && PyDict_CheckExact(f->f_builtins)) {
-        v = _PyDict_LoadGlobal((PyDictObject *)f->f_globals,
+        v = _PyJit_Dict_LoadGlobal((PyDictObject *)f->f_globals,
             (PyDictObject *)f->f_builtins,
             name);
         if (v == NULL) {
@@ -2169,6 +2169,21 @@ PyObject* PyJit_UnboxInt_Tagged(PyObject* value) {
     return TAG_IT(intValue);
 }
 
+bool __builtin_add_overflow(tagged_ptr left, tagged_ptr right, tagged_ptr* res) {
+	//res = left + right;
+	return true;
+}
+
+bool __builtin_sub_overflow(tagged_ptr left, tagged_ptr right, tagged_ptr* res) {
+	//res = left + right;
+	return true;
+}
+
+bool __builtin_mul_overflow(tagged_ptr left, tagged_ptr right, tagged_ptr* res) {
+	//res = left + right;
+	return true;
+}
+
 inline PyObject* PyJit_Tagged_Add(tagged_ptr left, tagged_ptr right) {
     tagged_ptr res;
 #ifdef _MSC_VER
@@ -2549,20 +2564,49 @@ Module g_module;
 
 #define BASE_INDEX 0x1000
 
-class GlobalMethod {
-	Method m_method;
+class GlobalMethod : IMethod {
+	vector<Parameter> m_params;
+	LocalKind m_retType;
+	void* m_addr;
 public:
-	GlobalMethod(Method method) {
-		m_method = method;
-		auto token = BASE_INDEX + g_module.m_tokenToMethod.size();
+	GlobalMethod(LocalKind returnType, std::vector<Parameter> params, void* addr) {
+		int token = BASE_INDEX + g_module.m_tokenToMethod.size();
 
-		g_module.m_tokenToMethod[token] = &m_method;
-		g_module.m_methodAddrToMethod[method.get_addr()] = &m_method;
+		g_module.m_tokenToMethod[token] = this;
+		g_module.m_methodAddrToToken[addr] = token;
+		
+	}
+
+	virtual IModule* get_module() {
+		return &g_module;
+	}
+
+	virtual void* get_addr() {
+		return m_addr;
+	}
+
+	virtual void* get_indirect_addr() {
+		return &m_addr;
+	}
+
+	virtual unsigned int get_param_count() {
+		return m_params.size();
+	}
+
+	virtual Parameter* get_params() {
+		if (m_params.size() == 0) {
+			return nullptr;
+		}
+		return &m_params[0];
+	}
+
+	virtual LocalKind get_return_type() {
+		return m_retType;
 	}
 };
 
 #define GLOBAL_METHOD(addr, returnType, ...) \
-    GlobalMethod g ## addr(Method(&g_module, returnType, std::vector<Parameter>{__VA_ARGS__}, &addr));
+    GlobalMethod g ## addr(returnType, std::vector<Parameter>{__VA_ARGS__}, (void*)&addr);
 
 GLOBAL_METHOD(PyJit_Add, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
 GLOBAL_METHOD(PyJit_Subscr, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));

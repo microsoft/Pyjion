@@ -27,9 +27,8 @@
 #define CEE_H
 
 #define FEATURE_NO_HOST
-#define USE_STL
+
 #include <stdint.h>
-#include <windows.h>
 #include <wchar.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -37,36 +36,40 @@
 #include <limits.h>
 #include <string.h>
 #include <float.h>
-#include <share.h>
 #include <cstdlib>
-#include <intrin.h>
-
-#include <vector>
-#include <unordered_map>
 
 #include <clrhost.h>
 #include "corjit.h"
 #include "openum.h"
 
+
+#define DUMMY_CODE_HEAP (HANDLE)0x12345679
 class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager {
 public:
-    HANDLE m_codeHeap, m_heap;
+	HANDLE m_heap;
+#ifndef PLATFORM_UNIX
+	HANDLE m_codeHeap;
+#endif
     DWORD m_tlsIndex;
     PTLS_CALLBACK_FUNCTION* m_callbacks;
 
 
     CExecutionEngine() {
-        m_codeHeap = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
-        m_heap = HeapCreate(0, 0, 0);
-        m_tlsIndex = TlsAlloc();
+#ifndef PLATFORM_UNIX
+		m_codeHeap = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
+#endif
+		m_heap = HeapCreate(0, 0, 0);
+		m_tlsIndex = TlsAlloc();
         // We can't use new[] here because utilcode isn't spun up yet...
         m_callbacks = (PTLS_CALLBACK_FUNCTION*)::HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PTLS_CALLBACK_FUNCTION) * MAX_PREDEFINED_TLS_SLOT);
     }
 
     ~CExecutionEngine() {
-        ::HeapDestroy(m_codeHeap);
-        ::HeapDestroy(m_heap);
-        TlsFree(m_tlsIndex);
+#ifndef PLATFORM_UNIX
+		::ClrHeapDestroy(m_codeHeap);
+#endif
+		::ClrHeapDestroy(m_heap);
+		TlsFree(m_tlsIndex);
         ::HeapFree(GetProcessHeap(), 0, m_callbacks);
     }
 
@@ -311,13 +314,13 @@ public:
         SIZE_T dwInitialSize,  // initial heap size
         SIZE_T dwMaximumSize   // maximum heap size
         ) {
-        return ::HeapCreate(flOptions, dwInitialSize, dwMaximumSize);
+        return ::ClrHeapCreate(flOptions, dwInitialSize, dwMaximumSize);
     }
 
     BOOL ClrHeapDestroy(
         HANDLE hHeap   // handle to heap
         ) {
-        return ::HeapDestroy(hHeap);
+        return ::ClrHeapDestroy(hHeap);
     }
 
     LPVOID ClrHeapAlloc(
@@ -325,7 +328,12 @@ public:
         DWORD dwFlags,  // heap allocation control
         SIZE_T dwBytes  // number of bytes to allocate
         ) {
-        return ::HeapAlloc(hHeap, dwFlags, dwBytes);
+#ifdef PLATFORM_UNIX
+		if (hHeap == DUMMY_CODE_HEAP) {
+			return AllocExecutable(dwBytes);
+		}
+#endif
+		return ::ClrHeapAlloc(hHeap, dwFlags, (S_SIZE_T)dwBytes);
     }
 
     BOOL ClrHeapFree(
@@ -333,6 +341,11 @@ public:
         DWORD dwFlags, // heap free options
         LPVOID lpMem   // pointer to memory
         ) {
+#ifdef PLATFORM_UNIX
+		if (hHeap == DUMMY_CODE_HEAP) {
+			return FreeExecutable(lpMem);
+		}
+#endif
         return ::HeapFree(hHeap, dwFlags, lpMem);
     }
 
@@ -341,20 +354,36 @@ public:
         DWORD dwFlags, // heap access options
         const void* lpMem   // optional pointer to memory block
         ) {
-        return ::HeapValidate(hHeap, dwFlags, lpMem);
+        return ::ClrHeapValidate(hHeap, dwFlags, lpMem);
     }
 
     HANDLE ClrGetProcessExecutableHeap() {
-        if (m_executableHeap == NULL) {
-            m_executableHeap = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
-        }
-        return m_executableHeap;
+#ifdef PLATFORM_UNIX
+		return DUMMY_CODE_HEAP;
+#else
+        return m_codeHeap;
+#endif
     }
 
+	void* AllocExecutable(ULONG size) {
+#ifdef PLATFORM_UNIX
+		// TODO: Implement a heap on top of VirtualAlloc
+		return ::VirtualAlloc(0, size, MEM_RESERVE_EXECUTABLE, PAGE_EXECUTE_READWRITE);
+#else
+		return HeapAlloc(m_codeHeap, 0, size); 
+#endif
+	}
+
+	BOOL FreeExecutable(PVOID code) {
+#ifdef PLATFORM_UNIX
+		return ::VirtualFree(code, 0, MEM_RELEASE);
+#else
+		return HeapFree(m_codeHeap, 0, code);
+#endif
+	}
 
 private:
-    ULONG m_refCount;
-    HANDLE m_executableHeap;
+    LONG m_refCount;
 };  // interface IExecutionEngine
 
 class CCorJitHost : public ICorJitHost {

@@ -52,9 +52,15 @@
 struct SpecializedTreeNode;
 class PyjionJittedCode;
 
-extern "C" __declspec(dllexport) void JitInit();
-extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *, int);
-extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
+#ifdef __NT__
+#define DLL_EXPORT __declspec(dllexport)
+#else
+#define DLL_EXPORT 
+#endif
+
+extern "C" DLL_EXPORT void JitInit();
+extern "C" DLL_EXPORT PyObject *PyJit_EvalFrame(PyFrameObject *, int);
+extern "C" DLL_EXPORT PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
 
 class PyjionJittedCode;
 typedef PyObject* (*Py_EvalFunc)(PyjionJittedCode*, struct _frame*);
@@ -94,6 +100,6 @@ public:
 
 	~PyjionJittedCode();
 };
-__declspec(dllexport) bool jit_compile(PyCodeObject* code);
+DLL_EXPORT bool jit_compile(PyCodeObject* code);
 
 #endif

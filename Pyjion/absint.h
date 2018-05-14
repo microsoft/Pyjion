@@ -31,6 +31,8 @@
 #include <unordered_map>
 
 #include "absvalue.h"
+#include "taggedptr.h"
+#include "intrins.h"
 #include "cowvector.h"
 #include "ipycomp.h"
 
@@ -297,6 +299,67 @@ struct BlockInfo {
     }
 };
 
+
+
+class UserModule : public Module {
+	Module& m_parent;
+public:
+	UserModule(Module& parent) : m_parent(parent) {
+	}
+
+	virtual IMethod* ResolveMethod(int tokenId) {
+		auto res = m_tokenToMethod.find(tokenId);
+		if (res == m_tokenToMethod.end()) {
+			return m_parent.ResolveMethod(tokenId);
+		}
+
+		return res->second;
+	}
+
+	virtual int ResolveMethodToken(void* addr) {
+		auto res = m_methodAddrToToken.find(addr);
+		if (res == m_methodAddrToToken.end()) {
+			return m_parent.ResolveMethodToken(addr);
+		}
+		return res->second;
+	}
+};
+
+class UserMethod : public IMethod {
+	IModule* m_module;
+public:
+	vector<Parameter> m_params;
+	LocalKind m_retType;
+	
+	UserMethod() {
+	}
+
+	virtual IModule* get_module() {
+		return m_module;
+	}
+
+	UserMethod(IModule* module, LocalKind returnType, std::vector<Parameter> params) {
+		m_retType = returnType;
+		m_params = params;
+		m_module = module;
+	}
+
+	virtual unsigned int get_param_count() {
+		return m_params.size();
+	}
+
+	virtual Parameter* get_params() {
+		if (m_params.size() == 0) {
+			return nullptr;
+		}
+		return &m_params[0];
+	}
+
+	virtual LocalKind get_return_type() {
+		return m_retType;
+	}
+};
+
 #ifdef _WIN32
 #define DLL_EXPORT __declspec(dllexport) 
 #else
@@ -309,6 +372,7 @@ class DLL_EXPORT AbstractInterpreter {
 	// Tracks the interpreter state before each opcode
 	unordered_map<size_t, InterpreterState> m_startStates;
 	AbstractValue* m_returnValue;
+	Method* m_method;
 
 	// ** Inputs:
 	PyCodeObject* m_code;
@@ -420,6 +484,7 @@ private:
 	AbstractSource* add_intermediate_source(size_t opcodeIndex);
 
 	void make_function(int oparg);
+	void emit_debug_msg(const char * message);
 	void fancy_call(int na, int nk, int flags);
 	bool can_skip_lasti_update(int opcodeIndex);
 	void build_tuple(size_t argCnt);
@@ -652,5 +717,41 @@ private:
 	void load_local(int oparg);
 	void emit_incref(bool maybeTagged = false);
 };
+
+class IndirectDispatchMethod : public IMethod {
+	IMethod* m_coreMethod;
+public:
+	void* m_addr;
+
+	IndirectDispatchMethod(IMethod* coreMethod) : m_coreMethod(coreMethod) {
+		m_addr = m_coreMethod->get_addr();
+	}
+
+public:
+	virtual IModule* get_module() {
+		return nullptr;
+	}
+
+	virtual void* get_addr() {
+		return m_addr;
+	}
+
+	virtual void* get_indirect_addr() {
+		return &m_addr;
+	}
+
+	virtual unsigned int get_param_count() {
+		return m_coreMethod->get_param_count();
+	}
+
+	virtual Parameter* get_params() {
+		return m_coreMethod->get_params();
+	}
+
+	virtual LocalKind get_return_type() {
+		return m_coreMethod->get_return_type();
+	}
+};
+
 
 #endif

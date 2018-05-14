@@ -31,17 +31,17 @@
 
 ICorJitCompiler* g_jit;
 
-IPythonCompiler* CreateCLRCompiler(Module* module) {
-	return new PythonCompiler(module, LK_Pointer, std::vector <Parameter> {Parameter(LK_Pointer), Parameter(LK_Pointer) });
+IPythonCompiler* CreateCLRCompiler(IMethod* method) {
+	return new PythonCompiler(method);
 }
 
-PythonCompiler::PythonCompiler(Module* module, LocalKind retType, std::vector<Parameter> params) :
-	m_module(module),
-    m_il(module, to_clr_type(retType), params) {
+PythonCompiler::PythonCompiler(IMethod* method) :	
+    m_il(method),
+	m_method(method) {
 }
 
 void PythonCompiler::emit_call(void* func) {
-	m_il.emit_call(m_module->ResolveMethodToken(func));
+	m_il.emit_call(m_method->get_module()->ResolveMethodToken(func));
 }
 
 void PythonCompiler::emit_call(int token) {
@@ -80,10 +80,6 @@ void PythonCompiler::emit_divide() {
 }
 
 void PythonCompiler::emit_multiply() {
-	m_il.mul();
-}
-
-void PythonCompiler::emit_multiply() {
 	m_il.sub();
 }
 
@@ -119,6 +115,10 @@ void PythonCompiler::emit_store_indirect_int32() {
 
 void PythonCompiler::emit_add() {
 	m_il.add();
+}
+
+void PythonCompiler::emit_subtract() {
+	m_il.sub();
 }
 
 Local PythonCompiler::emit_define_local(LocalKind kind) {
@@ -221,11 +221,6 @@ void PythonCompiler::emit_mark_label(Label label) {
     m_il.mark_label(label);
 }
 
-void PythonCompiler::emit_debug_msg(const char* msg) {
-    m_il.ld_i((void*)msg);
-    m_il.emit_call(METHOD_DEBUG_TRACE);
-}
-
 void PythonCompiler::emit_compare_float(CompareType compareType) {
     // TODO: If we know we're followed by the pop jump we could combine
     // and do a single branch comparison.
@@ -242,8 +237,8 @@ void PythonCompiler::emit_compare_float(CompareType compareType) {
 extern CExecutionEngine g_execEngine;
 
 JittedCode* PythonCompiler::emit_compile() {
-    CorJitInfo* jitInfo = new CorJitInfo(g_execEngine, m_module);
-    auto addr = m_il.compile(jitInfo, g_jit, 256).m_addr;
+    CorJitInfo* jitInfo = new CorJitInfo(g_execEngine, m_method);
+    auto addr = m_il.compile(jitInfo, g_jit, 256);
     if (addr == nullptr) {
         delete jitInfo;
         return nullptr;

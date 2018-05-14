@@ -27,17 +27,19 @@
 #define PYCOMP_H
 
 #include <stdint.h>
-#include <wchar.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <limits.h>
-#include <string.h>
-#include <float.h>
-#include <cstdlib>
+#include <winwrap.h>
 
-#include <vector>
-#include <unordered_map>
+#include <windef.h>
+#include <winnt.h>
+#include <stdlib.h>
+#include <wchar.h>
+#include <objbase.h>
+#include <stddef.h>
+#include <float.h>
+#include <math.h>
+#include <time.h>
+#include <limits.h>
+#include <assert.h>
 
 #include "ipycomp.h"
 #include "jitinfo.h"
@@ -48,10 +50,10 @@ extern ICorJitCompiler* g_jit;
 class PythonCompiler : public IPythonCompiler {
     // pre-calculate some information...
     ILGenerator m_il;
-    Module* m_module;
+    IMethod* m_method;
 
 public:
-    PythonCompiler(Module* module, LocalKind retType, std::vector<Parameter> params);
+    PythonCompiler(IMethod* method);
 
 	virtual void emit_compare_float(CompareType compareType);
 	virtual void emit_ret();
@@ -90,9 +92,6 @@ public:
     virtual void emit_pop();
     // Dups the current value on the stack, performing no operations related to reference counting
     virtual void emit_dup();
-
-    virtual void emit_debug_msg(const char* msg);
-
 
     virtual JittedCode* emit_compile();
 

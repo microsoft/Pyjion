@@ -26,6 +26,7 @@
 #ifndef IPYCOMP_H
 #define IPYCOMP_H
 
+
 class Local {
 public:
     int m_index;
@@ -67,7 +68,7 @@ enum CompareType {
 };
 
 class Method;
-class BaseMethod;
+class IMethod;
 
 enum LocalKind {
 	LK_Pointer,
@@ -77,46 +78,14 @@ enum LocalKind {
 	LK_Void
 };
 
-
-class Module {
+class IModule {
 public:
-	unordered_map<int, BaseMethod*> m_tokenToMethod;
-	unordered_map<void*, int> m_methodAddrToToken;
+	virtual IMethod* ResolveMethod(int tokenId) = 0;
 
-	Module() {
-	}
+	virtual int ResolveMethodToken(void* addr) = 0;
 
-	virtual BaseMethod* ResolveMethod(int tokenId) {
-		return m_tokenToMethod[tokenId];
-	}
-
-	virtual int ResolveMethodToken(void* addr) {
-		return m_methodAddrToToken[addr];
-	}
-};
-
-class UserModule : public Module {
-	Module& m_parent;
-public:
-	UserModule(Module& parent) : m_parent(parent) {
-	}
-
-	virtual BaseMethod* ResolveMethod(int tokenId) {
-		auto res = m_tokenToMethod.find(tokenId);
-		if (res == m_tokenToMethod.end()) {
-			return m_parent.ResolveMethod(tokenId);
-		}
-
-		return res->second;
-	}
-
-	virtual int ResolveMethodToken(void* addr) {
-		auto res = m_methodAddrToToken.find(addr);
-		if (res == m_methodAddrToToken.end()) {
-			return m_parent.ResolveMethodToken(addr);
-		}
-		return res->second;
-	}
+	virtual ~IModule() {
+	};
 };
 
 class Parameter {
@@ -127,12 +96,13 @@ public:
 	}
 };
 
-class BaseMethod {
+class IMethod {
 public:
 	virtual unsigned int get_param_count() = 0;
 	virtual Parameter* get_params() = 0;
 	virtual LocalKind get_return_type() = 0;
-
+	virtual IModule* get_module() = 0;
+	
 	virtual void* get_addr() {
 		return nullptr;
 	}
@@ -141,79 +111,9 @@ public:
 		return nullptr;
 	}
 
+	virtual ~IMethod() {
+	};
 	//    virtual void findSig(CORINFO_SIG_INFO  *sig) = 0;
-};
-
-class Method : public BaseMethod {
-	Module* m_module;
-public:
-	vector<Parameter> m_params;
-	LocalKind m_retType;
-	void* m_addr;
-
-	Method() {
-	}
-
-	Method(Module* module, LocalKind returnType, std::vector<Parameter> params, void* addr) {
-		m_retType = returnType;
-		m_params = params;
-		m_module = module;
-		m_addr = addr;
-	}
-
-	virtual void* get_addr() {
-		return m_addr;
-	}
-
-	virtual void* get_indirect_addr() {
-		return &m_addr;
-	}
-
-	virtual unsigned int get_param_count() {
-		return m_params.size();
-	}
-
-	virtual Parameter* get_params() {
-		if (m_params.size() == 0) {
-			return nullptr;
-		}
-		return &m_params[0];
-	}
-
-	virtual LocalKind get_return_type() {
-		return m_retType;
-	}
-};
-
-class IndirectDispatchMethod : public BaseMethod {
-	BaseMethod* m_coreMethod;
-public:
-	void* m_addr;
-
-	IndirectDispatchMethod(BaseMethod* coreMethod) : m_coreMethod(coreMethod) {
-		m_addr = m_coreMethod->get_addr();
-	}
-
-public:
-	virtual void* get_addr() {
-		return m_addr;
-	}
-
-	virtual void* get_indirect_addr() {
-		return &m_addr;
-	}
-
-	virtual unsigned int get_param_count() {
-		return m_coreMethod->get_param_count();
-	}
-
-	virtual Parameter* get_params() {
-		return m_coreMethod->get_params();
-	}
-
-	virtual LocalKind get_return_type() {
-		return m_coreMethod->get_return_type();
-	}
 };
 
 // Not currently used...
@@ -336,9 +236,7 @@ public:
     virtual void emit_ret() = 0;
        
     // Performs a comparison of two unboxed floating point values on the stack
-    virtual void emit_compare_float(int compareType) = 0;
-
-    virtual void emit_debug_msg(const char* msg) = 0;
+    virtual void emit_compare_float(CompareType compareType) = 0;
 
 	virtual void emit_store_int32() = 0;
 	virtual void emit_load_arg(int arg) = 0;
@@ -352,11 +250,9 @@ public:
 	}
 	virtual void emit_call(void* func) = 0;
 	virtual void emit_call(int token) = 0;
-
-	virtual void emit_compare_float(CompareType compareType) = 0;
 };
 
-typedef IPythonCompiler* (CompilerFactory)(Module* module, LocalKind retType, std::vector <Parameter> params);
+typedef IPythonCompiler* (CompilerFactory)(IMethod* method);
 
 
 #endif
