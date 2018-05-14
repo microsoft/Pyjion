@@ -58,7 +58,7 @@ public:
 	virtual void emit_compare_float(CompareType compareType);
 	virtual void emit_ret();
     virtual void emit_load_array(int index);
-	virtual void emit_store_to_array(Local array, int index);
+    virtual void emit_store_to_array(Local array, int index);
 
     virtual Local emit_spill();
     virtual void emit_store_local(Local local);

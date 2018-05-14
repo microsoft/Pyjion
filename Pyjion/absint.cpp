@@ -1014,38 +1014,38 @@ bool AbstractInterpreter::preprocess() {
     vector<bool> ehKind;
     vector<AbsIntBlockInfo> blockStarts;
     for (size_t curByte = 0; curByte < m_size; curByte += sizeof(_Py_CODEUNIT)) {
-		auto opcodeIndex = curByte;
-		auto byte = GET_OPCODE(curByte);
-		oparg = GET_OPARG(curByte); 
+        auto opcodeIndex = curByte;
+        auto byte = GET_OPCODE(curByte);
+        oparg = GET_OPARG(curByte); 
 
-		// POP_BLOCK can be removed because it is unreachable, e.g. if you do:
-		// def f():
-		//     x = 1
-		//         y = 0
-		//         try:
-		//			    return x / y
-		//         except:
-		//			    return 42
-		// In Python 3.5 you would always have POP_BLOCK's, but in 3.6 the POP_BLOCK
-		// that should come after return x / y is gone.  So we need to check
-		// the opcode offsets and apply the block pops here.
-	processOpCode:
-		while (blockStarts.size() != 0 && 
-			opcodeIndex >= blockStarts[blockStarts.size() - 1].BlockEnd) {
-			auto blockStart = blockStarts.back();
-			blockStarts.pop_back();
-			m_blockStarts[opcodeIndex] = blockStart.BlockStart;
-		}
+        // POP_BLOCK can be removed because it is unreachable, e.g. if you do:
+        // def f():
+        //     x = 1
+        //         y = 0
+        //         try:
+        //                return x / y
+        //         except:
+        //                return 42
+        // In Python 3.5 you would always have POP_BLOCK's, but in 3.6 the POP_BLOCK
+        // that should come after return x / y is gone.  So we need to check
+        // the opcode offsets and apply the block pops here.
+    processOpCode:
+        while (blockStarts.size() != 0 && 
+            opcodeIndex >= blockStarts[blockStarts.size() - 1].BlockEnd) {
+            auto blockStart = blockStarts.back();
+            blockStarts.pop_back();
+            m_blockStarts[opcodeIndex] = blockStart.BlockStart;
+        }
 
         switch (byte) {
-			case EXTENDED_ARG:
-			{
-				curByte += sizeof(_Py_CODEUNIT);
-				oparg = (oparg << 8) | GET_OPARG(curByte);
-				byte = GET_OPCODE(curByte);
-				goto processOpCode;
-			}
-			case YIELD_FROM:
+            case EXTENDED_ARG:
+            {
+                curByte += sizeof(_Py_CODEUNIT);
+                oparg = (oparg << 8) | GET_OPARG(curByte);
+                byte = GET_OPCODE(curByte);
+                goto processOpCode;
+            }
+            case YIELD_FROM:
             case YIELD_VALUE:
                 return false;
 
@@ -1054,14 +1054,14 @@ bool AbstractInterpreter::preprocess() {
                     m_sequenceLocals[curByte] = m_comp->emit_allocate_stack_array(((oparg & 0xFF) + (oparg >> 8)) * sizeof(void*));
                 }
                 break;
-			case BUILD_STRING:
-			case UNPACK_SEQUENCE:
+            case BUILD_STRING:
+            case UNPACK_SEQUENCE:
                 // we need a buffer for the slow case, but we need 
                 // to avoid allocating it in loops.
                 if (m_comp != nullptr) {
                     m_sequenceLocals[curByte] = m_comp->emit_allocate_stack_array(oparg * sizeof(void*));
                 }
-                break;			
+                break;
             case DELETE_FAST:
                 if (oparg < m_code->co_argcount) {
                     // this local is deleted, so we need to check for assignment
@@ -1104,7 +1104,10 @@ bool AbstractInterpreter::preprocess() {
             case LOAD_GLOBAL:
             {
                 auto name = PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg));
-                if (!strcmp(name, "vars") || !strcmp(name, "dir") || !strcmp(name, "locals")) {
+                if (!strcmp(name, "vars") || 
+                    !strcmp(name, "dir") || 
+                    !strcmp(name, "locals") || 
+                    !strcmp(name, "eval")) {
                     // In the future we might be able to do better, e.g. keep locals in fast locals,
                     // but for now this is a known limitation that if you load vars/dir we won't
                     // optimize your code, and if you alias them you won't get the correct behavior.
@@ -1186,16 +1189,16 @@ bool AbstractInterpreter::interpret() {
             auto opcodeIndex = curByte;
 
             auto opcode = GET_OPCODE(curByte);
-			oparg = GET_OPARG(curByte);
+            oparg = GET_OPARG(curByte);
 
         processOpCode:
             switch (opcode) {
                 case EXTENDED_ARG:
                 {
-					curByte += sizeof(_Py_CODEUNIT);
-					oparg = (oparg << 8) | GET_OPARG(curByte);
-					opcode = GET_OPCODE(curByte);
-					update_start_state(lastState, curByte);
+                    curByte += sizeof(_Py_CODEUNIT);
+                    oparg = (oparg << 8) | GET_OPARG(curByte);
+                    opcode = GET_OPCODE(curByte);
+                    update_start_state(lastState, curByte);
                     goto processOpCode;
                 }
                 case NOP: break;
@@ -1609,21 +1612,21 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop(); // code
 
                     if (oparg & 0x08) {
-						// closure object
+                        // closure object
                         lastState.pop(); 
                     }
                     if (oparg & 0x04) {
-						// annotations
+                        // annotations
                         lastState.pop();
                     }
-					if (oparg & 0x02) {
-						// kw defaults
-						lastState.pop();
-					}
-					if (oparg & 0x01) {
-						// defaults
-						lastState.pop();
-					}
+                    if (oparg & 0x02) {
+                        // kw defaults
+                        lastState.pop();
+                    }
+                    if (oparg & 0x01) {
+                        // defaults
+                        lastState.pop();
+                    }
 
                     lastState.push(&Function);
                     break;
@@ -1821,33 +1824,33 @@ bool AbstractInterpreter::interpret() {
                     }
                     break;
                 }
-				case FORMAT_VALUE:
-					if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
-						// format spec
-						lastState.pop();
-					}
-					lastState.pop();
-					lastState.push(&String);
-					break;
-				case BUILD_STRING:
-					for (auto i = 0; i < oparg; i++) {
-						lastState.pop();
-					}
-					lastState.push(&String);
-					break;
-				case SETUP_WITH:
+                case FORMAT_VALUE:
+                    if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
+                        // format spec
+                        lastState.pop();
+                    }
+                    lastState.pop();
+                    lastState.push(&String);
+                    break;
+                case BUILD_STRING:
+                    for (auto i = 0; i < oparg; i++) {
+                        lastState.pop();
+                    }
+                    lastState.push(&String);
+                    break;
+                case SETUP_WITH:
                 case YIELD_VALUE:
                     return false;
-				case BUILD_TUPLE_UNPACK_WITH_CALL:
-				case BUILD_MAP_UNPACK_WITH_CALL:
-					return false;
-				case BUILD_CONST_KEY_MAP:
-					lastState.pop(); //keys
-					for (auto i = 0; i < oparg; i++) {
-						lastState.pop(); // values
-					}
-					lastState.push(&Dict);
-					return false;
+                case BUILD_TUPLE_UNPACK_WITH_CALL:
+                case BUILD_MAP_UNPACK_WITH_CALL:
+                    return false;
+                case BUILD_CONST_KEY_MAP:
+                    lastState.pop(); //keys
+                    for (auto i = 0; i < oparg; i++) {
+                        lastState.pop(); // values
+                    }
+                    lastState.push(&Dict);
+                    return false;
                 default:
 #ifdef _DEBUG
                     printf("Unknown unsupported opcode: %s", opcode_name(opcode));
@@ -2000,9 +2003,9 @@ void AbstractInterpreter::dump() {
         );
     for (size_t curByte = 0; curByte < m_size; curByte+=sizeof(_Py_CODEUNIT)) {
         auto opcode = GET_OPCODE(curByte);
-		int oparg = GET_OPARG(curByte);
-		
-		auto byteIndex = curByte;
+        int oparg = GET_OPARG(curByte);
+        
+        auto byteIndex = curByte;
 
         auto find = m_startStates.find(byteIndex);
         if (find != m_startStates.end()) {
@@ -2295,10 +2298,10 @@ const char* AbstractInterpreter::opcode_name(int opcode) {
             OP_TO_STR(BUILD_TUPLE_UNPACK)
             OP_TO_STR(BUILD_SET_UNPACK)
             OP_TO_STR(SETUP_ASYNC_WITH)
-			OP_TO_STR(FORMAT_VALUE)
-			OP_TO_STR(BUILD_CONST_KEY_MAP)
-			OP_TO_STR(BUILD_STRING)
-			OP_TO_STR(BUILD_TUPLE_UNPACK_WITH_CALL)
+            OP_TO_STR(FORMAT_VALUE)
+            OP_TO_STR(BUILD_CONST_KEY_MAP)
+            OP_TO_STR(BUILD_STRING)
+            OP_TO_STR(BUILD_TUPLE_UNPACK_WITH_CALL)
     }
     return "unknown";
 }
@@ -2632,34 +2635,8 @@ void AbstractInterpreter::build_set(size_t argCnt) {
 		m_comp->emit_mark_label(noErr);
 		delete[] frees;
 		delete[] tmps;
-		/*
-		auto valueTmp = m_comp->emit_define_local();
 
-        for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
-            // save the argument into a temporary...
-            m_comp->emit_store_local(valueTmp);
-
-            dec_stack();
-
-            // load the address of the tuple item...
-            m_comp->emit_load_local(setTmp);
-            m_comp->emit_load_local(valueTmp);
-            m_comp->emit_set_add();
-
-            auto noErr = m_comp->emit_define_label();
-            m_comp->emit_branch(BranchTrue, noErr);
-            
-            // free the set too
-            m_comp->emit_load_local(setTmp);
-            emit_pop_top();
-
-            branch_raise("set add failed");
-            m_comp->emit_mark_label(noErr);
-
-        }
-		*/
         m_comp->emit_load_local(setTmp);
-        //m_comp->emit_free_local(valueTmp);
         m_comp->emit_free_local(setTmp);
     }
     inc_stack();
@@ -2755,11 +2732,19 @@ void AbstractInterpreter::make_function(int oparg) {
     emit_new_function();
     dec_stack(2);
 
-	if (oparg & 0x0f) {
-		auto func = m_comp->emit_spill();
-		if (oparg & 0x08) {
-			// closure
-			auto tmp = m_comp->emit_spill();
+    if (oparg & 0x0f) {
+        auto func = m_comp->emit_spill();
+        if (oparg & 0x08) {
+            // closure
+            auto tmp = m_comp->emit_spill();
+            m_comp->emit_load_local(func);
+            m_comp->emit_load_and_free_local(tmp);
+            emit_set_closure();
+            dec_stack();
+        }
+        if (oparg & 0x04) {
+            // annoations
+            auto tmp = m_comp->emit_spill();
             m_comp->emit_load_local(func);
 			m_comp->emit_load_and_free_local(tmp);
 			emit_set_closure();
@@ -2860,26 +2845,26 @@ void AbstractInterpreter::periodic_work() {
 }
 
 int AbstractInterpreter::get_extended_opcode(int curByte) {
-	auto opcode = GET_OPCODE(curByte);
-	while (opcode == EXTENDED_ARG) {
-		curByte += 2;
-		opcode = GET_OPCODE(curByte);
-	}
-	return opcode;
+    auto opcode = GET_OPCODE(curByte);
+    while (opcode == EXTENDED_ARG) {
+        curByte += 2;
+        opcode = GET_OPCODE(curByte);
+    }
+    return opcode;
 }
 
 // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
 // If the value on the stack is -1, we branch to the current error handler.
 // Otherwise branches based if the current value is true/false based upon the current opcode 
 void AbstractInterpreter::branch_or_error(int& curByte) {
-	curByte += sizeof(_Py_CODEUNIT);
-	auto jmpType = GET_OPCODE(curByte);
-	auto oparg = GET_OPARG(curByte);
-	while (jmpType == EXTENDED_ARG) {
-		curByte += sizeof(_Py_CODEUNIT);
-		oparg = (oparg << 8) | GET_OPARG(curByte);
-		jmpType = GET_OPCODE(curByte);
-	}
+    curByte += sizeof(_Py_CODEUNIT);
+    auto jmpType = GET_OPCODE(curByte);
+    auto oparg = GET_OPARG(curByte);
+    while (jmpType == EXTENDED_ARG) {
+        curByte += sizeof(_Py_CODEUNIT);
+        oparg = (oparg << 8) | GET_OPARG(curByte);
+        jmpType = GET_OPCODE(curByte);
+    }
     mark_offset_label(curByte);
 
     raise_on_negative_one();
@@ -2914,16 +2899,16 @@ void AbstractInterpreter::raise_on_negative_one() {
 // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
 // Branches based if the current value is true/false based upon the current opcode 
 void AbstractInterpreter::branch(int& curByte) {
-	curByte += sizeof(_Py_CODEUNIT);
-	auto jmpType = GET_OPCODE(curByte);
-	auto oparg = GET_OPARG(curByte);
-	while (jmpType == EXTENDED_ARG) {
-		curByte += sizeof(_Py_CODEUNIT);
-		oparg = (oparg << 8) | GET_OPARG(curByte);
-		jmpType = GET_OPCODE(curByte);
-	}
+    curByte += sizeof(_Py_CODEUNIT);
+    auto jmpType = GET_OPCODE(curByte);
+    auto oparg = GET_OPARG(curByte);
+    while (jmpType == EXTENDED_ARG) {
+        curByte += sizeof(_Py_CODEUNIT);
+        oparg = (oparg << 8) | GET_OPARG(curByte);
+        jmpType = GET_OPCODE(curByte);
+    }
 
-	mark_offset_label(curByte);
+    mark_offset_label(curByte);
 
     if (oparg <= curByte) {
         periodic_work();
@@ -2973,27 +2958,27 @@ JittedCode* AbstractInterpreter::compile_worker() {
 	for (int curByte = 0; curByte < m_size; curByte += sizeof(_Py_CODEUNIT)) {
 		assert(curByte % sizeof(_Py_CODEUNIT) == 0);
 
-		auto opcodeIndex = curByte;
+        auto opcodeIndex = curByte;
 
-		auto byte = GET_OPCODE(curByte);
-		auto oparg = GET_OPARG(curByte);
+        auto byte = GET_OPCODE(curByte);
+        auto oparg = GET_OPARG(curByte);
 
-	processOpCode:
-		// See FOR_ITER for special handling of the offset label
+    processOpCode:
+        // See FOR_ITER for special handling of the offset label
         if (get_extended_opcode(curByte) != FOR_ITER) {
             mark_offset_label(curByte);
         }
 
-		auto curStackDepth = m_offsetStack.find(curByte);
+        auto curStackDepth = m_offsetStack.find(curByte);
         if (curStackDepth != m_offsetStack.end()) {
             m_stack = curStackDepth->second;
-		}
+        }
 
-		if (m_blockStack.size() > 1 && 
-			curByte >= m_blockStack.back().EndOffset &&
-			m_blockStack.back().EndOffset != -1) {
-			compile_pop_block();
-		}
+        if (m_blockStack.size() > 1 && 
+            curByte >= m_blockStack.back().EndOffset &&
+            m_blockStack.back().EndOffset != -1) {
+            compile_pop_block();
+        }
 
         // update f_lasti
         if (!can_skip_lasti_update(curByte)) {
@@ -3271,17 +3256,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case BUILD_MAP_UNPACK:
                 extend_map(oparg);
                 inc_stack();
-                break;/*
-			case BUILD_MAP_UNPACK_WITH_CALL:
-			    {
-					m_comp->emit_new_dict(oparg);
-					auto dict = m_comp->emit_spill();
-					// TODO: Null check
-
-					for (auto i = 0; i < oparg; i++) {
-					}
-				}
-				break;*/
+                break;
             case STORE_SUBSCR:
                 dec_stack(3);
                 emit_store_subscr();
@@ -3441,10 +3416,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case RETURN_VALUE: return_value(opcodeIndex); break;
             case EXTENDED_ARG:
             {
-				curByte += sizeof(_Py_CODEUNIT);
-				oparg = (oparg << 8) | GET_OPARG(curByte);
-				byte = GET_OPCODE(curByte);
-				
+                curByte += sizeof(_Py_CODEUNIT);
+                oparg = (oparg << 8) | GET_OPARG(curByte);
+                byte = GET_OPCODE(curByte);
+                
                 goto processOpCode;
             }
             case MAKE_FUNCTION:
@@ -3509,10 +3484,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     }
                 }
                 for_iter(
-					curByte + oparg + sizeof(_Py_CODEUNIT), 
-					opcodeIndex, 
-					loopBlock
-				);
+                    curByte + oparg + sizeof(_Py_CODEUNIT), 
+                    opcodeIndex, 
+                    loopBlock
+                );
                 break;
             }
             case SET_ADD:
@@ -3647,9 +3622,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     )
                 );
 
-				vector<bool> newStack = m_stack;
-				newStack.push_back(STACK_KIND_OBJECT);
-				m_offsetStack[oparg + curByte + sizeof(_Py_CODEUNIT)] = newStack;
+                vector<bool> newStack = m_stack;
+                newStack.push_back(STACK_KIND_OBJECT);
+                m_offsetStack[oparg + curByte + sizeof(_Py_CODEUNIT)] = newStack;
             }
             break;
             case POP_EXCEPT: pop_except(); break;
@@ -3764,10 +3739,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
 						free_iter_locals_on_exception();
 						emit_restore_err();
 
-						unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
-						clean_stack_for_reraise();
+                        unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
+                        clean_stack_for_reraise();
 
-						m_comp->emit_branch(BranchAlways, get_ehblock().ReRaise);
+                        m_comp->emit_branch(BranchAlways, get_ehblock().ReRaise);
                     }
                 }
             }
@@ -3921,7 +3896,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 printf("Unsupported opcode: %d (with related)\r\n", byte);
 #endif
                 return nullptr;
-		}
+        }
     }
 
     // for each exception handler we need to load the exception
@@ -3940,7 +3915,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     handler.ExVars.PrevExc,
                     handler.ExVars.PrevExcVal,
                     handler.ExVars.PrevTraceback
-                    );
+                );
                 if (handler.Flags & EHF_TryFinally) {
                     auto tmpEx = m_comp->emit_spill();
 
@@ -3987,50 +3962,50 @@ JittedCode* AbstractInterpreter::compile_worker() {
 }
 
 void AbstractInterpreter::compile_pop_block() {
-	auto curHandler = m_blockStack.back();
-	m_blockStack.pop_back();
-	if (curHandler.Kind == SETUP_FINALLY || curHandler.Kind == SETUP_EXCEPT) {
-		// convert block into an END_FINALLY/POP_EXCEPT BlockInfo
-		auto back = m_blockStack.back();
+    auto curHandler = m_blockStack.back();
+    m_blockStack.pop_back();
+    if (curHandler.Kind == SETUP_FINALLY || curHandler.Kind == SETUP_EXCEPT) {
+        // convert block into an END_FINALLY/POP_EXCEPT BlockInfo
+        auto back = m_blockStack.back();
 
-		auto& prevHandler = m_allHandlers[curHandler.CurrentHandler];
-		auto& backHandler = m_allHandlers[back.CurrentHandler];
+        auto& prevHandler = m_allHandlers[curHandler.CurrentHandler];
+        auto& backHandler = m_allHandlers[back.CurrentHandler];
 
-		auto newBlock = BlockInfo(
-			back.EndOffset,
-			curHandler.Kind == SETUP_FINALLY ? END_FINALLY : POP_EXCEPT,
-			m_allHandlers.size(),
-			curHandler.Flags,
-			curHandler.ContinueOffset
-		);
+        auto newBlock = BlockInfo(
+            back.EndOffset,
+            curHandler.Kind == SETUP_FINALLY ? END_FINALLY : POP_EXCEPT,
+            m_allHandlers.size(),
+            curHandler.Flags,
+            curHandler.ContinueOffset
+        );
 
-		// For exceptions in a except/finally block we need to unwind the
-		// current exceptions before raising a new exception.  When we emit
-		// the unwind code we use the exception vars that we created for the
-		// try portion of the block, so we just flow those in here, but when we
-		// hit an error we'll branch to any previous handler that was on the
-		// stack.
-		EhFlags flags = EHF_None;
-		ExceptionVars exVars = prevHandler.ExVars;
-		if (backHandler.Flags & EHF_TryFinally) {
-			flags |= EHF_TryFinally;
-		}
+        // For exceptions in a except/finally block we need to unwind the
+        // current exceptions before raising a new exception.  When we emit
+        // the unwind code we use the exception vars that we created for the
+        // try portion of the block, so we just flow those in here, but when we
+        // hit an error we'll branch to any previous handler that was on the
+        // stack.
+        EhFlags flags = EHF_None;
+        ExceptionVars exVars = prevHandler.ExVars;
+        if (backHandler.Flags & EHF_TryFinally) {
+            flags |= EHF_TryFinally;
+        }
 
-		m_allHandlers.emplace_back(
-			ExceptionHandler(
-				m_allHandlers.size(),
-				exVars,
-				m_comp->emit_define_label(),
-				m_comp->emit_define_label(),
-				backHandler.ErrorTarget,
-				backHandler.EntryStack,
-				flags | EHF_InExceptHandler,
-				back.CurrentHandler
-			)
-		);
+        m_allHandlers.emplace_back(
+            ExceptionHandler(
+                m_allHandlers.size(),
+                exVars,
+                m_comp->emit_define_label(),
+                m_comp->emit_define_label(),
+                backHandler.ErrorTarget,
+                backHandler.EntryStack,
+                flags | EHF_InExceptHandler,
+                back.CurrentHandler
+            )
+        );
 
-		m_blockStack.push_back(newBlock);
-	}
+        m_blockStack.push_back(newBlock);
+    }
 }
 
 const char* AbstractInterpreter::op_to_string(int op) {
@@ -4219,7 +4194,7 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
 
     // Jumping, load the value back and jump
     m_comp->emit_mark_label(willJump);
-    m_comp->emit_load_local(tmp);	// load the value back onto the stack
+    m_comp->emit_load_local(tmp);    // load the value back onto the stack
     m_comp->emit_branch(BranchAlways, target);
 
     // not jumping, load the value and dec ref it
@@ -4341,10 +4316,10 @@ void AbstractInterpreter::unary_negative(int opcodeIndex) {
 }
 
 bool AbstractInterpreter::can_optimize_pop_jump(int opcodeIndex) {
-	/*auto opcode = GET_OPCODE(opcodeIndex + sizeof(_Py_CODEUNIT));
+    auto opcode = get_extended_opcode(opcodeIndex + sizeof(_Py_CODEUNIT));
     if (opcode == POP_JUMP_IF_TRUE || opcode == POP_JUMP_IF_FALSE) {
         return m_jumpsTo.find(opcodeIndex + sizeof(_Py_CODEUNIT)) == m_jumpsTo.end();
-    }*/
+    }
     return false;
 }
 
@@ -4418,7 +4393,6 @@ bool AbstractInterpreter::can_skip_lasti_update(int opcodeIndex) {
         case LOAD_CONST:
         case JUMP_FORWARD:
         case JUMP_ABSOLUTE:
-        case STORE_FAST:
             return true;
     }
 
@@ -4561,9 +4535,9 @@ void AbstractInterpreter::unpack_sequence(size_t size, int opcode) {
 
     // Equivalent to CPython's:
     //while (oparg--) {
-    //	item = items[oparg];
-    //	Py_INCREF(item);
-    //	PUSH(item);
+    //    item = items[oparg];
+    //    Py_INCREF(item);
+    //    PUSH(item);
     //}
 
     auto tmpOpArg = size;
@@ -4619,7 +4593,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
     switch (compareType) {
         case PyCmp_IS:
         case PyCmp_IS_NOT:
-            //	TODO: Inlining this would be nice, but then we need the dec refs, e.g.:
+            //    TODO: Inlining this would be nice, but then we need the dec refs, e.g.:
             if (can_optimize_pop_jump(i)) {
                 emit_is_push_int(compareType != PyCmp_IS);
                 dec_stack(); // popped 2, pushed 1
@@ -4819,9 +4793,9 @@ void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
     inc_stack();
     // load the left hand side, Equivalent to CPython's:
     //while (oparg--) {
-    //	item = items[oparg];
-    //	Py_INCREF(item);
-    //	PUSH(item);
+    //    item = items[oparg];
+    //    Py_INCREF(item);
+    //    PUSH(item);
     //}
 
     tmpOpArg = size & 0xff;

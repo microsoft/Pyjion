@@ -65,7 +65,7 @@ extern "C" DLL_EXPORT PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
 class PyjionJittedCode;
 typedef PyObject* (*Py_EvalFunc)(PyjionJittedCode*, struct _frame*);
 
-static PY_UINT64_T HOT_CODE = 20000;
+static PY_UINT64_T HOT_CODE = 0;
 
 void PyjionJitFree(void* obj);
 

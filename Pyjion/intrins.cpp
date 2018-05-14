@@ -881,8 +881,9 @@ PyObject* PyJit_CallKwArgs(PyObject* func, PyObject*callargs, PyObject*kwargs) {
 	PyObject* result = nullptr;
 	if (!PyDict_CheckExact(kwargs)) {
 		PyObject *d = PyDict_New();
-		if (d == NULL)
-			goto error;
+        if (d == NULL) {
+            goto error;
+        }
 		if (PyDict_Update(d, kwargs) != 0) {
 			Py_DECREF(d);
 			/* PyDict_Update raises attribute
