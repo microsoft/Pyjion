@@ -95,8 +95,6 @@ public:
     }
 };
 
-
-
 class ILGenerator {
     simple_vector<Parameter> m_params, m_locals;
 	simple_vector<Local> m_freedLocals[CORINFO_TYPE_COUNT];
@@ -108,7 +106,6 @@ public:
 	simple_vector<LabelInfo> m_labels;
 
 public:
-
     ILGenerator(IMethod* method) {
 		m_method = method;
         m_localCount = 0;
@@ -409,6 +406,9 @@ public:
     }
 
     void ld_loc(Local param) {
+		if (param.m_index == -1) {
+			printf("Fail\r\n");
+		}
         ld_loc(param.m_index);
     }
 

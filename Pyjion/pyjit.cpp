@@ -463,7 +463,6 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 }
 
 DLL_EXPORT bool jit_compile(PyCodeObject* code) {
-	printf("jit_compile\n");
 	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0 ||
 		strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
         return false;
@@ -479,7 +478,6 @@ DLL_EXPORT bool jit_compile(PyCodeObject* code) {
 #endif
 
 	auto jittedCode = PyJit_EnsureExtra((PyObject*)code);
-	printf("ensured extra\r\n");
 	jittedCode->j_evalfunc = &Jit_EvalTrace;
     return true;
 }
@@ -556,6 +554,7 @@ extern "C" DLL_EXPORT PyObject *PyJit_EvalFrame(PyFrameObject *f, int throwflag)
 	}
 #ifdef MS_WINDOWS
 	SetLastError(err);
+#endif
 #ifdef DEBUG_CALL_TRACE
 	printf("Falling to EFD %s from %s line %d %s %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),
