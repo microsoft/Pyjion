@@ -75,31 +75,31 @@ public:
     CowVector() {
     }
 
-    CowVector(size_t size) : CowData(new vector<T>(size)) {
+    CowVector(size_t size) : CowData<vector<T>>(new vector<T>(size)) {
     }
 
     T operator[](size_t index) {
-        return get_current()[index];
+        return this->get_current()[index];
     }
 
     size_t size() {
-        return get_current().size();
+        return this->get_current().size();
     }
 
     void replace(size_t index, T value) {
-        get_mutable()[index] = value;
+		this->get_mutable()[index] = value;
     }
 
     T& back() {
-        return get_current().back();
+        return this->get_current().back();
     }
 
     void push_back(T value) {
-        get_mutable().push_back(value);
+		this->get_mutable().push_back(value);
     }
 
     void pop_back() {
-        get_mutable().pop_back();
+		this->get_mutable().pop_back();
     }
 };
 
@@ -109,27 +109,27 @@ template<typename T> class CowSet : public CowData<unordered_set<T>> {
     typedef typename unordered_set<T>::iterator iterator;
     static shared_ptr<unordered_set<T>> s_empty;
 public:
-    CowSet() : CowData(get_empty()) {
+    CowSet() : CowData<unordered_set<T>>(get_empty()) {
 
     }
 
     iterator find(const key_type& k) {
-        return get_current().find(k);
+        return this->get_current().find(k);
     }
 
     size_t size() {
-        return get_current().size();
+        return this->get_current().size();
     }
 
     void insert(const value_type& val) {
-        get_mutable().insert(val);
+		this->get_mutable().insert(val);
     }
 
     iterator begin() {
-        return get_current().begin();
+        return this->get_current().begin();
     }
     iterator end() {
-        return get_current().end();
+        return this->get_current().end();
     }
 
     CowSet<T> combine(CowSet<T> other) {

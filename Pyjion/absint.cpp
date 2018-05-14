@@ -24,11 +24,12 @@
 */
 
 #include "absint.h"
-#include "taggedptr.h"
 #include <opcode.h>
 #include <deque>
 #include <unordered_map>
 #include <algorithm>
+#include <frameobject.h>
+#include <stddef.h>
 
 #define NUM_ARGS(n) ((n)&0xFF)
 #define NUM_KW_ARGS(n) (((n)>>8) & 0xff)
@@ -36,20 +37,960 @@
 #define GET_OPARG(index)  _Py_OPARG(m_byteCode[index/sizeof(_Py_CODEUNIT)])
 #define GET_OPCODE(index) _Py_OPCODE(m_byteCode[index/sizeof(_Py_CODEUNIT)])
 
-AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* comp) : m_code(code), m_comp(comp) {
+#define LD_FIELDA(type, field) m_comp->emit_ptr(offsetof(type, field)); m_comp->emit_add(); 
+#define LD_FIELD(type, field) m_comp->emit_ptr(offsetof(type, field)); m_comp->emit_add(); m_comp->emit_load_indirect_ptr();
+#define ST_FIELD(type, field) m_comp->emit_ptr(offsetof(type, field)); m_comp->emit_add(); m_comp->emit_store_indirect_ptr();
+
+
+AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, CompilerFactory* compFactory) : m_code(code) {
     m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
     m_size = PyBytes_Size(code->co_code);
     m_returnValue = &Undefined;
-    if (comp != nullptr) {
-        m_retLabel = comp->emit_define_label();
-        m_retValue = comp->emit_define_local();
-        m_errorCheckLocal = comp->emit_define_local();
+    if (compFactory != nullptr) {
+		m_module = new UserModule(g_module);
+		m_method = new Method(m_module, LK_Pointer, std::vector <Parameter> {Parameter(LK_Pointer), Parameter(LK_Pointer) }, nullptr);
+		m_comp = compFactory(m_method);
+		m_lasti = m_comp->emit_define_local(LK_Pointer);
+
+        m_retLabel = m_comp->emit_define_label();
+        m_retValue = m_comp->emit_define_local();
+        m_errorCheckLocal = m_comp->emit_define_local();
     }
     init_starting_state();
+	dump();
+}
+
+void AbstractInterpreter::emit_lasti_init() {
+	load_frame();
+	m_comp->emit_ptr(offsetof(PyFrameObject, f_lasti));
+	m_comp->emit_add();
+	m_comp->emit_store_local(m_lasti);
+}
+
+void AbstractInterpreter::emit_lasti_update(int index) {
+	m_comp->emit_load_local(m_lasti);
+	m_comp->emit_int(index);
+	m_comp->emit_store_int32();
+}
+
+void AbstractInterpreter::load_frame() {
+	m_comp->emit_load_arg(1);
+}
+
+// Emits a call to create a new function, consuming the code object and
+// the qualified name.
+void AbstractInterpreter::emit_new_function() {
+	load_frame();
+	m_comp->emit_call(PyJit_NewFunction);
+}
+
+void AbstractInterpreter::emit_set_closure() {
+	auto tmp = m_comp->emit_spill();
+	m_comp->emit_ptr(offsetof(PyFunctionObject, func_closure));
+	m_comp->emit_add();
+
+	// Emit value
+	m_comp->emit_load_and_free_local(tmp);
+
+	m_comp->emit_store_indirect_ptr();
+}
+
+void AbstractInterpreter::emit_set_annotations() {
+	auto tmp = m_comp->emit_spill();
+	m_comp->emit_ptr(offsetof(PyFunctionObject, func_annotations));
+	m_comp->emit_add();
+
+	// Emit value
+	m_comp->emit_load_and_free_local(tmp);
+}
+
+void AbstractInterpreter::emit_set_kw_defaults() {
+	auto tmp = m_comp->emit_spill();
+	m_comp->emit_ptr(offsetof(PyFunctionObject, func_kwdefaults));
+	m_comp->emit_add();
+
+	// Emit value
+	m_comp->emit_load_and_free_local(tmp);
+
+	m_comp->emit_store_indirect_ptr();
+}
+
+void AbstractInterpreter::emit_set_defaults() {
+	auto tmp = m_comp->emit_spill();
+	m_comp->emit_ptr(offsetof(PyFunctionObject, func_defaults));
+	m_comp->emit_add();
+
+	// Emit value
+	m_comp->emit_load_and_free_local(tmp);
+
+	m_comp->emit_store_indirect_ptr();
+}
+
+void AbstractInterpreter::emit_load_deref(int index) {
+	load_frame();
+	m_comp->emit_int(index);
+	//m_comp->emit_ptr(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + oparg) * sizeof(size_t));
+	//m_comp->emit_add();
+	//m_comp->emit_load_indirect_ptr();
+	m_comp->emit_call(PyJit_CellGet);
+}
+
+void AbstractInterpreter::emit_store_deref(int index) {
+	load_frame();
+	m_comp->emit_ptr(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + index) * sizeof(size_t));
+	m_comp->emit_add();
+	m_comp->emit_load_indirect_ptr();
+	m_comp->emit_call(PyJit_CellSet);
+}
+
+void AbstractInterpreter::emit_delete_deref(int index) {
+	m_comp->emit_null();
+	load_frame();
+	m_comp->emit_ptr(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + index) * sizeof(size_t));
+	m_comp->emit_add();
+	m_comp->emit_load_indirect_ptr();
+	m_comp->emit_call(PyJit_CellSet);
+}
+
+void AbstractInterpreter::emit_load_closure(int index) {
+	load_frame();
+	m_comp->emit_ptr(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + index) * sizeof(size_t));
+	m_comp->emit_add();
+	m_comp->emit_load_indirect_ptr();
+	m_comp->emit_dup();
+	emit_incref();
+}
+
+void AbstractInterpreter::emit_set_add() {
+	// due to FOR_ITER magic we store the
+	// iterable off the stack, and oparg here is based upon the stacking
+	// of the generator indexes, so we don't need to spill anything...
+	m_comp->emit_call(PyJit_SetAdd);
+}
+
+void AbstractInterpreter::emit_map_add() {
+	m_comp->emit_call(PyJit_MapAdd);
+}
+
+void AbstractInterpreter::emit_list_append() {
+	m_comp->emit_call(PyJit_ListAppend);
+}
+
+void AbstractInterpreter::emit_raise_varargs() {
+	// raise exc
+	m_comp->emit_call(PyJit_Raise);
+}
+
+void AbstractInterpreter::emit_print_expr() {
+	m_comp->emit_call(PyJit_PrintExpr);
+}
+
+void AbstractInterpreter::emit_load_classderef(int index) {
+	load_frame();
+	m_comp->emit_ptr(index);
+	m_comp->emit_call(PyJit_LoadClassDeref);
+}
+
+void AbstractInterpreter::emit_getiter() {
+	m_comp->emit_call(PyJit_GetIter);
+}
+
+void AbstractInterpreter::emit_box_bool() {
+	m_comp->emit_call(PyBool_FromLong);
+}
+
+void AbstractInterpreter::emit_box_float() {
+	m_comp->emit_call(PyFloat_FromDouble);
+}
+
+void AbstractInterpreter::emit_box_tagged_ptr() {
+	m_comp->emit_call(PyJit_BoxTaggedPointer);
+}
+
+void AbstractInterpreter::emit_for_next(Label processValue, Local iterValue) {
+	auto error = m_comp->emit_define_local(LK_Float);
+	m_comp->emit_load_local_addr(error);
+
+	/*
+	if (inLoop) {
+	m_comp->emit_load_local_addr(loopOpt1);
+	m_comp->emit_load_local_addr(loopOpt2);
+	m_comp->emit_call(SIG_ITERNEXT_OPTIMIZED_TOKEN);
+	}
+	else*/
+	{
+		m_comp->emit_call(PyJit_IterNext);
+	}
+	m_comp->emit_dup();
+	m_comp->emit_ptr(nullptr);
+	m_comp->emit_branch(BranchNotEqual, processValue);
+
+	// iteration has ended, or an exception was raised...
+
+	m_comp->emit_pop();
+	m_comp->emit_load_local(iterValue);
+	decref();
+	m_comp->emit_load_local(error);
+
+	m_comp->emit_free_local(error);
+}
+
+/*
+void PythonCompiler::emit_getiter_opt() {
+m_comp->emit_load_local_addr(loopOpt1);
+m_comp->emit_load_local_addr(loopOpt2);
+m_comp->emit_call(METHOD_GETITER_OPTIMIZED_TOKEN);
+dec_stack();
+emit_error_check();
+inc_stack();
+}*/
+
+void AbstractInterpreter::emit_binary_float(int opcode) {
+	switch (opcode) {
+	case BINARY_ADD:
+	case INPLACE_ADD: m_comp->emit_add(); break;
+	case INPLACE_TRUE_DIVIDE:
+	case BINARY_TRUE_DIVIDE: m_comp->emit_divide(); break;
+	case INPLACE_MODULO:
+	case BINARY_MODULO:
+		// TODO: We should be able to generate a mod and provide the JIT
+		// with a helper call method (CORINFO_HELP_DBLREM), but that's 
+		// currently crashing for some reason...
+		m_comp->emit_call(PyJit_FMod);
+		//m_il.mod(); 
+		break;
+	case INPLACE_MULTIPLY:
+	case BINARY_MULTIPLY:  m_comp->emit_multiply(); break;
+	case INPLACE_SUBTRACT:
+	case BINARY_SUBTRACT:  m_comp->emit_subtract(); break;
+
+	case BINARY_POWER:
+	case INPLACE_POWER: m_comp->emit_call(PyJit_Pow); break;
+	case BINARY_FLOOR_DIVIDE:
+	case INPLACE_FLOOR_DIVIDE: m_comp->emit_divide(); m_comp->emit_call(PyJit_Floor); break;
+
+	}
+}
+
+void AbstractInterpreter::emit_binary_tagged_int(int opcode) {
+	switch (opcode) {
+	case INPLACE_ADD:
+	case BINARY_ADD: m_comp->emit_call(PyJit_Add_Int); break;
+	case INPLACE_TRUE_DIVIDE:
+	case BINARY_TRUE_DIVIDE: m_comp->emit_call(PyJit_TrueDivide_Int); break;
+	case INPLACE_FLOOR_DIVIDE:
+	case BINARY_FLOOR_DIVIDE: m_comp->emit_call(PyJit_FloorDivide_Int); break;
+	case INPLACE_POWER:
+	case BINARY_POWER: m_comp->emit_call(PyJit_Power_Int); break;
+	case INPLACE_MODULO:
+	case BINARY_MODULO: m_comp->emit_call(PyJit_Modulo_Int); break;
+	case INPLACE_LSHIFT:
+	case BINARY_LSHIFT: m_comp->emit_call(PyJit_BinaryLShift_Int); break;
+	case INPLACE_RSHIFT:
+	case BINARY_RSHIFT: m_comp->emit_call(PyJit_BinaryRShift_Int); break;
+	case INPLACE_AND:
+	case BINARY_AND: m_comp->emit_call(PyJit_BinaryAnd_Int); break;
+	case INPLACE_XOR:
+	case BINARY_XOR: m_comp->emit_call(PyJit_BinaryXor_Int); break;
+	case INPLACE_OR:
+	case BINARY_OR: m_comp->emit_call(PyJit_BinaryOr_Int); break;
+	case INPLACE_MULTIPLY:
+	case BINARY_MULTIPLY: m_comp->emit_call(PyJit_Multiply_Int); break;
+	case INPLACE_SUBTRACT:
+	case BINARY_SUBTRACT: m_comp->emit_call(PyJit_Subtract_Int); break;
+	}
+}
+
+void AbstractInterpreter::emit_binary_object(int opcode) {
+	switch (opcode) {
+	case BINARY_SUBSCR: m_comp->emit_call(PyJit_Subscr); break;
+	case BINARY_ADD: m_comp->emit_call(PyJit_Add); break;
+	case BINARY_TRUE_DIVIDE: m_comp->emit_call(PyJit_TrueDivide); break;
+	case BINARY_FLOOR_DIVIDE: m_comp->emit_call(PyJit_FloorDivide); break;
+	case BINARY_POWER: m_comp->emit_call(PyJit_Power); break;
+	case BINARY_MODULO: m_comp->emit_call(PyJit_Modulo); break;
+	case BINARY_MATRIX_MULTIPLY: m_comp->emit_call(PyJit_MatrixMultiply); break;
+	case BINARY_LSHIFT: m_comp->emit_call(PyJit_BinaryLShift); break;
+	case BINARY_RSHIFT: m_comp->emit_call(PyJit_BinaryRShift); break;
+	case BINARY_AND: m_comp->emit_call(PyJit_BinaryAnd); break;
+	case BINARY_XOR: m_comp->emit_call(PyJit_BinaryXor); break;
+	case BINARY_OR: m_comp->emit_call(PyJit_BinaryOr); break;
+	case BINARY_MULTIPLY: m_comp->emit_call(PyJit_Multiply); break;
+	case BINARY_SUBTRACT: m_comp->emit_call(PyJit_Subtract); break;
+	case INPLACE_POWER: m_comp->emit_call(PyJit_InplacePower); break;
+	case INPLACE_MULTIPLY: m_comp->emit_call(PyJit_InplaceMultiply); break;
+	case INPLACE_MATRIX_MULTIPLY: m_comp->emit_call(PyJit_InplaceMatrixMultiply); break;
+	case INPLACE_TRUE_DIVIDE: m_comp->emit_call(PyJit_InplaceTrueDivide); break;
+	case INPLACE_FLOOR_DIVIDE: m_comp->emit_call(PyJit_InplaceFloorDivide); break;
+	case INPLACE_MODULO: m_comp->emit_call(PyJit_InplaceModulo); break;
+	case INPLACE_ADD:
+		// TODO: We should do the unicode_concatenate ref count optimization
+		m_comp->emit_call(PyJit_InplaceAdd);
+		break;
+	case INPLACE_SUBTRACT: m_comp->emit_call(PyJit_InplaceSubtract); break;
+	case INPLACE_LSHIFT: m_comp->emit_call(PyJit_InplaceLShift); break;
+	case INPLACE_RSHIFT:m_comp->emit_call(PyJit_InplaceRShift); break;
+	case INPLACE_AND: m_comp->emit_call(PyJit_InplaceAnd); break;
+	case INPLACE_XOR:m_comp->emit_call(PyJit_InplaceXor); break;
+	case INPLACE_OR: m_comp->emit_call(PyJit_InplaceOr); break;
+	}
+}
+
+void AbstractInterpreter::emit_is_push_int(bool isNot) {
+	m_comp->emit_call(isNot ? PyJit_IsNot_Bool : PyJit_Is_Bool);
+}
+
+void AbstractInterpreter::emit_is(bool isNot) {
+	m_comp->emit_call(isNot ? PyJit_IsNot : PyJit_Is);
+}
+
+void AbstractInterpreter::emit_in_push_int() {
+	m_comp->emit_call(PyJit_Contains_Int);
+}
+
+void AbstractInterpreter::emit_in() {
+	m_comp->emit_call(PyJit_Contains);
+}
+
+void AbstractInterpreter::emit_not_in_push_int() {
+	m_comp->emit_call(PyJit_NotContains_Int);
+}
+
+void AbstractInterpreter::emit_not_in() {
+	m_comp->emit_call(PyJit_NotContains);
+}
+
+void AbstractInterpreter::emit_compare_tagged_int(int compareType) {
+	switch (compareType) {
+	case Py_EQ:  m_comp->emit_call(PyJit_Equals_Int); break;
+	case Py_LT: m_comp->emit_call(PyJit_LessThan_Int); break;
+	case Py_LE: m_comp->emit_call(PyJit_LessThanEquals_Int); break;
+	case Py_NE: m_comp->emit_call(PyJit_NotEquals_Int); break;
+	case Py_GT: m_comp->emit_call(PyJit_GreaterThan_Int); break;
+	case Py_GE: m_comp->emit_call(PyJit_GreaterThanEquals_Int); break;
+	}
+}
+
+void AbstractInterpreter::emit_compare_object(int compareType) {
+	m_comp->emit_ptr(compareType);
+	m_comp->emit_call(PyJit_RichCompare);
+}
+
+bool AbstractInterpreter::emit_compare_object_push_int(int compareType) {
+	switch (compareType) {
+	case Py_EQ:
+		call_optimizing_function(PyJit_RichEquals_Generic);
+		return true;
+	case Py_LT:
+	case Py_LE:
+	case Py_NE:
+	case Py_GT:
+	case Py_GE:
+		break;
+	}
+	return false;
+}
+
+void AbstractInterpreter::emit_periodic_work() {
+	m_comp->emit_call(_PyJit_PeriodicWork);
+}
+
+void AbstractInterpreter::emit_unbox_int_tagged() {
+	m_comp->emit_call(PyJit_UnboxInt_Tagged);
+}
+
+void AbstractInterpreter::emit_restore_err() {
+	m_comp->emit_call(PyJit_PyErrRestore);
+}
+
+void AbstractInterpreter::emit_compare_exceptions() {
+	m_comp->emit_call(PyJit_CompareExceptions);
+}
+
+void AbstractInterpreter::emit_compare_exceptions_int() {
+	m_comp->emit_call(PyJit_CompareExceptions_Int);
+}
+
+void AbstractInterpreter::emit_pyerr_setstring(void* exception, const char*msg) {
+	m_comp->emit_ptr(exception);
+	m_comp->emit_ptr((void*)msg);
+	m_comp->emit_call(PyErr_SetString);
+}
+
+void AbstractInterpreter::emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback) {
+	m_comp->emit_load_local(prevExc);
+	m_comp->emit_load_local(prevExcVal);
+	m_comp->emit_load_local(prevTraceback);
+	m_comp->emit_call(PyJit_UnwindEh);
+}
+
+void AbstractInterpreter::emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback) {
+	auto excType = m_comp->emit_define_local(LK_Pointer);
+	auto ehVal = m_comp->emit_define_local(LK_Pointer);
+	auto tb = m_comp->emit_define_local(LK_Pointer);
+	m_comp->emit_load_local_addr(excType);
+	m_comp->emit_load_local_addr(ehVal);
+	m_comp->emit_load_local_addr(tb);
+
+	m_comp->emit_load_local_addr(prevExc);
+	m_comp->emit_load_local_addr(prevExcVal);
+	m_comp->emit_load_local_addr(prevTraceback);
+
+	m_comp->emit_call(PyJit_PrepareException);
+	m_comp->emit_load_local(tb);
+	m_comp->emit_load_local(ehVal);
+	m_comp->emit_load_local(excType);
+
+	m_comp->emit_free_local(excType);
+	m_comp->emit_free_local(ehVal);
+	m_comp->emit_free_local(tb);
+}
+
+void AbstractInterpreter::emit_unpack_ex(Local sequence, size_t leftSize, size_t rightSize, Local sequenceStorage, Local list, Local remainder) {
+	m_comp->emit_load_local(sequence);
+	m_comp->emit_ptr(leftSize);
+	m_comp->emit_ptr(rightSize);
+	m_comp->emit_load_local(sequenceStorage);
+	m_comp->emit_load_local_addr(list);
+	m_comp->emit_load_local_addr(remainder);
+	m_comp->emit_call(PyJit_UnpackSequenceEx);
+}
+
+void AbstractInterpreter::emit_call_args() {
+	m_comp->emit_call(PyJit_CallArgs);
+}
+
+void AbstractInterpreter::emit_call_kwargs() {
+	m_comp->emit_call(PyJit_CallKwArgs);
+}
+
+bool AbstractInterpreter::emit_call(size_t argCnt) {
+	switch (argCnt) {
+		case 0: call_optimizing_function(Call0_Generic); return true;
+		case 1: m_comp->emit_call(Call1); return true;
+		case 2: m_comp->emit_call(Call2); return true;
+		case 3: m_comp->emit_call(Call3); return true;
+		case 4: m_comp->emit_call(Call4); return true;
+	}
+	return false;
+}
+
+void AbstractInterpreter::emit_call_with_tuple() {
+	m_comp->emit_call(PyJit_CallN);
+}
+
+bool AbstractInterpreter::emit_kwcall(size_t argCnt) {
+	/*
+	switch (argCnt) {
+	case 1: m_comp->emit_call(METHOD_KWCALL1_TOKEN); return true;
+	case 2: m_comp->emit_call(METHOD_KWCALL2_TOKEN); return true;
+	case 3: m_comp->emit_call(METHOD_KWCALL3_TOKEN); return true;
+	case 4: m_comp->emit_call(METHOD_KWCALL4_TOKEN); return true;
+	}*/
+	return false;
+}
+
+void AbstractInterpreter::emit_kwcall_with_tuple() {
+	m_comp->emit_call(PyJit_KwCallN);
+}
+
+
+void AbstractInterpreter::call_optimizing_function(void* baseFunction) {
+	auto method = new IndirectDispatchMethod(g_module.m_tokenToMethod[g_module.m_methodAddrToToken[baseFunction]]);
+	m_comp->emit_ptr(&method->m_addr);
+	auto token = (int)(FIRST_USER_FUNCTION_TOKEN + m_module->m_tokenToMethod.size());
+	m_module->m_tokenToMethod[token] = method;
+	m_comp->emit_call(token);
+}
+
+void AbstractInterpreter::emit_tagged_int_to_float() {
+	m_comp->emit_call(PyJit_Int_ToFloat);
+}
+
+
+void AbstractInterpreter::emit_unbox_float() {
+	m_comp->emit_ptr(offsetof(PyFloatObject, ob_fval));
+	m_comp->emit_add();
+	m_comp->emit_load_indirect_double();
+}
+
+void AbstractInterpreter::emit_tagged_int(size_t value) {
+	m_comp->emit_ptr((size_t)((value << 1) | 0x01));
+}
+
+void AbstractInterpreter::emit_unbound_local_check() {
+	//// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
+	//// locals that are provably assigned)
+	m_comp->emit_call(PyJit_UnboundLocal);
+}
+
+void AbstractInterpreter::emit_load_fast(int local) {
+	load_local(local);
+}
+
+void AbstractInterpreter::emit_store_fast(int local) {
+	// TODO: Move locals out of the Python frame object and into real locals
+
+	auto valueTmp = m_comp->emit_define_local(LK_Pointer);
+	m_comp->emit_store_local(valueTmp);
+
+	// load the value onto the IL stack, we'll decref it after we replace the
+	// value in the frame object so that we never have a freed object in the
+	// frame object.
+	load_local(local);
+
+	load_frame();
+	m_comp->emit_ptr(offsetof(PyFrameObject, f_localsplus) + local * sizeof(size_t));
+	m_comp->emit_add();
+
+	m_comp->emit_load_local(valueTmp);
+
+	m_comp->emit_store_indirect_ptr();
+
+	m_comp->emit_free_local(valueTmp);
+
+	// now dec ref the old value potentially freeing it.
+	decref();
+}
+
+void AbstractInterpreter::emit_rot_two(LocalKind kind) {
+	auto top = m_comp->emit_define_local(kind);
+	auto second = m_comp->emit_define_local(kind);
+
+	m_comp->emit_store_local(top);
+	m_comp->emit_store_local(second);
+
+	m_comp->emit_load_local(top);
+	m_comp->emit_load_local(second);
+
+	m_comp->emit_free_local(top);
+	m_comp->emit_free_local(second);
+}
+
+void AbstractInterpreter::emit_rot_three(LocalKind kind) {
+	auto top = m_comp->emit_define_local(kind);
+	auto second = m_comp->emit_define_local(kind);
+	auto third = m_comp->emit_define_local(kind);
+
+	m_comp->emit_store_local(top);
+	m_comp->emit_store_local(second);
+	m_comp->emit_store_local(third);
+
+	m_comp->emit_load_local(top);
+	m_comp->emit_load_local(third);
+	m_comp->emit_load_local(second);
+
+	m_comp->emit_free_local(top);
+	m_comp->emit_free_local(second);
+	m_comp->emit_free_local(third);
+}
+
+void AbstractInterpreter::emit_pop_top() {
+	decref();
+}
+
+void AbstractInterpreter::emit_dup_top() {
+	m_comp->emit_dup();
+	m_comp->emit_dup();
+	emit_incref(true);
+}
+
+void AbstractInterpreter::emit_dup_top_two() {
+	auto top = m_comp->emit_define_local(LK_Pointer);
+	auto second = m_comp->emit_define_local(LK_Pointer);
+
+	m_comp->emit_store_local(top);
+	m_comp->emit_store_local(second);
+
+	m_comp->emit_load_local(second);
+	m_comp->emit_load_local(top);
+	m_comp->emit_load_local(second);
+	m_comp->emit_load_local(top);
+
+	m_comp->emit_load_local(top);
+	emit_incref(true);
+	m_comp->emit_load_local(second);
+	emit_incref(true);
+
+	m_comp->emit_free_local(top);
+	m_comp->emit_free_local(second);
+}
+
+void AbstractInterpreter::emit_new_list(size_t argCnt) {
+	m_comp->emit_ptr(argCnt);
+	m_comp->emit_call(PyList_New);
+}
+
+void AbstractInterpreter::emit_list_store(size_t argCnt) {
+	auto valueTmp = m_comp->emit_define_local(LK_Pointer);
+	auto listTmp = m_comp->emit_define_local(LK_Pointer);
+	auto listItems = m_comp->emit_define_local(LK_Pointer);
+
+	m_comp->emit_dup();
+	m_comp->emit_store_local(listTmp);
+
+	// load the address of the list item...
+	m_comp->emit_ptr(offsetof(PyListObject, ob_item));
+	m_comp->emit_add();
+	m_comp->emit_load_indirect_ptr();
+
+	m_comp->emit_store_local(listItems);
+
+	for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
+		// save the argument into a temporary...
+		m_comp->emit_store_local(valueTmp);
+
+		// load the address of the list item...
+		m_comp->emit_load_local(listItems);
+		m_comp->emit_ptr(arg * sizeof(size_t));
+		m_comp->emit_add();
+
+		// reload the value
+		m_comp->emit_load_local(valueTmp);
+
+		// store into the array
+		m_comp->emit_store_indirect_ptr();
+	}
+
+	// update the size of the list...
+	m_comp->emit_load_local(listTmp);
+	m_comp->emit_dup();
+	m_comp->emit_ptr(offsetof(PyVarObject, ob_size));
+	m_comp->emit_add();
+	m_comp->emit_ptr(argCnt);
+	m_comp->emit_store_indirect_ptr();
+
+	m_comp->emit_free_local(valueTmp);
+	m_comp->emit_free_local(listTmp);
+	m_comp->emit_free_local(listItems);
+}
+
+void AbstractInterpreter::emit_list_extend() {
+	m_comp->emit_call(PyJit_ExtendList);
+}
+
+void AbstractInterpreter::emit_list_to_tuple() {
+	m_comp->emit_call(PyJit_ListToTuple);
+}
+
+void AbstractInterpreter::emit_new_set() {
+	m_comp->emit_null();
+	m_comp->emit_call(PySet_New);
+}
+
+void AbstractInterpreter::emit_pyobject_str() {
+	m_comp->emit_call(PyObject_Str);
+}
+
+void AbstractInterpreter::emit_pyobject_repr() {
+	m_comp->emit_call(PyObject_Repr);
+}
+
+void AbstractInterpreter::emit_pyobject_ascii() {
+	m_comp->emit_call(PyObject_ASCII);
+}
+
+void AbstractInterpreter::emit_pyobject_format() {
+	m_comp->emit_call(PyJit_FormatObject);
+}
+
+void AbstractInterpreter::emit_unicode_joinarray() {
+	m_comp->emit_call(PyJit_UnicodeJoinArray);
+}
+
+void AbstractInterpreter::emit_format_value() {
+	m_comp->emit_call(PyJit_FormatValue);
+}
+
+void AbstractInterpreter::emit_set_extend() {
+	m_comp->emit_call(PyJit_UpdateSet);
+}
+
+void AbstractInterpreter::emit_new_dict(size_t size) {
+	m_comp->emit_ptr(size);
+	m_comp->emit_call(_PyDict_NewPresized);
+}
+
+void AbstractInterpreter::emit_dict_store() {
+	m_comp->emit_call(PyJit_StoreMap);
+}
+
+void AbstractInterpreter::emit_dict_store_no_decref() {
+	m_comp->emit_call(PyJit_StoreMap);
+}
+
+void AbstractInterpreter::emit_map_extend() {
+	m_comp->emit_call(PyJit_DictUpdate);
+}
+
+void AbstractInterpreter::emit_is_true() {
+	m_comp->emit_call(PyObject_IsTrue);
+}
+
+void AbstractInterpreter::emit_load_name(void* name) {
+	load_frame();
+	m_comp->emit_ptr(name);
+	m_comp->emit_call(PyJit_LoadName);
+}
+
+void AbstractInterpreter::emit_store_name(void* name) {
+	load_frame();
+	m_comp->emit_ptr(name);
+	m_comp->emit_call(PyJit_StoreName);
+}
+
+void AbstractInterpreter::emit_delete_name(void* name) {
+	load_frame();
+	m_comp->emit_ptr(name);
+	m_comp->emit_call(PyJit_DeleteName);
+}
+
+void AbstractInterpreter::emit_store_attr(void* name) {
+	m_comp->emit_ptr(name);
+	m_comp->emit_call(PyJit_StoreAttr);
+}
+
+void AbstractInterpreter::emit_delete_attr(void* name) {
+	m_comp->emit_ptr(name);
+	m_comp->emit_call(PyJit_DeleteAttr);
+}
+
+void AbstractInterpreter::emit_load_attr(void* name) {
+	m_comp->emit_ptr(name);
+	m_comp->emit_call(PyJit_LoadAttr);
+}
+
+void AbstractInterpreter::emit_store_global(void* name) {
+	// value is on the stack
+	load_frame();
+	m_comp->emit_ptr(name);
+	m_comp->emit_call(PyJit_StoreGlobal);
+}
+
+void AbstractInterpreter::emit_delete_global(void* name) {
+	load_frame();
+	m_comp->emit_ptr(name);
+	m_comp->emit_call(PyJit_DeleteGlobal);
+}
+
+void AbstractInterpreter::emit_load_global(void* name) {
+	load_frame();
+	m_comp->emit_ptr(name);
+	m_comp->emit_call(PyJit_LoadGlobal);
+}
+
+void AbstractInterpreter::emit_delete_fast(int index) {
+	load_local(index);
+	load_frame();
+	m_comp->emit_ptr(offsetof(PyFrameObject, f_localsplus) + index * sizeof(size_t));
+	m_comp->emit_add();
+	m_comp->emit_null();
+	m_comp->emit_store_indirect_ptr();
+	decref();
+}
+
+void AbstractInterpreter::emit_new_tuple(size_t size) {
+	if (size == 0) {
+		m_comp->emit_ptr(PyTuple_New(0));
+		m_comp->emit_dup();
+		emit_incref(false);
+	}
+	else {
+		m_comp->emit_ptr(size);
+		m_comp->emit_call(PyTuple_New);
+	}
+}
+
+// Loads the specified index from a tuple that's already on the stack
+void AbstractInterpreter::emit_tuple_load(size_t index) {
+	m_comp->emit_ptr(index * sizeof(size_t) + offsetof(PyTupleObject, ob_item));
+	m_comp->emit_add();
+	m_comp->emit_load_indirect_ptr();
+}
+
+void AbstractInterpreter::emit_tuple_store(size_t argCnt) {
+	auto valueTmp = m_comp->emit_define_local(LK_Pointer);
+	auto tupleTmp = m_comp->emit_define_local(LK_Pointer);
+	m_comp->emit_store_local(tupleTmp);
+
+	for (size_t i = 0, arg = argCnt - 1; i < argCnt; i++, arg--) {
+		// save the argument into a temporary...
+		m_comp->emit_store_local(valueTmp);
+
+		// load the address of the tuple item...
+		m_comp->emit_load_local(tupleTmp);
+		m_comp->emit_ptr(arg * sizeof(size_t) + offsetof(PyTupleObject, ob_item));
+		m_comp->emit_add();
+
+		// reload the value
+		m_comp->emit_load_local(valueTmp);
+
+		// store into the array
+		m_comp->emit_store_indirect_ptr();
+	}
+	m_comp->emit_load_local(tupleTmp);
+
+	m_comp->emit_free_local(valueTmp);
+	m_comp->emit_free_local(tupleTmp);
+}
+
+void AbstractInterpreter::emit_store_subscr() {
+	// stack is value, container, index
+	m_comp->emit_call(PyJit_StoreSubscr);
+}
+
+void AbstractInterpreter::emit_delete_subscr() {
+	// stack is container, index
+	m_comp->emit_call(PyJit_DeleteSubscr);
+}
+
+void AbstractInterpreter::emit_build_slice() {
+	m_comp->emit_call(PyJit_BuildSlice);
+}
+
+void AbstractInterpreter::emit_unary_positive() {
+	m_comp->emit_call(PyJit_UnaryPositive);
+}
+
+void AbstractInterpreter::emit_unary_negative() {
+	m_comp->emit_call(PyJit_UnaryNegative);
+}
+
+void AbstractInterpreter::emit_unary_not_push_int() {
+	m_comp->emit_call(PyJit_UnaryNot_Int);
+}
+
+void AbstractInterpreter::emit_unary_not() {
+	m_comp->emit_call(PyJit_UnaryNot);
+}
+
+void AbstractInterpreter::emit_unary_negative_float() {
+	m_comp->emit_negate();
+}
+
+void AbstractInterpreter::emit_unary_negative_tagged_int() {
+	m_comp->emit_call(PyJit_UnaryNegative_Int);
+}
+
+void AbstractInterpreter::emit_unary_not_float_push_bool() {
+	m_comp->emit_float(0);
+	m_comp->emit_compare_equal();
+}
+
+void AbstractInterpreter::emit_unary_not_tagged_int_push_bool() {
+	m_comp->emit_call(PyJit_UnaryNot_Int_PushBool);
+}
+
+void AbstractInterpreter::emit_unary_invert() {
+	m_comp->emit_call(PyJit_UnaryInvert);
+}
+
+void AbstractInterpreter::emit_import_name(void* name) {
+	m_comp->emit_ptr(name);
+	load_frame();
+	m_comp->emit_call(PyJit_ImportName);
+}
+
+void AbstractInterpreter::emit_import_from(void* name) {
+	m_comp->emit_dup();
+	m_comp->emit_ptr(name);
+	m_comp->emit_call(PyJit_ImportFrom);
+}
+
+void AbstractInterpreter::emit_import_star() {
+	load_frame();
+	m_comp->emit_call(PyJit_ImportStar);
+}
+
+void AbstractInterpreter::emit_load_build_class() {
+	load_frame();
+	m_comp->emit_call(PyJit_BuildClass);
+}
+
+void AbstractInterpreter::emit_unpack_sequence(Local sequence, Local sequenceStorage, Label success, size_t size) {
+	// load the iterable, the count, and our temporary 
+	// storage if we need to iterate over the object.
+	m_comp->emit_load_local(sequence);
+	m_comp->emit_ptr(size);
+	m_comp->emit_load_local(sequenceStorage);
+	m_comp->emit_call(PyJit_UnpackSequence);
+
+	m_comp->emit_dup();
+	m_comp->emit_null();
+	m_comp->emit_branch(BranchNotEqual, success);
+	m_comp->emit_pop();
+	m_comp->emit_load_local(sequence);
+	decref();
+}
+
+void AbstractInterpreter::decref() {
+	m_comp->emit_call(PyJit_DecRef);
+	// It might be nice to inline this at some point:
+	//LD_FIELDA(PyObject, ob_refcnt);
+	//m_il.push_back(CEE_DUP);
+	//m_il.push_back(CEE_LDIND_I4);
+	//m_il.push_back(CEE_LDC_I4_1);
+	//m_il.push_back(CEE_SUB);
+	////m_il.push_back(CEE_DUP);
+	//// _Py_Dealloc(_py_decref_tmp)
+
+	//m_il.push_back(CEE_STIND_I4);
+}
+
+
+void AbstractInterpreter::emit_push_frame() {
+	load_frame();
+	m_comp->emit_call(PyJit_PushFrame);
+}
+
+void AbstractInterpreter::emit_pop_frame() {
+	load_frame();
+	m_comp->emit_call(PyJit_PopFrame);
+}
+
+void AbstractInterpreter::emit_eh_trace() {
+	load_frame();
+	m_comp->emit_call(PyJit_EhTrace);
+}
+
+void AbstractInterpreter::load_local(int oparg) {
+	load_frame();
+	m_comp->emit_ptr(offsetof(PyFrameObject, f_localsplus) + oparg * sizeof(size_t));
+	m_comp->emit_add();
+	m_comp->emit_load_indirect_ptr();
+}
+
+void AbstractInterpreter::emit_incref(bool maybeTagged) {
+	Label tagged, done;
+	if (maybeTagged) {
+		m_comp->emit_dup();
+		m_comp->emit_ptr(1);
+		m_comp->emit_bitwise_and();
+		tagged = m_comp->emit_define_label();
+		done = m_comp->emit_define_label();
+		m_comp->emit_branch(BranchTrue, tagged);
+	}
+
+	LD_FIELDA(PyObject, ob_refcnt);
+	m_comp->emit_dup();
+	m_comp->emit_load_indirect_int32();
+	m_comp->emit_int(1);
+	m_comp->emit_add();
+	m_comp->emit_store_indirect_int32();
+
+	if (maybeTagged) {
+		m_comp->emit_branch(BranchAlways, done);
+
+		m_comp->emit_mark_label(tagged);
+		m_comp->emit_pop();
+
+		m_comp->emit_mark_label(done);
+	}
 }
 
 AbstractInterpreter::~AbstractInterpreter() {
     // clean up any dynamically allocated objects...
+	// TODO: Free m_comp
     for (auto source : m_sources) {
         delete source;
     }
@@ -634,37 +1575,37 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Any);
                     break;
                 }
-                case CALL_FUNCTION_KW:
-                {
-                    int na = oparg;
+				case CALL_FUNCTION_KW:
+				{
+					int na = oparg;
 
-                    // Pop the names tuple
-                    auto names = lastState.pop_no_escape();
-                    _ASSERTE(names.Value->kind() == AVK_Tuple);
+					// Pop the names tuple
+					auto names = lastState.pop_no_escape();
+					assert(names.Value->kind() == AVK_Tuple);
 
-                    for (int i = 0; i < na; i++) {
-                        lastState.pop();
-                    }
+					for (int i = 0; i < na; i++) {
+						lastState.pop();
+					}
 
-                    // pop the function
-                    lastState.pop();
+					// pop the function
+					lastState.pop();
 
-                    lastState.push(&Any);
-                    break;
-                }
-                case CALL_FUNCTION_EX:
-                    if (oparg & 0x01) {
-                        // kwargs
-                        lastState.pop();
-                    }
+					lastState.push(&Any);
+					break;
+				}
+				case CALL_FUNCTION_EX:
+					if (oparg & 0x01) {
+						// kwargs
+						lastState.pop();
+					}
 
-                    // call args (iterable)
-                    lastState.pop();
-                    // function
-                    lastState.pop();
+					// call args (iterable)
+					lastState.pop();
+					// function
+					lastState.pop();
 
-                    lastState.push(&Any);
-                    break;
+					lastState.push(&Any);
+					break;
                 case MAKE_FUNCTION:
                 {
                     lastState.pop(); // qual name
@@ -941,7 +1882,7 @@ bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterSt
     if (mergeTo.m_locals != newState.m_locals) {
         //    if (mergeTo.m_locals.get() != newState.m_locals.get()) {
             // need to merge locals...
-        _ASSERT(mergeTo.local_count() == newState.local_count());
+        assert(mergeTo.local_count() == newState.local_count());
         for (size_t i = 0; i < newState.local_count(); i++) {
             auto oldType = mergeTo.get_local(i);
             auto newType = oldType.merge_with(newState.get_local(i));
@@ -963,7 +1904,7 @@ bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterSt
     }
     else {
         // need to merge the stacks...
-        _ASSERT(mergeTo.stack_size() == newState.stack_size());
+        assert(mergeTo.stack_size() == newState.stack_size());
         for (size_t i = 0; i < newState.stack_size(); i++) {
             auto newType = mergeTo[i].merge_with(newState[i]);
             if (mergeTo[i] != newType) {
@@ -1045,6 +1986,10 @@ AbstractValue* AbstractInterpreter::to_abstract(AbstractValueKind kind) {
             return &Function;
         case AVK_Slice:
             return &Slice;
+		case AVK_Any:
+			return &Any;
+		case AVK_Undefined:
+			return &Undefined;
     }
 
     return &Any;
@@ -1094,7 +2039,7 @@ void AbstractInterpreter::dump() {
                 }
             }
             for (size_t i = 0; i < state.stack_size(); i++) {
-                printf("          %-20Id %s\r\n", i, state[i].Value->describe());
+                printf("          %-20ld %s\r\n", i, state[i].Value->describe());
                 dump_sources(state[i].Sources);
             }
         }
@@ -1106,7 +2051,7 @@ void AbstractInterpreter::dump() {
             case SETUP_FINALLY:
             case JUMP_FORWARD:
             case FOR_ITER:
-                printf("    %-3Id %-22s %d (to %Id)\r\n",
+                printf("    %-3ld %-22s %d (to %ld)\r\n",
                     byteIndex,
                     opcode_name(opcode),
                     oparg,
@@ -1114,7 +2059,7 @@ void AbstractInterpreter::dump() {
                     );
                 break;
             case LOAD_FAST:
-                printf("    %-3Id %-22s %d (%s) [%s]\r\n",
+                printf("    %-3ld %-22s %d (%s) [%s]\r\n",
                     byteIndex,
                     opcode_name(opcode),
                     oparg,
@@ -1124,7 +2069,7 @@ void AbstractInterpreter::dump() {
                 break;
             case STORE_FAST:
             case DELETE_FAST:
-                printf("    %-3Id %-22s %d (%s) [%s]\r\n",
+                printf("    %-3ld %-22s %d (%s) [%s]\r\n",
                     byteIndex,
                     opcode_name(opcode),
                     oparg,
@@ -1141,7 +2086,7 @@ void AbstractInterpreter::dump() {
             case LOAD_GLOBAL:
             case STORE_GLOBAL:
             case DELETE_GLOBAL:
-                printf("    %-3Id %-22s %d (%s)\r\n",
+                printf("    %-3ld %-22s %d (%s)\r\n",
                     byteIndex,
                     opcode_name(opcode),
                     oparg,
@@ -1158,7 +2103,7 @@ void AbstractInterpreter::dump() {
                 auto repr = PyObject_Repr(PyTuple_GetItem(m_code->co_consts, oparg));
                 auto reprStr = PyUnicode_AsUTF8(repr);
                 printf(
-                    "    %-3Id %-22s %d (%s) [%s] (src=%p)\r\n",
+                    "    %-3ld %-22s %d (%s) [%s] (src=%p)\r\n",
                     byteIndex,
                     opcode_name(opcode),
                     oparg,
@@ -1170,14 +2115,14 @@ void AbstractInterpreter::dump() {
                 break;
             }
             default:
-                if (HAS_ARG(opcode)) {
-                    printf("    %-3Id %-22s %d\r\n", byteIndex, opcode_name(opcode), oparg);
-                }
-                else {
-                    printf("    %-3Id %-22s\r\n", byteIndex, opcode_name(opcode));
+				if (HAS_ARG(opcode)) {
+					printf("    %-3ld %-22s %d\r\n", byteIndex, opcode_name(opcode), oparg);
+				}
+				else {
+					printf("    %-3ld %-22s\r\n", byteIndex, opcode_name(opcode));
 
-                }
-                break;
+				}
+			    break;
         }
     }
     printf("Returns %s\r\n", m_returnValue->describe());
@@ -1239,7 +2184,7 @@ void AbstractInterpreter::dump_sources(AbstractSource* sources) {
     }
 }
 
-char* AbstractInterpreter::opcode_name(int opcode) {
+const char* AbstractInterpreter::opcode_name(int opcode) {
 #define OP_TO_STR(x)   case x: return #x;
     switch (opcode) {
         OP_TO_STR(POP_TOP)
@@ -1423,7 +2368,7 @@ AbstractSource* AbstractInterpreter::add_intermediate_source(size_t opcodeIndex)
 
  // Checks to see if we have a non-zero error code on the stack, and if so,
  // branches to the current error handler.  Consumes the error code in the process
-void AbstractInterpreter::int_error_check(char* reason) {
+void AbstractInterpreter::int_error_check(const char* reason) {
     auto noErr = m_comp->emit_define_label();
     m_comp->emit_int(0);
     m_comp->emit_branch(BranchEqual, noErr);
@@ -1434,7 +2379,7 @@ void AbstractInterpreter::int_error_check(char* reason) {
 
 // Checks to see if we have a null value as the last value on our stack
 // indicating an error, and if so, branches to our current error handler.
-void AbstractInterpreter::error_check(char *reason) {
+void AbstractInterpreter::error_check(const char *reason) {
     auto noErr = m_comp->emit_define_label();
     m_comp->emit_dup();
     m_comp->emit_store_local(m_errorCheckLocal);
@@ -1513,55 +2458,60 @@ void AbstractInterpreter::ensure_labels(vector<Label>& labels, size_t count) {
     }
 }
 
-void AbstractInterpreter::branch_raise(char *reason) {
+void AbstractInterpreter::emit_debug_msg(const char * msg) {
+	m_comp->emit_ptr((void*)msg);
+	m_comp->emit_call(PyJit_DebugTrace);
+}
+
+void AbstractInterpreter::branch_raise(const char *reason) {
     auto& ehBlock = get_ehblock();
     auto& entry_stack = ehBlock.EntryStack;
 
 #if DEBUG_TRACE
     if (reason != nullptr) {
-        m_comp->emit_debug_msg(reason);
+        emit_debug_msg(reason);
     }
 #endif
 
-    // number of stack entries we need to clear...
-    size_t count = m_stack.size() - entry_stack.size();    
-    
-    auto cur = m_stack.rbegin();
-    for (; cur != m_stack.rend() && count >= 0; cur++) {
-        if (*cur == STACK_KIND_VALUE) {
-            count--;
-            m_comp->emit_pop();
-        }
-        else {
-            break;
-        }
-    }
+	// number of stack entries we need to clear...
+	ssize_t count = m_stack.size() - entry_stack.size();	
+	
+	auto cur = m_stack.rbegin();
+	for (; cur != m_stack.rend() && count >= 0; cur++) {
+		if (*cur == STACK_KIND_VALUE) {
+			count--;
+			m_comp->emit_pop();
+		}
+		else {
+			break;
+		}
+	}
 
-    if (!count) {
-        // No values on the stack, we can just branch directly to the raise label
-        m_comp->emit_branch(BranchAlways, ehBlock.Raise);
-        return;
-    }
+	if (!count) {
+		// No values on the stack, we can just branch directly to the raise label
+		m_comp->emit_branch(BranchAlways, ehBlock.Raise);
+		return;
+	}
 
-    vector<Label>& labels = get_raise_and_free_labels(ehBlock.RaiseAndFreeId);
-    ensure_labels(labels, count);
-    ensure_raise_and_free_locals(count);
+	vector<Label>& labels = get_raise_and_free_labels(ehBlock.RaiseAndFreeId);
+	ensure_labels(labels, count);
+	ensure_raise_and_free_locals(count);
 
-    // continue walking our stack iterator
-    for (auto i = 0; i < count; cur++, i++) {
-        if (*cur == STACK_KIND_VALUE) {
-            // pop off the stack value...
-            m_comp->emit_pop();
+	// continue walking our stack iterator
+	for (auto i = 0; i < count; cur++, i++) {
+		if (*cur == STACK_KIND_VALUE) {
+			// pop off the stack value...
+			m_comp->emit_pop();
 
-            // and store null into our local that needs to be freed
-            m_comp->emit_null();
-            m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
-        }
-        else {
-            m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
-        }
-    }
-    m_comp->emit_branch(BranchAlways, labels[count - 1]);
+			// and store null into our local that needs to be freed
+			m_comp->emit_null();
+			m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
+		}
+		else {
+			m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
+		}
+	}
+	m_comp->emit_branch(BranchAlways, labels[count - 1]);
 }
 
 void AbstractInterpreter::clean_stack_for_reraise() {
@@ -1571,30 +2521,30 @@ void AbstractInterpreter::clean_stack_for_reraise() {
     size_t count = m_stack.size() - entry_stack.size();
 
     for (size_t i = m_stack.size(); i-- > entry_stack.size();) {
-        m_comp->emit_pop_top();
+        emit_pop_top();
     }
 }
 
 void AbstractInterpreter::build_tuple(size_t argCnt) {
-    m_comp->emit_new_tuple(argCnt);
+    emit_new_tuple(argCnt);
     if (argCnt != 0) {
         error_check("tuple build failed");
-        m_comp->emit_tuple_store(argCnt);
+        emit_tuple_store(argCnt);
         dec_stack(argCnt);
     }
 }
 
 void AbstractInterpreter::extend_tuple(size_t argCnt) {
     extend_list(argCnt);
-    m_comp->emit_list_to_tuple();
+    emit_list_to_tuple();
     error_check("extend tuple failed");
 }
 
 void AbstractInterpreter::build_list(size_t argCnt) {
-    m_comp->emit_new_list(argCnt);
+    emit_new_list(argCnt);
     error_check("build list failed");
     if (argCnt != 0) {
-        m_comp->emit_list_store(argCnt);
+        emit_list_store(argCnt);
     }
     dec_stack(argCnt);
 }
@@ -1613,16 +2563,16 @@ void AbstractInterpreter::extend_list_recursively(Local listTmp, size_t argCnt) 
     m_comp->emit_load_local(listTmp);
     m_comp->emit_load_local(valueTmp);
 
-    m_comp->emit_list_extend();
+    emit_list_extend();
     int_error_check("list extend failed");
 
     m_comp->emit_free_local(valueTmp);
 }
 
 void AbstractInterpreter::extend_list(size_t argCnt) {
-    _ASSERTE(argCnt > 0);
+    assert(argCnt > 0);
 
-    m_comp->emit_new_list(0);
+    emit_new_list(0);
     error_check("new list failed");
 
     auto listTmp = m_comp->emit_define_local();
@@ -1634,57 +2584,57 @@ void AbstractInterpreter::extend_list(size_t argCnt) {
 }
 
 void AbstractInterpreter::build_set(size_t argCnt) {
-    m_comp->emit_new_set();
+    emit_new_set();
     error_check("build set failed");
 
     if (argCnt != 0) {
-        auto setTmp = m_comp->emit_define_local();
-        m_comp->emit_store_local(setTmp);
-        Local* tmps = new Local[argCnt];
-        Label* frees = new Label[argCnt];
-        for (auto i = 0; i < argCnt; i++) {
-            tmps[argCnt - (i + 1)] = m_comp->emit_spill();
-            dec_stack();
-        }
+		auto setTmp = m_comp->emit_define_local();
+		m_comp->emit_store_local(setTmp);
+		Local* tmps = new Local[argCnt];
+		Label* frees = new Label[argCnt];
+		for (auto i = 0; i < argCnt; i++) {
+			tmps[argCnt - (i + 1)] = m_comp->emit_spill();
+			dec_stack();
+		}
 
-        // load all the values into the set...
-        auto err = m_comp->emit_define_label();
-        for (int i = 0; i < argCnt; i++) {
-            m_comp->emit_load_local(setTmp);
-            m_comp->emit_load_local(tmps[i]);
-            m_comp->emit_set_add();
-            frees[i] = m_comp->emit_define_label();
-            m_comp->emit_branch(BranchFalse, frees[i]);
-        }
+		// load all the values into the set...
+		auto err = m_comp->emit_define_label();
+		for (int i = 0; i < argCnt; i++) {
+			m_comp->emit_load_local(setTmp);
+			m_comp->emit_load_local(tmps[i]);
+			emit_set_add();
+			frees[i] = m_comp->emit_define_label();
+			m_comp->emit_branch(BranchFalse, frees[i]);
+		}
 
-        auto noErr = m_comp->emit_define_label();
-        m_comp->emit_branch(BranchAlways, noErr);
+		auto noErr = m_comp->emit_define_label();
+		m_comp->emit_branch(BranchAlways, noErr);
 
-        m_comp->emit_mark_label(err);
-        m_comp->emit_load_local(setTmp);
-        m_comp->emit_pop_top();
-        
-        // In the event of an error we need to free any
-        // args that weren't processed.  We'll always process
-        // the 1st value and dec ref it in the set add helper.
-        // tmps[0] = 'a', tmps[1] = 'b', tmps[2] = 'c'
-        // We'll process tmps[0], and if that fails, then we need
-        // to free tmps[1] and tmps[2] which correspond with frees[0]
-        // and frees[1]
-        for (size_t i = 1; i < argCnt; i++) {
-            m_comp->emit_mark_label(frees[i - 1]);
-            m_comp->emit_load_local(tmps[i]);
-            m_comp->emit_pop_top();
-        }
+		m_comp->emit_mark_label(err);
+		m_comp->emit_load_local(setTmp);
+		emit_pop_top();
+		
+		// In the event of an error we need to free any
+		// args that weren't processed.  We'll always process
+		// the 1st value and dec ref it in the set add helper.
+		// tmps[0] = 'a', tmps[1] = 'b', tmps[2] = 'c'
+		// We'll process tmps[0], and if that fails, then we need
+		// to free tmps[1] and tmps[2] which correspond with frees[0]
+		// and frees[1]
+		for (int i = 1; i < argCnt; i++) {
+			m_comp->emit_mark_label(frees[i - 1]);
+			m_comp->emit_load_local(tmps[i]);
+			emit_pop_top();
+		}
 
-        // And if the last one failed, then all of the values have been
-        // decref'd
-        m_comp->emit_mark_label(frees[argCnt - 1]);
-        branch_raise("set add failed");
+		// And if the last one failed, then all of the values have been
+		// decref'd
+		m_comp->emit_mark_label(frees[argCnt - 1]);
+		branch_raise("set add failed");
 
-        m_comp->emit_mark_label(noErr);
-        delete[] frees;
-        delete[] tmps;
+		m_comp->emit_mark_label(noErr);
+		delete[] frees;
+		delete[] tmps;
 
         m_comp->emit_load_local(setTmp);
         m_comp->emit_free_local(setTmp);
@@ -1706,16 +2656,16 @@ void AbstractInterpreter::extend_set_recursively(Local setTmp, size_t argCnt) {
     m_comp->emit_load_local(setTmp);
     m_comp->emit_load_local(valueTmp);
 
-    m_comp->emit_set_extend();
+    emit_set_extend();
     int_error_check("set extend failed");
 
     m_comp->emit_free_local(valueTmp);
 }
 
 void AbstractInterpreter::extend_set(size_t argCnt) {
-    _ASSERTE(argCnt > 0);
+    assert(argCnt > 0);
 
-    m_comp->emit_new_set();
+    emit_new_set();
     error_check("new set failed");
 
     auto setTmp = m_comp->emit_define_local();
@@ -1727,7 +2677,7 @@ void AbstractInterpreter::extend_set(size_t argCnt) {
 }
 
 void AbstractInterpreter::build_map(size_t  argCnt) {
-    m_comp->emit_new_dict(argCnt);
+    emit_new_dict(argCnt);
     error_check("build map failed");
 
     if (argCnt > 0) {
@@ -1735,7 +2685,7 @@ void AbstractInterpreter::build_map(size_t  argCnt) {
         for (size_t curArg = 0; curArg < argCnt; curArg++) {
             m_comp->emit_load_local(map);
 
-            m_comp->emit_dict_store();
+            emit_dict_store();
 
             dec_stack(2);
             int_error_check("dict store failed");
@@ -1758,16 +2708,16 @@ void AbstractInterpreter::extend_map_recursively(Local dictTmp, size_t argCnt) {
     m_comp->emit_load_local(dictTmp);
     m_comp->emit_load_local(valueTmp);
 
-    m_comp->emit_map_extend();
+    emit_map_extend();
     int_error_check("map extend failed");
 
     m_comp->emit_free_local(valueTmp);
 }
 
 void AbstractInterpreter::extend_map(size_t argCnt) {
-    _ASSERTE(argCnt > 0);
+    assert(argCnt > 0);
 
-    m_comp->emit_new_dict(0);
+    emit_new_dict(0);
     error_check("new map failed");
 
     auto dictTmp = m_comp->emit_define_local();
@@ -1779,7 +2729,7 @@ void AbstractInterpreter::extend_map(size_t argCnt) {
 }
 
 void AbstractInterpreter::make_function(int oparg) {
-    m_comp->emit_new_function();
+    emit_new_function();
     dec_stack(2);
 
     if (oparg & 0x0f) {
@@ -1789,43 +2739,51 @@ void AbstractInterpreter::make_function(int oparg) {
             auto tmp = m_comp->emit_spill();
             m_comp->emit_load_local(func);
             m_comp->emit_load_and_free_local(tmp);
-            m_comp->emit_set_closure();
+            emit_set_closure();
             dec_stack();
         }
         if (oparg & 0x04) {
             // annoations
             auto tmp = m_comp->emit_spill();
             m_comp->emit_load_local(func);
-            m_comp->emit_load_and_free_local(tmp);
+			m_comp->emit_load_and_free_local(tmp);
+			emit_set_closure();
+			dec_stack();
+		}
+		if (oparg & 0x04) {
+			// annoations
+			auto tmp = m_comp->emit_spill();
+			m_comp->emit_load_local(func);
+			m_comp->emit_load_and_free_local(tmp);
 
-            m_comp->emit_set_annotations();
-            dec_stack();
-        }
-        if (oparg & 0x02) {
-            // kw defaults
-            auto tmp = m_comp->emit_spill();
-            m_comp->emit_load_local(func);
-            m_comp->emit_load_and_free_local(tmp);
+			emit_set_annotations();
+			dec_stack();
+		}
+		if (oparg & 0x02) {
+			// kw defaults
+			auto tmp = m_comp->emit_spill();
+			m_comp->emit_load_local(func);
+			m_comp->emit_load_and_free_local(tmp);
 
-            m_comp->emit_set_kw_defaults();
-            dec_stack();
-        }
-        if (oparg & 0x01) {
-            // defaults
-            auto tmp = m_comp->emit_spill();
-            m_comp->emit_load_local(func);
-            m_comp->emit_load_and_free_local(tmp);
-            m_comp->emit_set_defaults();
-            dec_stack();
-        }
-        m_comp->emit_load_and_free_local(func);
-    }
+			emit_set_kw_defaults();
+			dec_stack();
+		}
+		if (oparg & 0x01) {
+			// defaults
+			auto tmp = m_comp->emit_spill();
+			m_comp->emit_load_local(func);
+			m_comp->emit_load_and_free_local(tmp);
+			emit_set_defaults();
+			dec_stack();
+		}
+		m_comp->emit_load_and_free_local(func);
+	}
 
-    inc_stack();
+	inc_stack();
 }
 
 void AbstractInterpreter::dec_stack(size_t size) {
-    _ASSERTE(m_stack.size() >= size);
+    assert(m_stack.size() >= size);
     for (size_t i = 0; i < size; i++) {
         m_stack.pop_back();
     }
@@ -1844,7 +2802,7 @@ void AbstractInterpreter::free_iter_local() {
         if ((*cur).Kind == SETUP_LOOP) {
             if ((*cur).LoopVar.is_valid()) {
                 m_comp->emit_load_local((*cur).LoopVar);
-                m_comp->emit_pop_top();
+                emit_pop_top();
             }
             break;
         }
@@ -1858,7 +2816,7 @@ void AbstractInterpreter::free_all_iter_locals(size_t to) {
         if (m_blockStack[i].Kind == SETUP_LOOP) {
             if (m_blockStack[i].LoopVar.is_valid()) {
                 m_comp->emit_load_local(m_blockStack[i].LoopVar);
-                m_comp->emit_pop_top();
+                emit_pop_top();
             }
         }
     }
@@ -1872,7 +2830,7 @@ void AbstractInterpreter::free_iter_locals_on_exception() {
         if ((*cur).Kind == SETUP_LOOP) {
             if ((*cur).LoopVar.is_valid()) {
                 m_comp->emit_load_local((*cur).LoopVar);
-                m_comp->emit_pop_top();
+                emit_pop_top();
             }
         }
         else {
@@ -1882,7 +2840,7 @@ void AbstractInterpreter::free_iter_locals_on_exception() {
 }
 
 void AbstractInterpreter::periodic_work() {
-    m_comp->emit_periodic_work();
+    emit_periodic_work();
     int_error_check("periodic work");
 }
 
@@ -1966,8 +2924,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
     auto raiseNoHandlerLabel = m_comp->emit_define_label();
     auto reraiseNoHandlerLabel = m_comp->emit_define_label();
 
-    m_comp->emit_lasti_init();
-    m_comp->emit_push_frame();
+    emit_lasti_init();
+    emit_push_frame();
 
     m_blockStack.push_back(BlockInfo(-1, NOP, 0));
     m_allHandlers.push_back(
@@ -1984,21 +2942,21 @@ JittedCode* AbstractInterpreter::compile_worker() {
     for (size_t i = 0; i < m_code->co_argcount + m_code->co_kwonlyargcount; i++) {
         auto local = get_local_info(0, i);
         if (!local.ValueInfo.needs_boxing()) {
-            m_comp->emit_load_fast(i);
+            emit_load_fast(i);
 
             if (local.ValueInfo.Value->kind() == AVK_Float) {
-                m_comp->emit_unbox_float();
+                emit_unbox_float();
                 m_comp->emit_store_local(get_optimized_local(i, AVK_Float));
             }
             else if (local.ValueInfo.Value->kind() == AVK_Integer) {
-                m_comp->emit_unbox_int_tagged();
+                emit_unbox_int_tagged();
                 m_comp->emit_store_local(get_optimized_local(i, AVK_Any));
             }
         }
     }
     
-    for (int curByte = 0; curByte < m_size; curByte += sizeof(_Py_CODEUNIT)) {
-        _ASSERTE(curByte % sizeof(_Py_CODEUNIT) == 0);
+	for (int curByte = 0; curByte < m_size; curByte += sizeof(_Py_CODEUNIT)) {
+		assert(curByte % sizeof(_Py_CODEUNIT) == 0);
 
         auto opcodeIndex = curByte;
 
@@ -2024,7 +2982,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
         // update f_lasti
         if (!can_skip_lasti_update(curByte)) {
-            m_comp->emit_lasti_update(curByte);
+            emit_lasti_update(curByte);
         }
 
         switch (byte) {
@@ -2039,14 +2997,14 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     auto second_kind = stackInfo[stackInfo.size() - 2].Value->kind();
 
                     if (top_kind == AVK_Float && second_kind == AVK_Float) {
-                        m_comp->emit_rot_two(LK_Float);
+                        emit_rot_two(LK_Float);
                         break;
                     } else if (top_kind == AVK_Integer && second_kind == AVK_Integer) {
-                        m_comp->emit_rot_two(LK_Pointer);
+                        emit_rot_two(LK_Pointer);
                         break;
                     }
                 }
-                m_comp->emit_rot_two();
+                emit_rot_two();
                 break;
             }
             case ROT_THREE: 
@@ -2061,28 +3019,28 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     auto third_kind = stackInfo[stackInfo.size() - 3].Value->kind();
 
                     if (top_kind == AVK_Float && second_kind == AVK_Float && third_kind == AVK_Float) {
-                        m_comp->emit_rot_three(LK_Float);
+                        emit_rot_three(LK_Float);
                         break;
                     }
                     else if (top_kind == AVK_Integer && second_kind == AVK_Integer && third_kind == AVK_Integer) {
-                        m_comp->emit_rot_three(LK_Pointer);
+                        emit_rot_three(LK_Pointer);
                         break;
                     }
                 }
-                m_comp->emit_rot_three();
+                emit_rot_three();
                 break;
             }
             case POP_TOP:
-                m_comp->emit_pop_top();
+                emit_pop_top();
                 dec_stack();
                 break;
             case DUP_TOP:
-                m_comp->emit_dup_top();
+                emit_dup_top();
                 m_stack.push_back(m_stack.back());
                 break;
             case DUP_TOP_TWO:
                 inc_stack(2);
-                m_comp->emit_dup_top_two();
+                emit_dup_top_two();
                 break;
             case COMPARE_OP: compare_op(oparg, curByte, opcodeIndex); break;
             case SETUP_LOOP:
@@ -2163,7 +3121,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             break;
             case LOAD_BUILD_CLASS:
-                m_comp->emit_load_build_class();
+                emit_load_build_class();
                 error_check("load build class failed");
                 inc_stack();
                 break;
@@ -2174,54 +3132,54 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case POP_JUMP_IF_TRUE:
             case POP_JUMP_IF_FALSE: pop_jump_if(byte != POP_JUMP_IF_FALSE, opcodeIndex, oparg); break;
             case LOAD_NAME:
-                m_comp->emit_load_name(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_load_name(PyTuple_GetItem(m_code->co_names, oparg));
                 error_check("load name failed");
                 inc_stack();
                 break;
             case STORE_ATTR:
-                m_comp->emit_store_attr(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_store_attr(PyTuple_GetItem(m_code->co_names, oparg));
                 dec_stack(2);
                 int_error_check("store attr failed");
                 break;
             case DELETE_ATTR:
-                m_comp->emit_delete_attr(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_delete_attr(PyTuple_GetItem(m_code->co_names, oparg));
                 dec_stack();
                 int_error_check("delete attr failed");
                 break;
             case LOAD_ATTR:
-                m_comp->emit_load_attr(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_load_attr(PyTuple_GetItem(m_code->co_names, oparg));
                 dec_stack();
                 error_check("load attr failed");
                 inc_stack();
                 break;
             case STORE_GLOBAL:
-                m_comp->emit_store_global(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_store_global(PyTuple_GetItem(m_code->co_names, oparg));
                 dec_stack();
                 int_error_check("store global failed");
                 break;
             case DELETE_GLOBAL:
-                m_comp->emit_delete_global(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_delete_global(PyTuple_GetItem(m_code->co_names, oparg));
                 int_error_check("delete global failed");
                 break;
             case LOAD_GLOBAL:
-                m_comp->emit_load_global(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_load_global(PyTuple_GetItem(m_code->co_names, oparg));
                 error_check("load global failed");
                 inc_stack();
                 break;
             case LOAD_CONST: load_const(oparg, opcodeIndex); break;
             case STORE_NAME:
-                m_comp->emit_store_name(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_store_name(PyTuple_GetItem(m_code->co_names, oparg));
                 dec_stack();
                 int_error_check("store name failed");
                 break;
             case DELETE_NAME:
-                m_comp->emit_delete_name(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_delete_name(PyTuple_GetItem(m_code->co_names, oparg));
                 int_error_check("delete name failed");
                 break;
             case DELETE_FAST:
                 load_fast_worker(oparg, true);
-                m_comp->emit_pop_top();
-                m_comp->emit_delete_fast(oparg);
+                emit_pop_top();
+                emit_delete_fast(oparg);
                 break;
             case STORE_FAST: store_fast(oparg, opcodeIndex); break;
             case LOAD_FAST: load_fast(oparg, opcodeIndex); break;
@@ -2230,47 +3188,47 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             case UNPACK_EX: unpack_ex(oparg, curByte); break;
             case CALL_FUNCTION_KW:
-                // names is a tuple on the stack, should have come from a LOAD_CONST
-                if (!m_comp->emit_kwcall(oparg)) {
-                    auto names = m_comp->emit_spill();
-                    dec_stack();    // names
-                    build_tuple(oparg);
-                    m_comp->emit_load_and_free_local(names);
+				// names is a tuple on the stack, should have come from a LOAD_CONST
+				if (!emit_kwcall(oparg)) {
+					auto names = m_comp->emit_spill();
+					dec_stack();	// names
+					build_tuple(oparg);
+					m_comp->emit_load_and_free_local(names);
 
-                    m_comp->emit_kwcall_with_tuple();
-                    dec_stack();// function & names
-                }
-                else {
-                    dec_stack(oparg + 2); // + function & names
-                }
+					emit_kwcall_with_tuple();
+					dec_stack();// function & names
+				}
+				else {
+					dec_stack(oparg + 2); // + function & names
+				}
 
-                error_check("kwcall failed");
-                inc_stack();
-                break;
-            case CALL_FUNCTION_EX:
-                if (oparg & 0x01) {
-                    // kwargs, then args, then function
-                    m_comp->emit_call_kwargs();
-                    dec_stack(3);
-                }else{
-                    m_comp->emit_call_args();
-                    dec_stack(2);
-                }
+				error_check("kwcall failed");
+				inc_stack();
+				break;
+			case CALL_FUNCTION_EX:
+				if (oparg & 0x01) {
+					// kwargs, then args, then function
+					emit_call_kwargs();
+					dec_stack(3);
+				}else{
+					emit_call_args();
+					dec_stack(2);
+				}
 
-                error_check("call failed");
-                inc_stack();
-                break;
+				error_check("call failed");
+				inc_stack();
+				break;
             case CALL_FUNCTION:
             {
-                if (!m_comp->emit_call(oparg)) {
-                    build_tuple(oparg);
-                    m_comp->emit_call_with_tuple();
-                    dec_stack();// function
-                }
-                else {
-                    dec_stack(oparg + 1); // + function
-                }
-                
+				if (!emit_call(oparg)) {
+					build_tuple(oparg);
+					emit_call_with_tuple();
+					dec_stack();// function
+				}
+				else {
+					dec_stack(oparg + 1); // + function
+				}
+				
                 error_check("call function failed");
                 inc_stack();
                 break;
@@ -2301,12 +3259,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             case STORE_SUBSCR:
                 dec_stack(3);
-                m_comp->emit_store_subscr();
+                emit_store_subscr();
                 int_error_check("store subscr failed");
                 break;
             case DELETE_SUBSCR:
                 dec_stack(2);
-                m_comp->emit_delete_subscr();
+                emit_delete_subscr();
                 int_error_check("delete subscr failed");
                 break;
             case BUILD_SLICE:
@@ -2314,7 +3272,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 if (oparg != 3) {
                     m_comp->emit_null();
                 }
-                m_comp->emit_build_slice();
+                emit_build_slice();
                 inc_stack();
                 break;
             case BUILD_SET: build_set(oparg); break;
@@ -2327,7 +3285,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case UNARY_NOT: unary_not(curByte); break;
             case UNARY_INVERT:
                 dec_stack(1);
-                m_comp->emit_unary_invert();
+                emit_unary_invert();
                 error_check("unary invert failed");
                 inc_stack();
                 break;
@@ -2366,15 +3324,15 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     // Currently we only optimize floating point numbers..
                     if (one.Value->kind() == AVK_Integer && two.Value->kind() == AVK_Float) {
                         // tagged ints might be objects, so we track the stack kind as object
-                        _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT); 
-                        _ASSERTE(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
+                        assert(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT); 
+                        assert(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
 
                         if (byte == BINARY_AND || byte == INPLACE_AND || byte == INPLACE_OR || byte == BINARY_OR ||
                             byte == INPLACE_LSHIFT || byte == BINARY_LSHIFT || byte == INPLACE_RSHIFT || byte == BINARY_RSHIFT ||
                             byte == INPLACE_XOR || byte == BINARY_XOR) {
                             char buf[100];
-                            sprintf_s(buf, "unsupported operand type(s) for %s: 'float' and 'int'", op_to_string(byte));
-                            m_comp->emit_pyerr_setstring(PyExc_TypeError, buf);
+                            snprintf(buf, sizeof(buf)/sizeof(char), "unsupported operand type(s) for %s: 'float' and 'int'", op_to_string(byte));
+                            emit_pyerr_setstring(PyExc_TypeError, buf);
                             branch_raise();
                             break;
                         } else if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE ||
@@ -2383,10 +3341,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                             // Check and see if the right hand side is zero, and if so, raise
                             // an exception.
                             m_comp->emit_dup();
-                            m_comp->emit_unary_not_tagged_int_push_bool();
+                            emit_unary_not_tagged_int_push_bool();
                             auto noErr = m_comp->emit_define_label();
                             m_comp->emit_branch(BranchFalse, noErr);
-                            m_comp->emit_pyerr_setstring(PyExc_ZeroDivisionError, "float division by zero");
+                            emit_pyerr_setstring(PyExc_ZeroDivisionError, "float division by zero");
                             branch_raise();
 
                             m_comp->emit_mark_label(noErr);
@@ -2395,7 +3353,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         // Convert int to float
                         auto floatValue = m_comp->emit_define_local(LK_Float);
                         m_comp->emit_load_local_addr(floatValue);
-                        m_comp->emit_tagged_int_to_float();
+                        emit_tagged_int_to_float();
 
                         dec_stack(1);   // we've consumed the int
 
@@ -2403,14 +3361,14 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                         m_comp->emit_load_and_free_local(floatValue);
 
-                        m_comp->emit_binary_float(byte);
+                        emit_binary_float(byte);
 
                         dec_stack(1);
                         inc_stack(1, STACK_KIND_VALUE);
                         break;
                     } else if (one.Value->kind() == AVK_Float && two.Value->kind() == AVK_Float) {
-                        _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
-                        _ASSERTE(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
+                        assert(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
+                        assert(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
 
                         dec_stack(2);
 
@@ -2425,13 +3383,13 @@ JittedCode* AbstractInterpreter::compile_worker() {
                             // Move the stack depth down to zero (we already did the decstack above)
                             m_comp->emit_pop();
                             m_comp->emit_pop();
-                            m_comp->emit_pyerr_setstring(PyExc_ZeroDivisionError, "float division by zero");
+                            emit_pyerr_setstring(PyExc_ZeroDivisionError, "float division by zero");
                             branch_raise();
 
                             m_comp->emit_mark_label(noErr);
                         }
 
-                        m_comp->emit_binary_float(byte);
+                        emit_binary_float(byte);
 
                         inc_stack(1, STACK_KIND_VALUE);
                         break;
@@ -2439,7 +3397,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     else if (one.Value->kind() == AVK_Integer && two.Value->kind() == AVK_Integer) {
                         dec_stack(2);
 
-                        m_comp->emit_binary_tagged_int(byte);
+                        emit_binary_tagged_int(byte);
 
                         error_check("tagged binary add failed");
 
@@ -2449,7 +3407,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 }
                 dec_stack(2);
 
-                m_comp->emit_binary_object(byte);
+                emit_binary_object(byte);
 
                 error_check("binary op failed");
                 inc_stack();
@@ -2468,17 +3426,17 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 make_function(oparg);
                 break;
             case LOAD_DEREF:
-                m_comp->emit_load_deref(oparg);
+                emit_load_deref(oparg);
                 error_check("load deref failed");
                 inc_stack();
                 break;
             case STORE_DEREF:
                 dec_stack();
-                m_comp->emit_store_deref(oparg);
+                emit_store_deref(oparg);
                 break;
-            case DELETE_DEREF: m_comp->emit_delete_deref(oparg); break;
+            case DELETE_DEREF: emit_delete_deref(oparg); break;
             case LOAD_CLOSURE:
-                m_comp->emit_load_closure(oparg);
+                emit_load_closure(oparg);
                 inc_stack();
                 break;
             case GET_ITER:
@@ -2504,7 +3462,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_getiter_opt();
                 }
                 else*/ {
-                    m_comp->emit_getiter();
+                    emit_getiter();
                     dec_stack();
                     error_check("get iter failed");
                     inc_stack();
@@ -2536,30 +3494,30 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 // TODO: Are these stack counts right?
                 // We error_check with the set/map/list on the
                 // stack, but it's not in the count
-                m_comp->emit_set_add();
+                emit_set_add();
                 dec_stack(2);
                 error_check("set add failed");
                 inc_stack();
                 break;
             case MAP_ADD:
-                m_comp->emit_map_add();
+                emit_map_add();
                 dec_stack(3);
                 error_check("map add failed");
                 inc_stack();
                 break;
             case LIST_APPEND:
-                m_comp->emit_list_append();
+                emit_list_append();
                 dec_stack(2);
                 error_check("list append failed");
                 inc_stack();
                 break;
             case PRINT_EXPR:
-                m_comp->emit_print_expr();
+                emit_print_expr();
                 dec_stack();
                 int_error_check("print expr failed");
                 break;
             case LOAD_CLASSDEREF:
-                m_comp->emit_load_classderef(oparg);
+                emit_load_classderef(oparg);
                 error_check("load classderef failed");
                 inc_stack();
                 break;
@@ -2572,7 +3530,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     case 2:
                         dec_stack(oparg);
                         // raise exc
-                        m_comp->emit_raise_varargs();
+                        emit_raise_varargs();
                         // returns 1 if we're doing a re-raise in which case we don't need
                         // to update the traceback.  Otherwise returns 0.
                         auto& curHandler = get_ehblock();
@@ -2703,9 +3661,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     dec_stack();
                     m_comp->emit_store_local(ehInfo.ExVars.FinallyExc);
                     m_comp->emit_load_local(ehInfo.ExVars.FinallyExc);
-                    m_comp->emit_ptr(Py_None);
-                    m_comp->emit_dup();
-                    m_comp->emit_incref();
+					m_comp->emit_ptr(Py_None);
+					m_comp->emit_dup();
+					emit_incref();
                     m_comp->emit_branch(BranchEqual, noException);
 
                     if (flags & EHF_BlockBreaks) {
@@ -2758,7 +3716,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_load_local(ehInfo.ExVars.FinallyTb);
                     m_comp->emit_load_local(ehInfo.ExVars.FinallyValue);
                     m_comp->emit_load_local(ehInfo.ExVars.FinallyExc);
-                    m_comp->emit_restore_err();
+                    emit_restore_err();
                     unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
 
                     auto ehBlock = get_ehblock();
@@ -2778,8 +3736,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     // anyway.
                     if (m_offsetStack.find(curByte) != m_offsetStack.end()) {
                         dec_stack(3);
-                        free_iter_locals_on_exception();
-                        m_comp->emit_restore_err();
+						free_iter_locals_on_exception();
+						emit_restore_err();
 
                         unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
                         clean_stack_for_reraise();
@@ -2795,18 +3753,18 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 return nullptr;
 
             case IMPORT_NAME:
-                m_comp->emit_import_name(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_import_name(PyTuple_GetItem(m_code->co_names, oparg));
                 dec_stack(2);
                 error_check("import name failed");
                 inc_stack();
                 break;
             case IMPORT_FROM:
-                m_comp->emit_import_from(PyTuple_GetItem(m_code->co_names, oparg));
+                emit_import_from(PyTuple_GetItem(m_code->co_names, oparg));
                 error_check("import from failed");
                 inc_stack();
                 break;
             case IMPORT_STAR:
-                m_comp->emit_import_star();
+                emit_import_star();
                 dec_stack(1);
                 int_error_check("import star failed");
                 break;
@@ -2814,136 +3772,126 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case WITH_CLEANUP_START:
             case WITH_CLEANUP_FINISH:
                 return nullptr;
-            case BUILD_MAP_UNPACK_WITH_CALL:
-                /* TODO: Finish implementation
+			case BUILD_MAP_UNPACK_WITH_CALL:
+			case BUILD_TUPLE_UNPACK_WITH_CALL:
+				return nullptr;
+			case FORMAT_VALUE:
+			{
+				Local fmtSpec;
+				if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
+					// format spec
+					fmtSpec = m_comp->emit_spill();
+					dec_stack();
+				}
 
-                    m_comp->emit_new_dict(oparg);
-                    auto dict = m_comp->emit_spill();
-                    // TODO: Null check
+				int which_conversion = oparg & FVC_MASK;
 
-                    for (auto i = 0; i < oparg; i++) {
-                    }
+				dec_stack();
+				if (which_conversion) {
+					// Save the original value so we can decref it...
+					m_comp->emit_dup();
+					auto tmp = m_comp->emit_spill();
 
-                */
-            case BUILD_TUPLE_UNPACK_WITH_CALL:
-                return nullptr;
-            case FORMAT_VALUE:
-            {
-                Local fmtSpec;
-                if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
-                    // format spec
-                    fmtSpec = m_comp->emit_spill();
-                    dec_stack();
-                }
+					// Convert it
+					switch (which_conversion) {
+						case FVC_STR:   emit_pyobject_str();   break;
+						case FVC_REPR:  emit_pyobject_repr();  break;
+						case FVC_ASCII: emit_pyobject_ascii(); break;
+					}
 
-                int which_conversion = oparg & FVC_MASK;
+					// Decref the original value
+					m_comp->emit_load_and_free_local(tmp);
+					emit_pop_top();
 
-                dec_stack();
-                if (which_conversion) {
-                    // Save the original value so we can decref it...
-                    m_comp->emit_dup();
-                    auto tmp = m_comp->emit_spill();
+					// Custom error handling in case we have a spilled spec
+					// we need to free as well.
+					auto noErr = m_comp->emit_define_label();
+					m_comp->emit_dup();
+					m_comp->emit_store_local(m_errorCheckLocal);
+					m_comp->emit_null();
+					m_comp->emit_branch(BranchNotEqual, noErr);
 
-                    // Convert it
-                    switch (which_conversion) {
-                        case FVC_STR:   m_comp->emit_pyobject_str();   break;
-                        case FVC_REPR:  m_comp->emit_pyobject_repr();  break;
-                        case FVC_ASCII: m_comp->emit_pyobject_ascii(); break;
-                    }
+					if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
+						m_comp->emit_load_local(fmtSpec);
+						emit_pop_top();
+					}
 
-                    // Decref the original value
-                    m_comp->emit_load_and_free_local(tmp);
-                    m_comp->emit_pop_top();
+					branch_raise("conversion failed");
+					m_comp->emit_mark_label(noErr);
+					m_comp->emit_load_local(m_errorCheckLocal);
+				}
 
-                    // Custom error handling in case we have a spilled spec
-                    // we need to free as well.
-                    auto noErr = m_comp->emit_define_label();
-                    m_comp->emit_dup();
-                    m_comp->emit_store_local(m_errorCheckLocal);
-                    m_comp->emit_null();
-                    m_comp->emit_branch(BranchNotEqual, noErr);
+				if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
+					// format spec
+					m_comp->emit_load_and_free_local(fmtSpec);
+					emit_pyobject_format();
 
-                    if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
-                        m_comp->emit_load_local(fmtSpec);
-                        m_comp->emit_pop_top();
-                    }
+					error_check("format object");
+				}
+				else if (!which_conversion) {
+					// TODO: This could also be avoided if we knew we had a string on the stack
 
-                    branch_raise("conversion failed");
-                    m_comp->emit_mark_label(noErr);
-                    m_comp->emit_load_local(m_errorCheckLocal);
-                }
+					// If we did a conversion we know we have a string...
+					// Otherwise we need to convert
+					emit_format_value();
+				}
 
-                if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
-                    // format spec
-                    m_comp->emit_load_and_free_local(fmtSpec);
-                    m_comp->emit_pyobject_format();
+				inc_stack();
+				break;
+				}
+			case BUILD_STRING:
+				{
+					Local stackArray = m_sequenceLocals[curByte];
+					Local tmp;
+					for (auto i = 0; i < oparg; i++) {
+						m_comp->emit_store_to_array(stackArray, oparg - i - 1);
+						dec_stack();
+					}
 
-                    error_check("format object");
-                }
-                else if (!which_conversion) {
-                    // TODO: This could also be avoided if we knew we had a string on the stack
+					// Array
+					m_comp->emit_load_local(stackArray);
+					// Count
+					m_comp->emit_ptr((size_t)oparg);
 
-                    // If we did a conversion we know we have a string...
-                    // Otherwise we need to convert
-                    m_comp->emit_format_value();
-                }
+					emit_unicode_joinarray();
 
-                inc_stack();
-                break;
-            }
-            case BUILD_STRING:
-            {
-                    Local stackArray = m_sequenceLocals[curByte];
-                    Local tmp;
-                    for (auto i = 0; i < oparg; i++) {
-                        m_comp->emit_store_to_array(stackArray, oparg - i - 1);
-                        dec_stack();
-                    }
+					inc_stack();
+				}
+				break;
+			case BUILD_CONST_KEY_MAP:
+				{
+					auto names = m_comp->emit_spill();
+					emit_new_dict(oparg);
+					auto dict = m_comp->emit_spill();
+					for (auto i = 0; i < oparg; i++) {
+						auto value = m_comp->emit_spill();
+						// key
+						m_comp->emit_load_local(names);
+						emit_tuple_load(i);
 
-                    // Array
-                    m_comp->emit_load_local(stackArray);
-                    // Count
-                    m_comp->emit_ptr((void*)oparg);
+						// value
+						m_comp->emit_load_and_free_local(value);
 
-                    m_comp->emit_unicode_joinarray();
+						// dict
+						m_comp->emit_load_local(dict);
 
-                    inc_stack();
-                    break;
-            }
-            case BUILD_CONST_KEY_MAP:
-            {
-                    auto names = m_comp->emit_spill();
-                    m_comp->emit_new_dict(oparg);
-                    auto dict = m_comp->emit_spill();
-                    for (auto i = 0; i < oparg; i++) {
-                        auto value = m_comp->emit_spill();
-                        // key
-                        m_comp->emit_load_local(names);
-                        m_comp->emit_tuple_load(i);
+						emit_dict_store_no_decref();
 
-                        // value
-                        m_comp->emit_load_and_free_local(value);
+						dec_stack(1);
+					}
 
-                        // dict
-                        m_comp->emit_load_local(dict);
+					dec_stack(1); // names
+					m_comp->emit_load_local(names);
+					emit_pop_top();
 
-                        m_comp->emit_dict_store_no_decref();
+					m_comp->emit_free_local(names);
 
-                        dec_stack(1);
-                    }
+					m_comp->emit_load_local(dict);
 
-                    dec_stack(1); // names
-                    m_comp->emit_load_local(names);
-                    m_comp->emit_pop_top();
-
-                    m_comp->emit_free_local(names);
-
-                    m_comp->emit_load_local(dict);
-
-                    inc_stack();
-                    break;
-            }
-            default:
+					inc_stack();
+				}
+				break;
+			default:
 #if _DEBUG
                 printf("Unsupported opcode: %d (with related)\r\n", byte);
 #endif
@@ -2963,7 +3911,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             emit_raise_and_free(i);
 
             if (handler.ErrorTarget.m_index != -1) {
-                m_comp->emit_prepare_exception(
+                emit_prepare_exception(
                     handler.ExVars.PrevExc,
                     handler.ExVars.PrevExcVal,
                     handler.ExVars.PrevTraceback
@@ -2998,11 +3946,19 @@ JittedCode* AbstractInterpreter::compile_worker() {
     m_comp->emit_load_local(m_retValue);
 
     m_comp->emit_mark_label(finalRet);
-    m_comp->emit_pop_frame();
+    emit_pop_frame();
 
     m_comp->emit_ret();
 
-    return m_comp->emit_compile();
+    auto res = m_comp->emit_compile();
+	if (res == nullptr) {
+		printf("Compiling failed %s from %s line %d\r\n",
+			PyUnicode_AsUTF8(m_code->co_name),
+			PyUnicode_AsUTF8(m_code->co_filename),
+			m_code->co_firstlineno
+		);
+	}
+	return res;
 }
 
 void AbstractInterpreter::compile_pop_block() {
@@ -3079,7 +4035,7 @@ void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
     for (auto cur = reraiseAndFreeLabels.size() - 1; cur != -1; cur--) {
         m_comp->emit_mark_label(reraiseAndFreeLabels[cur]);
         m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
-        m_comp->emit_pop_top();
+        emit_pop_top();
     }
     if (reraiseAndFreeLabels.size() != 0) {
         m_comp->emit_branch(BranchAlways, handler.ReRaise);
@@ -3088,7 +4044,7 @@ void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
     for (auto cur = raiseAndFreeLabels.size() - 1; cur != -1; cur--) {
         m_comp->emit_mark_label(raiseAndFreeLabels[cur]);
         m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
-        m_comp->emit_pop_top();
+        emit_pop_top();
     }
 
     if (handler.Flags & EHF_InExceptHandler) {
@@ -3101,7 +4057,7 @@ void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
         m_comp->emit_mark_label(handler.Raise);
         unwind_eh(handlerIndex);
 
-        m_comp->emit_eh_trace();     // update the traceback
+        emit_eh_trace();     // update the traceback
 
         if (handler.ErrorTarget.m_index == -1) {
             // We're in an except handler raising an exception with no outer exception
@@ -3132,7 +4088,7 @@ void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
         // whatever opcode will handle the exception.
         m_comp->emit_mark_label(handler.Raise);
 
-        m_comp->emit_eh_trace();
+        emit_eh_trace();
 
         m_comp->emit_mark_label(handler.ReRaise);
     }
@@ -3207,14 +4163,16 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
                 m_comp->emit_dup();
                 m_comp->emit_float(0);
                 m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
-                m_comp->emit_pop_top();
+                emit_pop_top();
                 return;
             case AVK_Integer:
                 m_comp->emit_dup();
-                m_comp->emit_unary_not_tagged_int_push_bool();
+                emit_unary_not_tagged_int_push_bool();
                 m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
-                m_comp->emit_pop_top();
+                emit_pop_top();
                 return;
+			default:
+				break;
         }
     }
     
@@ -3228,7 +4186,7 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
 
     // Use PyObject_IsTrue
     m_comp->emit_load_local(tmp);
-    m_comp->emit_is_true();
+    emit_is_true();
 
     raise_on_negative_one();
 
@@ -3242,7 +4200,7 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
     // not jumping, load the value and dec ref it
     m_comp->emit_mark_label(noJump);
     m_comp->emit_load_local(tmp);
-    m_comp->emit_pop_top();
+    emit_pop_top();
 
     m_comp->emit_free_local(tmp);
 }
@@ -3265,9 +4223,10 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
                 break;
             case AVK_Integer:
                 emitted = true;
-                m_comp->emit_unary_not_tagged_int_push_bool();
+                emit_unary_not_tagged_int_push_bool();
                 m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
                 break;
+			default: break;
         }
     }
 
@@ -3286,7 +4245,7 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
 
         // Use PyObject_IsTrue
         m_comp->emit_dup();
-        m_comp->emit_is_true();
+        emit_is_true();
 
         raise_on_negative_one();
 
@@ -3294,12 +4253,12 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
 
         // Branching, pop the value and branch
         m_comp->emit_mark_label(willJump);
-        m_comp->emit_pop_top();
+        emit_pop_top();
         m_comp->emit_branch(BranchAlways, target);
 
         // Not branching, just pop the value and fall through
         m_comp->emit_mark_label(noJump);
-        m_comp->emit_pop_top();
+        emit_pop_top();
     }
 
     dec_stack();
@@ -3317,7 +4276,7 @@ void AbstractInterpreter::unary_positive(int opcodeIndex) {
             break;
         default:
             dec_stack();
-            m_comp->emit_unary_positive();
+            emit_unary_positive();
             error_check("unary positive failed");
             inc_stack();
             break;
@@ -3334,21 +4293,23 @@ void AbstractInterpreter::unary_negative(int opcodeIndex) {
             case AVK_Float:
                 handled = true;
                 dec_stack();
-                m_comp->emit_unary_negative_float();
+                emit_unary_negative_float();
                 inc_stack(1, STACK_KIND_VALUE);
                 break;
             case AVK_Integer:
                 handled = true;
                 dec_stack();
-                m_comp->emit_unary_negative_tagged_int();
+                emit_unary_negative_tagged_int();
                 inc_stack();
                 break;
+			default:
+				break;
         }
     }
 
     if (!handled) {
         dec_stack();
-        m_comp->emit_unary_negative();
+        emit_unary_negative();
         error_check("unary negative failed");
         inc_stack();
     }
@@ -3370,16 +4331,16 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
         // optimizing away the unnecessary boxing and True/False comparisons
         switch (one.Value->kind()) {
             case AVK_Float:
-                m_comp->emit_unary_not_float_push_bool();
+                emit_unary_not_float_push_bool();
                 branch(opcodeIndex);
                 break;
             case AVK_Integer:
-                m_comp->emit_unary_not_tagged_int_push_bool();
+                emit_unary_not_tagged_int_push_bool();
                 branch(opcodeIndex);
                 break;
             default:
                 dec_stack();
-                m_comp->emit_unary_not_push_int();
+                emit_unary_not_push_int();
                 branch_or_error(opcodeIndex);
                 break;
         }
@@ -3389,15 +4350,15 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
         dec_stack();
         switch (one.Value->kind()) {
             case AVK_Float:
-                m_comp->emit_unary_not_float_push_bool();
-                m_comp->emit_box_bool();
+                emit_unary_not_float_push_bool();
+                emit_box_bool();
                 break;
             case AVK_Integer:
-                m_comp->emit_unary_not_tagged_int_push_bool();
-                m_comp->emit_box_bool();
+                emit_unary_not_tagged_int_push_bool();
+                emit_box_bool();
                 break;
             default:
-                m_comp->emit_unary_not();
+                emit_unary_not();
                 error_check("unary not failed");
                 break;
         }
@@ -3445,7 +4406,7 @@ void AbstractInterpreter::store_fast(int local, int opcodeIndex) {
         // We only optimize floats so far...
 
         if (stackValue.Value->kind() == AVK_Float) {
-            _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
+            assert(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
             m_comp->emit_store_local(get_optimized_local(local, AVK_Float));
             dec_stack();
             return;
@@ -3457,8 +4418,8 @@ void AbstractInterpreter::store_fast(int local, int opcodeIndex) {
         }
     }
 
-    _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT);
-    m_comp->emit_store_fast(local);
+    assert(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT);
+    emit_store_fast(local);
     dec_stack();
 }
 
@@ -3474,15 +4435,15 @@ void AbstractInterpreter::load_const(int constIndex, int opcodeIndex) {
             int overflow;
             auto value = PyLong_AsLongLongAndOverflow(constValue, &overflow);
             if (!overflow && can_tag(value)) {
-                m_comp->emit_tagged_int(value);
+                emit_tagged_int(value);
                 inc_stack();
                 return;
             }
         }
     }
-    m_comp->emit_ptr(constValue);
-    m_comp->emit_dup();
-    m_comp->emit_incref();
+	m_comp->emit_ptr(constValue);
+	m_comp->emit_dup();
+	emit_incref();
     inc_stack();
 }
 
@@ -3492,13 +4453,13 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
         auto stackInfo = get_stack_info(opcodeIndex);
         // We only optimize floats so far...
         if (stackInfo[stackInfo.size() - 1].Value->kind() == AVK_Float) {
-            _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
+            assert(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
 
             // we need to convert the returned floating point value back into a boxed float.
-            m_comp->emit_box_float();
+            emit_box_float();
         }
         else if (stackInfo[stackInfo.size() - 1].Value->kind() == AVK_Integer) {
-            m_comp->emit_box_tagged_ptr();
+            emit_box_tagged_ptr();
         }
     }
 
@@ -3535,16 +4496,16 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
                 clearEh = blockIndex;
                 if (m_blockStack[blockIndex].Kind == END_FINALLY) {
                     m_comp->emit_load_local(m_allHandlers[m_blockStack[blockIndex].CurrentHandler].ExVars.FinallyTb);
-                    m_comp->emit_pop_top();
+                    emit_pop_top();
                     m_comp->emit_load_local(m_allHandlers[m_blockStack[blockIndex].CurrentHandler].ExVars.FinallyValue);
-                    m_comp->emit_pop_top();
+                    emit_pop_top();
                     m_comp->emit_load_local(m_allHandlers[m_blockStack[blockIndex].CurrentHandler].ExVars.FinallyExc);
-                    m_comp->emit_pop_top();
+                    emit_pop_top();
 
                     m_comp->emit_null();
                     m_comp->emit_null();
                     m_comp->emit_null();
-                    m_comp->emit_restore_err();
+                    emit_restore_err();
                 }
             }
         }
@@ -3565,7 +4526,7 @@ void AbstractInterpreter::unpack_sequence(size_t size, int opcode) {
     dec_stack();
 
     auto success = m_comp->emit_define_label();
-    m_comp->emit_unpack_sequence(valueTmp, m_sequenceLocals[opcode], success, size);
+    emit_unpack_sequence(valueTmp, m_sequenceLocals[opcode], success, size);
 
     branch_raise();
 
@@ -3587,7 +4548,7 @@ void AbstractInterpreter::unpack_sequence(size_t size, int opcode) {
     }
 
     m_comp->emit_load_and_free_local(valueTmp);
-    m_comp->emit_pop_top();
+    emit_pop_top();
 
     m_comp->emit_free_local(fastTmp);
 }
@@ -3618,7 +4579,7 @@ void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *lo
     // TODO: It'd be nice to inline this...
     auto processValue = m_comp->emit_define_label();
 
-    m_comp->emit_for_next(processValue, iterValue);
+    emit_for_next(processValue, iterValue);
 
     int_error_check("for_iter failed");
 
@@ -3634,23 +4595,23 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
         case PyCmp_IS_NOT:
             //    TODO: Inlining this would be nice, but then we need the dec refs, e.g.:
             if (can_optimize_pop_jump(i)) {
-                m_comp->emit_is_push_int(compareType != PyCmp_IS);
+                emit_is_push_int(compareType != PyCmp_IS);
                 dec_stack(); // popped 2, pushed 1
                 branch(i);
             }
             else {
-                m_comp->emit_is(compareType != PyCmp_IS);
+                emit_is(compareType != PyCmp_IS);
                 dec_stack();
             }
             break;
         case PyCmp_IN:
             if (can_optimize_pop_jump(i)) {
-                m_comp->emit_in_push_int();
+                emit_in_push_int();
                 dec_stack(2);
                 branch_or_error(i);
             }
             else {
-                m_comp->emit_in();
+                emit_in();
                 dec_stack(2);
                 error_check("in failed");
                 inc_stack();
@@ -3658,12 +4619,12 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
             break;
         case PyCmp_NOT_IN:
             if (can_optimize_pop_jump(i)) {
-                m_comp->emit_not_in_push_int();
+                emit_not_in_push_int();
                 dec_stack(2);
                 branch_or_error(i);
             }
             else {
-                m_comp->emit_not_in();
+                emit_not_in();
                 dec_stack(2);
                 error_check("not in failed");
                 inc_stack();
@@ -3671,14 +4632,14 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
             break;
         case PyCmp_EXC_MATCH:
             if (get_extended_opcode(i + sizeof(_Py_CODEUNIT)) == POP_JUMP_IF_FALSE) {
-                m_comp->emit_compare_exceptions_int();
+                emit_compare_exceptions_int();
                 dec_stack(2);
                 branch_or_error(i);
             }
             else {
                 // this will actually not currently be reached due to the way
                 // CPython generates code, but is left for completeness.
-                m_comp->emit_compare_exceptions();
+                emit_compare_exceptions();
                 dec_stack(2);
                 error_check("exc match failed");
                 inc_stack();
@@ -3691,10 +4652,20 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
                 if (stackInfo[stackInfo.size() - 1].Value->kind() == AVK_Float &&
                     stackInfo[stackInfo.size() - 2].Value->kind() == AVK_Float) {
 
-                    _ASSERTE(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
-                    _ASSERTE(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
+                    assert(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
+                    assert(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
 
-                    m_comp->emit_compare_float(compareType);
+					CompareType ct;
+					switch (compareType) {
+					case Py_EQ:  ct = CT_Equal; break;
+					case Py_LT: ct = CT_LessThan; break;
+					case Py_LE: ct = CT_LessThanEqual; break;
+					case Py_NE: ct = CT_NotEqual; break;
+					case Py_GT: ct = CT_GreaterThan; break;
+					case Py_GE: ct = CT_GreaterThanEqual; break;
+					}
+
+                    m_comp->emit_compare_float(ct);
                     dec_stack();
 
                     if (can_optimize_pop_jump(i)) {
@@ -3702,14 +4673,14 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
                     }
                     else {
                         // push Python bool onto the stack
-                        m_comp->emit_box_bool();
+                        emit_box_bool();
                     }
                     return;
                 }
                 else if (stackInfo[stackInfo.size() - 1].Value->kind() == AVK_Integer &&
                     stackInfo[stackInfo.size() - 2].Value->kind() == AVK_Integer) {
 
-                    m_comp->emit_compare_tagged_int(compareType);
+                    emit_compare_tagged_int(compareType);
                     dec_stack();
 
                     if (can_optimize_pop_jump(i)) {
@@ -3717,7 +4688,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
                     }
                     else {
                         // push Python bool onto the stack
-                        m_comp->emit_box_bool();
+                        emit_box_bool();
                     }
                     return;
                 }
@@ -3725,7 +4696,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
 
             bool generated = false;
             if (can_optimize_pop_jump(i)) {
-                generated = m_comp->emit_compare_object_push_int(compareType);
+                generated = emit_compare_object_push_int(compareType);
                 if (generated) {
                     dec_stack(2);
                     branch_or_error(i);
@@ -3733,7 +4704,7 @@ void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
             }
 
             if (!generated) {
-                m_comp->emit_compare_object(compareType);
+                emit_compare_object(compareType);
                 dec_stack(2);
                 error_check("compare failed");
                 inc_stack();
@@ -3755,9 +4726,9 @@ void AbstractInterpreter::load_fast(int local, int opcodeIndex) {
         }
         else if (kind == AVK_Integer) {
             m_comp->emit_load_local(get_optimized_local(local, AVK_Any));
-            m_comp->emit_dup();
-            m_comp->emit_incref(true);
-            inc_stack();
+			m_comp->emit_dup();
+			emit_incref(true);
+			inc_stack();
             return;
         }
     }
@@ -3768,7 +4739,7 @@ void AbstractInterpreter::load_fast(int local, int opcodeIndex) {
 }
 
 void AbstractInterpreter::load_fast_worker(int local, bool checkUnbound) {
-    m_comp->emit_load_fast(local);
+    emit_load_fast(local);
 
     if (checkUnbound) {
         Label success = m_comp->emit_define_label();
@@ -3780,7 +4751,7 @@ void AbstractInterpreter::load_fast_worker(int local, bool checkUnbound) {
 
         m_comp->emit_ptr(PyTuple_GetItem(m_code->co_varnames, local));
 
-        m_comp->emit_unbound_local_check();
+        emit_unbound_local_check();
         
         branch_raise();
 
@@ -3789,7 +4760,7 @@ void AbstractInterpreter::load_fast_worker(int local, bool checkUnbound) {
     }
 
     m_comp->emit_dup();
-    m_comp->emit_incref(false);
+    emit_incref(false);
 }
 
 void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
@@ -3799,7 +4770,7 @@ void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
 
     dec_stack();
 
-    m_comp->emit_unpack_ex(valueTmp, size & 0xff, size >> 8, m_sequenceLocals[opcode], listTmp, remainderTmp);
+    emit_unpack_ex(valueTmp, size & 0xff, size >> 8, m_sequenceLocals[opcode], listTmp, remainderTmp);
     // load the iterable, the sizes, and our temporary 
     // storage if we need to iterate over the object, 
     // the list local address, and the remainder address
@@ -3835,7 +4806,7 @@ void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
     }
 
     m_comp->emit_load_and_free_local(valueTmp);
-    m_comp->emit_pop_top();
+    emit_pop_top();
 
     m_comp->emit_free_local(fastTmp);
     m_comp->emit_free_local(remainderTmp);
@@ -3860,7 +4831,7 @@ void AbstractInterpreter::unwind_eh(size_t fromHandler, size_t toHandler) {
         auto& exVars = m_allHandlers[cur].ExVars;
 
         if (exVars.PrevExc.is_valid()) {
-            m_comp->emit_unwind_eh(exVars.PrevExc, exVars.PrevExcVal, exVars.PrevTraceback);
+            emit_unwind_eh(exVars.PrevExc, exVars.PrevExcVal, exVars.PrevTraceback);
         }
 
         cur = m_allHandlers[cur].BackHandler;
@@ -3891,6 +4862,8 @@ LocalKind get_optimized_local_kind(AbstractValueKind kind) {
     switch (kind) {
         case AVK_Float:
             return LK_Float;
+		default:
+			break;
     }
     return LK_Pointer;
 }
@@ -3914,8 +4887,8 @@ void AbstractInterpreter::pop_except() {
     auto block = m_blockStack.back();
     unwind_eh(block.CurrentHandler, m_allHandlers[block.CurrentHandler].BackHandler);
 #ifdef DEBUG_TRACE
-    m_il.ld_i("Exception cleared");
-    m_il.emit_call(METHOD_DEBUG_TRACE);
+    m_comp->emit_ptr("Exception cleared");
+    m_comp->emit_call(METHOD_DEBUG_TRACE);
 #endif
 }
 
@@ -3925,9 +4898,9 @@ void AbstractInterpreter::debug_log(const char* fmt, ...) {
     va_start(args, fmt);
     const int bufferSize = 181;
     char* buffer = new char[bufferSize];
-    vsprintf_s(buffer, bufferSize, fmt, args);
+    vsnprintf(buffer, bufferSize, fmt, args);
     va_end(args);
-    m_comp->emit_debug_msg(buffer);
+    emit_debug_msg(buffer);
 }
 
 EhFlags operator | (EhFlags lhs, EhFlags rhs) {

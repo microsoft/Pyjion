@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="absint.cpp" />
     <ClCompile Include="absvalue.cpp" />
+    <ClCompile Include="cee.cpp" />
     <ClCompile Include="pycomp.cpp" />
     <ClCompile Include="pyjit.cpp" />
     <ClCompile Include="intrins.cpp" />

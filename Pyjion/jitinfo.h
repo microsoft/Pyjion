@@ -28,9 +28,8 @@
 
 
 #define FEATURE_NO_HOST
-#define USE_STL
+
 #include <stdint.h>
-#include <windows.h>
 #include <wchar.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -38,41 +37,36 @@
 #include <limits.h>
 #include <string.h>
 #include <float.h>
-#include <share.h>
 #include <cstdlib>
-#include <intrin.h>
-
-#include <Python.h>
-#include <utilcode.h>
-#include <frameobject.h>
-#include <opcode.h>
-
-#include <vector>
-#include <unordered_map>
 
 #include <corjit.h>
-#include <utilcode.h>
 #include <openum.h>
 
-#include "codemodel.h"
 #include "cee.h"
 #include "ipycomp.h"
 
 using namespace std;
 
+CorInfoType to_clr_type(LocalKind kind) {
+    switch (kind) {
+    case LK_Float: return CORINFO_TYPE_DOUBLE;
+    case LK_Int: return CORINFO_TYPE_INT;
+    case LK_Bool: return CORINFO_TYPE_BOOL;
+	default: return CORINFO_TYPE_NATIVEINT;
+    }    
+}
+
 class CorJitInfo : public ICorJitInfo, public JittedCode {
     CExecutionEngine& m_executionEngine;
     void* m_codeAddr;
     void* m_dataAddr;
-    PyCodeObject *m_code;
-    UserModule* m_module;
+	IMethod* m_method;
 
 public:
 
-    CorJitInfo(CExecutionEngine& executionEngine, PyCodeObject* code, UserModule* module) : m_executionEngine(executionEngine) {
+    CorJitInfo(CExecutionEngine& executionEngine, IMethod* method) : m_executionEngine(executionEngine) {
         m_codeAddr = m_dataAddr = nullptr;
-        m_code = code;
-        m_module = module;
+        m_method = method;
     }
 
     ~CorJitInfo() {
@@ -80,9 +74,9 @@ public:
             freeMem(m_codeAddr);
         }
         if (m_dataAddr != nullptr) {
-            ::GlobalFree(m_dataAddr);
+            free(m_dataAddr);
         }
-        delete m_module;
+        delete m_method;
     }
 
     void* get_code_addr() {
@@ -95,7 +89,7 @@ public:
     }
 
     void freeMem(PVOID code) {
-        HeapFree(m_executionEngine.m_codeHeap, 0, code);
+		m_executionEngine.FreeExecutable(code);
     }
 
     virtual void allocMem(
@@ -111,11 +105,10 @@ public:
         //printf("allocMem\r\n");
         // TODO: Alignment?
         //printf("Code size: %d\r\n", hotCodeSize);
-        auto code = HeapAlloc(m_executionEngine.m_codeHeap, 0, hotCodeSize);
+		auto code = m_executionEngine.AllocExecutable(hotCodeSize);
         *hotCodeBlock = m_codeAddr = code;
         if (roDataSize != 0) {
-            // TODO: This mem needs to be freed...
-            *roDataBlock = m_dataAddr = GlobalAlloc(0, roDataSize);
+            *roDataBlock = m_dataAddr = malloc(roDataSize);
         }
     }
 
@@ -363,14 +356,14 @@ public:
         void                  **ppIndirection = NULL
         ) {
         switch (ftnNum) {
-            case CORINFO_HELP_THROW: return &ThrowFunc;
-            case CORINFO_HELP_FAIL_FAST: return &FailFast;
+            case CORINFO_HELP_THROW: return (void*)&ThrowFunc;
+            case CORINFO_HELP_FAIL_FAST: return (void*)&FailFast;
             case CORINFO_HELP_DBLREM:
-                auto res = (double(*)(double, double))&fmod;
-                return res;
-        }
-        printf("unknown getHelperFtn\r\n");
-        return NULL;
+                return (void*)(double(*)(double, double))&fmod;
+			default:
+				printf("unknown getHelperFtn\r\n");
+				return NULL;
+		}
     }
 
     // return a callable address of the function (native code). This function
@@ -380,8 +373,14 @@ public:
         CORINFO_METHOD_HANDLE   ftn,                 /* IN  */
         CORINFO_CONST_LOOKUP *  pResult,             /* OUT */
         CORINFO_ACCESS_FLAGS    accessFlags = CORINFO_ACCESS_ANY) {
-        BaseMethod* method = (BaseMethod*)ftn;
-        method->getFunctionEntryPoint(pResult);
+        IMethod* method = (IMethod*)ftn;
+        auto indir = method->get_indirect_addr();
+        if (indir != nullptr) {
+            pResult->accessType = IAT_PVALUE;
+            pResult->addr = indir;
+        }
+        else {
+        }
     }
 
     // return a directly callable address. This can be used similarly to the
@@ -558,10 +557,22 @@ public:
         //out params
         CORINFO_CALL_INFO       *pResult
         ) {
-        auto method = (BaseMethod*)pResolvedToken->hMethod;
+        auto method = (IMethod*)pResolvedToken->hMethod;
         pResult->hMethod = (CORINFO_METHOD_HANDLE)method;
 
-        method->get_call_info(pResult);
+        void *indir = method->get_indirect_addr();
+        if (indir != nullptr) {
+            pResult->codePointerLookup.lookupKind.needsRuntimeLookup = false;
+            // TODO: If we use IAT_VALUE we need to generate a jump stub
+            pResult->codePointerLookup.constLookup.accessType = IAT_PVALUE;
+            pResult->codePointerLookup.constLookup.addr = indir;
+            pResult->verMethodFlags = pResult->methodFlags = CORINFO_FLG_STATIC;
+            pResult->kind = CORINFO_CALL;
+            pResult->sig.args = (CORINFO_ARG_LIST_HANDLE)method->get_params();
+            pResult->sig.retType = to_clr_type(method->get_return_type());
+            pResult->sig.numArgs = method->get_param_count();
+        }
+
         pResult->nullInstanceCheck = false;
         pResult->sig.callConv = CORINFO_CALLCONV_DEFAULT;
         pResult->sig.retTypeClass = nullptr;
@@ -702,8 +713,7 @@ public:
         CORINFO_METHOD_HANDLE       ftn         /* IN */
         ) {
         //printf("getMethodAttribs\r\n");
-        auto method = (BaseMethod*)ftn;
-        return method->get_method_attrs();
+        return CORINFO_FLG_NOSECURITYWRAP | CORINFO_FLG_STATIC | CORINFO_FLG_NATIVE;;
     }
 
     // sets private JIT flags, which can be, retrieved using getAttrib.
@@ -723,9 +733,14 @@ public:
         CORINFO_SIG_INFO          *sig,        /* OUT */
         CORINFO_CLASS_HANDLE      memberParent = NULL /* IN */
         ) {
-        BaseMethod* m = (BaseMethod*)ftn;
+        IMethod* m = (IMethod*)ftn;
         //printf("getMethodSig %p\r\n", ftn);
-        m->findSig(sig);
+
+        sig->retType = to_clr_type(m->get_return_type());
+        sig->callConv = CORINFO_CALLCONV_STDCALL;
+        sig->retTypeClass = nullptr;
+        sig->args = (CORINFO_ARG_LIST_HANDLE)m->get_params();
+        sig->numArgs = m->get_param_count();
     }
 
     /*********************************************************************
@@ -1059,8 +1074,8 @@ public:
 
     // Resolve metadata token into runtime method handles.
     virtual void resolveToken(/* IN, OUT */ CORINFO_RESOLVED_TOKEN * pResolvedToken) {
-        Module* mod = (Module*)pResolvedToken->tokenScope;
-        BaseMethod* method = mod->ResolveMethod(pResolvedToken->token);
+        IModule* mod = (IModule*)pResolvedToken->tokenScope;
+        IMethod* method = mod->ResolveMethod(pResolvedToken->token);
         pResolvedToken->hMethod = (CORINFO_METHOD_HANDLE)method;
         pResolvedToken->hClass = (CORINFO_CLASS_HANDLE)1; // this just suppresses a JIT assert
         //printf("resolveToken %d\r\n", pResolvedToken->token);
@@ -1084,9 +1099,14 @@ public:
         CORINFO_SIG_INFO           *sig         /* OUT */
         ) {
         printf("findSig %d\r\n", sigTOK);
-        auto mod = (Module*)module;
+        auto mod = (IModule*)module;
         auto method = mod->ResolveMethod(sigTOK);
-        method->findSig(sig);
+
+        sig->retType = to_clr_type(method->get_return_type());
+        sig->callConv = CORINFO_CALLCONV_STDCALL;
+        sig->retTypeClass = nullptr;
+        sig->args = (CORINFO_ARG_LIST_HANDLE)method->get_params();
+        sig->numArgs = method->get_param_count();
     }
 
     // for Varargs, the signature at the call site may differ from
@@ -1767,7 +1787,7 @@ public:
         ) {
         //printf("getArgType %p\r\n", args);
         *vcTypeRet = nullptr;
-        return (CorInfoTypeWithMod)((Parameter*)args)->m_type;
+        return (CorInfoTypeWithMod)to_clr_type(((Parameter*)args)->m_type);
     }
 
     // If the Arg is a CORINFO_TYPE_CLASS fetch the class handle associated with it
