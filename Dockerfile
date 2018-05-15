@@ -25,21 +25,7 @@ RUN mkdir /opt/pyjion
 ADD . /opt/pyjion
 WORKDIR /opt/pyjion
 
-RUN git submodule update --init CoreCLR
-RUN git submodule update --init Python
-RUN git submodule update --init Tests/Catch
 RUN echo fs.file-max = 100000 > /etc/sysctl.conf
 RUN sysctl -p
 
-WORKDIR /opt/pyjion/CoreCLR
-# || true is because build.sh fails but all the stuff we care about is there.
-RUN ./build.sh || true
-
-WORKDIR /opt/pyjion/Python
-RUN ./configure
-RUN make
-
-WORKDIR /opt/pyjion/Pyjion
-RUN ./make.sh
-
-CMD /opt/pyjion/Python/python
+CMD /bin/bash

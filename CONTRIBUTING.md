@@ -58,3 +58,53 @@ The `DebugBuild.bat` file will build Pyjion in debug mode for x64 and copy the a
 
 ### Known Issues
 You'll need to run `git clean -d -f -x` in CoreCLR when switching between release and debug builds.
+
+
+## Contributing to experimental Linux build
+
+Rudimentary Linux support has been mostly tested on Windows with WSL. We've provided a Dockerfile with a pre-configured Ubuntu system containing the correct dependencies for CoreCLR. Here's how to use it:
+
+Clone the repo and it's dependencies and check out the experimental Linux branch:
+
+```
+git clone --recursive git@github.com:Microsoft/Pyjion.git
+cd Pyjion
+git checkout linux
+```
+
+Build and run the Docker image:
+
+```
+docker build . -t pyjion
+docker run -it --name pyjion --mount type=bind,source=$(pwd),target=/opt/pyjion pyjion
+```
+
+Inside the docker container, build the Pyjion dependencies (CoreCLR and Python):
+
+```
+./BuildDeps.sh
+cd Pyjion
+./make.sh
+```
+
+Run Python and import pyjion to see it working:
+
+```
+$ ../Python/python
+>>> import pyjion
+```
+
+Hack on the Pyjion code, your container will be updated with your file's changes. Run `make.sh` as needed.
+
+In order to avoid rebuilding your container after building, you may want to save the image after running the above commands:
+
+```
+docker commit pyjion pyjion:built
+```
+
+And when you come back later:
+
+```
+docker run -it --name pyjion --mount type=bind,source=$(pwd),target=/opt/pyjion pyjion:built
+```
+
