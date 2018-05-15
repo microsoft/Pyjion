@@ -12,4 +12,6 @@
 *.opensdf
 *.sdf
 *.opendb
+**/*.o
+**/*.so
 *.VC.db
