@@ -334,6 +334,12 @@ public:
 	UserMethod() {
 	}
 
+	~UserMethod() {
+		if (m_module != nullptr) {
+			delete m_module;
+		}
+	}
+
 	virtual IModule* get_module() {
 		return m_module;
 	}
@@ -372,7 +378,7 @@ class DLL_EXPORT AbstractInterpreter {
 	// Tracks the interpreter state before each opcode
 	unordered_map<size_t, InterpreterState> m_startStates;
 	AbstractValue* m_returnValue;
-	Method* m_method;
+	IMethod* m_method;
 
 	// ** Inputs:
 	PyCodeObject* m_code;
@@ -485,7 +491,6 @@ private:
 
 	void make_function(int oparg);
 	void emit_debug_msg(const char * message);
-	void fancy_call(int na, int nk, int flags);
 	bool can_skip_lasti_update(int opcodeIndex);
 	void build_tuple(size_t argCnt);
 	void extend_tuple(size_t argCnt);

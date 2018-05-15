@@ -35,9 +35,7 @@
 #include <limits.h>
 #include <string.h>
 #include <float.h>
-//#include <share.h>
 #include <cstdlib>
-//#include <intrin.h>
 
 #include <Python.h>
 #include <frameobject.h>

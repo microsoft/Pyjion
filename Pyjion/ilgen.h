@@ -372,7 +372,7 @@ public:
 #ifdef _TARGET_AMD64_
         if ((value & 0xFFFFFFFF) == value) {
             ld_i((int)value);
-        }
+		}
         else {
             m_il.push_back(CEE_LDC_I8);
             m_il.push_back(value & 0xff);
@@ -568,6 +568,9 @@ private:
     }
 
 	void dump() {
+		for (auto i = 0; i < m_locals.size(); i++) {
+			pyjit_log("Local %d: %s\n", i, LK_ToString(m_locals[i].m_type));
+		}
 		dumpILRange(&m_il[0], m_il.size());
 	}
 

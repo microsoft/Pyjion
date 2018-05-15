@@ -10,6 +10,7 @@
  */
 #ifdef PLATFORM_UNIX
 #include <sys/mman.h>
+#include <unistd.h>
 #endif
 
 #include <cstdarg>
@@ -18,6 +19,9 @@
 #ifdef PLATFORM_UNIX
 int g_executableMmapProt = PROT_READ | PROT_WRITE | PROT_EXEC;
 int g_privateAnonMmapFlags = MAP_PRIVATE | MAP_ANONYMOUS;
+size_t pyjit_pagesize() {
+	return sysconf(_SC_PAGESIZE);
+}
 #endif
 
 int pyjit_log(const char *__restrict format, ...) {
@@ -28,4 +32,5 @@ int pyjit_log(const char *__restrict format, ...) {
 	va_end(arglist);
 	return res;
 }
+
 

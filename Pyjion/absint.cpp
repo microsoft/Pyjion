@@ -43,12 +43,12 @@
 
 
 AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, CompilerFactory* compFactory) : m_code(code) {
-    m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
-    m_size = PyBytes_Size(code->co_code);
+    m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);	
+	m_size = PyBytes_Size(code->co_code);
     m_returnValue = &Undefined;
     if (compFactory != nullptr) {
 		m_module = new UserModule(g_module);
-		m_method = new Method(m_module, LK_Pointer, std::vector <Parameter> {Parameter(LK_Pointer), Parameter(LK_Pointer) }, nullptr);
+		m_method = new UserMethod(m_module, LK_Pointer, std::vector <Parameter> {Parameter(LK_Pointer), Parameter(LK_Pointer) });
 		m_comp = compFactory(m_method);
 		m_lasti = m_comp->emit_define_local(LK_Pointer);
 
@@ -207,7 +207,7 @@ void AbstractInterpreter::emit_box_tagged_ptr() {
 }
 
 void AbstractInterpreter::emit_for_next(Label processValue, Local iterValue) {
-	auto error = m_comp->emit_define_local(LK_Float);
+	auto error = m_comp->emit_define_local(LK_Int);
 	m_comp->emit_load_local_addr(error);
 
 	/*
@@ -989,7 +989,7 @@ void AbstractInterpreter::emit_incref(bool maybeTagged) {
 
 AbstractInterpreter::~AbstractInterpreter() {
     // clean up any dynamically allocated objects...
-	// TODO: Free m_comp
+	delete m_comp;
     for (auto source : m_sources) {
         delete source;
     }

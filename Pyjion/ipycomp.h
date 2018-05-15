@@ -26,6 +26,7 @@
 #ifndef IPYCOMP_H
 #define IPYCOMP_H
 
+#include <stddef.h>
 
 class Local {
 public:
@@ -77,6 +78,8 @@ enum LocalKind {
 	LK_Bool,
 	LK_Void
 };
+
+extern const char* LK_ToString(LocalKind localKind);
 
 class IModule {
 public:
@@ -254,6 +257,9 @@ public:
 	}
 	virtual void emit_call(void* func) = 0;
 	virtual void emit_call(int token) = 0;
+
+	virtual ~IPythonCompiler() {
+	}
 };
 
 typedef IPythonCompiler* (CompilerFactory)(IMethod* method);
