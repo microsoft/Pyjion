@@ -35,6 +35,7 @@
 #ifndef PLATFORM_UNIX
 #include <Windows.h>
 #endif
+#include <stdarg.h>
 
 using namespace std;
 
@@ -43,6 +44,7 @@ HINSTANCE            g_pMSCorEE;
 #endif
 
 IPythonCompiler* CreateCLRCompiler(IMethod* method);
+
 
 // Tracks types for a function call.  Each argument has a SpecializedTreeNode with
 // children for the subsequent arguments.  When we get to the leaves of the tree

@@ -33,7 +33,7 @@ IExecutionEngine* __stdcall IEE() {
 
 #ifndef PLATFORM_UNIX
 HRESULT __stdcall GetCORSystemDirectoryInternal(SString& pbuffer) {
-	printf("get cor system\n");
+	pyjit_log("get cor system\n");
 	return S_OK;
 }
 #endif
@@ -48,7 +48,7 @@ void CeeInit() {
 #endif
 	cccallbacks.m_pfnIEE = IEE;
 	cccallbacks.m_pfnGetCLRFunction = GetCLRFunction;
-
+	
 	InitUtilcode(cccallbacks);
 	// TODO: We should re-enable contracts and handle exceptions from OOM
 	// and just fail the whole compilation if we hit that.  Right now we
