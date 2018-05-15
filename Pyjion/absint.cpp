@@ -57,7 +57,6 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, CompilerFactory* co
         m_errorCheckLocal = m_comp->emit_define_local();
     }
     init_starting_state();
-	dump();
 }
 
 void AbstractInterpreter::emit_lasti_init() {

@@ -2571,13 +2571,21 @@ class GlobalMethod : IMethod {
 	vector<Parameter> m_params;
 	LocalKind m_retType;
 	void* m_addr;
+	const char* m_name;
 public:
-	GlobalMethod(LocalKind returnType, std::vector<Parameter> params, void* addr) {
+	GlobalMethod(LocalKind returnType, std::vector<Parameter> params, void* addr, const char* name) {
 		int token = BASE_INDEX + g_module.m_tokenToMethod.size();
 
+		m_addr = addr;
 		g_module.m_tokenToMethod[token] = this;
 		g_module.m_methodAddrToToken[addr] = token;
-		
+		m_retType = returnType;
+		m_params = params;
+		m_name = name;
+	}
+
+	virtual const char* get_name() {
+		return m_name;
 	}
 
 	virtual IModule* get_module() {
@@ -2609,7 +2617,7 @@ public:
 };
 
 #define GLOBAL_METHOD(addr, returnType, ...) \
-    GlobalMethod g ## addr(returnType, std::vector<Parameter>{__VA_ARGS__}, (void*)&addr);
+    GlobalMethod g ## addr(returnType, std::vector<Parameter>{__VA_ARGS__}, (void*)&addr, #addr);
 
 GLOBAL_METHOD(PyJit_Add, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
 GLOBAL_METHOD(PyJit_Subscr, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));

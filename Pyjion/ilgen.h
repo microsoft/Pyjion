@@ -44,6 +44,11 @@
 #include <openum.h>
 
 #include "ipycomp.h"
+#include "bridge.h"
+
+extern const signed char    opcodeSizes[];
+extern const char * const   opcodeNames[];
+extern const BYTE           opcodeArgKinds[];
 
 template<typename T> struct simple_vector {
 	T* m_items;
@@ -69,7 +74,7 @@ public:
 			T* newItems = (T*)malloc(sizeof(T) * newCount);
 			
 			if (m_items != nullptr) {
-				memcpy(newItems, m_items, sizeof(T));
+				memcpy(newItems, m_items, m_count * sizeof(T));
 				free(m_items);
 			}
 
@@ -96,7 +101,7 @@ public:
 };
 
 class ILGenerator {
-    simple_vector<Parameter> m_params, m_locals;
+    simple_vector<Parameter> m_locals;
 	simple_vector<Local> m_freedLocals[CORINFO_TYPE_COUNT];
 	IMethod* m_method;
 
@@ -406,9 +411,6 @@ public:
     }
 
     void ld_loc(Local param) {
-		if (param.m_index == -1) {
-			printf("Fail\r\n");
-		}
         ld_loc(param.m_index);
     }
 
@@ -485,7 +487,7 @@ public:
         methodInfo.regionKind = CORINFO_REGION_JIT;
         methodInfo.args = CORINFO_SIG_INFO{ CORINFO_CALLCONV_DEFAULT };
         methodInfo.args.args = (CORINFO_ARG_LIST_HANDLE)(m_method->get_param_count() == 0 ? nullptr : &m_method->get_params()[0]);
-        methodInfo.args.numArgs = m_params.size();
+        methodInfo.args.numArgs = m_method->get_param_count();
         methodInfo.args.retType = to_clr_type(m_method->get_return_type());
         methodInfo.args.retTypeClass = nullptr;
         methodInfo.locals = CORINFO_SIG_INFO{ CORINFO_CALLCONV_DEFAULT };
@@ -565,6 +567,212 @@ private:
         m_il.push_back(b);
     }
 
+	void dump() {
+		dumpILRange(&m_il[0], m_il.size());
+	}
+
+	void dumpILRange(const BYTE* const codeAddr, unsigned codeSize) {
+		for (size_t offs = 0; offs < codeSize; ) {
+			char prefix[100];
+			sprintf_s(prefix, sizeof(prefix), "IL_%04x ", offs);
+			unsigned codeBytesDumped = dumpSingleInstr(codeAddr, offs, prefix);
+			offs += codeBytesDumped;
+		}
+	}
+
+	void dumpILBytes(const BYTE* const codeAddr, unsigned codeSize, unsigned  alignSize) {
+		for (size_t offs = 0; offs < codeSize; ++offs) {
+			pyjit_log(" %02x", *(codeAddr + offs));
+		}
+
+		unsigned charsWritten = 3 * codeSize;
+		for (unsigned i = charsWritten; i < alignSize; i++) {
+			pyjit_log(" ");
+		}
+	}
+
+
+	inline unsigned __int8 getU1LittleEndian(const BYTE * ptr) {
+		return *(UNALIGNED unsigned __int8 *)ptr;
+	}
+
+	inline unsigned __int16    getU2LittleEndian(const BYTE * ptr) {
+		return *(UNALIGNED unsigned __int16 *)ptr;
+	}
+
+	inline unsigned __int32    getU4LittleEndian(const BYTE * ptr) {
+		return *(UNALIGNED unsigned __int32*)ptr;
+	}
+
+	inline signed __int8     getI1LittleEndian(const BYTE * ptr) {
+		return *(UNALIGNED signed __int8 *)ptr;
+	}
+
+	inline signed __int16    getI2LittleEndian(const BYTE * ptr) {
+		return *(UNALIGNED signed __int16 *)ptr;
+	}
+
+	inline signed __int32    getI4LittleEndian(const BYTE * ptr) {
+		return *(UNALIGNED signed __int32*)ptr;
+	}
+
+	inline signed __int64    getI8LittleEndian(const BYTE * ptr) {
+		return *(UNALIGNED signed __int64*)ptr;
+	}
+
+	inline float               getR4LittleEndian(const BYTE * ptr) {
+		__int32 val = getI4LittleEndian(ptr);
+		return *(float *)&val;
+	}
+
+	inline double              getR8LittleEndian(const BYTE * ptr) {
+		__int64 val = getI8LittleEndian(ptr);
+		return *(double *)&val;
+	}
+
+
+	//------------------------------------------------------------------------
+	// dumpSingleInstr: Display a single IL instruction.
+	//
+	// Arguments:
+	//    codeAddr  - Base pointer to a stream of IL instructions.
+	//    offs      - Offset from codeAddr of the IL instruction to display.
+	//    prefix    - Optional string to prefix the IL instruction with (if nullptr, no prefix is output).
+	// 
+	// Return Value:
+	//    Size of the displayed IL instruction in the instruction stream, in bytes. (Add this to 'offs' to
+	//    get to the next instruction.)
+	// 
+	unsigned
+		dumpSingleInstr(const BYTE* const codeAddr, size_t offs, const char* prefix)
+	{
+		const BYTE  *        opcodePtr = codeAddr + offs;
+		const BYTE  *   startOpcodePtr = opcodePtr;
+		const unsigned ALIGN_WIDTH = 3 * 6; // assume 3 characters * (1 byte opcode + 4 bytes data + 1 prefix byte) for most things
+
+		if (prefix != NULL)
+			pyjit_log("%s", prefix);
+
+		OPCODE      opcode = (OPCODE)getU1LittleEndian(opcodePtr);
+		opcodePtr += 1;
+
+	DECODE_OPCODE:
+
+		if (opcode >= CEE_COUNT)
+		{
+			pyjit_log("\nIllegal opcode: %02X\n", (int)opcode);
+			return (size_t)(opcodePtr - startOpcodePtr);
+		}
+
+		/* Get the size of additional parameters */
+
+		size_t      sz = opcodeSizes[opcode];
+		unsigned    argKind = opcodeArgKinds[opcode];
+
+		/* See what kind of an opcode we have, then */
+
+		switch (opcode)
+		{
+		case CEE_PREFIX1:
+			opcode = OPCODE(getU1LittleEndian(opcodePtr) + 256);
+			opcodePtr += sizeof(__int8);
+			goto DECODE_OPCODE;
+		case CEE_CALL:
+		{
+			dumpILBytes(startOpcodePtr, (unsigned)((opcodePtr - startOpcodePtr) + sz), ALIGN_WIDTH);
+			auto method = getI4LittleEndian(opcodePtr);
+			auto methodObj = this->m_method->get_module()->ResolveMethod(method);
+			const char * name = methodObj->get_name();
+			if (name != nullptr) {
+				pyjit_log(" %-12s %s ", opcodeNames[opcode], name);
+				pyjit_log(" (pops %d, pushes %d)", methodObj->get_param_count(), methodObj->get_return_type() == LK_Void ? 0 : 1);
+				opcodePtr += 4;
+			}
+			else {
+				goto no_method_name;
+			}
+			break;
+		}
+		default:
+		{
+			no_method_name:
+			__int64     iOp;
+			double      dOp;
+			int         jOp;
+			DWORD       jOp2;
+
+			switch (argKind)
+			{
+			case InlineNone:
+				dumpILBytes(startOpcodePtr, (unsigned)(opcodePtr - startOpcodePtr), ALIGN_WIDTH);
+				pyjit_log(" %-12s", opcodeNames[opcode]);
+				break;
+
+			case ShortInlineVar:   iOp = getU1LittleEndian(opcodePtr);  goto INT_OP;
+			case ShortInlineI:   iOp = getI1LittleEndian(opcodePtr);  goto INT_OP;
+			case InlineVar:   iOp = getU2LittleEndian(opcodePtr);  goto INT_OP;
+			case InlineTok:
+			case InlineMethod:
+			case InlineField:
+			case InlineType:
+			case InlineString:
+			case InlineSig:
+			case InlineI:   iOp = getI4LittleEndian(opcodePtr);  goto INT_OP;
+			case InlineI8:   iOp = getU4LittleEndian(opcodePtr);
+				iOp |= (__int64)getU4LittleEndian(opcodePtr + 4) << 32;
+				goto INT_OP;
+
+			INT_OP:
+				dumpILBytes(startOpcodePtr, (unsigned)((opcodePtr - startOpcodePtr) + sz), ALIGN_WIDTH);
+				pyjit_log(" %-12s 0x%X", opcodeNames[opcode], iOp);
+				break;
+
+			case ShortInlineR:  dOp = getR4LittleEndian(opcodePtr);  goto FLT_OP;
+			case InlineR:  dOp = getR8LittleEndian(opcodePtr);  goto FLT_OP;
+
+			FLT_OP:
+				dumpILBytes(startOpcodePtr, (unsigned)((opcodePtr - startOpcodePtr) + sz), ALIGN_WIDTH);
+				pyjit_log(" %-12s %f", opcodeNames[opcode], dOp);
+				break;
+
+			case ShortInlineBrTarget:  jOp = getI1LittleEndian(opcodePtr);  goto JMP_OP;
+			case InlineBrTarget:       jOp = getI4LittleEndian(opcodePtr);  goto JMP_OP;
+
+			JMP_OP:
+				dumpILBytes(startOpcodePtr, (unsigned)((opcodePtr - startOpcodePtr) + sz), ALIGN_WIDTH);
+				pyjit_log(" %-12s %d (IL_%04x)",
+					opcodeNames[opcode],
+					jOp,
+					(int)(opcodePtr + sz - codeAddr) + jOp);
+				break;
+
+			case InlineSwitch:
+				jOp2 = getU4LittleEndian(opcodePtr);
+				opcodePtr += 4;
+				opcodePtr += jOp2 * 4; // Jump over the table
+				dumpILBytes(startOpcodePtr, (unsigned)(opcodePtr - startOpcodePtr), ALIGN_WIDTH);
+				pyjit_log(" %-12s", opcodeNames[opcode]);
+				break;
+
+			case InlinePhi:
+				jOp2 = getU1LittleEndian(opcodePtr);
+				opcodePtr += 1;
+				opcodePtr += jOp2 * 2; // Jump over the table
+				dumpILBytes(startOpcodePtr, (unsigned)(opcodePtr - startOpcodePtr), ALIGN_WIDTH);
+				pyjit_log(" %-12s", opcodeNames[opcode]);
+				break;
+
+			default: assert(!"Bad argKind");
+			}
+
+			opcodePtr += sz;
+			break;
+		}
+		}
+
+		pyjit_log("\n");
+		return (size_t)(opcodePtr - startOpcodePtr);
+	}
 
 };
 

@@ -26,6 +26,7 @@
 #include "pycomp.h"
 #include <corjit.h>
 #include <openum.h>
+#include "bridge.h"
 
 //#define DEBUG_TRACE
 

@@ -103,6 +103,10 @@ public:
 	virtual LocalKind get_return_type() = 0;
 	virtual IModule* get_module() = 0;
 	
+	virtual const char* get_name() {
+		return nullptr;
+	}
+
 	virtual void* get_addr() {
 		return nullptr;
 	}

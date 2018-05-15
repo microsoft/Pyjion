@@ -42,6 +42,7 @@
 #include "corjit.h"
 #include "openum.h"
 
+#include "bridge.h"
 
 #define DUMMY_CODE_HEAP (HANDLE)0x12345679
 class CExecutionEngine : public IExecutionEngine, public IEEMemoryManager {
@@ -359,8 +360,9 @@ public:
 
     HANDLE ClrGetProcessExecutableHeap() {
 #ifdef PLATFORM_UNIX
+		pyjit_log("Getting executable heap...\n");
 		return DUMMY_CODE_HEAP;
-#else
+#else		
         return m_codeHeap;
 #endif
     }
@@ -368,7 +370,7 @@ public:
 	void* AllocExecutable(ULONG size) {
 #ifdef PLATFORM_UNIX
 		// TODO: Implement a heap on top of VirtualAlloc
-		return ::VirtualAlloc(0, size, MEM_RESERVE_EXECUTABLE, PAGE_EXECUTE_READWRITE);
+		return mmap(NULL, size, g_executableMmapProt, g_privateAnonMmapFlags, -1, 0);
 #else
 		return HeapAlloc(m_codeHeap, 0, size); 
 #endif
@@ -376,7 +378,7 @@ public:
 
 	BOOL FreeExecutable(PVOID code) {
 #ifdef PLATFORM_UNIX
-		return ::VirtualFree(code, 0, MEM_RELEASE);
+		return munmap(code, 0);
 #else
 		return HeapFree(m_codeHeap, 0, code);
 #endif

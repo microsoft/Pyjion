@@ -25,10 +25,12 @@
     <ClCompile Include="pycomp.cpp" />
     <ClCompile Include="pyjit.cpp" />
     <ClCompile Include="intrins.cpp" />
+    <ClCompile Include="bridge.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="absint.h" />
     <ClInclude Include="absvalue.h" />
+    <ClInclude Include="bridge.h" />
     <ClInclude Include="cee.h" />
     <ClInclude Include="codemodel.h" />
     <ClInclude Include="cowvector.h" />

@@ -52,6 +52,7 @@ CorInfoType to_clr_type(LocalKind kind) {
     case LK_Float: return CORINFO_TYPE_DOUBLE;
     case LK_Int: return CORINFO_TYPE_INT;
     case LK_Bool: return CORINFO_TYPE_BOOL;
+	case LK_Void: return CORINFO_TYPE_VOID;
 	default: return CORINFO_TYPE_NATIVEINT;
     }    
 }
@@ -379,8 +380,6 @@ public:
             pResult->accessType = IAT_PVALUE;
             pResult->addr = indir;
         }
-        else {
-        }
     }
 
     // return a directly callable address. This can be used similarly to the
@@ -571,7 +570,7 @@ public:
             pResult->sig.args = (CORINFO_ARG_LIST_HANDLE)method->get_params();
             pResult->sig.retType = to_clr_type(method->get_return_type());
             pResult->sig.numArgs = method->get_param_count();
-        }
+		}
 
         pResult->nullInstanceCheck = false;
         pResult->sig.callConv = CORINFO_CALLCONV_DEFAULT;
