@@ -26,6 +26,7 @@
     <ClCompile Include="pyjit.cpp" />
     <ClCompile Include="intrins.cpp" />
     <ClCompile Include="bridge.cpp" />
+    <ClCompile Include="ipycomp.cpp" />
     <ClCompile Include="pycomp.cpp" />
   </ItemGroup>
   <ItemGroup>

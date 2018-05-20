@@ -245,7 +245,6 @@ public:
     // Performs a comparison of two unboxed floating point values on the stack
     virtual void emit_compare_float(CompareType compareType) = 0;
 
-	virtual void emit_store_int32() = 0;
 	virtual void emit_load_arg(int arg) = 0;
 	virtual void emit_bitwise_and() = 0;
 	/* Compiles the generated code */

@@ -419,7 +419,7 @@ class DLL_EXPORT AbstractInterpreter {
 	vector<bool> m_stack;
 	// Tracks the state of the stack when we perform a branch.  We copy the existing state to the map and
 	// reload it when we begin processing at the stack.
-	unordered_map<int, vector<bool>> m_offsetStack;
+	unordered_map<size_t, vector<bool>> m_offsetStack;
 	// Set of labels used for when we need to raise an error but have values on the stack
 	// that need to be freed.  We have one set of labels which fall through to each other
 	// before doing the raise:

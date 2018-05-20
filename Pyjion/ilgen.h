@@ -497,7 +497,8 @@ public:
     }
 
     void* compile(ICorJitInfo* jitInfo, ICorJitCompiler* jit, int stackSize) {
-        BYTE* nativeEntry;
+		//dump();
+		BYTE* nativeEntry;
         ULONG nativeSizeOfCode;
         CORINFO_METHOD_INFO methodInfo = to_method(stackSize);
         CorJitResult result = jit->compileMethod(
@@ -651,7 +652,7 @@ private:
 	{
 		const BYTE  *        opcodePtr = codeAddr + offs;
 		const BYTE  *   startOpcodePtr = opcodePtr;
-		const unsigned ALIGN_WIDTH = 3 * 6; // assume 3 characters * (1 byte opcode + 4 bytes data + 1 prefix byte) for most things
+		const unsigned ALIGN_WIDTH = 3 * 9; // assume 3 characters * (1 byte opcode + 8 bytes data) for most the things
 
 		if (prefix != NULL)
 			pyjit_log("%s", prefix);
@@ -723,7 +724,9 @@ private:
 			case InlineI:   iOp = getI4LittleEndian(opcodePtr);  goto INT_OP;
 			case InlineI8:   iOp = getU4LittleEndian(opcodePtr);
 				iOp |= (__int64)getU4LittleEndian(opcodePtr + 4) << 32;
-				goto INT_OP;
+				dumpILBytes(startOpcodePtr, (unsigned)((opcodePtr - startOpcodePtr) + sz), ALIGN_WIDTH);
+				pyjit_log(" %-12s 0x%llX", opcodeNames[opcode], iOp);
+				break;
 
 			INT_OP:
 				dumpILBytes(startOpcodePtr, (unsigned)((opcodePtr - startOpcodePtr) + sz), ALIGN_WIDTH);

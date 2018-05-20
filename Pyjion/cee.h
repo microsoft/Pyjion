@@ -315,13 +315,13 @@ public:
         SIZE_T dwInitialSize,  // initial heap size
         SIZE_T dwMaximumSize   // maximum heap size
         ) {
-        return ::ClrHeapCreate(flOptions, dwInitialSize, dwMaximumSize);
+        return ::HeapCreate(flOptions, dwInitialSize, dwMaximumSize);
     }
 
     BOOL ClrHeapDestroy(
         HANDLE hHeap   // handle to heap
         ) {
-        return ::ClrHeapDestroy(hHeap);
+        return ::HeapDestroy(hHeap);
     }
 
     LPVOID ClrHeapAlloc(

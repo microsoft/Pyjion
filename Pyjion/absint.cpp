@@ -69,7 +69,7 @@ void AbstractInterpreter::emit_lasti_init() {
 void AbstractInterpreter::emit_lasti_update(int index) {
 	m_comp->emit_load_local(m_lasti);
 	m_comp->emit_int(index);
-	m_comp->emit_store_int32();
+	m_comp->emit_store_indirect_int32();
 }
 
 void AbstractInterpreter::load_frame() {
@@ -199,7 +199,7 @@ void AbstractInterpreter::emit_box_bool() {
 }
 
 void AbstractInterpreter::emit_box_float() {
-	m_comp->emit_call(PyFloat_FromDouble);
+	m_comp->emit_call(PyJit_Float_FromDouble);
 }
 
 void AbstractInterpreter::emit_box_tagged_ptr() {
@@ -2938,7 +2938,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
         )
     );
 
-    for (size_t i = 0; i < m_code->co_argcount + m_code->co_kwonlyargcount; i++) {
+    for (int i = 0; i < m_code->co_argcount + m_code->co_kwonlyargcount; i++) {
         auto local = get_local_info(0, i);
         if (!local.ValueInfo.needs_boxing()) {
             emit_load_fast(i);
@@ -3948,6 +3948,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
     emit_pop_frame();
 
     m_comp->emit_ret();
+
+	//dump();
 
     auto res = m_comp->emit_compile();
 	if (res == nullptr) {

@@ -2118,7 +2118,7 @@ inline PyObject* init_number(size_t* data, tagged_ptr number) {
 
     // This won't overflow on min int because we never have min int due to the stolen bit
     auto size = 0;
-    auto tmpNumber = labs(number);
+    auto tmpNumber = number < 0 ? -number : number;
     for (int i = 0; i < DIGITS_IN_TAGGED_PTR; i++) {
         ((PyLongObject*)value)->ob_digit[i] = tmpNumber & ((1 << PYLONG_BITS_IN_DIGIT) - 1);
         tmpNumber >>= PYLONG_BITS_IN_DIGIT;
@@ -2203,6 +2203,7 @@ inline PyObject* PyJit_Tagged_Add(tagged_ptr left, tagged_ptr right) {
 
 INIT_TMP_NUMBER(tmpLeft, left);
 INIT_TMP_NUMBER(tmpRight, right);
+auto tmp = PyLong_AsLongLong(tmpLeft);
 // We overflowed big time...
 return safe_return(tmpLeft, left, tmpRight, right, PyNumber_Add(tmpLeft, tmpRight));
 }
@@ -2616,8 +2617,15 @@ public:
 	}
 };
 
+PyObject* PyJit_Float_FromDouble(double val) {
+	return PyFloat_FromDouble(val);
+}
+
 #define GLOBAL_METHOD(addr, returnType, ...) \
     GlobalMethod g ## addr(returnType, std::vector<Parameter>{__VA_ARGS__}, (void*)&addr, #addr);
+
+#define GLOBAL_REF_METHOD(addr, returnType, ...) \
+    GlobalMethod g ## addr(returnType, std::vector<Parameter>{__VA_ARGS__}, (void*)addr, #addr);
 
 GLOBAL_METHOD(PyJit_Add, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
 GLOBAL_METHOD(PyJit_Subscr, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
@@ -2787,9 +2795,9 @@ double(*PyJit_Pow)(double, double) = pow;
 double(*PyJit_Floor)(double) = floor;
 double(*PyJit_FMod)(double, double) = fmod;
 
-GLOBAL_METHOD(PyJit_Pow, LK_Float, Parameter(LK_Float), Parameter(LK_Float));
-GLOBAL_METHOD(PyJit_Floor, LK_Float, Parameter(LK_Float));
-GLOBAL_METHOD(PyJit_FMod, LK_Float, Parameter(LK_Float), Parameter(LK_Float));
+GLOBAL_REF_METHOD(PyJit_Pow, LK_Float, Parameter(LK_Float), Parameter(LK_Float));
+GLOBAL_REF_METHOD(PyJit_Floor, LK_Float, Parameter(LK_Float));
+GLOBAL_REF_METHOD(PyJit_FMod, LK_Float, Parameter(LK_Float), Parameter(LK_Float));
 GLOBAL_METHOD(PyFloat_FromDouble, LK_Pointer, Parameter(LK_Float));
 GLOBAL_METHOD(PyBool_FromLong, LK_Pointer, Parameter(LK_Int));
 GLOBAL_METHOD(PyJit_BoxTaggedPointer, LK_Pointer, Parameter(LK_Pointer));
@@ -2825,3 +2833,4 @@ GLOBAL_METHOD(PyJit_Int_ToFloat, LK_Bool, Parameter(LK_Float), Parameter(LK_Poin
 GLOBAL_METHOD(PyJit_UnicodeJoinArray, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
 GLOBAL_METHOD(PyJit_FormatValue, LK_Pointer, Parameter(LK_Pointer));
 GLOBAL_METHOD(PyJit_FormatObject, LK_Pointer, Parameter(LK_Pointer), Parameter(LK_Pointer));
+GLOBAL_METHOD(PyJit_Float_FromDouble, LK_Pointer, Parameter(LK_Float));
