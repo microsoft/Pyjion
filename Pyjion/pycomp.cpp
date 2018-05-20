@@ -42,7 +42,9 @@ PythonCompiler::PythonCompiler(IMethod* method) :
 }
 
 void PythonCompiler::emit_call(void* func) {
-	m_il.emit_call(m_method->get_module()->ResolveMethodToken(func));
+	auto token = m_method->get_module()->ResolveMethodToken(func);
+	_ASSERTE(token != 0);
+	m_il.emit_call(token);
 }
 
 void PythonCompiler::emit_call(int token) {
@@ -51,10 +53,6 @@ void PythonCompiler::emit_call(int token) {
 
 void PythonCompiler::emit_load_arg(int arg) {
 	m_il.ld_arg(arg);
-}
-
-void PythonCompiler::emit_store_int32() {
-	m_il.st_ind_i4();
 }
 
 Local PythonCompiler::emit_allocate_stack_array(size_t bytes) {
@@ -81,7 +79,7 @@ void PythonCompiler::emit_divide() {
 }
 
 void PythonCompiler::emit_multiply() {
-	m_il.sub();
+	m_il.mul();
 }
 
 // Stores the value on the stack into the array at the specified index

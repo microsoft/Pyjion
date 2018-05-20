@@ -55,45 +55,36 @@ class PythonCompiler : public IPythonCompiler {
 public:
     PythonCompiler(IMethod* method);
 
-	virtual void emit_compare_float(CompareType compareType);
 	virtual void emit_ret();
-    virtual void emit_load_array(int index);
-    virtual void emit_store_to_array(Local array, int index);
 
-    virtual Local emit_spill();
-    virtual void emit_store_local(Local local);
-
+	virtual Local emit_define_local(LocalKind kind = LK_Pointer);
+	virtual void emit_store_local(Local local);
     virtual void emit_load_local(Local local);
     virtual void emit_load_local_addr(Local local);
-    virtual void emit_load_and_free_local(Local local);
-    virtual Local emit_define_local(bool cache);
-    virtual Local emit_define_local(LocalKind kind = LK_Pointer);
-    virtual void emit_free_local(Local local);
-    virtual Local emit_allocate_stack_array(size_t elements);
 
-    virtual void emit_null();
+	virtual Local emit_allocate_stack_array(size_t elements);
+
+	virtual void emit_load_array(int index);
+	virtual void emit_store_to_array(Local array, int index);
+
+	virtual void emit_load_arg(int arg);
 
     virtual Label emit_define_label();
     virtual void emit_mark_label(Label label);
     virtual void emit_branch(BranchType branchType, Label label);
-    virtual void emit_compare_equal();
 
-    virtual void emit_int(int value);
+	virtual void emit_compare_equal();
+	virtual void emit_compare_float(CompareType compareType);
+
+	virtual void emit_null();
+	virtual void emit_int(int value);
     virtual void emit_float(double value);
     virtual void emit_ptr(void *value);
 	virtual void emit_ptr(size_t value);
     virtual void emit_bool(bool value);
 
-	virtual void emit_store_int32();
-	virtual void emit_load_arg(int arg);
-	virtual void emit_add();
-
-    // Pops a value off the stack, performing no operations related to reference counting
     virtual void emit_pop();
-    // Dups the current value on the stack, performing no operations related to reference counting
     virtual void emit_dup();
-
-    virtual JittedCode* emit_compile();
 
 	virtual void emit_call(void* func);
 	virtual void emit_call(int token);
@@ -101,14 +92,23 @@ public:
 	virtual void emit_store_indirect_ptr();
 	virtual void emit_load_indirect_ptr();
 	virtual void emit_load_indirect_double();
-	virtual void emit_negate();
-	virtual void emit_bitwise_and();
 	virtual void emit_load_indirect_int32();
 	virtual void emit_store_indirect_int32();
 
+	virtual void emit_add();
 	virtual void emit_divide();
 	virtual void emit_multiply();
 	virtual void emit_subtract();
+	virtual void emit_negate();
+	virtual void emit_bitwise_and();
+
+	virtual JittedCode* emit_compile();
+
+	// TODO: Pull out of compiler interface
+	virtual Local emit_spill();
+	virtual void emit_load_and_free_local(Local local);
+	virtual void emit_free_local(Local local);
+	virtual Local emit_define_local(bool cache);
 };
 
 #endif

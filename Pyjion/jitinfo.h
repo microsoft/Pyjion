@@ -146,14 +146,14 @@ public:
     virtual void setEHcount(
         unsigned                cEH          /* IN */
         ) {
-        printf("setEHcount\r\n");
+        pyjit_log("setEHcount\r\n");
     }
 
     virtual void setEHinfo(
         unsigned                 EHnumber,   /* IN  */
         const CORINFO_EH_CLAUSE *clause      /* IN */
         ) {
-        printf("setEHinfo\r\n");
+		pyjit_log("setEHinfo\r\n");
     }
 
     virtual BOOL logMsg(unsigned level, const char* fmt, va_list args) {
@@ -166,19 +166,19 @@ public:
     }
 
     int doAssert(const char* szFile, int iLine, const char* szExpr) {
-        printf("Assert: %s %d", szFile, iLine);
+		pyjit_log("Assert: %s %d", szFile, iLine);
         return 0;
     }
 
     virtual void reportFatalError(CorJitResult result) {
-        printf("Fatal error %X\r\n", result);
+		pyjit_log("Fatal error %X\r\n", result);
     }
 
     virtual HRESULT allocBBProfileBuffer(
         ULONG                 count,           // The number of basic blocks that we have
         ProfileBuffer **      profileBuffer
         ) {
-        printf("Alloc bb profile buffer\r\n");
+		pyjit_log("Alloc bb profile buffer\r\n");
         return E_FAIL;
     }
 
@@ -188,7 +188,7 @@ public:
         ProfileBuffer **      profileBuffer,
         ULONG *               numRuns
         ) {
-        printf("getBBProfileData\r\n");
+		pyjit_log("getBBProfileData\r\n");
         return E_FAIL;
     }
 
