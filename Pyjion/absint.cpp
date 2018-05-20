@@ -43,7 +43,7 @@
 
 
 AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, CompilerFactory* compFactory) : m_code(code) {
-    m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);	
+    m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
 	m_size = PyBytes_Size(code->co_code);
     m_returnValue = &Undefined;
     if (compFactory != nullptr) {
