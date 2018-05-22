@@ -103,14 +103,31 @@ public:
         void **             coldCodeBlock,  /* OUT */
         void **             roDataBlock     /* OUT */
         ) {
-        //printf("allocMem\r\n");
-        // TODO: Alignment?
-        //printf("Code size: %d\r\n", hotCodeSize);
+
+#ifdef PLATFORM_UNIX
+		// The JIT will produce accesses to the roDataBlock which are relative
+		// to the generate code and uses 32-bit offsets to access it.  Therefore
+		// if we have a range that's greater than 32-bits the access will be invalid
+		// fail.  On Windows malloc() is returning addresses close to the executable
+		// heap and everything is okay.  On Linux we're currently just allocating the
+		// executable + ro blocks together so we know they're close.  This has the downsize
+		// that we have some data which is marked as executable which isn't the best.
+#define ALIGN(size, align) \
+    (((size)+((align)-1)) & ~((align)-1))
+
+		auto size = ALIGN(hotCodeSize, 16) + roDataSize;
+		auto code = m_executionEngine.AllocExecutable(size);
+		*hotCodeBlock = m_codeAddr = code;
+		if (roDataSize != 0) {
+			*roDataBlock = ((char*)code) + ALIGN(hotCodeSize, 16);
+		}
+#else
 		auto code = m_executionEngine.AllocExecutable(hotCodeSize);
         *hotCodeBlock = m_codeAddr = code;
         if (roDataSize != 0) {
             *roDataBlock = m_dataAddr = malloc(roDataSize);
         }
+#endif
     }
 
     virtual void reserveUnwindInfo(
