@@ -91,10 +91,15 @@ Pyjion is not a transpiler.
 ### Are you going to support OS X and/or Linux?
 Yes! Goals #1 and #3 are entirely platform-agnostic while goal #2 of using
 CoreCLR as a JIT compiler is not an impedence to supporting OS X or Linux as
-it already supports the major OSs. The only reason Pyjion doesn't directly
-support Linux or OS X is entirely momentum/laziness: since the work is being
-driven by Microsoft employees, it simply meant it was easier to get going on
-Windows.
+it already supports the major OSs.
+
+The only reason Pyjion doesn't directly support Linux or OS X is entirely
+momentum/laziness: since the work is being driven by Microsoft employees,
+it was easier to get going on Windows.
+
+We now have experimental Linux support that has been tested on WSL. We also
+provide a Dockerfile to help get the test system running under Ubuntu. See
+the CONTRIBUTING file if you would like to help develop Pyjion on Linux.
 
 ### Will this ever ship with CPython?
 Goal #1 is explicitly to add a C API to CPython to support JIT compilers. There
