@@ -321,7 +321,11 @@ public:
     BOOL ClrHeapDestroy(
         HANDLE hHeap   // handle to heap
         ) {
+#ifdef PLATFORM_UNIX
+		return FALSE;
+#else
         return ::HeapDestroy(hHeap);
+#endif
     }
 
     LPVOID ClrHeapAlloc(
