@@ -1970,6 +1970,28 @@ public:
 		return 0;
 	}
 
+
+	// Inherited via ICorJitInfo
+	virtual CORINFO_METHOD_HANDLE resolveVirtualMethod(CORINFO_METHOD_HANDLE virtualMethod, CORINFO_CLASS_HANDLE implementingClass, CORINFO_CONTEXT_HANDLE ownerType = NULL) {
+		return nullptr;
+	}
+
+	virtual bool tryResolveToken(CORINFO_RESOLVED_TOKEN * pResolvedToken) {
+		return false;
+	}
+
+	virtual bool getReadyToRunHelper(CORINFO_RESOLVED_TOKEN * pResolvedToken, CORINFO_LOOKUP_KIND * pGenericLookupKind, CorInfoHelpFunc id, CORINFO_CONST_LOOKUP * pLookup) {
+		return false;
+	}
+
+	virtual void getReadyToRunDelegateCtorHelper(CORINFO_RESOLVED_TOKEN * pTargetMethod, CORINFO_CLASS_HANDLE delegateType, CORINFO_LOOKUP * pLookup) {
+		
+	}
+
+	virtual bool runWithErrorTrap(void(*function)(void *), void * parameter) {
+		return false;
+	}
+
 };
 
 #endif
