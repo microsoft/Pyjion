@@ -31,7 +31,12 @@
 
 
 int main(int argc, char* const argv[]) {
-    Py_Initialize();
+	wchar_t* program = Py_DecodeLocale(argv[0], NULL);
+	Py_SetPath(L"Lib");
+	Py_SetPythonHome(program);
+	Py_NoSiteFlag = 1;
+	
+	Py_Initialize();
     JitInit();
 
     int result = Catch::Session().run(argc, argv);

@@ -41,8 +41,8 @@ Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Pyth
 * Run `CopyFiles.bat` to copy files to key locations
 
 #### Testing
-  1. Run `x64\Debug\Test.exe`
-  2. Run `x64\Debug\Tests.exe`
+  1. Run `pushd x64\Debug && .\Test.exe && popd`
+  2. Run `pushd x64\Debug && .\Tests.exe && popd`
   3. Run `Python\python.bat -m test -n -f Tests\python_tests.txt`
 
 #### Running
@@ -83,7 +83,6 @@ Inside the docker container, build the Pyjion dependencies (CoreCLR and Python):
 
 ```
 ./BuildDeps.sh
-cd Pyjion
 ./make.sh
 ```
 
@@ -93,6 +92,9 @@ Run Python and import pyjion to see it working:
 $ ../Python/python
 >>> import pyjion
 ```
+
+#### Testing
+  1. Run runtests.sh
 
 Hack on the Pyjion code, your container will be updated with your file's changes. Run `make.sh` as needed.
 

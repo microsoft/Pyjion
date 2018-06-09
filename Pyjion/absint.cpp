@@ -55,7 +55,10 @@ AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, CompilerFactory* co
         m_retLabel = m_comp->emit_define_label();
         m_retValue = m_comp->emit_define_local();
         m_errorCheckLocal = m_comp->emit_define_local();
-    }
+	}
+	else {
+		m_comp = nullptr;
+	}
     init_starting_state();
 }
 

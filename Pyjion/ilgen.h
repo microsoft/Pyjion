@@ -508,6 +508,7 @@ public:
 			&nativeEntry,
 			&nativeSizeOfCode
 		);
+		
 		if (result == CORJIT_OK) {
 			return nativeEntry;
 		}

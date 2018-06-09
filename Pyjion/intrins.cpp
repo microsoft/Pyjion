@@ -1458,7 +1458,7 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
         *listRes = (PyObject*)list;
 
         auto res = ((PyListObject *)seq)->ob_item;
-        auto size = PyTuple_GET_SIZE(seq);
+        auto size = PyList_GET_SIZE(seq);
         for (int i = 0; i < size; i++) {
             Py_INCREF(res[i]);
         }

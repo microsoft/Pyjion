@@ -30,30 +30,15 @@
 
 #pragma once
 
-#include "targetver.h"
-
 #include <stdio.h>
-#include <tchar.h>
-
-#define FEATURE_NO_HOST
-#define USE_STL
-#include <stdint.h>
-#include <windows.h>
-#include <wchar.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <limits.h>
-#include <string.h>
-#include <float.h>
-#include <share.h>
-#include <cstdlib>
-#include <intrin.h>
 
 #include <vector>
 #include <unordered_map>
-
-#include <openum.h>
+#include <assert.h>
 
 #include "pyjit.h"
 #include "absint.h"
+
+#ifndef _countof
+#define _countof(array) (sizeof(array) / sizeof(array[0]))
+#endif

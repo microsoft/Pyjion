@@ -46,7 +46,7 @@ private:
 public:
     InferenceTest(const char* code) {
         auto pyCode = CompileCode(code);
-        m_absint = std::make_unique<AbstractInterpreter>(pyCode, nullptr);
+        m_absint = std::unique_ptr<AbstractInterpreter>(new AbstractInterpreter(pyCode, nullptr));
         auto success = m_absint->interpret();
         if (!success) {
             Py_DECREF(pyCode);
@@ -64,6 +64,8 @@ public:
 /* Old test code; do not use in new tests! ========================= */
 class AIVerifier {
 public:
+	virtual ~AIVerifier() {
+	}
     virtual void verify(AbstractInterpreter& interpreter) = 0;
 };
 

@@ -89,6 +89,9 @@ public:
 
 class AIVerifier {
 public:
+	virtual ~AIVerifier() {
+
+	}
     virtual void verify(AbstractInterpreter& interpreter) = 0;
 };
 
@@ -104,7 +107,7 @@ public:
 
     virtual void verify(AbstractInterpreter& interpreter) {
         auto info = interpreter.get_stack_info(m_byteCodeIndex);
-        _ASSERTE(m_kind == info[info.size() - m_stackIndex - 1].Value->kind());
+        assert(m_kind == info[info.size() - m_stackIndex - 1].Value->kind());
     };
 };
 
@@ -129,8 +132,8 @@ public:
 
     virtual void verify(AbstractInterpreter& interpreter) {
         auto local = interpreter.get_local_info(m_byteCodeIndex, m_localIndex);
-        _ASSERTE(local.IsMaybeUndefined == m_undefined);
-        _ASSERTE(local.ValueInfo.Value->kind() == m_kind);
+        assert(local.IsMaybeUndefined == m_undefined);
+        assert(local.ValueInfo.Value->kind() == m_kind);
     };
 };
 
@@ -142,7 +145,7 @@ public:
     }
 
     virtual void verify(AbstractInterpreter& interpreter) {
-        _ASSERTE(m_kind == interpreter.get_return_info()->kind());
+        assert(m_kind == interpreter.get_return_info()->kind());
     }
 };
 
@@ -157,7 +160,7 @@ public:
     }
 
     virtual void verify(AbstractInterpreter& interpreter) {
-        _ASSERTE(m_shouldBox == interpreter.should_box(m_byteCodeIndex));
+        assert(m_shouldBox == interpreter.should_box(m_byteCodeIndex));
     }
 };
 
@@ -1249,11 +1252,11 @@ void PyJitTest() {
             TestInput("1")
         ),
         TestCase(
-            "def f():\n    from sys import winver, version_info\n    return winver[0]",
+            "def f():\n    from sys import version, version_info\n    return version[0]",
             TestInput("'3'")
         ),
         TestCase(
-            "def f():\n    from sys import winver\n    return winver[0]",
+            "def f():\n    from sys import version\n    return version[0]",
             TestInput("'3'")
         ),
         TestCase(
@@ -1599,7 +1602,7 @@ void PyJitTest() {
         ),
         TestCase(
             "def f():\n    class C:\n        pass\n    return C",
-            TestInput("<class 'C'>")
+            TestInput("<class '__main__.f.<locals>.C'>")
         ),
         TestCase(
             "def f():\n    a = 0\n    for x in[1]:\n        a = a + 1\n    return a",
@@ -1746,25 +1749,27 @@ void PyJitTest() {
         auto codeObj = CompileCode(curCase.m_code);
 		auto addr = PyJit_EnsureExtra((PyObject*)codeObj);
         if (addr == nullptr) {
-            _ASSERT(FALSE);
+            assert(0);
         }
         // For the purpose of exercising the JIT machinery while testing, the
         // code should be JITed everytime.
         addr->j_specialization_threshold = 0;
         if (!jit_compile(codeObj) || addr->j_evalfunc == nullptr) {
-            _ASSERT(FALSE);
+			assert(0);
         }
 
         for (auto curInput = 0; curInput < curCase.m_inputs.size(); curInput++) {
             auto input = curCase.m_inputs[curInput];
 
-            auto globals = PyDict_New();
-            auto builtins = PyThreadState_GET()->interp->builtins;
-            PyDict_SetItemString(globals, "__builtins__", builtins);
+			auto globals = PyModule_GetDict(PyImport_AddModule("__main__")); // PyDict_New();
+			
+            //auto builtins = PyThreadState_GET()->interp->builtins;
+            //PyDict_SetItemString(globals, "__builtins__", builtins);
             PyDict_SetItemString(globals, "sys", sysModule);
 
             PyRun_String("finalized = False\nclass RefCountCheck:\n    def __del__(self):\n        print('finalizing')\n        global finalized\n        finalized = True\n    def __add__(self, other):\n        return self", Py_file_input, globals, globals);
             if (PyErr_Occurred()) {
+				printf("Error running ref checker:\n");
                 PyErr_Print();
                 return;
             }
@@ -1782,19 +1787,19 @@ void PyJitTest() {
                 if (strcmp(repr, "<NULL>") == 0) {
                     PyErr_Print();
                 }
-                _ASSERT(FALSE);
+                assert(0);
             }
             if (res != nullptr) {
-                _ASSERT(!PyErr_Occurred());
+				assert(!PyErr_Occurred());
             }
             else {
-                _ASSERT(PyErr_Occurred());
+				assert(PyErr_Occurred());
                 PyErr_Clear();
             }
             auto tstate = PyThreadState_GET();
-            _ASSERTE(tstate->exc_value == nullptr);
-            _ASSERTE(tstate->exc_traceback == nullptr);
-            _ASSERTE(tstate->exc_type == nullptr || tstate->exc_type == Py_None);
+            assert(tstate->exc_value == nullptr);
+            assert(tstate->exc_traceback == nullptr);
+            assert(tstate->exc_type == nullptr || tstate->exc_type == Py_None);
             //Py_DECREF(frame);
             Py_XDECREF(res);
             Py_DECREF(codeObj);
@@ -2119,7 +2124,7 @@ void AbsIntTest() {
 
         AbstractInterpreter interpreter(codeObj, nullptr);
         if (!interpreter.interpret()) {
-            _ASSERTE(FALSE && "Failed to interprete code");
+            assert(0 && "Failed to interprete code");
         }
         interpreter.dump();
 
@@ -2129,11 +2134,16 @@ void AbsIntTest() {
     }
 }
 
-int main() {
+int main(int argc, const char*argv[]) {
+	wchar_t* program = Py_DecodeLocale(argv[0], NULL);
+	Py_SetPath(L"Lib");
+	Py_SetPythonHome(program);
+	Py_NoSiteFlag = 1;
+
     Py_Initialize();
     JitInit();
 
-    //AbsIntTest();
+    AbsIntTest();
 
     PyJitTest();
 
