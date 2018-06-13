@@ -27,7 +27,7 @@ git clone --recursive https://github.com/Microsoft/Pyjion.git
 ```
 
 #### Patching dependencies
-Run `PatchDeps.bat` to patch Python to have JIT support and CoreCLR to disable COM support.
+Run `PatchDeps.bat` to patch CoreCLR to produce a statically linkable JIT
 
 #### Build Dependencies
 Run `BuildDeps.cmd` to build CoreCLR and Python (which includes downloading Python's dependencies).
@@ -82,6 +82,7 @@ docker run -it --name pyjion --mount type=bind,source=$(pwd),target=/opt/pyjion 
 Inside the docker container, build the Pyjion dependencies (CoreCLR and Python):
 
 ```
+./PatchDeps.sh
 ./BuildDeps.sh
 ./make.sh
 ```

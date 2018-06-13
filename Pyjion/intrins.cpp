@@ -535,7 +535,7 @@ PyObject* PyJit_InplaceOr(PyObject *left, PyObject *right) {
 }
 
 int PyJit_PrintExpr(PyObject *value) {
-    _Py_IDENTIFIER(displayhook);
+    _PyJ_IDENTIFIER(displayhook);
     PyObject *hook = _PySys_GetObjectId(&PyId_displayhook);
     PyObject *res;
     if (hook == NULL) {
@@ -698,7 +698,7 @@ void PyJit_PyErrRestore(PyObject*tb, PyObject*value, PyObject*exception) {
 }
 
 PyObject* PyJit_ImportName(PyObject*level, PyObject*from, PyObject* name, PyFrameObject* f) {
-    _Py_IDENTIFIER(__import__);
+    _PyJ_IDENTIFIER(__import__);
     PyObject *func = _PyDict_GetItemId(f->f_builtins, &PyId___import__);
     PyObject *args, *res;
     if (func == NULL) {
@@ -739,7 +739,7 @@ PyObject* PyJit_ImportName(PyObject*level, PyObject*from, PyObject* name, PyFram
 
 PyObject* PyJit_ImportFrom(PyObject*v, PyObject* name) {
     PyObject *x;
-    _Py_IDENTIFIER(__name__);
+    _PyJ_IDENTIFIER(__name__);
     PyObject *fullmodname, *pkgname;
 
     x = PyObject_GetAttr(v, name);
@@ -767,8 +767,8 @@ PyObject* PyJit_ImportFrom(PyObject*v, PyObject* name) {
 
 static int
 import_all_from(PyObject *locals, PyObject *v) {
-    _Py_IDENTIFIER(__all__);
-    _Py_IDENTIFIER(__dict__);
+    _PyJ_IDENTIFIER(__all__);
+    _PyJ_IDENTIFIER(__dict__);
     PyObject *all = _PyObject_GetAttrId(v, &PyId___all__);
     PyObject *dict, *name, *value;
     int skip_leading_underscores = 0;
@@ -1395,7 +1395,7 @@ void PyJit_CellSet(PyObject* value, PyObject* cell) {
 }
 
 PyObject* PyJit_BuildClass(PyFrameObject *f) {
-    _Py_IDENTIFIER(__build_class__);
+    _PyJ_IDENTIFIER(__build_class__);
 
     PyObject *bc;
     if (PyDict_CheckExact(f->f_builtins)) {

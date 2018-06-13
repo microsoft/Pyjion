@@ -1890,15 +1890,15 @@ public:
     virtual void getEEInfo(
         CORINFO_EE_INFO            *pEEInfoOut
         ) {
-        printf("getEEInfo\r\n");
         memset(pEEInfoOut, 0, sizeof(CORINFO_EE_INFO));
+        pEEInfoOut->osPageSize = pyjit_pagesize(); //0x1000;
+        pEEInfoOut->maxUncheckedOffsetForNullObject = 0x1000;
         pEEInfoOut->inlinedCallFrameInfo.size = 4;
 
     }
 
     // Returns name of the JIT timer log
     virtual LPCWSTR getJitTimeLogFilename() {
-        printf("getJitTimeLogFilename\r\n");
         return NULL;
 
     }
@@ -1997,15 +1997,36 @@ public:
 #endif // RYUJIT_CTPBUILD
 
 
-	void CorJitInfo::getAddressOfPInvokeTarget(CORINFO_METHOD_HANDLE method, CORINFO_CONST_LOOKUP * pLookup)
-	{
-	}
+    void CorJitInfo::getAddressOfPInvokeTarget(CORINFO_METHOD_HANDLE method, CORINFO_CONST_LOOKUP * pLookup) {
+    }
 
-	DWORD CorJitInfo::getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes)
-	{
-		return 0;
-	}
+    DWORD CorJitInfo::getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes) { 
+        if (sizeInBytes == sizeof(CORJIT_FLAGS)) {
+            *flags = CORJIT_FLAGS::CORJIT_FLAG_SKIP_VERIFICATION;
+            return sizeof(CORJIT_FLAGS);
+        }
+        return 0;
+    }
 
+	// Inherited via ICorJitInfo
+    virtual CORINFO_METHOD_HANDLE resolveVirtualMethod(CORINFO_METHOD_HANDLE virtualMethod, CORINFO_CLASS_HANDLE implementingClass, CORINFO_CONTEXT_HANDLE ownerType = NULL) {
+        return nullptr;
+    }
+
+    virtual bool tryResolveToken(CORINFO_RESOLVED_TOKEN * pResolvedToken) {
+        return false;
+    }
+
+    virtual bool getReadyToRunHelper(CORINFO_RESOLVED_TOKEN * pResolvedToken, CORINFO_LOOKUP_KIND * pGenericLookupKind, CorInfoHelpFunc id, CORINFO_CONST_LOOKUP * pLookup) {
+        return false;
+    }
+
+    virtual void getReadyToRunDelegateCtorHelper(CORINFO_RESOLVED_TOKEN * pTargetMethod, CORINFO_CLASS_HANDLE delegateType, CORINFO_LOOKUP * pLookup) {
+    }
+
+    virtual bool runWithErrorTrap(void(*function)(void *), void * parameter) {
+        return false;
+    }
 };
 
 #endif

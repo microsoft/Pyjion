@@ -16,13 +16,24 @@
 #include <cstdarg>
 #include <cstdio>
 
-#ifdef PLATFORM_UNIX
-int g_executableMmapProt = PROT_READ | PROT_WRITE | PROT_EXEC;
-int g_privateAnonMmapFlags = MAP_PRIVATE | MAP_ANONYMOUS;
-size_t pyjit_pagesize() {
-	return sysconf(_SC_PAGESIZE);
-}
+#if !PLATFORM_UNIX
+#include <windows.h>
 #endif
+
+#ifdef PLATFORM_UNIX
+extern "C" int g_executableMmapProt = PROT_READ | PROT_WRITE | PROT_EXEC;
+extern "C" int g_privateAnonMmapFlags = MAP_PRIVATE | MAP_ANONYMOUS;
+#endif
+
+extern "C" size_t pyjit_pagesize() {
+#ifdef PLATFORM_UNIX
+	return sysconf(_SC_PAGESIZE);
+#else
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return si.dwPageSize;
+#endif
+}
 
 int pyjit_log(const char *__restrict format, ...) {
 	va_list arglist;

@@ -19,11 +19,12 @@ goto Usage
 
 :BuildCoreCLR
 pushd coreclr
-call build.cmd %__BuildArch% %__BuildType% skipmscorlib skiptests
+call build.cmd %__BuildArch% %__BuildType% skipmscorlib skiptests skipbuildpackages
 IF ERRORLEVEL 1 goto Error
 
 mkdir ..\Libs\%__BuildType%\%__BuildArch%\
-copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\jit\dll\%__BuildType%\clrjit.lib ..\Libs\%__BuildType%\%__BuildArch%\
+copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\jit\standalone\%__BuildType%\clrjit.lib ..\Libs\%__BuildType%\%__BuildArch%\
+copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\jit\standalone\%__BuildType%\clrjit.dll ..\Libs\%__BuildType%\%__BuildArch%\
 copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\utilcode\dyncrt\%__BuildType%\utilcode.lib ..\Libs\%__BuildType%\%__BuildArch%\
 copy bin\obj\Windows_NT.%__BuildArch%.%__BuildType%\src\gcinfo\lib\%__BuildType%\gcinfo.lib ..\Libs\%__BuildType%\%__BuildArch%\
 popd

@@ -7,9 +7,11 @@ extern "C" void *mmap(void *addr, size_t length, int prot, int flags,
 
 extern "C" int munmap(void *addr, size_t length);
 
-extern "C" size_t pyjit_pagesize();
-
 extern "C" int g_executableMmapProt;
 extern "C" int g_privateAnonMmapFlags;
 
 #endif
+
+
+extern "C" size_t pyjit_pagesize();
+
