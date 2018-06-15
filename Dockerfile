@@ -8,8 +8,8 @@ RUN wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add -
 RUN apt-get update -y && apt-get install -y \
     git \
     cmake \
-    llvm-3.5 \
-    clang-3.5 \
+    llvm-3.9 \
+    clang-3.9 \
     lldb-3.6 \
     lldb-3.6-dev \
     libunwind8 \

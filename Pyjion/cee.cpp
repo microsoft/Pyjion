@@ -18,10 +18,10 @@ LPVOID EEHeapAllocInProcessHeap(DWORD dwFlags, SIZE_T dwBytes) {
 
 void* __stdcall GetCLRFunction(LPCSTR functionName) {
 	if (strcmp(functionName, "EEHeapAllocInProcessHeap") == 0) {
-		return ::EEHeapAllocInProcessHeap;
+		return (void*)::EEHeapAllocInProcessHeap;
 	}
 	else if (strcmp(functionName, "EEHeapFreeInProcessHeap") == 0) {
-		return ::EEHeapFreeInProcessHeap;
+		return (void*)::EEHeapFreeInProcessHeap;
 	}
 	printf("get clr function %s\n", functionName);
 	return NULL;

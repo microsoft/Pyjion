@@ -2172,21 +2172,6 @@ PyObject* PyJit_UnboxInt_Tagged(PyObject* value) {
     return TAG_IT(intValue);
 }
 
-bool __builtin_add_overflow(tagged_ptr left, tagged_ptr right, tagged_ptr* res) {
-	//res = left + right;
-	return true;
-}
-
-bool __builtin_sub_overflow(tagged_ptr left, tagged_ptr right, tagged_ptr* res) {
-	//res = left + right;
-	return true;
-}
-
-bool __builtin_mul_overflow(tagged_ptr left, tagged_ptr right, tagged_ptr* res) {
-	//res = left + right;
-	return true;
-}
-
 inline PyObject* PyJit_Tagged_Add(tagged_ptr left, tagged_ptr right) {
     tagged_ptr res;
 #ifdef _MSC_VER
