@@ -3,7 +3,7 @@
 # Build things which don't depend upon CoreCLR
 OUT_DIR=Pyjion
 SRC_DIR=Pyjion
-PY_INC_DIRS="-I../Python/Include/ -IPython/"
+PY_INC_DIRS="-IPython/Include/ -IPython/"
 clang++-3.9 -DPLATFORM_UNIX=1 -std=c++11 $SRC_DIR/intrins.cpp  $PY_INC_DIRS -o $OUT_DIR/intrins.o -c -fPIC -g  -D_TARGET_AMD64_=1 
 clang++-3.9 -DPLATFORM_UNIX=1 -std=c++11 $SRC_DIR/absvalue.cpp $PY_INC_DIRS  -o $OUT_DIR/absvalue.o -c -fPIC -g -D_TARGET_AMD64_=1 
 clang++-3.9 -DPLATFORM_UNIX=1 -std=c++11 $SRC_DIR/absint.cpp $PY_INC_DIRS  -o $OUT_DIR/absint.o -c -fPIC -g  -D_TARGET_AMD64_=1 

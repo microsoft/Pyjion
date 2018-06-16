@@ -12,6 +12,7 @@ RUN apt-get update -y && apt-get install -y \
     clang-3.9 \
     lldb-3.6 \
     lldb-3.6-dev \
+    libnuma-dev \
     libunwind8 \
     libunwind8-dev \
     gettext \
