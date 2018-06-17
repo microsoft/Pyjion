@@ -2057,7 +2057,7 @@ public:
         return nullptr;
     }
 
-    // Given resolved token that corresponds to an intrinsic classified as
+    // Given a resolved token that corresponds to an intrinsic classified as
     // a CORINFO_INTRINSIC_GetRawHandle intrinsic, fetch the handle associated
     // with the token. If this is not possible at compile-time (because the current method's 
     // code is shared and the token contains generic parameters) then indicate 
@@ -2079,7 +2079,7 @@ public:
     }
 
     // Return the type argument of the instantiated generic class,
-    // which is specified by the index
+    // which is specified by the index.
     virtual CORINFO_CLASS_HANDLE getTypeInstantiationArgument(
             CORINFO_CLASS_HANDLE cls, 
             unsigned             index
