@@ -497,14 +497,13 @@ public:
 	}
 
 	void* compile(ICorJitInfo* jitInfo, ICorJitCompiler* jit, int stackSize) {
-		//dump();
 		BYTE* nativeEntry;
 		ULONG nativeSizeOfCode;
 		CORINFO_METHOD_INFO methodInfo = to_method(stackSize);
 		CorJitResult result = jit->compileMethod(
 			/*ICorJitInfo*/jitInfo,
 			/*CORINFO_METHOD_INFO */&methodInfo,
-			/*flags*/CORJIT_FLG_SKIP_VERIFICATION,
+			/*flags*/CORJIT_FLAGS::CORJIT_FLAG_CALL_GETJITFLAGS,
 			&nativeEntry,
 			&nativeSizeOfCode
 		);

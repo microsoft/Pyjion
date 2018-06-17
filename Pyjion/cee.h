@@ -393,27 +393,23 @@ private:
 };  // interface IExecutionEngine
 
 class CCorJitHost : public ICorJitHost {
-	void * allocateMemory(size_t size, bool usePageAllocator = false)
-	{
-		return nullptr;
+	void * allocateMemory(size_t size, bool usePageAllocator = false) {
+		return malloc(size);
 	}
 
-	void freeMemory(void * block, bool usePageAllocator = false)
-	{
+	void freeMemory(void * block, bool usePageAllocator = false) {
+        free(block);
 	}
 
-	int getIntConfigValue(const wchar_t * name, int defaultValue)
-	{
+	int getIntConfigValue(const wchar_t * name, int defaultValue) {
 		return defaultValue;
 	}
 
-	const wchar_t * getStringConfigValue(const wchar_t * name)
-	{
+	const wchar_t * getStringConfigValue(const wchar_t * name) {
 		return nullptr;
 	}
 
-	void freeStringConfigValue(const wchar_t * value)
-	{
+	void freeStringConfigValue(const wchar_t * value) {
 	}
 };
 

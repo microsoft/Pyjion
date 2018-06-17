@@ -18,10 +18,10 @@ LPVOID EEHeapAllocInProcessHeap(DWORD dwFlags, SIZE_T dwBytes) {
 
 void* __stdcall GetCLRFunction(LPCSTR functionName) {
 	if (strcmp(functionName, "EEHeapAllocInProcessHeap") == 0) {
-		return ::EEHeapAllocInProcessHeap;
+		return (void*)::EEHeapAllocInProcessHeap;
 	}
 	else if (strcmp(functionName, "EEHeapFreeInProcessHeap") == 0) {
-		return ::EEHeapFreeInProcessHeap;
+		return (void*)::EEHeapFreeInProcessHeap;
 	}
 	printf("get clr function %s\n", functionName);
 	return NULL;
@@ -62,23 +62,6 @@ void CeeInit() {
 	DisableThrowCheck();
 #endif
 }
-#ifndef PLATFORM_UNIX
-extern "C" __declspec(dllexport) BOOL WINAPI DllMain(
-	_In_ HINSTANCE hinstDLL,
-	_In_ DWORD     fdwReason,
-	_In_ LPVOID    lpvReserved
-) {
-	switch (fdwReason) {
-	case DLL_PROCESS_ATTACH: break;
-	case DLL_PROCESS_DETACH: break;
-	case DLL_THREAD_ATTACH: break;
-	case DLL_THREAD_DETACH:
-		g_execEngine.TLS_ThreadDetaching();
-		break;
-	}
-	return TRUE;
-}
-#endif
 
 class InitHolder {
 public:

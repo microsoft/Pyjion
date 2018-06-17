@@ -34,6 +34,13 @@
 #include <unordered_map>
 using namespace std;
 
+/* Python 3.6.0b0 and above use designated initializers, which aren't allowed in C++.
+ * To work around this, we re-define the _Py_IDENTIFIER macro with a new prefix.
+ */
+#define _PyJ_static_string_init(value) { NULL, value, NULL }
+#define _PyJ_static_string(varname, value) static _Py_Identifier varname = _PyJ_static_string_init(value)
+#define _PyJ_IDENTIFIER(varname) _PyJ_static_string(PyId_##varname, #varname)
+
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
 

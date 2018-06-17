@@ -1496,8 +1496,10 @@ public:
     virtual CORINFO_CLASS_HANDLE getBuiltinClass(
         CorInfoClassId              classId
         ) {
-        printf("getBuiltinClass\r\n");
-        return NULL;
+        // This gets called to see if the JIT should do some folding, we don't
+        // support that, but need to make sure that this doesn't resolve as
+        // equal to anything.
+        return (CORINFO_CLASS_HANDLE)0xb111c1a5;
     }
 
     // "System.Int32" ==> CORINFO_TYPE_INT..
@@ -1890,15 +1892,15 @@ public:
     virtual void getEEInfo(
         CORINFO_EE_INFO            *pEEInfoOut
         ) {
-        printf("getEEInfo\r\n");
         memset(pEEInfoOut, 0, sizeof(CORINFO_EE_INFO));
+        pEEInfoOut->osPageSize = pyjit_pagesize(); //0x1000;
+        pEEInfoOut->maxUncheckedOffsetForNullObject = 0x1000;
         pEEInfoOut->inlinedCallFrameInfo.size = 4;
 
     }
 
     // Returns name of the JIT timer log
     virtual LPCWSTR getJitTimeLogFilename() {
-        printf("getJitTimeLogFilename\r\n");
         return NULL;
 
     }
@@ -1997,14 +1999,134 @@ public:
 #endif // RYUJIT_CTPBUILD
 
 
-	void CorJitInfo::getAddressOfPInvokeTarget(CORINFO_METHOD_HANDLE method, CORINFO_CONST_LOOKUP * pLookup)
-	{
-	}
+    void CorJitInfo::getAddressOfPInvokeTarget(CORINFO_METHOD_HANDLE method, CORINFO_CONST_LOOKUP * pLookup) {
+    }
 
-	DWORD CorJitInfo::getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes)
-	{
-		return 0;
-	}
+    DWORD CorJitInfo::getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes) { 
+        if (sizeInBytes == sizeof(CORJIT_FLAGS)) {
+            *flags = CORJIT_FLAGS::CORJIT_FLAG_SKIP_VERIFICATION;
+            return sizeof(CORJIT_FLAGS);
+        }
+        return 0;
+    }
+
+	// Inherited via ICorJitInfo
+    virtual CORINFO_METHOD_HANDLE resolveVirtualMethod(CORINFO_METHOD_HANDLE virtualMethod, CORINFO_CLASS_HANDLE implementingClass, CORINFO_CONTEXT_HANDLE ownerType = NULL) {
+        return nullptr;
+    }
+
+    virtual bool tryResolveToken(CORINFO_RESOLVED_TOKEN * pResolvedToken) {
+        return false;
+    }
+
+    virtual bool getReadyToRunHelper(CORINFO_RESOLVED_TOKEN * pResolvedToken, CORINFO_LOOKUP_KIND * pGenericLookupKind, CorInfoHelpFunc id, CORINFO_CONST_LOOKUP * pLookup) {
+        return false;
+    }
+
+    virtual void getReadyToRunDelegateCtorHelper(CORINFO_RESOLVED_TOKEN * pTargetMethod, CORINFO_CLASS_HANDLE delegateType, CORINFO_LOOKUP * pLookup) {
+    }
+
+    virtual bool runWithErrorTrap(void(*function)(void *), void * parameter) {
+        return false;
+    }
+
+    // This function returns the offset of the specified method in the
+    // vtable of it's owning class or interface.
+    virtual void getMethodVTableOffset (
+            CORINFO_METHOD_HANDLE       method,                 /* IN */
+            unsigned*                   offsetOfIndirection,    /* OUT */
+            unsigned*                   offsetAfterIndirection, /* OUT */
+            bool*                       isRelative              /* OUT */
+            ) { 
+        printf("getMethodVTableOffset\n");
+    }
+    virtual CORINFO_METHOD_HANDLE getUnboxedEntry(
+        CORINFO_METHOD_HANDLE ftn,
+        bool* requiresInstMethodTableArg = NULL /* OUT */
+        ) { 
+        printf("getUnboxedEntry\n");
+        return nullptr;
+    }
+
+    // Given T, return the type of the default EqualityComparer<T>.
+    // Returns null if the type can't be determined exactly.
+    virtual CORINFO_CLASS_HANDLE getDefaultEqualityComparerClass(
+            CORINFO_CLASS_HANDLE elemType
+            ) { 
+        printf("getDefaultEqualityComparerClass\n");
+        return nullptr;
+    }
+
+    // Given a resolved token that corresponds to an intrinsic classified as
+    // a CORINFO_INTRINSIC_GetRawHandle intrinsic, fetch the handle associated
+    // with the token. If this is not possible at compile-time (because the current method's 
+    // code is shared and the token contains generic parameters) then indicate 
+    // how the handle should be looked up at runtime.
+    virtual void expandRawHandleIntrinsic(
+        CORINFO_RESOLVED_TOKEN *        pResolvedToken,
+        CORINFO_GENERICHANDLE_RESULT *  pResult) { 
+        printf("expandRawHandleIntrinsic\n");
+    }
+
+    // Return class name as in metadata, or nullptr if there is none.
+    // Suitable for non-debugging use.
+    virtual const char* getClassNameFromMetadata (
+            CORINFO_CLASS_HANDLE    cls,
+            const char            **namespaceName   /* OUT */
+            ) { 
+        printf("getClassNameFromMetadata\n");
+        return nullptr;
+    }
+
+    // Return the type argument of the instantiated generic class,
+    // which is specified by the index.
+    virtual CORINFO_CLASS_HANDLE getTypeInstantiationArgument(
+            CORINFO_CLASS_HANDLE cls, 
+            unsigned             index
+            ) { 
+        printf("getTypeInstantiationArgument\n");
+        return nullptr;
+    }
+    
+    // See if a cast from fromClass to toClass will succeed, fail, or needs
+    // to be resolved at runtime.
+    virtual TypeCompareState compareTypesForCast(
+            CORINFO_CLASS_HANDLE        fromClass,
+            CORINFO_CLASS_HANDLE        toClass
+            ) { 
+        printf("compareTypesForCast\n");
+        return TypeCompareState::MustNot;
+    }
+
+    // See if types represented by cls1 and cls2 compare equal, not
+    // equal, or the comparison needs to be resolved at runtime.
+    virtual TypeCompareState compareTypesForEquality(
+            CORINFO_CLASS_HANDLE        cls1,
+            CORINFO_CLASS_HANDLE        cls2
+            ) { 
+        printf("compareTypesForEquality\n");
+        return TypeCompareState::MustNot;
+    }
+    // Return method name as in metadata, or nullptr if there is none,
+    // and optionally return the class and namespace names as in metadata.
+    // Suitable for non-debugging use.
+    virtual const char* getMethodNameFromMetadata(
+            CORINFO_METHOD_HANDLE       ftn,            /* IN */
+            const char                **className,      /* OUT */
+            const char                **namespaceName   /* OUT */
+            ) { 
+        printf("getMethodNameFromMetadata\n");
+        return nullptr;
+    }
+
+    // "System.Int32" ==> CORINFO_TYPE_INT..
+    // "System.UInt32" ==> CORINFO_TYPE_UINT..
+    virtual CorInfoType getTypeForPrimitiveNumericClass(
+            CORINFO_CLASS_HANDLE        cls
+            ) {
+        printf("getTypeForPrimitiveNumericClass\n");
+        return  CORINFO_TYPE_INT;
+    }
 
 };
 
