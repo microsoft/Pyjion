@@ -9,6 +9,7 @@
 /ipch/
 /x64/
 /.vs/
+/.vscode/
 *.opensdf
 *.sdf
 *.opendb
