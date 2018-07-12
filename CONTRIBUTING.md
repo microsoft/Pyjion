@@ -90,6 +90,7 @@ Inside the docker container, build the Pyjion dependencies (CoreCLR and Python):
 Run Python and import pyjion to see it working:
 
 ```
+cd Pyjion
 $ ../Python/python
 >>> import pyjion
 ```
