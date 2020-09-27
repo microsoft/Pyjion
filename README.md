@@ -13,7 +13,7 @@ There are three goals for this project.
 
 1. Add a C API to CPython for plugging in a JIT
 2. Develop a JIT module using [CoreCLR](https://github.com/dotnet/coreclr) utilizing the C API mentioned in goal #1
-3. Develop a C++ framework that any JIT targetting the API in goal #1 can use to make development easier
+3. Develop a C++ framework that any JIT targeting the API in goal #1 can use to make development easier
 
 Goal #1 is to make it so that CPython can have a JIT plugged in as desired (CPython
 is the Python implementation you download from https://www.python.org/). That
