@@ -1,10 +1,11 @@
 [submodule "Python"]
 	path = Python
 	url = https://github.com/python/cpython.git
-[submodule "CoreCLR"]
+	branch = 3.9
+[submodule "dotnet"]
 	path = CoreCLR
-	url = https://github.com/dotnet/coreclr.git
-	branch = release/1.0.0-rc2
+	url = https://github.com/dotnet/runtime
+	branch = release/5.0
 [submodule "Tests/Catch"]
 	path = Tests/Catch
 	url = https://github.com/philsquared/Catch.git
