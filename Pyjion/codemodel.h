@@ -112,9 +112,6 @@ public:
     CorInfoType m_retType;
     void* m_addr;
 
-    Method() {
-    }
-
     Method(Module* module, CorInfoType returnType, std::vector<Parameter> params, void* addr) {
         m_retType = returnType;
         m_params = params;

@@ -35,17 +35,6 @@ using namespace std;
 CCorJitHost g_jitHost;
 
 void CeeInit() {
-//    CoreClrCallbacks cccallbacks;
-//    cccallbacks.m_hmodCoreCLR = (HINSTANCE)GetModuleHandleW(NULL);
-//    cccallbacks.m_pfnIEE = IEE;
-//    cccallbacks.m_pfnGetCORSystemDirectory = GetCORSystemDirectoryInternal;
-//    cccallbacks.m_pfnGetCLRFunction = GetCLRFunction;
-//
-//    InitUtilcode(cccallbacks);
-    // TODO: We should re-enable contracts and handle exceptions from OOM
-    // and just fail the whole compilation if we hit that.  Right now we
-    // just leak an exception out across the JIT boundary.
-
 	jitStartup(&g_jitHost);
 #if _DEBUG
     DisableThrowCheck();
@@ -60,8 +49,6 @@ public:
 };
 
 InitHolder g_initHolder;
-
-//#define DEBUG_TRACE
 
 Module g_module;
 ICorJitCompiler* g_jit;
@@ -143,16 +130,6 @@ void PythonCompiler::emit_incref(bool maybeTagged) {
 
 void PythonCompiler::decref() {
     m_il.emit_call(METHOD_DECREF_TOKEN);
-    // It might be nice to inline this at some point:
-    //LD_FIELDA(PyObject, ob_refcnt);
-    //m_il.push_back(CEE_DUP);
-    //m_il.push_back(CEE_LDIND_I4);
-    //m_il.push_back(CEE_LDC_I4_1);
-    //m_il.push_back(CEE_SUB);
-    ////m_il.push_back(CEE_DUP);
-    //// _Py_Dealloc(_py_decref_tmp)
-
-    //m_il.push_back(CEE_STIND_I4);
 }
 
 
@@ -1169,14 +1146,14 @@ void PythonCompiler::emit_tagged_int_to_float() {
 class GlobalMethod {
     Method m_method;
 public:
-    GlobalMethod(int token, Method method) {
+    GlobalMethod(int token, Method method) : m_method(method) {
         m_method = method;
         g_module.m_methods[token] = &m_method;
     }
 };
 
 #define GLOBAL_METHOD(token, addr, returnType, ...) \
-    GlobalMethod g ## token(token, Method(&g_module, returnType, std::vector<Parameter>{__VA_ARGS__}, addr));
+    GlobalMethod g ## token(token, Method(&g_module, returnType, std::vector<Parameter>{__VA_ARGS__}, (void*)addr));
 
 GLOBAL_METHOD(METHOD_ADD_TOKEN, &PyJit_Add, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_SUBSCR_TOKEN, &PyJit_Subscr, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
