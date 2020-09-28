@@ -27,10 +27,9 @@
 #define CEE_H
 
 #define FEATURE_NO_HOST
-#define USE_STL
+
 #include <stdint.h>
 #include <windows.h>
-#include <wchar.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -44,8 +43,11 @@
 #include <vector>
 #include <unordered_map>
 
-#include "corjit.h"
-#include "utilcode.h"
+#include <corjit.h>
+#include <pal.h>
+#include <utilcode.h>
+
+
 #include "openum.h"
 
 using namespace std;

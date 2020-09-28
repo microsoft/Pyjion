@@ -26,12 +26,6 @@
 #ifndef ABSINT_H
 #define ABSINT_H
 
-#include <stdlib.h>
-
-#ifndef _WIN32
-#include <pal_assert.h>
-#endif
-
 #include <Python.h>
 #include <vector>
 #include <unordered_map>
@@ -421,8 +415,8 @@ struct AbstractLocalInfo {
     }
 
     AbstractLocalInfo(AbstractValueWithSources valueInfo, bool isUndefined = false) {
-        _ASSERTE(valueInfo.Value != nullptr);
-        _ASSERTE(!(valueInfo.Value == &Undefined && !isUndefined));
+        assert(valueInfo.Value != nullptr);
+        assert(!(valueInfo.Value == &Undefined && !isUndefined));
         ValueInfo = valueInfo;
         IsMaybeUndefined = isUndefined;
     }

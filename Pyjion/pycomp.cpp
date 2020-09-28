@@ -23,13 +23,13 @@
 *
 */
 
-#include <cstdlib>
-#define PAL_STDCPP_COMPAT 1
-#include "pycomp.h"
+#include <stdlib.h>
 
 #include <windows.h>
 #include <corjit.h>
 #include <openum.h>
+
+#include "pycomp.h"
 
 HRESULT __stdcall GetCORSystemDirectoryInternal(SString& pbuffer) {
     printf("get cor system\n");

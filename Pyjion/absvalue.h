@@ -28,6 +28,7 @@
 
 #include <Python.h>
 #include <opcode.h>
+
 #include "cowvector.h"
 
 class AbstractValue;

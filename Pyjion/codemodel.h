@@ -27,7 +27,7 @@
 #define CODEMODEL_H
 
 #define FEATURE_NO_HOST
-#define USE_STL
+
 #include <stdint.h>
 #include <windows.h>
 #include <wchar.h>

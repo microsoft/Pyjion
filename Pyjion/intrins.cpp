@@ -25,9 +25,10 @@
 * Portions lifted from CPython under the PSF license.
 */
 
+#include <stdint.h>
+
 #include "intrins.h"
 #include "taggedptr.h"
-#include <stdint.h>
 
 #ifdef _MSC_VER
 

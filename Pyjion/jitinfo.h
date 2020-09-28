@@ -30,7 +30,6 @@
 #define FEATURE_NO_HOST
 
 #include <Python.h>
-//#include <utilcode.h>
 #include <frameobject.h>
 #include <opcode.h>
 #include <windows.h>
