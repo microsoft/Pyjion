@@ -98,7 +98,7 @@ public:
 
     virtual void get_call_info(CORINFO_CALL_INFO *pResult) = 0;
     virtual DWORD get_method_attrs() {
-        return CORINFO_FLG_NOSECURITYWRAP | CORINFO_FLG_STATIC | CORINFO_FLG_NATIVE;
+        return CORINFO_FLG_STATIC | CORINFO_FLG_NATIVE;
     }
     virtual void findSig(CORINFO_SIG_INFO  *sig) = 0;
     virtual void* get_addr() = 0;
@@ -206,7 +206,7 @@ class VirtualMethod : public Method {
     }
 
     virtual DWORD get_method_attrs() {
-        return CORINFO_FLG_NOSECURITYWRAP | CORINFO_FLG_VIRTUAL | CORINFO_FLG_NATIVE;
+        return CORINFO_FLG_VIRTUAL | CORINFO_FLG_NATIVE;
     }
 };
 
