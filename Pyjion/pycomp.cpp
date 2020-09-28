@@ -23,6 +23,8 @@
 *
 */
 
+#include <windows.h>
+
 #include "pycomp.h"
 #include <corjit.h>
 #include <openum.h>

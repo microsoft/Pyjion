@@ -26,6 +26,13 @@
 #ifndef ABSINT_H
 #define ABSINT_H
 
+#include <cstdlib>
+
+#ifndef _WIN32
+#define _ASSERTE(cond) \
+    assert(cond);
+#endif
+
 #include <Python.h>
 #include <vector>
 #include <unordered_map>
@@ -154,8 +161,12 @@ struct BlockInfo {
 };
 
 
+#ifdef _WIN32
 class __declspec(dllexport) AbstractInterpreter {
 #pragma warning (disable:4251)
+#else
+    class AbstractInterpreter {
+#endif
     // ** Results produced:
     // Tracks the interpreter state before each opcode
     unordered_map<size_t, InterpreterState> m_startStates;

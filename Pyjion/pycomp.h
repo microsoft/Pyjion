@@ -28,18 +28,13 @@
 
 #include <stdint.h>
 
-#ifdef _WIN32
 #include <windows.h>
-#include <share.h>
-#include <intrin.h>
-#else
-// TODO intrinsics from x86/LLVM
-#endif
-
 #include <wchar.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <share.h>
+#include <intrin.h>
 #include <limits.h>
 #include <string.h>
 #include <float.h>
