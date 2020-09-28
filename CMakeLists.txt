@@ -28,18 +28,17 @@ if(NOT WIN32)
     endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif(NOT WIN32)
 
+include_directories(CoreCLR/src/coreclr/src/inc)
+
 if (APPLE)
     include_directories(Pyjion/compat)
-    add_definitions(-DHOST_UNIX)
-    add_definitions(-DHOST_AMD64)
-    add_definitions(-DHOST_64BIT)
+    include_directories(CoreCLR/artifacts/bin/coreclr/OSX.x64.Debug/inc)
     set(CLR_CMAKE_HOST_UNIX 1)
 endif()
 
-include_directories(CoreCLR/src/coreclr/src/inc)
-include_directories(CoreCLR/artifacts/bin/coreclr/OSX.x64.Debug/inc)
-
-
 set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp)
+
 add_library(pyjion SHARED ${SOURCES})
+target_link_libraries(pyjion ${Python3_LIBRARIES})
+target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/OSX.x64.Debug/libclrjit.dylib)
 add_compile_options(-Wno-sign-compare)
