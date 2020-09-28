@@ -168,11 +168,11 @@ int PyJit_RichEquals_Long(PyObject *left, PyObject *right, void**state) {
 int PyJit_RichEquals_Generic(PyObject *left, PyObject *right, void**state) {
     if (left->ob_type == right->ob_type) {
         if (PyUnicode_CheckExact(left)) {
-            *state = &PyJit_RichEquals_Str;
+            *state = (void*)&PyJit_RichEquals_Str;
             return PyJit_RichEquals_Str(left, right, state);
         }
         else if (PyLong_CheckExact(left)) {
-            *state = &PyJit_RichEquals_Long;
+            *state = (void*)&PyJit_RichEquals_Long;
             return PyJit_RichEquals_Long(left, right, state);
         }
     }
@@ -554,15 +554,15 @@ void PyJit_PrepareException(PyObject** exc, PyObject**val, PyObject** tb, PyObje
     auto tstate = PyThreadState_GET();
 
     // we take ownership of these into locals...
-    if (tstate->exc_type != nullptr) {
-        *oldexc = tstate->exc_type;
+    if (tstate->curexc_type != nullptr) {
+        *oldexc = tstate->curexc_type;
     }
     else {
         *oldexc = Py_None;
         Py_INCREF(Py_None);
     }
-    *oldVal = tstate->exc_value;
-    *oldTb = tstate->exc_traceback;
+    *oldVal = tstate->curexc_value;
+    *oldTb = tstate->curexc_traceback;
 
     PyErr_Fetch(exc, val, tb);
     /* Make the raw exception data
@@ -576,11 +576,11 @@ void PyJit_PrepareException(PyObject** exc, PyObject**val, PyObject** tb, PyObje
     else
         PyException_SetTraceback(*val, Py_None);
     Py_INCREF(*exc);
-    tstate->exc_type = *exc;
+    tstate->curexc_type = *exc;
     Py_INCREF(*val);
-    tstate->exc_value = *val;
+    tstate->curexc_value = *val;
     assert(PyExceptionInstance_Check(*val));
-    tstate->exc_traceback = *tb;
+    tstate->curexc_traceback = *tb;
     if (*tb == NULL)
         *tb = Py_None;
     Py_INCREF(*tb);
@@ -589,12 +589,12 @@ void PyJit_PrepareException(PyObject** exc, PyObject**val, PyObject** tb, PyObje
 void PyJit_UnwindEh(PyObject*exc, PyObject*val, PyObject*tb) {
     auto tstate = PyThreadState_GET();
     assert(val == nullptr || PyExceptionInstance_Check(val));
-    auto oldtb = tstate->exc_traceback;
-    auto oldtype = tstate->exc_type;
-    auto oldvalue = tstate->exc_value;
-    tstate->exc_traceback = tb;
-    tstate->exc_type = exc;
-    tstate->exc_value = val;
+    auto oldtb = tstate->curexc_traceback;
+    auto oldtype = tstate->curexc_type;
+    auto oldvalue = tstate->curexc_value;
+    tstate->curexc_traceback = tb;
+    tstate->curexc_type = exc;
+    tstate->curexc_value = val;
     Py_XDECREF(oldtb);
     Py_XDECREF(oldtype);
     Py_XDECREF(oldvalue);
@@ -1010,9 +1010,9 @@ int PyJit_Raise(PyObject *exc, PyObject *cause) {
         /* Reraise */
         PyThreadState *tstate = PyThreadState_GET();
         PyObject *tb;
-        type = tstate->exc_type;
-        value = tstate->exc_value;
-        tb = tstate->exc_traceback;
+        type = tstate->curexc_type;
+        value = tstate->curexc_value;
+        tb = tstate->curexc_traceback;
         if (type == Py_None || type == nullptr) {
             PyErr_SetString(PyExc_RuntimeError,
                 "No active exception to reraise");
@@ -1437,12 +1437,14 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
         // the function allocated space on the stack for us to
         // store these temporarily.
         auto it = PyObject_GetIter(seq);
+        int i = 0;
+        auto sp = tempStorage + leftSize + rightSize;
+
         if (it == nullptr) {
             goto Error;
         }
 
-        auto sp = tempStorage + leftSize + rightSize;
-        int i = 0;
+
         for (; i < leftSize; i++) {
             auto w = PyIter_Next(it);
             if (w == NULL) {
@@ -1808,15 +1810,15 @@ PyObject* Call0_CFunction(PyObject *target, void** addr) {
 PyObject* Call0_Generic(PyObject *target, void** addr) {
     PyObject* res;
     if (PyFunction_Check(target)) {
-        *addr = &Call0_Function;
+        *addr = (void*)&Call0_Function;
         return Call0_Function(target, addr);
     }
     else if (PyCFunction_Check(target)) {
-        *addr = Call0_CFunction;
+        *addr = (void*)Call0_CFunction;
         return Call0_CFunction(target, addr);
     }
     else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
-        *addr = Call0_Method;
+        *addr = (void*)Call0_Method;
         return Call0_Method(target, addr);
     }
     else {
@@ -1829,6 +1831,7 @@ PyObject* Call0_Generic(PyObject *target, void** addr) {
 
 PyObject* Call1(PyObject *target, PyObject* arg0) {
     PyObject* res = nullptr;
+    auto args = PyTuple_New(1);
     if (PyFunction_Check(target)) {
         PyObject* stack[1] = { arg0 };
         res = fast_function(target, stack, 1);
@@ -1844,8 +1847,6 @@ PyObject* Call1(PyObject *target, PyObject* arg0) {
         goto error;
     }
 
-
-    auto args = PyTuple_New(1);
     if (args == nullptr) {
         Py_DECREF(arg0);
         goto error;
@@ -1865,6 +1866,7 @@ error:
 
 PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1) {
     PyObject* res = nullptr;
+    auto args = PyTuple_New(2);
     if (PyFunction_Check(target)) {
         PyObject* stack[2] = { arg0, arg1 };
         res = fast_function(target, stack, 2);
@@ -1881,8 +1883,6 @@ PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1) {
         goto error;
     }
 
-
-    auto args = PyTuple_New(2);
     if (args == nullptr) {
         Py_DECREF(arg0);
         Py_DECREF(arg1);
@@ -1904,6 +1904,7 @@ error:
 
 PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
     PyObject* res = nullptr;
+    auto args = PyTuple_New(3);
     if (PyFunction_Check(target)) {
         PyObject* stack[3] = { arg0, arg1, arg2 };
         res = fast_function(target, stack, 3);
@@ -1921,7 +1922,6 @@ PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
         goto error;
     }
 
-    auto args = PyTuple_New(3);
     if (args == nullptr) {
         Py_DECREF(arg0);
         Py_DECREF(arg1);
@@ -1945,6 +1945,7 @@ error:
 
 PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
     PyObject* res = nullptr;
+    auto args = PyTuple_New(4);
     if (PyFunction_Check(target)) {
         PyObject* stack[4] = { arg0, arg1, arg2, arg3 };
         res = fast_function(target, stack, 4);
@@ -1955,7 +1956,6 @@ PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
         goto error;
     }
 
-    auto args = PyTuple_New(4);
     if (args == nullptr) {
         Py_DECREF(arg0);
         Py_DECREF(arg1);
@@ -2210,7 +2210,7 @@ inline PyObject* PyJit_Tagged_Modulo(tagged_ptr left, tagged_ptr right) {
 #ifdef _MSC_VER
     if (right > 0 && left > 0 && SafeModulus(left, right, res)) {
 #else
-#error No support for this compiler
+    if (right > 0 && left > 0 && left % right) {
 #endif
     if (can_tag(res)) {
         return TAG_IT(res);
@@ -2245,7 +2245,7 @@ inline PyObject* PyJit_Tagged_FloorDivide(tagged_ptr left, tagged_ptr right) {
 #ifdef _MSC_VER
     if (SafeDivide(left, right, res)) {
 #else
-#error No support for this compiler
+    if (floor(left / right)){
 #endif
     if (can_tag(res)) {
         return TAG_IT(res);
