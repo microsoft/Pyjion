@@ -1758,6 +1758,201 @@ public:
 		return 0;
 	}
 
+    void getMethodVTableOffset(CORINFO_METHOD_HANDLE method, unsigned int *offsetOfIndirection,
+                               unsigned int *offsetAfterIndirection, bool *isRelative) override {
+
+    }
+
+    CORINFO_METHOD_HANDLE
+    resolveVirtualMethod(CORINFO_METHOD_HANDLE virtualMethod, CORINFO_CLASS_HANDLE implementingClass,
+                         CORINFO_CONTEXT_HANDLE ownerType) override {
+        return nullptr;
+    }
+
+    CORINFO_METHOD_HANDLE getUnboxedEntry(CORINFO_METHOD_HANDLE ftn, bool *requiresInstMethodTableArg) override {
+        return nullptr;
+    }
+
+    CORINFO_CLASS_HANDLE getDefaultEqualityComparerClass(CORINFO_CLASS_HANDLE elemType) override {
+        return nullptr;
+    }
+
+    void
+    expandRawHandleIntrinsic(CORINFO_RESOLVED_TOKEN *pResolvedToken, CORINFO_GENERICHANDLE_RESULT *pResult) override {
+
+    }
+
+    void setPatchpointInfo(PatchpointInfo *patchpointInfo) override {
+
+    }
+
+    PatchpointInfo *getOSRInfo(unsigned int *ilOffset) override {
+        return nullptr;
+    }
+
+    bool tryResolveToken(CORINFO_RESOLVED_TOKEN *pResolvedToken) override {
+        return false;
+    }
+
+    LPCWSTR getStringLiteral(CORINFO_MODULE_HANDLE module, unsigned int metaTOK, int *length) override {
+        return nullptr;
+    }
+
+    const char *getClassNameFromMetadata(CORINFO_CLASS_HANDLE cls, const char **namespaceName) override {
+        return nullptr;
+    }
+
+    CORINFO_CLASS_HANDLE getTypeInstantiationArgument(CORINFO_CLASS_HANDLE cls, unsigned int index) override {
+        return nullptr;
+    }
+
+    CorInfoInlineTypeCheck canInlineTypeCheck(CORINFO_CLASS_HANDLE cls, CorInfoInlineTypeCheckSource source) override {
+        return CORINFO_INLINE_TYPECHECK_USE_HELPER;
+    }
+
+    unsigned int getHeapClassSize(CORINFO_CLASS_HANDLE cls) override {
+        return 0;
+    }
+
+    BOOL canAllocateOnStack(CORINFO_CLASS_HANDLE cls) override {
+        return false;
+    }
+
+    CorInfoHelpFunc getNewHelper(CORINFO_RESOLVED_TOKEN *pResolvedToken, CORINFO_METHOD_HANDLE callerHandle,
+                                 bool *pHasSideEffects) override {
+        return CORINFO_HELP_GETREFANY;
+    }
+
+    bool getReadyToRunHelper(CORINFO_RESOLVED_TOKEN *pResolvedToken, CORINFO_LOOKUP_KIND *pGenericLookupKind,
+                             CorInfoHelpFunc id, CORINFO_CONST_LOOKUP *pLookup) override {
+        return false;
+    }
+
+    void getReadyToRunDelegateCtorHelper(CORINFO_RESOLVED_TOKEN *pTargetMethod, CORINFO_CLASS_HANDLE delegateType,
+                                         CORINFO_LOOKUP *pLookup) override {
+
+    }
+
+    CorInfoInitClassResult
+    initClass(CORINFO_FIELD_HANDLE field, CORINFO_METHOD_HANDLE method, CORINFO_CONTEXT_HANDLE context) override {
+        return CORINFO_INITCLASS_INITIALIZED;
+    }
+
+    CorInfoType getTypeForPrimitiveNumericClass(CORINFO_CLASS_HANDLE cls) override {
+        return CORINFO_TYPE_BYREF;
+    }
+
+    TypeCompareState compareTypesForCast(CORINFO_CLASS_HANDLE fromClass, CORINFO_CLASS_HANDLE toClass) override {
+        return TypeCompareState::May;
+    }
+
+    TypeCompareState compareTypesForEquality(CORINFO_CLASS_HANDLE cls1, CORINFO_CLASS_HANDLE cls2) override {
+        return TypeCompareState::May;
+    }
+
+    BOOL isMoreSpecificType(CORINFO_CLASS_HANDLE cls1, CORINFO_CLASS_HANDLE cls2) override {
+        return false;
+    }
+
+    void *allocateArray(size_t cBytes) override {
+        return nullptr;
+    }
+
+    CorInfoHFAElemType getHFAType(CORINFO_CLASS_HANDLE hClass) override {
+        return CORINFO_HFA_ELEM_DOUBLE;
+    }
+
+    bool runWithErrorTrap(void (*function)(void *), void *parameter) override {
+        return false;
+    }
+
+    const char *getMethodNameFromMetadata(CORINFO_METHOD_HANDLE ftn, const char **className, const char **namespaceName,
+                                          const char **enclosingClassName) override {
+        return nullptr;
+    }
+
+    bool getSystemVAmd64PassStructInRegisterDescriptor(CORINFO_CLASS_HANDLE structHnd,
+                                                       SYSTEMV_AMD64_CORINFO_STRUCT_REG_PASSING_DESCRIPTOR *structPassInRegDescPtr) override {
+        return false;
+    }
+
+    void *getHelperFtn(CorInfoHelpFunc ftnNum, void **ppIndirection) override {
+        return nullptr;
+    }
+
+    void getLocationOfThisType(CORINFO_METHOD_HANDLE context, CORINFO_LOOKUP_KIND *pLookupKind) override {
+
+    }
+
+    CORINFO_CLASS_HANDLE getStaticFieldCurrentClass(CORINFO_FIELD_HANDLE field, bool *pIsSpeculative) override {
+        return nullptr;
+    }
+
+    DWORD getFieldThreadLocalStoreID(CORINFO_FIELD_HANDLE field, void **ppIndirection) override {
+        return 0;
+    }
+
+    void setOverride(ICorDynamicInfo *pOverride, CORINFO_METHOD_HANDLE currentMethod) override {
+
+    }
+
+    void addActiveDependency(CORINFO_MODULE_HANDLE moduleFrom, CORINFO_MODULE_HANDLE moduleTo) override {
+
+    }
+
+    CORINFO_METHOD_HANDLE
+    GetDelegateCtor(CORINFO_METHOD_HANDLE methHnd, CORINFO_CLASS_HANDLE clsHnd, CORINFO_METHOD_HANDLE targetMethodHnd,
+                    DelegateCtorArgs *pCtorData) override {
+        return nullptr;
+    }
+
+    void MethodCompileComplete(CORINFO_METHOD_HANDLE methHnd) override {
+
+    }
+
+    bool getTailCallHelpers(CORINFO_RESOLVED_TOKEN *callToken, CORINFO_SIG_INFO *sig,
+                            CORINFO_GET_TAILCALL_HELPERS_FLAGS flags, CORINFO_TAILCALL_HELPERS *pResult) override {
+        return false;
+    }
+
+    bool convertPInvokeCalliToCall(CORINFO_RESOLVED_TOKEN *pResolvedToken, bool fMustConvert) override {
+        return false;
+    }
+
+    void notifyInstructionSetUsage(CORINFO_InstructionSet instructionSet, bool supportEnabled) override {
+
+    }
+
+    void reserveUnwindInfo(BOOL isFunclet, BOOL isColdCode, ULONG unwindSize) override {
+
+    }
+
+    void allocUnwindInfo(BYTE *pHotCode, BYTE *pColdCode, ULONG startOffset, ULONG endOffset, ULONG unwindSize,
+                         BYTE *pUnwindBlock, CorJitFuncKind funcKind) override {
+
+    }
+
+    void *allocGCInfo(size_t size) override {
+        return nullptr;
+    }
+
+    void setEHcount(unsigned int cEH) override {
+
+    }
+
+    void setEHinfo(unsigned int EHnumber, const CORINFO_EH_CLAUSE *clause) override {
+
+    }
+
+    HRESULT allocMethodBlockCounts(UINT32 count, BlockCounts **pBlockCounts) override {
+        return 0;
+    }
+
+    HRESULT getMethodBlockCounts(CORINFO_METHOD_HANDLE ftnHnd, UINT32 *pCount, BlockCounts **pBlockCounts,
+                                 UINT32 *pNumRuns) override {
+        return 0;
+    }
+
 };
 
 #endif
