@@ -63,7 +63,7 @@ public:
         m_module = module;
     }
 
-    ~CorJitInfo() {
+    ~CorJitInfo() override {
         if (m_codeAddr != nullptr) {
             freeMem(m_codeAddr);
         }

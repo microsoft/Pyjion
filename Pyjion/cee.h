@@ -51,28 +51,41 @@
 using namespace std;
 
 class CCorJitHost : public ICorJitHost {
-	void * allocateMemory(size_t size, bool usePageAllocator = false)
+	void * allocateMemory(size_t size) override
 	{
+	    // TODO
 		return nullptr;
 	}
 
-	void freeMemory(void * block, bool usePageAllocator = false)
+	void freeMemory(void * block) override
 	{
+	    // TODO..
 	}
 
-	int getIntConfigValue(const wchar_t * name, int defaultValue)
+	int getIntConfigValue(const WCHAR* name, int defaultValue) override
 	{
 		return defaultValue;
 	}
 
-	const wchar_t * getStringConfigValue(const wchar_t * name)
+	const WCHAR * getStringConfigValue(const WCHAR* name) override
 	{
 		return nullptr;
 	}
 
-	void freeStringConfigValue(const wchar_t * value)
+	void freeStringConfigValue(const WCHAR* value) override
 	{
 	}
+
+	void* allocateSlab(size_t size, size_t* pActualSize) override
+    {
+        *pActualSize = size;
+        return allocateMemory(size);
+    }
+
+    void freeSlab(void* slab, size_t actualSize) override
+    {
+        freeMemory(slab);
+    }
 };
 
 void CeeInit();

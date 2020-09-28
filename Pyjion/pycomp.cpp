@@ -32,62 +32,16 @@
 
 using namespace std;
 
-HRESULT __stdcall GetCORSystemDirectoryInternal(SString& pbuffer) {
-    printf("get cor system\n");
-    return S_OK;
-}
-
-CExecutionEngine g_execEngine;
-
-extern "C" __declspec(dllexport) BOOL WINAPI DllMain(
-    _In_ HINSTANCE hinstDLL,
-    _In_ DWORD     fdwReason,
-    _In_ LPVOID    lpvReserved
-    ) {
-    switch (fdwReason) {
-        case DLL_PROCESS_ATTACH: break;
-        case DLL_PROCESS_DETACH: break;
-        case DLL_THREAD_ATTACH: break;
-        case DLL_THREAD_DETACH:
-            g_execEngine.TLS_ThreadDetaching();
-            break;
-    }
-    return TRUE;
-}
-
-BOOL EEHeapFreeInProcessHeap(DWORD dwFlags, LPVOID lpMem) {
-    return ::HeapFree(g_execEngine.ClrGetProcessHeap(), dwFlags, lpMem);
-}
-
-LPVOID EEHeapAllocInProcessHeap(DWORD dwFlags, SIZE_T dwBytes) {
-    return ::HeapAlloc(g_execEngine.ClrGetProcessHeap(), dwFlags, dwBytes);
-}
-
-void* __stdcall GetCLRFunction(LPCSTR functionName) {
-    if (strcmp(functionName, "EEHeapAllocInProcessHeap") == 0) {
-        return ::EEHeapAllocInProcessHeap;
-    }
-    else if (strcmp(functionName, "EEHeapFreeInProcessHeap") == 0) {
-        return ::EEHeapFreeInProcessHeap;
-    }
-    printf("get clr function %s\n", functionName);
-    return NULL;
-}
-
-IExecutionEngine* __stdcall IEE() {
-    return &g_execEngine;
-}
-
 CCorJitHost g_jitHost;
 
 void CeeInit() {
-    CoreClrCallbacks cccallbacks;
-    cccallbacks.m_hmodCoreCLR = (HINSTANCE)GetModuleHandleW(NULL);
-    cccallbacks.m_pfnIEE = IEE;
-    cccallbacks.m_pfnGetCORSystemDirectory = GetCORSystemDirectoryInternal;
-    cccallbacks.m_pfnGetCLRFunction = GetCLRFunction;
-
-    InitUtilcode(cccallbacks);
+//    CoreClrCallbacks cccallbacks;
+//    cccallbacks.m_hmodCoreCLR = (HINSTANCE)GetModuleHandleW(NULL);
+//    cccallbacks.m_pfnIEE = IEE;
+//    cccallbacks.m_pfnGetCORSystemDirectory = GetCORSystemDirectoryInternal;
+//    cccallbacks.m_pfnGetCLRFunction = GetCLRFunction;
+//
+//    InitUtilcode(cccallbacks);
     // TODO: We should re-enable contracts and handle exceptions from OOM
     // and just fail the whole compilation if we hit that.  Right now we
     // just leak an exception out across the JIT boundary.
@@ -1189,7 +1143,7 @@ void PythonCompiler::emit_periodic_work() {
 }
 
 JittedCode* PythonCompiler::emit_compile() {
-    CorJitInfo* jitInfo = new CorJitInfo(g_execEngine, m_code, m_module);
+    CorJitInfo* jitInfo = new CorJitInfo(m_code, m_module);
     auto addr = m_il.compile(jitInfo, g_jit, m_code->co_stacksize + 100).m_addr;
     if (addr == nullptr) {
         printf("Compiling failed %s from %s line %d\r\n",
