@@ -50,7 +50,6 @@
 using namespace std;
 
 class CorJitInfo : public ICorJitInfo, public JittedCode {
-    CExecutionEngine& m_executionEngine;
     void* m_codeAddr;
     void* m_dataAddr;
     PyCodeObject *m_code;
@@ -58,7 +57,7 @@ class CorJitInfo : public ICorJitInfo, public JittedCode {
 
 public:
 
-    CorJitInfo(CExecutionEngine& executionEngine, PyCodeObject* code, UserModule* module) : m_executionEngine(executionEngine) {
+    CorJitInfo(PyCodeObject* code, UserModule* module) {
         m_codeAddr = m_dataAddr = nullptr;
         m_code = code;
         m_module = module;
@@ -78,13 +77,8 @@ public:
         return m_codeAddr;
     }
 
-    /* ICorJitInfo */
-    IEEMemoryManager* getMemoryManager() {
-        return &m_executionEngine;
-    }
 
     void freeMem(PVOID code) {
-        HeapFree(m_executionEngine.m_codeHeap, 0, code);
     }
 
     virtual void allocMem(
@@ -97,58 +91,6 @@ public:
         void **             coldCodeBlock,  /* OUT */
         void **             roDataBlock     /* OUT */
         ) {
-        //printf("allocMem\r\n");
-        // TODO: Alignment?
-        //printf("Code size: %d\r\n", hotCodeSize);
-        auto code = HeapAlloc(m_executionEngine.m_codeHeap, 0, hotCodeSize);
-        *hotCodeBlock = m_codeAddr = code;
-        if (roDataSize != 0) {
-            // TODO: This mem needs to be freed...
-            *roDataBlock = m_dataAddr = GlobalAlloc(0, roDataSize);
-        }
-    }
-
-    virtual void reserveUnwindInfo(
-        BOOL                isFunclet,             /* IN */
-        BOOL                isColdCode,            /* IN */
-        ULONG               unwindSize             /* IN */
-        ) {
-        //printf("reserveUnwindInfo\r\n");
-    }
-
-    virtual void allocUnwindInfo(
-        BYTE *              pHotCode,              /* IN */
-        BYTE *              pColdCode,             /* IN */
-        ULONG               startOffset,           /* IN */
-        ULONG               endOffset,             /* IN */
-        ULONG               unwindSize,            /* IN */
-        BYTE *              pUnwindBlock,          /* IN */
-        CorJitFuncKind      funcKind               /* IN */
-        ) {
-        //printf("allocUnwindInfo\r\n");
-    }
-
-    virtual void * allocGCInfo(
-        size_t                  size        /* IN */
-        ) {
-        //printf("allocGCInfo\r\n");
-        return malloc(size);
-    }
-
-    virtual void yieldExecution() {
-    }
-
-    virtual void setEHcount(
-        unsigned                cEH          /* IN */
-        ) {
-        printf("setEHcount\r\n");
-    }
-
-    virtual void setEHinfo(
-        unsigned                 EHnumber,   /* IN  */
-        const CORINFO_EH_CLAUSE *clause      /* IN */
-        ) {
-        printf("setEHinfo\r\n");
     }
 
     virtual BOOL logMsg(unsigned level, const char* fmt, va_list args) {
@@ -167,24 +109,6 @@ public:
 
     virtual void reportFatalError(CorJitResult result) {
         printf("Fatal error %X\r\n", result);
-    }
-
-    virtual HRESULT allocBBProfileBuffer(
-        ULONG                 count,           // The number of basic blocks that we have
-        ProfileBuffer **      profileBuffer
-        ) {
-        printf("Alloc bb profile buffer\r\n");
-        return E_FAIL;
-    }
-
-    virtual HRESULT getBBProfileData(
-        CORINFO_METHOD_HANDLE ftnHnd,
-        ULONG *               count,           // The number of basic blocks that we have
-        ProfileBuffer **      profileBuffer,
-        ULONG *               numRuns
-        ) {
-        printf("getBBProfileData\r\n");
-        return E_FAIL;
     }
 
 #if !defined(RYUJIT_CTPBUILD)
@@ -626,66 +550,6 @@ public:
         return IAT_VALUE;
     }
 
-    // (static fields only) given that 'field' refers to thread local store,
-    // return the ID (TLS index), which is used to find the begining of the
-    // TLS data area for the particular DLL 'field' is associated with.
-    virtual DWORD getFieldThreadLocalStoreID(
-        CORINFO_FIELD_HANDLE    field,
-        void                  **ppIndirection = NULL
-        ) {
-        printf("getFieldThreadLocalStoreID\r\n"); return 0;
-    }
-
-    // Sets another object to intercept calls to "self" and current method being compiled
-    virtual void setOverride(
-        ICorDynamicInfo             *pOverride,
-        CORINFO_METHOD_HANDLE       currentMethod
-        ) {
-        printf("setOverride\r\n");
-    }
-
-    // Adds an active dependency from the context method's module to the given module
-    // This is internal callback for the EE. JIT should not call it directly.
-    virtual void addActiveDependency(
-        CORINFO_MODULE_HANDLE       moduleFrom,
-        CORINFO_MODULE_HANDLE       moduleTo
-        ) {
-        printf("addActiveDependency\r\n");
-    }
-
-    virtual CORINFO_METHOD_HANDLE GetDelegateCtor(
-        CORINFO_METHOD_HANDLE  methHnd,
-        CORINFO_CLASS_HANDLE   clsHnd,
-        CORINFO_METHOD_HANDLE  targetMethodHnd,
-        DelegateCtorArgs *     pCtorData
-        ) {
-        printf("GetDelegateCtor\r\n"); return nullptr;
-    }
-
-    virtual void MethodCompileComplete(
-        CORINFO_METHOD_HANDLE methHnd
-        ) {
-        printf("MethodCompileComplete\r\n");
-    }
-
-    // return a thunk that will copy the arguments for the given signature.
-    virtual void* getTailCallCopyArgsThunk(
-        CORINFO_SIG_INFO       *pSig,
-        CorInfoHelperTailCallSpecialHandling flags
-        ) {
-        printf("getTailCallCopyArgsThunk\r\n");
-        return nullptr;
-    }
-
-    /* ICorStaticInfo */
-    virtual bool getSystemVAmd64PassStructInRegisterDescriptor(
-        /* IN */    CORINFO_CLASS_HANDLE        structHnd,
-        /* OUT */   SYSTEMV_AMD64_CORINFO_STRUCT_REG_PASSING_DESCRIPTOR* structPassInRegDescPtr
-        ) {
-        assert(false);
-        return false;
-    }
-
     // return flags (defined above, CORINFO_FLG_PUBLIC ...)
     virtual DWORD getMethodAttribs(
         CORINFO_METHOD_HANDLE       ftn         /* IN */
@@ -891,15 +755,6 @@ public:
     }
 
 
-    // Indicates if the method is an instance of the generic
-    // method that passes (or has passed) verification
-    virtual CorInfoInstantiationVerification isInstantiationOfVerifiedGeneric(
-        CORINFO_METHOD_HANDLE   method /* IN  */
-        ) {
-        //printf("isInstantiationOfVerifiedGeneric\r\n"); 
-        return  INSTVER_NOT_INSTANTIATION;
-    }
-
     // Loads the constraints on a typical method definition, detecting cycles;
     // for use in verification.
     virtual void initConstraintsForVerification(
@@ -910,15 +765,6 @@ public:
         *pfHasCircularClassConstraints = FALSE;
         *pfHasCircularMethodConstraint = FALSE;
         //printf("initConstraintsForVerification\r\n");
-    }
-
-    // Returns enum whether the method does not require verification
-    // Also see ICorModuleInfo::canSkipVerification
-    virtual CorInfoCanSkipVerificationResult canSkipMethodVerification(
-        CORINFO_METHOD_HANDLE       ftnHandle
-        ) {
-        //printf("canSkipMethodVerification\r\n"); 
-        return CORINFO_VERIFICATION_CAN_SKIP;
     }
 
     // load and restore the method
@@ -1104,15 +950,6 @@ public:
     // If it is cached, it should only be used as a hint.
     // This is only used by ngen for calculating certain hints.
     //
-
-    // Returns enum whether the module does not require verification
-    // Also see ICorMethodInfo::canSkipMethodVerification();
-    virtual CorInfoCanSkipVerificationResult canSkipVerification(
-        CORINFO_MODULE_HANDLE       module     /* IN  */
-        ) {
-        printf("canSkipVerification\r\n");
-        return CORINFO_VERIFICATION_CAN_SKIP;
-    }
 
     // Checks if the given metadata token is valid
     virtual BOOL isValidToken(
@@ -1768,14 +1605,6 @@ public:
         return NULL;
     }
 
-    // Returns type of HFA for valuetype
-    virtual CorInfoType getHFAType(
-        CORINFO_CLASS_HANDLE hClass
-        ) {
-        printf("getHFAType\r\n");
-        return CORINFO_TYPE_UNDEF;
-    }
-
     /*****************************************************************************
     * ICorErrorInfo contains methods to deal with SEH exceptions being thrown
     * from the corinfo interface.  These methods may be called when an exception
@@ -1950,11 +1779,11 @@ public:
 #endif // RYUJIT_CTPBUILD
 
 
-	void CorJitInfo::getAddressOfPInvokeTarget(CORINFO_METHOD_HANDLE method, CORINFO_CONST_LOOKUP * pLookup)
+	void getAddressOfPInvokeTarget(CORINFO_METHOD_HANDLE method, CORINFO_CONST_LOOKUP * pLookup)
 	{
 	}
 
-	DWORD CorJitInfo::getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes)
+	DWORD getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes)
 	{
 		return 0;
 	}
