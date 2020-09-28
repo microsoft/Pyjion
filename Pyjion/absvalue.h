@@ -26,7 +26,7 @@
 #ifndef ABSVALUE_H
 #define ABSVALUE_H
 
-#include <python.h>
+#include <Python.h>
 #include <opcode.h>
 #include "cowvector.h"
 
