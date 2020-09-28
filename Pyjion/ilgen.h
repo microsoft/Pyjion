@@ -27,7 +27,7 @@
 #define ILGEN_H
 
 #define FEATURE_NO_HOST
-#define USE_STL
+
 #include <stdint.h>
 #include <windows.h>
 #include <wchar.h>
@@ -62,15 +62,20 @@ public:
     }
 };
 
+struct CorInfoTypeHash {
+    std::size_t operator()(CorInfoType e) const {
+        return static_cast<std::size_t>(e);
+    }
+};
 
 class ILGenerator {
     vector<Parameter> m_params, m_locals;
     CorInfoType m_retType;
     Module* m_module;
-    unordered_map<CorInfoType, vector<Local>> m_freedLocals;
+    unordered_map<CorInfoType, vector<Local>, CorInfoTypeHash> m_freedLocals;
 
 public:
-    vector<byte> m_il;
+    vector<BYTE> m_il;
     int m_localCount;
     vector<LabelInfo> m_labels;
 
@@ -142,7 +147,7 @@ public:
 
     void localloc() {
         push_back(CEE_PREFIX1);
-        push_back((byte)CEE_LOCALLOC);
+        push_back((BYTE)CEE_LOCALLOC);
     }
 
     void ret() {
@@ -176,7 +181,7 @@ public:
                 }
                 else {
                     m_il.push_back(CEE_LDC_I4);
-                    m_il.push_back((byte)CEE_STLOC);
+                    m_il.push_back((BYTE)CEE_STLOC);
                     emit_int(i);
                 }
         }
@@ -240,7 +245,7 @@ public:
                     m_il.push_back(CEE_BNE_UN_S);
                     break;
             }
-            m_il.push_back((byte)offset - 2);
+            m_il.push_back((BYTE)offset - 2);
         }
         else {
             switch (branchType) {
@@ -285,7 +290,7 @@ public:
 
     void compare_eq() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((byte)CEE_CEQ);
+        m_il.push_back((BYTE)CEE_CEQ);
     }
 
     void compare_ne() {
@@ -296,38 +301,38 @@ public:
 
     void compare_gt() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((byte)CEE_CGT);
+        m_il.push_back((BYTE)CEE_CGT);
     }
 
     void compare_lt() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((byte)CEE_CLT);
+        m_il.push_back((BYTE)CEE_CLT);
     }
 
     void compare_ge() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((byte)CEE_CLT);
+        m_il.push_back((BYTE)CEE_CLT);
         ld_i4(0);
         compare_eq();
     }
 
     void compare_le() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((byte)CEE_CGT);
+        m_il.push_back((BYTE)CEE_CGT);
         ld_i4(0);
         compare_eq();
     }
 
     void compare_ge_float() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((byte)CEE_CLT_UN);
+        m_il.push_back((BYTE)CEE_CLT_UN);
         ld_i4(0);
         compare_eq();
     }
 
     void compare_le_float() {
         m_il.push_back(CEE_PREFIX1);
-        m_il.push_back((byte)CEE_CGT_UN);
+        m_il.push_back((BYTE)CEE_CGT_UN);
         ld_i4(0);
         compare_eq();
     }
@@ -408,7 +413,7 @@ public:
                 }
                 else {
                     m_il.push_back(CEE_PREFIX1);
-                    m_il.push_back((byte)CEE_STLOC);
+                    m_il.push_back((BYTE)CEE_STLOC);
                     m_il.push_back(index & 0xff);
                     m_il.push_back((index >> 8) & 0xff);
                 }
@@ -429,7 +434,7 @@ public:
                 }
                 else {
                     m_il.push_back(CEE_PREFIX1);
-                    m_il.push_back((byte)CEE_LDLOC);
+                    m_il.push_back((BYTE)CEE_LDLOC);
                     m_il.push_back(index & 0xff);
                     m_il.push_back((index >> 8) & 0xff);
                 }
@@ -444,7 +449,7 @@ public:
         }
         else {
             m_il.push_back(CEE_PREFIX1);
-            m_il.push_back((byte)CEE_LDLOCA);
+            m_il.push_back((BYTE)CEE_LDLOCA);
             m_il.push_back(index & 0xff);
             m_il.push_back((index >> 8) & 0xff);
         }
@@ -479,7 +484,7 @@ public:
         CorJitResult result = jit->compileMethod(
             /*ICorJitInfo*/jitInfo,
             /*CORINFO_METHOD_INFO */&methodInfo,
-            /*flags*/CORJIT_FLG_SKIP_VERIFICATION,
+            /*flags*/ CORJIT_FLAGS::CorJitFlag::CORJIT_FLAG_SKIP_VERIFICATION ,
             &nativeEntry,
             &nativeSizeOfCode
             );
@@ -523,7 +528,7 @@ public:
                 }
                 else {
                     m_il.push_back(CEE_PREFIX1);
-                    m_il.push_back((byte)CEE_LDARG);
+                    m_il.push_back((BYTE)CEE_LDARG);
                     m_il.push_back(index & 0xff);
                     m_il.push_back((index >> 8) & 0xff);
                 }
@@ -539,7 +544,7 @@ private:
         m_il.push_back((value >> 24) & 0xff);
     }
 
-    void push_back(byte b) {
+    void push_back(BYTE b) {
         m_il.push_back(b);
     }
 

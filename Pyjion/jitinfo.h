@@ -68,7 +68,7 @@ public:
             freeMem(m_codeAddr);
         }
         if (m_dataAddr != nullptr) {
-            ::GlobalFree(m_dataAddr);
+            free(m_dataAddr);
         }
         delete m_module;
     }
@@ -190,13 +190,6 @@ public:
         return -1;
     }
 
-    virtual void getModuleNativeEntryPointRange(
-        void ** pStart, /* OUT */
-        void ** pEnd    /* OUT */
-        ) {
-        printf("getModuleNativeEntryPointRange\r\n");
-    }
-
     // For what machine does the VM expect the JIT to generate code? The VM
     // returns one of the IMAGE_FILE_MACHINE_* values. Note that if the VM
     // is cross-compiling (such as the case for crossgen), it will return a
@@ -261,29 +254,6 @@ public:
     virtual SIZE_T*       getAddrModuleDomainID(CORINFO_MODULE_HANDLE   module) {
         printf("getAddrModuleDomainID\r\n");
         return 0;
-    }
-
-    static void ThrowFunc() {
-    }
-
-    static void FailFast() {
-        ::ExitProcess(1);
-    }
-
-    // return the native entry point to an EE helper (see CorInfoHelpFunc)
-    virtual void* getHelperFtn(
-        CorInfoHelpFunc         ftnNum,
-        void                  **ppIndirection = NULL
-        ) {
-        switch (ftnNum) {
-            case CORINFO_HELP_THROW: return &ThrowFunc;
-            case CORINFO_HELP_FAIL_FAST: return &FailFast;
-            case CORINFO_HELP_DBLREM:
-                auto res = (double(*)(double, double))&fmod;
-                return res;
-        }
-        printf("unknown getHelperFtn\r\n");
-        return NULL;
     }
 
     // return a callable address of the function (native code). This function

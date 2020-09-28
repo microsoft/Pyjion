@@ -23,12 +23,14 @@
 *
 */
 
-#include <stdlib.h>
+
 #include <palrt.h>
 #include <corjit.h>
 #include <openum.h>
 
 #include "pycomp.h"
+
+using namespace std;
 
 HRESULT __stdcall GetCORSystemDirectoryInternal(SString& pbuffer) {
     printf("get cor system\n");
