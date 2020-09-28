@@ -26,24 +26,13 @@
 #ifndef PYCOMP_H
 #define PYCOMP_H
 
-#include <stdint.h>
 
 #include <windows.h>
-#include <wchar.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
+
 #include <share.h>
 #include <intrin.h>
 #include <limits.h>
-#include <string.h>
 #include <float.h>
-
-#include <cstdlib>
-
-
-#include <vector>
-#include <unordered_map>
 
 #include "ipycomp.h"
 #include "jitinfo.h"

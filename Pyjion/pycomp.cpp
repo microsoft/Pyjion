@@ -23,9 +23,11 @@
 *
 */
 
-#include <windows.h>
-
+#include <cstdlib>
+#define PAL_STDCPP_COMPAT 1
 #include "pycomp.h"
+
+#include <windows.h>
 #include <corjit.h>
 #include <openum.h>
 

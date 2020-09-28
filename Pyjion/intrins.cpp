@@ -27,7 +27,7 @@
 
 #include "intrins.h"
 #include "taggedptr.h"
-#include <cstdint>
+#include <stdint.h>
 
 #ifdef _MSC_VER
 

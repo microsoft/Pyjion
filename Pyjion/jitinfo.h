@@ -28,37 +28,20 @@
 
 
 #define FEATURE_NO_HOST
-#define USE_STL
-#include <stdint.h>
 
-#ifdef _WIN32
+#include <Python.h>
+//#include <utilcode.h>
+#include <frameobject.h>
+#include <opcode.h>
 #include <windows.h>
 #include <share.h>
 #include <intrin.h>
-#else
-// TODO intrinsics from x86/LLVM
-#endif
-
-#include <wchar.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <limits.h>
-#include <string.h>
-#include <float.h>
-
-#include <cstdlib>
-
-#include <Python.h>
-#include <utilcode.h>
-#include <frameobject.h>
-#include <opcode.h>
 
 #include <vector>
 #include <unordered_map>
 
 #include <corjit.h>
-#include <utilcode.h>
+
 #include <openum.h>
 
 #include "codemodel.h"
