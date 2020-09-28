@@ -36,13 +36,12 @@ using namespace std;
 template<typename T> class CowData {
     shared_ptr<T> m_data;
 public:
-    CowData() {
+    CowData() = default;
+
+    explicit CowData(T *data) : m_data(data) {
     }
 
-    CowData(T *data) : m_data(data) {
-    }
-
-    CowData(shared_ptr<T> data) : m_data(data) {
+    explicit CowData(shared_ptr<T> data) : m_data(data) {
     }
 
     bool operator ==(CowData<T> other) {
@@ -72,10 +71,9 @@ protected:
 // Copy on write vector implementation
 template<typename T> class CowVector : public CowData<vector<T>> {
 public:
-    CowVector() {
-    }
+    CowVector() = default;
 
-    CowVector(size_t size) : CowData(new vector<T>(size)) {
+    explicit CowVector(size_t size) : CowData<vector<T>>(new vector<T>(size)) {
     }
 
     T operator[](size_t index) {
@@ -109,9 +107,7 @@ template<typename T> class CowSet : public CowData<unordered_set<T>> {
     typedef typename unordered_set<T>::iterator iterator;
     static shared_ptr<unordered_set<T>> s_empty;
 public:
-    CowSet() : CowData(get_empty()) {
-
-    }
+    CowSet() : CowData<unordered_set<T>>(get_empty()) { } ;
 
     iterator find(const key_type& k) {
         return get_current().find(k);

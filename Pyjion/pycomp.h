@@ -27,7 +27,15 @@
 #define PYCOMP_H
 
 #include <stdint.h>
+
+#ifdef _WIN32
 #include <windows.h>
+#include <share.h>
+#include <intrin.h>
+#else
+// TODO intrinsics from x86/LLVM
+#endif
+
 #include <wchar.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -35,9 +43,9 @@
 #include <limits.h>
 #include <string.h>
 #include <float.h>
-#include <share.h>
+
 #include <cstdlib>
-#include <intrin.h>
+
 
 #include <vector>
 #include <unordered_map>

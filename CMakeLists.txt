@@ -8,10 +8,18 @@ set (CMAKE_CXX_STANDARD_REQUIRED)
 find_package (Python3 COMPONENTS Interpreter Development)
 include_directories(${Python3_INCLUDE_DIRS})
 
+include(CoreCLR/eng/native/functions.cmake)
+include(CoreCLR/src/coreclr/pgosupport.cmake)
+set(CLR_CMAKE_TARGET_ARCH_AMD64 1)
+
+add_subdirectory(CoreCLR/src/coreclr/src/jit)
+include_directories(CoreCLR/src/coreclr/src/pal/prebuilt/inc)
+include_directories(CoreCLR/src/coreclr/src/inc)
+
 set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp)
 add_library(pyjion SHARED ${SOURCES})
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-sign-compare -Wno-invalid-token-paste")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-sign-compare")
 
 option(WERROR "Turn warnings into errors" OFF)
 if (WERROR)
