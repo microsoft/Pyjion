@@ -20,10 +20,8 @@
 #include <hash_map>
 
 #include <corjit.h>
-#include <utilcode.h>
 #include <openum.h>
 
-CorJitInfo g_corJitInfo;
 ICorJitCompiler* g_jit;
 
 extern "C" __declspec(dllexport) void JitInit()

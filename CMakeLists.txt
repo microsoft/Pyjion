@@ -18,8 +18,9 @@ add_compile_options(-fexceptions)
 add_definitions(-DUSE_STL)
 
 if(NOT WIN32)
-    include_directories(CoreCLR/src/coreclr/src/pal/inc/rt CoreCLR/src/coreclr/src/pal/inc CoreCLR/src/coreclr/src/inc)
+    include_directories(CoreCLR/src/coreclr/src/pal/inc/rt CoreCLR/src/coreclr/src/pal/inc CoreCLR/src/coreclr/src/pal/prebuilt/inc)
     add_compile_options(-DPAL_STDCPP_COMPAT)
+    add_compile_options(-fdeclspec)
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         add_compile_options(-Wno-null-arithmetic)
     else(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -36,8 +37,8 @@ if (APPLE)
 endif()
 
 include_directories(CoreCLR/src/coreclr/src/inc)
+include_directories(CoreCLR/artifacts/bin/coreclr/OSX.x64.Debug/inc)
 
-#include(CoreCLR/eng/native/configurecompiler.cmake)
 
 set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp)
 add_library(pyjion SHARED ${SOURCES})

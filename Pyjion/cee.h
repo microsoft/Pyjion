@@ -45,8 +45,6 @@
 
 #include <corjit.h>
 #include <pal.h>
-#include <utilcode.h>
-
 
 #include "openum.h"
 

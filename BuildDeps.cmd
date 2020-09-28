@@ -19,7 +19,7 @@ goto Usage
 
 :BuildCoreCLR
 pushd coreclr
-call build.cmd %__BuildArch% %__BuildType% skipmscorlib skiptests
+call build.cmd %__BuildArch% %__BuildType%
 IF ERRORLEVEL 1 goto Error
 
 mkdir ..\Libs\%__BuildType%\%__BuildArch%\
@@ -41,7 +41,7 @@ if /i "%__BuildArch%" == "x64" set arch=amd64
 set SUFFIX=
 if /i "%__BuildType%" == "Debug" set SUFFIX=_d
 
-copy %arch%\python35%SUFFIX%.lib ..\..\Libs\%__BuildType%\%__BuildArch%\
+copy %arch%\python39%SUFFIX%.lib ..\..\Libs\%__BuildType%\%__BuildArch%\
 popd
 
 :Done

@@ -24,8 +24,7 @@
 */
 
 #include <stdlib.h>
-
-#include <windows.h>
+#include <palrt.h>
 #include <corjit.h>
 #include <openum.h>
 

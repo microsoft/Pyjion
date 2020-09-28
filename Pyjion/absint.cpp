@@ -23,6 +23,7 @@
 *
 */
 
+#include <Python.h>
 #include <opcode.h>
 #include <deque>
 #include <unordered_map>
