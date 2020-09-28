@@ -1,7 +1,3 @@
-[submodule "Python"]
-	path = Python
-	url = https://github.com/python/cpython.git
-	branch = 3.9
 [submodule "dotnet"]
 	path = CoreCLR
 	url = https://github.com/dotnet/runtime
