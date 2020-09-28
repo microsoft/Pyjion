@@ -38,11 +38,6 @@
 #define GET_OPARG(index)  _Py_OPARG(m_byteCode[index/sizeof(_Py_CODEUNIT)])
 #define GET_OPCODE(index) _Py_OPCODE(m_byteCode[index/sizeof(_Py_CODEUNIT)])
 
-struct AbstractValueKindHash {
-    std::size_t operator()(AbstractValueKind e) const {
-        return static_cast<std::size_t>(e);
-    }
-};
 
 AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* comp) : m_code(code), m_comp(comp) {
     m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);

@@ -84,6 +84,12 @@ enum EhFlags {
 EhFlags operator | (EhFlags lhs, EhFlags rhs);
 EhFlags operator |= (EhFlags& lhs, EhFlags rhs);
 
+struct AbstractValueKindHash {
+    std::size_t operator()(AbstractValueKind e) const {
+        return static_cast<std::size_t>(e);
+    }
+};
+
 struct ExceptionVars {
     // The previous exception value before we took the exception we're currently
     // handling.  These correspond with the values in tstate->exc_* and will be
@@ -221,7 +227,7 @@ class __declspec(dllexport) AbstractInterpreter {
     // unpack.
     unordered_map<int, Local> m_sequenceLocals;
     unordered_map<int, bool> m_assignmentState;
-    unordered_map<int, unordered_map<AbstractValueKind, Local>> m_optLocals;
+    unordered_map<int, unordered_map<AbstractValueKind, Local, AbstractValueKindHash>> m_optLocals;
 
 #pragma warning (default:4251)
 
