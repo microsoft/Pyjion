@@ -38,6 +38,12 @@
 #define GET_OPARG(index)  _Py_OPARG(m_byteCode[index/sizeof(_Py_CODEUNIT)])
 #define GET_OPCODE(index) _Py_OPCODE(m_byteCode[index/sizeof(_Py_CODEUNIT)])
 
+struct AbstractValueKindHash {
+    std::size_t operator()(AbstractValueKind e) const {
+        return static_cast<std::size_t>(e);
+    }
+};
+
 AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* comp) : m_code(code), m_comp(comp) {
     m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
     m_size = PyBytes_Size(code->co_code);
@@ -3591,7 +3597,7 @@ LocalKind get_optimized_local_kind(AbstractValueKind kind) {
 Local AbstractInterpreter::get_optimized_local(int index, AbstractValueKind kind) {
 
     if (m_optLocals.find(index) == m_optLocals.end()) {
-        m_optLocals[index] = unordered_map<AbstractValueKind, Local>();
+        m_optLocals[index] = unordered_map<AbstractValueKind, Local, AbstractValueKindHash>();
     }
     auto& map = m_optLocals.find(index)->second;
     if (map.find(kind) == map.end()) {
