@@ -26,11 +26,10 @@
 #ifndef ABSINT_H
 #define ABSINT_H
 
-#include <cstdlib>
+#include <stdlib.h>
 
 #ifndef _WIN32
-#define _ASSERTE(cond) \
-    assert(cond);
+#include <pal_assert.h>
 #endif
 
 #include <Python.h>
