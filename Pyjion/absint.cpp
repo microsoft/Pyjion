@@ -25,6 +25,7 @@
 
 #include <Python.h>
 #include <opcode.h>
+#include <object.h>
 #include <deque>
 #include <unordered_map>
 #include <algorithm>
@@ -528,14 +529,12 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     break;
                 case BUILD_LIST:
-                case BUILD_LIST_UNPACK:
                     for (int i = 0; i < oparg; i++) {
                         lastState.pop();
                     }
                     lastState.push(&List);
                     break;
                 case BUILD_TUPLE:
-                case BUILD_TUPLE_UNPACK:
                 {
                     vector<AbstractValueWithSources> sources;
                     for (int i = 0; i < oparg; i++) {
@@ -561,43 +560,18 @@ bool AbstractInterpreter::interpret() {
                     }
                     lastState.push(&Dict);
                     break;
-                case BUILD_MAP_UNPACK:
-                    for (int i = 0; i < oparg; i++) {
-                        lastState.pop();
-                    }
-                    lastState.push(&Dict);
-                    break;
-                case COMPARE_OP:
-                    switch (oparg) {
-                        case PyCmp_IS:
-                        case PyCmp_IS_NOT:
-                        case PyCmp_IN:
-                        case PyCmp_NOT_IN:
-                            lastState.pop();
-                            lastState.pop();
-                            lastState.push(&Bool);
-                            break;
-                        case PyCmp_EXC_MATCH:
-                            // TODO: Produces an error or a bool, but no way to represent that so we're conservative
-                            lastState.pop();
-                            lastState.pop();
-                            lastState.push(&Any);
-                            break;
-                        default:
-                        {
-                            auto two = lastState.pop_no_escape();
-                            auto one = lastState.pop_no_escape();
-                            auto binaryRes = one.Value->compare(one.Sources, oparg, two);
-
-                            auto sources = add_intermediate_source(opcodeIndex);
-                            AbstractSource::combine(
+                case COMPARE_OP: {
+                        // TODO Implement IS_OP, _CONTAINS_OP
+                        auto two = lastState.pop_no_escape();
+                        auto one = lastState.pop_no_escape();
+                        auto binaryRes = one.Value->compare(one.Sources, oparg, two);
+                        auto sources = add_intermediate_source(opcodeIndex);
+                        AbstractSource::combine(
                                 AbstractSource::combine(one.Sources, two.Sources),
                                 sources
-                                );
-                            auto value = AbstractValueWithSources(binaryRes, sources);
-                            lastState.push(value);
-                            break;
-                        }
+                        );
+                        auto value = AbstractValueWithSources(binaryRes, sources);
+                        lastState.push(value);
                     }
                     break;
                 case IMPORT_NAME:
@@ -757,7 +731,6 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     break;
                 case BUILD_SET:
-                case BUILD_SET_UNPACK:
                     for (int i = 0; i < oparg; i++) {
                         lastState.pop();
                     }
@@ -821,30 +794,6 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     lastState.pop();
                     break;
-//                case CONTINUE_LOOP:
-//                    if (update_start_state(lastState, oparg)) {
-//                        queue.push_back(oparg);
-//                    }
-//                    // Done processing this basic block, we'll need to see a branch
-//                    // to the following opcodes before we'll process them.
-//                    goto next;
-//                case BREAK_LOOP:
-//                {
-//                    auto breakTo = m_breakTo[opcodeIndex];
-//
-//                    // BREAK_LOOP does an unwind block, which restores the
-//                    // stack state to what it was when we entered the loop.  So
-//                    // we get the start state for where the SETUP_LOOP happened
-//                    // here and propagate it to where we're breaking to.  But we
-//                    // need to preserve our local state as that isn't restored.
-//                    auto startState = m_startStates[breakTo.BlockStart];
-//                    startState.m_locals = lastState.m_locals;
-//                    if (update_start_state(startState, breakTo.BlockEnd)) {
-//                        queue.push_back(breakTo.BlockEnd);
-//                    }
-//
-//                    goto next;
-//                }
                 case SETUP_FINALLY:
                 {
                     auto finallyState = lastState;
@@ -900,9 +849,6 @@ bool AbstractInterpreter::interpret() {
                     break;
                 case SETUP_WITH:
                 case YIELD_VALUE:
-                    return false;
-                case BUILD_TUPLE_UNPACK_WITH_CALL:
-                case BUILD_MAP_UNPACK_WITH_CALL:
                     return false;
                 case BUILD_CONST_KEY_MAP:
                     lastState.pop(); //keys
@@ -1339,16 +1285,10 @@ char* AbstractInterpreter::opcode_name(int opcode) {
             OP_TO_STR(SET_ADD)
             OP_TO_STR(MAP_ADD)
             OP_TO_STR(LOAD_CLASSDEREF)
-            OP_TO_STR(BUILD_LIST_UNPACK)
-            OP_TO_STR(BUILD_MAP_UNPACK)
-            OP_TO_STR(BUILD_MAP_UNPACK_WITH_CALL)
-            OP_TO_STR(BUILD_TUPLE_UNPACK)
-            OP_TO_STR(BUILD_SET_UNPACK)
             OP_TO_STR(SETUP_ASYNC_WITH)
             OP_TO_STR(FORMAT_VALUE)
             OP_TO_STR(BUILD_CONST_KEY_MAP)
             OP_TO_STR(BUILD_STRING)
-            OP_TO_STR(BUILD_TUPLE_UNPACK_WITH_CALL)
     }
     return "unknown";
 }
@@ -2168,24 +2108,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 build_tuple(oparg);
                 inc_stack();
                 break;
-            case BUILD_TUPLE_UNPACK:
-                extend_tuple(oparg);
-                inc_stack();
-                break;
             case BUILD_LIST:
                 build_list(oparg);
                 inc_stack();
                 break;
-            case BUILD_LIST_UNPACK:
-                extend_list(oparg);
-                inc_stack();
-                break;
             case BUILD_MAP:
                 build_map(oparg);
-                inc_stack();
-                break;
-            case BUILD_MAP_UNPACK:
-                extend_map(oparg);
                 inc_stack();
                 break;
             case STORE_SUBSCR:
@@ -2207,7 +2135,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 inc_stack();
                 break;
             case BUILD_SET: build_set(oparg); break;
-            case BUILD_SET_UNPACK:
                 extend_set(oparg);
                 inc_stack();
                 break;
@@ -2545,18 +2472,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 int_error_check("import star failed");
                 break;
             case SETUP_WITH:
-            case BUILD_MAP_UNPACK_WITH_CALL:
-                /* TODO: Finish implementation
-
-                    m_comp->emit_new_dict(oparg);
-                    auto dict = m_comp->emit_spill();
-                    // TODO: Null check
-
-                    for (auto i = 0; i < oparg; i++) {
-                    }
-
-                */
-            case BUILD_TUPLE_UNPACK_WITH_CALL:
                 return nullptr;
             case FORMAT_VALUE:
             {
@@ -3324,46 +3239,7 @@ void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *lo
 
 void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
     switch (compareType) {
-        case PyCmp_IS:
-        case PyCmp_IS_NOT:
-            //    TODO: Inlining this would be nice, but then we need the dec refs, e.g.:
-            if (can_optimize_pop_jump(i)) {
-                m_comp->emit_is_push_int(compareType != PyCmp_IS);
-                dec_stack(); // popped 2, pushed 1
-                branch(i);
-            }
-            else {
-                m_comp->emit_is(compareType != PyCmp_IS);
-                dec_stack();
-            }
-            break;
-        case PyCmp_IN:
-            if (can_optimize_pop_jump(i)) {
-                m_comp->emit_in_push_int();
-                dec_stack(2);
-                branch_or_error(i);
-            }
-            else {
-                m_comp->emit_in();
-                dec_stack(2);
-                error_check("in failed");
-                inc_stack();
-            }
-            break;
-        case PyCmp_NOT_IN:
-            if (can_optimize_pop_jump(i)) {
-                m_comp->emit_not_in_push_int();
-                dec_stack(2);
-                branch_or_error(i);
-            }
-            else {
-                m_comp->emit_not_in();
-                dec_stack(2);
-                error_check("not in failed");
-                inc_stack();
-            }
-            break;
-        case PyCmp_EXC_MATCH:
+        case Py_EQ:
             if (get_extended_opcode(i + sizeof(_Py_CODEUNIT)) == POP_JUMP_IF_FALSE) {
                 m_comp->emit_compare_exceptions_int();
                 dec_stack(2);
