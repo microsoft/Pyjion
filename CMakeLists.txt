@@ -16,9 +16,10 @@ add_compile_options(-fexceptions)
 add_definitions(-DUSE_STL)
 add_compile_options(-fvisibility=hidden)
 
-if (DEBUG)
-    add_definitions(-DDEBUG_CALL_TRACE)
-endif()
+IF(CMAKE_BUILD_TYPE MATCHES DEBUG)
+    message("Enabling very verbose messages")
+    add_definitions(-DDEBUG)
+ENDIF(CMAKE_BUILD_TYPE MATCHES DEBUG)
 
 if(NOT WIN32)
     include_directories(CoreCLR/src/coreclr/src/pal/inc/rt CoreCLR/src/coreclr/src/pal/inc CoreCLR/src/coreclr/src/pal/prebuilt/inc)

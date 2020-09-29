@@ -348,6 +348,7 @@ public:
     }
 
     void ld_i(void* ptr) {
+        // BUG : Line causes bad access Exception: EXC_BAD_ACCESS (code=2, address=0x7ffeecf15ff8)
         size_t value = (size_t)ptr;
 #ifdef _TARGET_AMD64_
         if ((value & 0xFFFFFFFF) == value) {
