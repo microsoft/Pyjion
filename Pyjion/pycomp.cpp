@@ -26,7 +26,6 @@
 
 #include <palrt.h>
 #include <corjit.h>
-#include <openum.h>
 
 #include "pycomp.h"
 
@@ -40,15 +39,6 @@ void CeeInit() {
     DisableThrowCheck();
 #endif
 }
-
-class InitHolder {
-public:
-    InitHolder() {
-        CeeInit();
-    }
-};
-
-InitHolder g_initHolder;
 
 Module g_module;
 ICorJitCompiler* g_jit;

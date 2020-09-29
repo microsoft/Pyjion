@@ -134,9 +134,6 @@ bool AbstractInterpreter::preprocess() {
             case SETUP_WITH:
                 // not supported...
                 return false;
-//            case SETUP_LOOP:
-//                blockStarts.push_back(AbsIntBlockInfo(opcodeIndex, oparg + curByte + sizeof(_Py_CODEUNIT), true));
-//                break;
             case POP_BLOCK:
             {
                 auto blockStart = blockStarts.back();
@@ -144,26 +141,10 @@ bool AbstractInterpreter::preprocess() {
                 m_blockStarts[opcodeIndex] = blockStart.BlockStart;
                 break;
             }
-//            case SETUP_EXCEPT:
-//                blockStarts.push_back(AbsIntBlockInfo(opcodeIndex, oparg + curByte + sizeof(_Py_CODEUNIT), false));
-//                ehKind.push_back(false);
-//                break;
             case SETUP_FINALLY:
                 blockStarts.push_back(AbsIntBlockInfo(opcodeIndex, oparg + curByte + sizeof(_Py_CODEUNIT), false));
                 ehKind.push_back(true);
                 break;
-//            case END_FINALLY:
-//                m_endFinallyIsFinally[opcodeIndex] = ehKind.back();
-//                ehKind.pop_back();
-//                break;
-//            case BREAK_LOOP:
-//                for (auto iter = blockStarts.rbegin(); iter != blockStarts.rend(); ++iter) {
-//                    if (iter->IsLoop) {
-//                        m_breakTo[opcodeIndex] = *iter;
-//                        break;
-//                    }
-//                }
-//                break;
             case LOAD_GLOBAL:
             {
                 auto name = PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg));
@@ -190,7 +171,6 @@ bool AbstractInterpreter::preprocess() {
             case POP_JUMP_IF_FALSE:
                 m_jumpsTo.insert(oparg);
                 break;
-
         }
     }
     return true;
@@ -805,34 +785,6 @@ bool AbstractInterpreter::interpret() {
                     }
                 }
                 break;
-//                case SETUP_EXCEPT:
-//                {
-//                    auto ehState = lastState;
-//                    // Except is entered with the exception object, traceback, and exception
-//                    // type.  TODO: We could type these stronger then they currently are typed
-//                    ehState.push(&Any);
-//                    ehState.push(&Any);
-//                    ehState.push(&Any);
-//                    if (update_start_state(ehState, (size_t)oparg + curByte + sizeof(_Py_CODEUNIT))) {
-//                        queue.push_back((size_t)oparg + curByte + sizeof(_Py_CODEUNIT));
-//                    }
-//                }
-//                break;
-//                case END_FINALLY:
-//                {
-//                    bool isFinally = m_endFinallyIsFinally[opcodeIndex];
-//                    if (isFinally) {
-//                        // single value indicating whether we're unwinding or
-//                        // completed normally.
-//                        lastState.pop();
-//                    }
-//                    else {
-//                        lastState.pop();
-//                        lastState.pop();
-//                        lastState.pop();
-//                    }
-//                    break;
-//                }
                 case FORMAT_VALUE:
                     if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
                         // format spec
@@ -858,13 +810,12 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Dict);
                     return false;
                 default:
-#ifdef _DEBUG
                     printf("Unknown unsupported opcode: %s", opcode_name(opcode));
-#endif
+                    PyErr_Format(PyExc_ValueError,
+                                 "Unknown unsupported opcode: %s", opcode_name(opcode));
                     return false;
             }
             update_start_state(lastState, curByte + sizeof(_Py_CODEUNIT));
-
         }
     next:;
     } while (queue.size() != 0);
