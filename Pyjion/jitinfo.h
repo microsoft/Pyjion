@@ -1755,7 +1755,8 @@ public:
 
 	DWORD getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes)
 	{
-		return 0;
+		flags->Add(flags->CORJIT_FLAG_SKIP_VERIFICATION);
+		return sizeof(CORJIT_FLAGS);
 	}
 
     void getMethodVTableOffset(CORINFO_METHOD_HANDLE method, unsigned int *offsetOfIndirection,

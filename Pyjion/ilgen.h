@@ -485,7 +485,7 @@ public:
         CorJitResult result = jit->compileMethod(
             /*ICorJitInfo*/jitInfo,
             /*CORINFO_METHOD_INFO */&methodInfo,
-            /*flags*/ CORJIT_FLAGS::CorJitFlag::CORJIT_FLAG_SKIP_VERIFICATION ,
+            /*flags*/ CORJIT_FLAGS::CORJIT_FLAG_CALL_GETJITFLAGS ,
             &nativeEntry,
             &nativeSizeOfCode
             );

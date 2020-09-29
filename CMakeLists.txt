@@ -32,6 +32,16 @@ if(NOT WIN32)
     endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif(NOT WIN32)
 
+if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+    add_definitions(-D_TARGET_AMD64_)
+elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "amd64")
+    add_definitions(-D_TARGET_AMD64_)
+elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "AMD64")
+    if (CMAKE_CL_64)
+        add_definitions(-D_TARGET_AMD64_)
+    endif()
+endif()
+
 include_directories(CoreCLR/src/coreclr/src/inc)
 
 if (WIN32)
