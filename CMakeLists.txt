@@ -7,8 +7,6 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(CheckCXXCompilerFlag)
-
 find_package (Python3 COMPONENTS Interpreter Development)
 include_directories(${Python3_INCLUDE_DIRS})
 
@@ -17,6 +15,11 @@ set (CLR_DIR CoreCLR/src/coreclr)
 add_compile_options(-fexceptions)
 add_definitions(-DUSE_STL)
 add_compile_options(-fvisibility=hidden)
+
+if (DEBUG)
+    add_definitions(-DDEBUG_CALL_TRACE)
+endif()
+
 if(NOT WIN32)
     include_directories(CoreCLR/src/coreclr/src/pal/inc/rt CoreCLR/src/coreclr/src/pal/inc CoreCLR/src/coreclr/src/pal/prebuilt/inc)
     add_compile_options(-DPAL_STDCPP_COMPAT)
@@ -63,5 +66,6 @@ set_target_properties(
         OUTPUT_NAME "pyjion"
         LINKER_LANGUAGE C
 )
+
 target_link_libraries(pyjion ${Python3_LIBRARIES})
 target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})

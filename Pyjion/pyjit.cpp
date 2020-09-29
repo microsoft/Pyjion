@@ -29,6 +29,8 @@
 #include "pyjit.h"
 #include "pycomp.h"
 
+#define DEBUG_CALL_TRACE 1
+
 HINSTANCE            g_pMSCorEE;
 
 // Tracks types for a function call.  Each argument has a SpecializedTreeNode with
@@ -127,10 +129,10 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
 
 static Py_tss_t* g_extraSlot;
 
-extern "C" __declspec(dllexport) void JitInit() {
+static void JitInit() {
 	g_extraSlot = PyThread_tss_alloc();
+	PyThread_tss_create(g_extraSlot);
 	g_jit = getJit();
-
     g_emptyTuple = PyTuple_New(0);
 }
 
@@ -428,7 +430,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 	return res;
 }
 
-__declspec(dllexport) bool jit_compile(PyCodeObject* code) {
+static bool jit_compile(PyCodeObject* code) {
 	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0 ||
 		strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
         return false;
@@ -452,8 +454,8 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
 #endif
 
 
-extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject) {
-	ssize_t index = (ssize_t)PyThread_tss_get(g_extraSlot);
+static PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject) {
+	auto index = (ssize_t)PyThread_tss_get(g_extraSlot);
 	if (index == 0) {
 		index = _PyEval_RequestCodeExtraIndex(PyjionJitFree);
 		if (index == -1) {
@@ -486,17 +488,16 @@ extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* c
 	return jitted;
 }
 
-// This is our replacement evaluation function.  We lookup our coorespanding jitted code
+// This is our replacement evaluation function.  We lookup our corresponding jitted code
 // and dispatch to it if it's already compiled.  If it hasn't yet been compiled we'll
 // eventually compile it and invoke it.  If it's not time to compile it yet then we'll
 // invoke the default evaluation function.
-extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyThreadState *ts,PyFrameObject *f, int throwflag) {
-	auto err = GetLastError();
-
+PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
+	//auto err = GetLastError();
 	auto jitted = PyJit_EnsureExtra((PyObject*)f->f_code);
 	if (jitted != nullptr && !throwflag) {
 		if (jitted->j_evalfunc != nullptr) {
-			SetLastError(err);
+			//SetLastError(err);
 #if DEBUG_CALL_TRACE
 			printf("Calling %s from %s line %d %p\r\n",
 				PyUnicode_AsUTF8(f->f_code->co_name),
@@ -510,7 +511,7 @@ extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyThreadState *ts,PyF
 		else if (!jitted->j_failed && jitted->j_run_count++ >= jitted->j_specialization_threshold) {
 			if (jit_compile(f->f_code)) {
 				// execute the jitted code...
-				SetLastError(err);
+				//SetLastError(err);
 #ifdef DEBUG_CALL_TRACE
 				printf("Calling first %s from %s line %d %p\r\n",
 					PyUnicode_AsUTF8(f->f_code->co_name),
@@ -526,7 +527,7 @@ extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyThreadState *ts,PyF
 			jitted->j_failed = true;
 		}
 	}
-	SetLastError(err);
+	//SetLastError(err);
 #ifdef DEBUG_CALL_TRACE
 	printf("Falling to EFD %s from %s line %d %s %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),
@@ -568,7 +569,7 @@ static PyInterpreterState* inter(){
 
 static PyObject *pyjion_enable(PyObject *self, PyObject* args) {
     auto prev = _PyInterpreterState_GetEvalFrameFunc(inter());
-    _PyInterpreterState_SetEvalFrameFunc(inter(), reinterpret_cast<_PyFrameEvalFunction>(PyJit_EvalFrame));
+    _PyInterpreterState_SetEvalFrameFunc(inter(), PyJit_EvalFrame);
     if (prev == PyJit_EvalFrame) {
         Py_RETURN_FALSE;
     }
