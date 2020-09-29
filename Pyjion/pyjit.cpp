@@ -121,13 +121,13 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     Py_LeaveRecursiveCall();
     frame->f_executing = 0;
 
-    return _Py_CheckFunctionResult(NULL, res, "Jit_EvalHelper");
+    return _Py_CheckFunctionResult(NULL, res, (PyObject *) "Jit_EvalHelper", NULL);
 }
 
-static DWORD g_extraSlot;
+static Py_tss_t* g_extraSlot;
 
 extern "C" __declspec(dllexport) void JitInit() {
-	g_extraSlot = TlsAlloc();
+	g_extraSlot = PyThread_tss_alloc();
 
 	g_jit = getJit();
 
@@ -236,7 +236,7 @@ PyTypeObject* GetArgType(int arg, PyObject** locals) {
 
 PyObject* Jit_EvalGeneric(PyjionJittedCode* state, PyFrameObject*frame) {
     auto trace = (PyjionJittedCode*)state;
-    return Jit_EvalHelper(trace->j_generic, frame);
+    return Jit_EvalHelper((void*)trace->j_generic, frame);
 }
 
 #define MAX_TRACE 5
@@ -346,7 +346,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 	if (target != nullptr && !trace->j_failed) {
 		if (target->addr != nullptr) {
 			// we have a specialized function for this, just invoke it
-			auto res = Jit_EvalHelper(target->addr, frame);
+			auto res = Jit_EvalHelper((void*)target->addr, frame);
 			return res;
 		}
 
@@ -403,7 +403,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 				trace->j_evalfunc = Jit_EvalGeneric;
 			}
 			
-			return Jit_EvalHelper(target->addr, frame);
+			return Jit_EvalHelper((void*)target->addr, frame);
 		}
 	}
 
@@ -453,14 +453,14 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
 
 
 extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject) {
-	ssize_t index = (ssize_t)TlsGetValue(g_extraSlot);
+	ssize_t index = (ssize_t)PyThread_tss_get(g_extraSlot);
 	if (index == 0) {
 		index = _PyEval_RequestCodeExtraIndex(PyjionJitFree);
 		if (index == -1) {
 			return nullptr;
 		}
 
-		TlsSetValue(g_extraSlot, (LPVOID)((index << 1) | 0x01));
+		PyThread_tss_set(g_extraSlot, (LPVOID)((index << 1) | 0x01));
 	}
 	else {
 		index = index >> 1;
@@ -684,7 +684,7 @@ static PyMethodDef PyjionMethods[] = {
 static struct PyModuleDef pyjionmodule = {
 	PyModuleDef_HEAD_INIT,
 	"pyjion",   /* name of module */
-	"Pyjion - A Just-in-Time Compiler for CPython 3.6.x", /* module documentation, may be NULL */
+	"Pyjion - A Just-in-Time Compiler for CPython", /* module documentation, may be NULL */
 	-1,       /* size of per-interpreter state of the module,
 			  or -1 if the module keeps state in global variables. */
 	PyjionMethods

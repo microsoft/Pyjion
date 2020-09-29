@@ -16,7 +16,7 @@ set (CLR_DIR CoreCLR/src/coreclr)
 
 add_compile_options(-fexceptions)
 add_definitions(-DUSE_STL)
-
+add_compile_options(-fvisibility=hidden)
 if(NOT WIN32)
     include_directories(CoreCLR/src/coreclr/src/pal/inc/rt CoreCLR/src/coreclr/src/pal/inc CoreCLR/src/coreclr/src/pal/prebuilt/inc)
     add_compile_options(-DPAL_STDCPP_COMPAT)
@@ -48,9 +48,23 @@ if (APPLE)
 endif()
 
 include_directories(CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/inc)
-set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp)
+set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp)
 
 add_library(pyjion SHARED ${SOURCES})
+
+install(TARGETS pyjion
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+set_target_properties(
+        pyjion
+        PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME "pyjit"
+        LINKER_LANGUAGE C
+)
+
 target_link_libraries(pyjion ${Python3_LIBRARIES})
 target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})
+
 add_compile_options(-Wno-sign-compare)
