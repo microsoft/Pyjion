@@ -28,6 +28,7 @@
 
 #define FEATURE_NO_HOST
 
+#include <Python.h>
 #include <stdint.h>
 #include <windows.h>
 #include <stdio.h>
@@ -53,13 +54,12 @@ using namespace std;
 class CCorJitHost : public ICorJitHost {
 	void * allocateMemory(size_t size) override
 	{
-	    // TODO
-		return nullptr;
+        return PyMem_Malloc(size);
 	}
 
 	void freeMemory(void * block) override
 	{
-	    // TODO..
+	    return PyMem_Free(block);
 	}
 
 	int getIntConfigValue(const WCHAR* name, int defaultValue) override
