@@ -53,7 +53,7 @@ struct SpecializedTreeNode;
 class PyjionJittedCode;
 
 extern "C" __declspec(dllexport) void JitInit();
-extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *, int);
+extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyThreadState *, PyFrameObject *, int);
 extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
 
 class PyjionJittedCode;

@@ -25,6 +25,7 @@
 
 */
 
+#include <Python.h>
 #include "pyjit.h"
 #include "pycomp.h"
 
@@ -103,7 +104,7 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     PyThreadState *tstate = PyThreadState_GET();
     if (tstate->use_tracing) {
         if (tstate->c_tracefunc != NULL) {
-            return _PyEval_EvalFrameDefault(frame, 0);
+            return _PyEval_EvalFrameDefault(tstate, frame, 0);
         }
     }
 
@@ -245,7 +246,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 	// Walk our tree of argument types to find the SpecializedTreeNode which
     // corresponds with our sets of arguments here.
     auto trace = (PyjionJittedCode*)state;
-
+    auto tstate = PyThreadState_Get();
 #ifdef TRACE_TREE
     // no match on specialized functions...
 
@@ -390,7 +391,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 				printf("Compilation failure #%d\r\n", ++failCount);
 #endif
 				trace->j_failed = true;
-				return _PyEval_EvalFrameDefault(frame, 0);
+				return _PyEval_EvalFrameDefault(tstate, frame, 0);
 			}
 
 			// Update the jitted information for this tree node
@@ -416,7 +417,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 		frame
 	);
 #endif
-	auto res = _PyEval_EvalFrameDefault(frame, 0);
+	auto res = _PyEval_EvalFrameDefault(tstate, frame, 0);
 #ifdef DEBUG_CALL_TRACE
     printf("Returning default %s from %s line %d %s %p\r\n",
 		PyUnicode_AsUTF8(frame->f_code->co_name),
@@ -490,7 +491,7 @@ extern "C" __declspec(dllexport) PyjionJittedCode* PyJit_EnsureExtra(PyObject* c
 // and dispatch to it if it's already compiled.  If it hasn't yet been compiled we'll
 // eventually compile it and invoke it.  If it's not time to compile it yet then we'll
 // invoke the default evaluation function.
-extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int throwflag) {
+extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyThreadState *ts,PyFrameObject *f, int throwflag) {
 	auto err = GetLastError();
 
 	auto jitted = PyJit_EnsureExtra((PyObject*)f->f_code);
@@ -536,7 +537,7 @@ extern "C" __declspec(dllexport) PyObject *PyJit_EvalFrame(PyFrameObject *f, int
 	);
 #endif
 
-	auto res = _PyEval_EvalFrameDefault(f, throwflag);
+	auto res = _PyEval_EvalFrameDefault(ts, f, throwflag);
 #ifdef DEBUG_CALL_TRACE
 	printf("Returning EFD %s from %s line %d %s %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),
@@ -562,10 +563,13 @@ void PyjionJitFree(void* obj) {
 	delete obj;
 }
 
+static PyInterpreterState* inter(){
+    return PyInterpreterState_Main();
+}
+
 static PyObject *pyjion_enable(PyObject *self, PyObject* args) {
-	auto ts = PyThreadState_Get();
-	auto prev = ts->interp->eval_frame;
-	ts->interp->eval_frame = PyJit_EvalFrame;
+    auto prev = _PyInterpreterState_GetEvalFrameFunc(inter());
+    _PyInterpreterState_SetEvalFrameFunc(inter(), reinterpret_cast<_PyFrameEvalFunction>(PyJit_EvalFrame));
     if (prev == PyJit_EvalFrame) {
         Py_RETURN_FALSE;
     }
@@ -573,9 +577,8 @@ static PyObject *pyjion_enable(PyObject *self, PyObject* args) {
 }
 
 static PyObject *pyjion_disable(PyObject *self, PyObject* args) {
-	auto ts = PyThreadState_Get();
-	auto prev = ts->interp->eval_frame;
-	ts->interp->eval_frame = _PyEval_EvalFrameDefault;
+	auto prev = _PyInterpreterState_GetEvalFrameFunc(inter());
+    _PyInterpreterState_SetEvalFrameFunc(inter(), _PyEval_EvalFrameDefault);
     if (prev == PyJit_EvalFrame) {
         Py_RETURN_TRUE;
     }
@@ -583,8 +586,7 @@ static PyObject *pyjion_disable(PyObject *self, PyObject* args) {
 }
 
 static PyObject *pyjion_status(PyObject *self, PyObject* args) {
-	auto ts = PyThreadState_Get();
-	auto prev = ts->interp->eval_frame;
+	auto prev = _PyInterpreterState_GetEvalFrameFunc(inter());
     if (prev == PyJit_EvalFrame) {
         Py_RETURN_TRUE;
     }
@@ -695,8 +697,7 @@ PyMODINIT_FUNC PyInit_pyjion(void)
 	// Install our frame evaluation function
 	JitInit();
 
-	auto ts = PyThreadState_Get();
-	ts->interp->eval_frame = PyJit_EvalFrame;
+    _PyInterpreterState_SetEvalFrameFunc(inter(), PyJit_EvalFrame);
 
 	return PyModule_Create(&pyjionmodule);
 }
