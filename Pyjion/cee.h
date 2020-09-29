@@ -52,6 +52,12 @@
 using namespace std;
 
 class CCorJitHost : public ICorJitHost {
+    protected: PyObject* settings ;
+
+public: CCorJitHost(){
+        settings = PyDict_New();
+    }
+
 	void * allocateMemory(size_t size) override
 	{
         return PyMem_Malloc(size);
@@ -62,18 +68,27 @@ class CCorJitHost : public ICorJitHost {
 	    return PyMem_Free(block);
 	}
 
+	PyObject * getSettings(){
+        return settings;
+    }
+
 	int getIntConfigValue(const WCHAR* name, int defaultValue) override
 	{
-		return defaultValue;
+        return PyLong_AsSize_t(
+                PyDict_GetItemString(settings, reinterpret_cast<const char *>(name)));
 	}
 
 	const WCHAR * getStringConfigValue(const WCHAR* name) override
 	{
-		return nullptr;
+        return reinterpret_cast<const WCHAR *>(PyUnicode_AsWideCharString(
+                PyDict_GetItemString(settings, reinterpret_cast<const char *>(name)), 0));
 	}
 
 	void freeStringConfigValue(const WCHAR* value) override
 	{
+        if (value == 0)
+            return;
+        PyDict_DelItemString(settings, reinterpret_cast<const char *>(value));
 	}
 
 	void* allocateSlab(size_t size, size_t* pActualSize) override
