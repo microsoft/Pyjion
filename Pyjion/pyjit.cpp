@@ -129,7 +129,6 @@ static Py_tss_t* g_extraSlot;
 
 extern "C" __declspec(dllexport) void JitInit() {
 	g_extraSlot = PyThread_tss_alloc();
-
 	g_jit = getJit();
 
     g_emptyTuple = PyTuple_New(0);
@@ -696,8 +695,6 @@ PyMODINIT_FUNC PyInit_pyjion(void)
 {
 	// Install our frame evaluation function
 	JitInit();
-
-    _PyInterpreterState_SetEvalFrameFunc(inter(), PyJit_EvalFrame);
 
 	return PyModule_Create(&pyjionmodule);
 }

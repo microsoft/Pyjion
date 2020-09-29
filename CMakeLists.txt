@@ -50,7 +50,7 @@ endif()
 include_directories(CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/inc)
 set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp)
 
-add_library(pyjion SHARED ${SOURCES})
+add_library(pyjion MODULE ${SOURCES})
 
 install(TARGETS pyjion
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -60,11 +60,8 @@ set_target_properties(
         pyjion
         PROPERTIES
         PREFIX ""
-        OUTPUT_NAME "pyjit"
+        OUTPUT_NAME "pyjion"
         LINKER_LANGUAGE C
 )
-
 target_link_libraries(pyjion ${Python3_LIBRARIES})
 target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})
-
-add_compile_options(-Wno-sign-compare)
