@@ -40,6 +40,15 @@ void CeeInit() {
 #endif
 }
 
+class InitHolder {
+public:
+    InitHolder() {
+        CeeInit();
+    }
+};
+
+InitHolder g_initHolder;
+
 Module g_module;
 ICorJitCompiler* g_jit;
 
@@ -615,13 +624,14 @@ void PythonCompiler::emit_call_with_tuple() {
 }
 
 bool PythonCompiler::emit_kwcall(size_t argCnt) {
-	/*
-	switch (argCnt) {
-		case 1: m_il.emit_call(METHOD_KWCALL1_TOKEN); return true;
-		case 2: m_il.emit_call(METHOD_KWCALL2_TOKEN); return true;
-		case 3: m_il.emit_call(METHOD_KWCALL3_TOKEN); return true;
-		case 4: m_il.emit_call(METHOD_KWCALL4_TOKEN); return true;
-	}*/
+//	switch (argCnt) {
+//        case 0: m_il.emit_call(METHOD_KWCALL0_TOKEN); return true;
+//		case 1: m_il.emit_call(METHOD_KWCALL1_TOKEN); return true;
+//		case 2: m_il.emit_call(METHOD_KWCALL2_TOKEN); return true;
+//		case 3: m_il.emit_call(METHOD_KWCALL3_TOKEN); return true;
+//		case 4: m_il.emit_call(METHOD_KWCALL4_TOKEN); return true;
+//		default: m_il.emit_call(METHOD_KWCALLN_TOKEN); return true;
+//	}
 	return false;
 }
 

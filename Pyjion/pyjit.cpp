@@ -29,9 +29,9 @@
 #include "pyjit.h"
 #include "pycomp.h"
 
-#ifdef DEBUG
+
 #define DEBUG_CALL_TRACE 1
-#endif
+#define DEBUG_TRACE 1
 
 HINSTANCE            g_pMSCorEE;
 
