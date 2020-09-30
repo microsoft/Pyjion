@@ -143,10 +143,6 @@ static void JitInit() {
 unordered_map<PyjionJittedCode*, JittedCode*> g_pyjionJittedCode;
 
 __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
-    if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0) {
-        return false;
-    }
-
     auto jittedCode = (PyjionJittedCode *)code->co_extra;
 
 #ifdef DEBUG_TRACE
@@ -433,8 +429,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 }
 
 static bool jit_compile(PyCodeObject* code) {
-	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<module>") == 0 ||
-		strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
+	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
         return false;
     }
 #ifdef DEBUG_TRACE
