@@ -44,6 +44,7 @@
 #include <vector>
 #include <unordered_map>
 
+#include <error.h>
 #include <corjit.h>
 #include <openum.h>
 
@@ -348,7 +349,6 @@ public:
     }
 
     void ld_i(void* ptr) {
-        // BUG : Line causes bad access Exception: EXC_BAD_ACCESS (code=2, address=0x7ffeecf15ff8)
         size_t value = (size_t)ptr;
 #ifdef _TARGET_AMD64_
         if ((value & 0xFFFFFFFF) == value) {
@@ -482,15 +482,25 @@ public:
         ULONG nativeSizeOfCode;
         auto res = Method(m_module, m_retType, m_params, nullptr);
         CORINFO_METHOD_INFO methodInfo = to_method(&res, stackSize);
+
         CorJitResult result = jit->compileMethod(
-            /*ICorJitInfo*/jitInfo,
-            /*CORINFO_METHOD_INFO */&methodInfo,
-            /*flags*/ CORJIT_FLAGS::CORJIT_FLAG_CALL_GETJITFLAGS ,
-            &nativeEntry,
-            &nativeSizeOfCode
-            );
-        if (result == CORJIT_OK) {
-            res.m_addr = nativeEntry;
+                jitInfo,
+                &methodInfo,
+                CORJIT_FLAGS::CORJIT_FLAG_CALL_GETJITFLAGS,
+                &nativeEntry,
+                &nativeSizeOfCode
+        );
+        switch (result){
+            case CORJIT_OK:
+                res.m_addr = nativeEntry;
+                break;
+            case CORJIT_BADCODE:
+            case CORJIT_OUTOFMEM:
+            case CORJIT_INTERNALERROR:
+            case CORJIT_SKIPPED:
+            case CORJIT_RECOVERABLEERROR:
+                printf("Got failure code from JIT.");
+                break;
         }
         return res;
     }

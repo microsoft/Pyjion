@@ -34,16 +34,26 @@ if(NOT WIN32)
 endif(NOT WIN32)
 
 if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-    add_definitions(-D_TARGET_AMD64_)
+    set(IS_64 1)
 elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "amd64")
-    add_definitions(-D_TARGET_AMD64_)
+    set(IS_64 1)
 elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "AMD64")
     if (CMAKE_CL_64)
-        add_definitions(-D_TARGET_AMD64_)
+        set(IS_64 1)
     endif()
 endif()
 
-include_directories(CoreCLR/src/coreclr/src/inc)
+if (IS_64)
+    add_definitions(-D_TARGET_AMD64_)
+    add_definitions(-DTARGET_AMD64)
+    if (NOT WIN32)
+        add_definitions(-DUNIX_AMD64_ABI) # assume 64-bit
+    endif()
+else()
+    add_definitions(-DTARGET_X86)
+endif()
+
+include_directories(CoreCLR/src/coreclr/src/inc CoreCLR/src/coreclr/src/jit)
 
 if (WIN32)
     set(CLR_OS_BUILD WIN.x64.Debug)
@@ -51,7 +61,7 @@ if (WIN32)
 endif()
 
 if (LINUX)
-    set(CLR_OS_BUILD OSX.x64.Debug)
+    set(CLR_OS_BUILD OSX.x64.Debug)  # todo  - find out what this is called
     set(CLR_JIT_LIB "libclrjit.so")
 endif()
 
@@ -60,6 +70,7 @@ if (APPLE)
     include_directories(Pyjion/compat)
     set(CLR_CMAKE_HOST_UNIX 1)
     set(CLR_JIT_LIB "libclrjit.dylib")
+    add_definitions(-D_XOPEN_SOURCE)
 endif()
 
 include_directories(CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/inc)

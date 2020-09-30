@@ -46,16 +46,28 @@
 
 #include <corjit.h>
 #include <pal.h>
+#include <map>
 
 #include "openum.h"
 
 using namespace std;
 
 class CCorJitHost : public ICorJitHost {
-    protected: PyObject* settings ;
+protected:
+    map<const WCHAR*, int> intSettings;
+    map<const WCHAR*, WCHAR*> strSettings;
 
 public: CCorJitHost(){
-        settings = PyDict_New();
+        intSettings = map<const WCHAR*, int>();
+        strSettings = map<const WCHAR*, WCHAR*>();
+
+#if DEBUG
+        intSettings = {
+                "JitLsraStats": 1,
+                "DumpJittedMethods": 1,
+                "JitDumpToDebugger": 1
+        };
+#endif
     }
 
 	void * allocateMemory(size_t size) override
@@ -68,27 +80,23 @@ public: CCorJitHost(){
 	    return PyMem_Free(block);
 	}
 
-	PyObject * getSettings(){
-        return settings;
-    }
-
 	int getIntConfigValue(const WCHAR* name, int defaultValue) override
 	{
-        return PyLong_AsSize_t(
-                PyDict_GetItemString(settings, reinterpret_cast<const char *>(name)));
+        if (intSettings.find(name) != intSettings.end())
+            return intSettings[name];
+        return defaultValue;
 	}
 
 	const WCHAR * getStringConfigValue(const WCHAR* name) override
 	{
-        return reinterpret_cast<const WCHAR *>(PyUnicode_AsWideCharString(
-                PyDict_GetItemString(settings, reinterpret_cast<const char *>(name)), 0));
+        if (strSettings.find(name) != strSettings.end())
+            return strSettings[name];
+        return NULL;
 	}
 
 	void freeStringConfigValue(const WCHAR* value) override
 	{
-        if (value == 0)
-            return;
-        PyDict_DelItemString(settings, reinterpret_cast<const char *>(value));
+        // noop.
 	}
 
 	void* allocateSlab(size_t size, size_t* pActualSize) override

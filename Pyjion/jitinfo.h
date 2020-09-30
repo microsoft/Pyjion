@@ -233,26 +233,26 @@ public:
     virtual DWORD getThreadTLSIndex(
         void                  **ppIndirection = NULL
         ) {
-        printf("getThreadTLSIndex\r\n");
+        printf("getThreadTLSIndex  not implemented\r\n");
         return 0;
     }
 
     virtual const void * getInlinedCallFrameVptr(
         void                  **ppIndirection = NULL
         ) {
-        printf("getInlinedCallFrameVptr\r\n");
+        printf("getInlinedCallFrameVptr  not implemented\r\n");
         return NULL;
     }
 
     virtual LONG * getAddrOfCaptureThreadGlobal(
         void                  **ppIndirection = NULL
         ) {
-        printf("getAddrOfCaptureThreadGlobal\r\n");
+        printf("getAddrOfCaptureThreadGlobal  not implemented\r\n");
         return NULL;
     }
 
     virtual SIZE_T*       getAddrModuleDomainID(CORINFO_MODULE_HANDLE   module) {
-        printf("getAddrModuleDomainID\r\n");
+        printf("getAddrModuleDomainID not implemented\r\n");
         return 0;
     }
 
@@ -273,7 +273,7 @@ public:
     virtual void getFunctionFixedEntryPoint(
         CORINFO_METHOD_HANDLE   ftn,
         CORINFO_CONST_LOOKUP *  pResult) {
-        printf("getFunctionFixedEntryPoint\r\n");
+        printf("getFunctionFixedEntryPoint not implemented\r\n");
     }
 
     // get the synchronization handle that is passed to monXstatic function
@@ -281,7 +281,7 @@ public:
         CORINFO_METHOD_HANDLE               ftn,
         void                  **ppIndirection = NULL
         ) {
-        printf("getMethodSync\r\n");
+        printf("getMethodSync  not implemented\r\n");
         return nullptr;
     }
 
@@ -312,21 +312,21 @@ public:
         CORINFO_MODULE_HANDLE   handle,
         void                  **ppIndirection = NULL
         ) {
-        printf("embedModuleHandle\r\n"); return nullptr;
+        printf("embedModuleHandle  not implemented\r\n"); return nullptr;
     }
 
     virtual CORINFO_CLASS_HANDLE embedClassHandle(
         CORINFO_CLASS_HANDLE    handle,
         void                  **ppIndirection = NULL
         ) {
-        printf("embedClassHandle\r\n"); return nullptr;
+        printf("embedClassHandle  not implemented\r\n"); return nullptr;
     }
 
     virtual CORINFO_METHOD_HANDLE embedMethodHandle(
         CORINFO_METHOD_HANDLE   handle,
         void                  **ppIndirection = NULL
         ) {
-        printf("embedMethodHandle\r\n");
+        printf("embedMethodHandle  not implemented\r\n");
         *ppIndirection = NULL;
         return handle;
     }
@@ -335,7 +335,7 @@ public:
         CORINFO_FIELD_HANDLE    handle,
         void                  **ppIndirection = NULL
         ) {
-        printf("embedFieldHandle\r\n"); return nullptr;
+        printf("embedFieldHandle  not implemented\r\n"); return nullptr;
     }
 
     // Given a module scope (module), a method handle (context) and
@@ -349,7 +349,7 @@ public:
         CORINFO_RESOLVED_TOKEN *        pResolvedToken,
         BOOL                            fEmbedParent, // TRUE - embeds parent type handle of the field/method handle
         CORINFO_GENERICHANDLE_RESULT *  pResult) {
-        printf("embedGenericHandle\r\n");
+        printf("embedGenericHandle  not implemented\r\n");
     }
 
     // Return information used to locate the exact enclosing type of the current method.
@@ -371,7 +371,7 @@ public:
         CORINFO_METHOD_HANDLE   method,
         void                  **ppIndirection = NULL
         ) {
-        printf("getPInvokeUnmanagedTarget\r\n");
+        printf("getPInvokeUnmanagedTarget  not implemented\r\n");
         return nullptr;
     }
 
@@ -380,7 +380,7 @@ public:
         CORINFO_METHOD_HANDLE   method,
         void                  **ppIndirection = NULL
         ) {
-        printf("getAddressOfPInvokeFixup\r\n");
+        printf("getAddressOfPInvokeFixup  not implemented\r\n");
         return nullptr;
     }
 
@@ -390,7 +390,7 @@ public:
         CORINFO_SIG_INFO* szMetaSig,
         void           ** ppIndirection = NULL
         ) {
-        printf("GetCookieForPInvokeCalliSig\r\n");
+        printf("GetCookieForPInvokeCalliSig  not implemented\r\n");
         return nullptr;
     }
 
@@ -409,8 +409,12 @@ public:
         CORINFO_METHOD_HANDLE       method,
         CORINFO_JUST_MY_CODE_HANDLE**ppIndirection = NULL
         ) {
-        printf("getJustMyCodeHandle\r\n");
-        return nullptr;
+        CORINFO_JUST_MY_CODE_HANDLE result = NULL;
+        if (ppIndirection)
+            *ppIndirection = NULL;
+        DWORD * pFlagAddr = NULL;
+        result = (CORINFO_JUST_MY_CODE_HANDLE) pFlagAddr;
+        return result;
     }
 
     // Gets a method handle that can be used to correlate profiling data.
@@ -438,7 +442,7 @@ public:
         //Jit info
         CORINFO_CALLINFO_FLAGS  flags,
 
-        //out params
+        //out params (OUT)
         CORINFO_CALL_INFO       *pResult
         ) {
         auto method = (BaseMethod*)pResolvedToken->hMethod;
@@ -450,19 +454,18 @@ public:
         pResult->sig.retTypeClass = nullptr;
         pResult->verSig = pResult->sig;
         pResult->accessAllowed = CORINFO_ACCESS_ALLOWED;
-        //printf("getCallInfo\r\n");
     }
 
     virtual BOOL canAccessFamily(CORINFO_METHOD_HANDLE hCaller,
         CORINFO_CLASS_HANDLE hInstanceType) {
-        printf("canAccessFamily\r\n");
+        printf("canAccessFamily \r\n");
         return FALSE;
     }
 
     // Returns TRUE if the Class Domain ID is the RID of the class (currently true for every class
     // except reflection emitted classes and generics)
     virtual BOOL isRIDClassDomainID(CORINFO_CLASS_HANDLE cls) {
-        printf("isRIDClassDomainID\r\n");
+        printf("isRIDClassDomainID  \r\n");
         return FALSE;
     }
 
@@ -471,7 +474,7 @@ public:
         CORINFO_CLASS_HANDLE    cls,
         void                  **ppIndirection = NULL
         ) {
-        printf("getClassDomainID\r\n");
+        printf("getClassDomainID not implemented\r\n");
         return 0;
     }
 
@@ -481,7 +484,7 @@ public:
         CORINFO_FIELD_HANDLE    field,
         void                  **ppIndirection = NULL
         ) {
-        printf("getFieldAddress\r\n");
+        printf("getFieldAddress  not implemented\r\n");
         return nullptr;
     }
 
@@ -490,7 +493,7 @@ public:
         CORINFO_SIG_INFO       *pSig,
         void                  **ppIndirection = NULL
         ) {
-        printf("getVarArgsHandle\r\n");
+        printf("getVarArgsHandle  not implemented\r\n");
         return nullptr;
     }
 
@@ -524,7 +527,6 @@ public:
     virtual DWORD getMethodAttribs(
         CORINFO_METHOD_HANDLE       ftn         /* IN */
         ) {
-        //printf("getMethodAttribs\r\n");
         auto method = (BaseMethod*)ftn;
         return method->get_method_attrs();
     }
@@ -534,7 +536,7 @@ public:
         CORINFO_METHOD_HANDLE       ftn,        /* IN */
         CorInfoMethodRuntimeFlags   attribs     /* IN */
         ) {
-        //printf("setMethodAttribs\r\n");
+        printf("setMethodAttribs  not implemented\r\n");
     }
 
     // Given a method descriptor ftnHnd, extract signature information into sigInfo
@@ -564,7 +566,7 @@ public:
         CORINFO_METHOD_HANDLE   ftn,            /* IN  */
         CORINFO_METHOD_INFO*    info            /* OUT */
         ) {
-        printf("getMethodInfo\r\n"); return false;
+        printf("getMethodInfo  not implemented\r\n"); return false;
     }
 
     // Decides if you have any limitations for inlining. If everything's OK, it will return
@@ -632,15 +634,15 @@ public:
     virtual CORINFO_CLASS_HANDLE getMethodClass(
         CORINFO_METHOD_HANDLE       method
         ) {
-        //printf("getMethodClass\r\n"); 
-        return nullptr;
+        auto meth = (BaseMethod*)method;
+        return meth->getClass();
     }
 
     // return module it belongs to
     virtual CORINFO_MODULE_HANDLE getMethodModule(
         CORINFO_METHOD_HANDLE       method
         ) {
-        printf("getMethodModule\r\n"); return nullptr;
+        printf("getMethodModule  not implemented\r\n"); return nullptr;
     }
 
     // This function returns the offset of the specified method in the
@@ -903,12 +905,12 @@ public:
         CORINFO_CONTEXT_HANDLE      context,    /* IN */
         CORINFO_SIG_INFO           *sig         /* OUT */
         ) {
-        //printf("findCallSiteSig\r\n");
+        printf("findCallSiteSig\r\n");
     }
 
     virtual CORINFO_CLASS_HANDLE getTokenTypeAsHandle(
         CORINFO_RESOLVED_TOKEN *    pResolvedToken /* IN  */) {
-        printf("getTokenTypeAsHandle\r\n");
+        printf("getTokenTypeAsHandle  not implemented\r\n");
         return nullptr;
     }
 
@@ -972,9 +974,7 @@ public:
     virtual const char* getClassName(
         CORINFO_CLASS_HANDLE    cls
         ) {
-        //printf("getClassName\r\n");
-        return NULL;
-
+        return "classname";
     }
 
 
@@ -1008,8 +1008,8 @@ public:
     virtual DWORD getClassAttribs(
         CORINFO_CLASS_HANDLE    cls
         ) {
-        //printf("getClassAttribs\r\n");
-        return 0;
+        // TODO : Load from a base class and establish correct attribs.
+        return CORINFO_FLG_VALUECLASS;
     }
 
     // Returns "TRUE" iff "cls" is a struct type such that return buffers used for returning a value
@@ -1026,7 +1026,7 @@ public:
     virtual CORINFO_MODULE_HANDLE getClassModule(
         CORINFO_CLASS_HANDLE    cls
         ) {
-        printf("getClassModule\r\n");
+        printf("getClassModule  not implemented\r\n");
         return nullptr;
     }
 
@@ -1034,7 +1034,7 @@ public:
     virtual CORINFO_ASSEMBLY_HANDLE getModuleAssembly(
         CORINFO_MODULE_HANDLE   mod
         ) {
-        printf("getModuleAssembly\r\n");
+        printf("getModuleAssembly  not implemented\r\n");
         return nullptr;
     }
 
@@ -1042,7 +1042,7 @@ public:
     virtual const char* getAssemblyName(
         CORINFO_ASSEMBLY_HANDLE assem
         ) {
-        printf("getAssemblyName\r\n");
+        printf("getAssemblyName  not implemented\r\n");
         return nullptr;
     }
 
@@ -1060,7 +1060,7 @@ public:
         CORINFO_MODULE_HANDLE *pModule,
         void **ppIndirection
         ) {
-        printf("getClassModuleIdForStatics\r\n");
+        printf("getClassModuleIdForStatics  not implemented\r\n");
         return 0;
     }
 
@@ -1068,7 +1068,7 @@ public:
     virtual unsigned getClassSize(
         CORINFO_CLASS_HANDLE        cls
         ) {
-        printf("getClassSize\r\n");
+        printf("getClassSize  not implemented\r\n");
         return 0;
     }
 
@@ -1110,7 +1110,7 @@ public:
         INT num
         ) {
         printf("getFieldInClass\r\n");
-        return nullptr;
+        return NULL;
     }
 
     virtual BOOL checkMethodModifier(
@@ -1170,8 +1170,8 @@ public:
     virtual CORINFO_CLASS_HANDLE  getTypeForBox(
         CORINFO_CLASS_HANDLE        cls
         ) {
-        printf("getTypeForBox\r\n");
-        return nullptr;
+        printf("getTypeForBox  not implemented\r\n");
+        return NULL;
     }
 
     // returns the correct box helper for a particular class.  Note
@@ -1216,7 +1216,7 @@ public:
     virtual const char* getHelperName(
         CorInfoHelpFunc
         ) {
-        printf("getHelperName\r\n");
+        printf("getHelperName  not implemented\r\n");
         return nullptr;
     }
 
@@ -1292,7 +1292,7 @@ public:
         CORINFO_CLASS_HANDLE        cls1,
         CORINFO_CLASS_HANDLE        cls2
         ) {
-        printf("mergeClasses\r\n");
+        printf("mergeClasses  not implemented\r\n");
         return nullptr;
     }
 
@@ -1302,8 +1302,8 @@ public:
     virtual CORINFO_CLASS_HANDLE getParentType(
         CORINFO_CLASS_HANDLE        cls
         ) {
-        printf("getParentType\r\n");
-        return NULL;
+        printf("getParentType  not implemented\r\n");
+        return nullptr;
     }
 
     // Returns the CorInfoType of the "child type". If the child type is
@@ -1314,7 +1314,7 @@ public:
         CORINFO_CLASS_HANDLE       clsHnd,
         CORINFO_CLASS_HANDLE       *clsRet
         ) {
-        printf("getChildType\r\n");
+        printf("getChildType  not implemented\r\n");
         return CORINFO_TYPE_UNDEF;
     }
 
@@ -1348,7 +1348,7 @@ public:
         DWORD                       size
         ) {
         printf("getArrayInitializationData\r\n");
-        return NULL;
+        return nullptr;
     }
 
     // Check Visibility rules.
@@ -1375,7 +1375,7 @@ public:
         CORINFO_FIELD_HANDLE        ftn,        /* IN */
         const char                **moduleName  /* OUT */
         ) {
-        printf("getFieldName\r\n");
+        printf("getFieldName  not implemented\r\n");
         return NULL;
     }
 
@@ -1518,7 +1518,7 @@ public:
     virtual void * allocateArray(
         ULONG              cBytes
         ) {
-        printf("\r\n");
+        printf("allocateArray not implemented\r\n");
         return nullptr;
     }
 
@@ -1571,8 +1571,8 @@ public:
         CORINFO_SIG_INFO*           sig,            /* IN */
         CORINFO_ARG_LIST_HANDLE     args            /* IN */
         ) {
-        //printf("getArgClass\r\n");
-        return NULL;
+        // TODO: Work out correct return type
+        return sig->retTypeClass;
     }
 
     /*****************************************************************************
@@ -1642,7 +1642,6 @@ public:
     virtual void getEEInfo(
         CORINFO_EE_INFO            *pEEInfoOut
         ) {
-        printf("getEEInfo\r\n");
         memset(pEEInfoOut, 0, sizeof(CORINFO_EE_INFO));
         pEEInfoOut->inlinedCallFrameInfo.size = 4;
 
@@ -1650,9 +1649,7 @@ public:
 
     // Returns name of the JIT timer log
     virtual LPCWSTR getJitTimeLogFilename() {
-        printf("getJitTimeLogFilename\r\n");
-        return NULL;
-
+        return reinterpret_cast<LPCWSTR>("pyjion.log");
     }
 
 #ifdef RYUJIT_CTPBUILD
@@ -1685,9 +1682,8 @@ public:
         CORINFO_METHOD_HANDLE       ftn,        /* IN */
         const char                **moduleName  /* OUT */
         ) {
-        *moduleName = "foo";
-        //printf("getMethodName %p\r\n", ftn);
-        return "bar";
+        *moduleName = "modulename";
+        return "methodname";
     }
 
     // this function is for debugging only.  It returns a value that
@@ -1711,44 +1707,6 @@ public:
 
     }
 
-#if !defined(RYUJIT_CTPBUILD)
-    /*************************************************************************/
-    //
-    // Configuration values - Allows querying of the CLR configuration.
-    //
-    /*************************************************************************/
-
-    //  Return an integer ConfigValue if any.
-    //
-    virtual int getIntConfigValue(
-        const wchar_t *name,
-        int defaultValue
-        ) {
-        printf("getIntConfigValue\r\n");
-        return 0;
-    }
-
-    //  Return a string ConfigValue if any.
-    //
-    virtual wchar_t *getStringConfigValue(
-        const wchar_t *name
-        ) {
-        printf("getStringConfigValue\r\n");
-        return NULL;
-    }
-
-    // Free a string ConfigValue returned by the runtime.
-    // JITs using the getStringConfigValue query are required
-    // to return the string values to the runtime for deletion.
-    // this avoid leaking the memory in the JIT.
-    virtual void freeStringConfigValue(
-        wchar_t *value
-        ) {
-        printf("freeStringConfigValue\r\n");
-    }
-#endif // RYUJIT_CTPBUILD
-
-
 	void getAddressOfPInvokeTarget(CORINFO_METHOD_HANDLE method, CORINFO_CONST_LOOKUP * pLookup)
 	{
 	}
@@ -1756,6 +1714,9 @@ public:
 	DWORD getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes)
 	{
 		flags->Add(flags->CORJIT_FLAG_SKIP_VERIFICATION);
+        flags->Add(flags->CORJIT_FLAG_DEBUG_CODE);
+        flags->Add(flags->CORJIT_FLAG_NO_INLINING);
+        flags->Add(flags->CORJIT_FLAG_MIN_OPT);
 		return sizeof(CORJIT_FLAGS);
 	}
 
@@ -1767,14 +1728,17 @@ public:
     CORINFO_METHOD_HANDLE
     resolveVirtualMethod(CORINFO_METHOD_HANDLE virtualMethod, CORINFO_CLASS_HANDLE implementingClass,
                          CORINFO_CONTEXT_HANDLE ownerType) override {
+        printf("resolveVirtualMethod not defined\r\n");
         return nullptr;
     }
 
     CORINFO_METHOD_HANDLE getUnboxedEntry(CORINFO_METHOD_HANDLE ftn, bool *requiresInstMethodTableArg) override {
+        printf("getUnboxedEntry not defined\r\n");
         return nullptr;
     }
 
     CORINFO_CLASS_HANDLE getDefaultEqualityComparerClass(CORINFO_CLASS_HANDLE elemType) override {
+        printf("getDefaultEqualityComparerClass not defined\r\n");
         return nullptr;
     }
 
@@ -1788,6 +1752,7 @@ public:
     }
 
     PatchpointInfo *getOSRInfo(unsigned int *ilOffset) override {
+        printf("getOSRInfo not defined\r\n");
         return nullptr;
     }
 
@@ -1796,14 +1761,17 @@ public:
     }
 
     LPCWSTR getStringLiteral(CORINFO_MODULE_HANDLE module, unsigned int metaTOK, int *length) override {
+        printf("getStringLiteral not defined\r\n");
         return nullptr;
     }
 
     const char *getClassNameFromMetadata(CORINFO_CLASS_HANDLE cls, const char **namespaceName) override {
+        printf("getClassNameFromMetadata not defined\r\n");
         return nullptr;
     }
 
     CORINFO_CLASS_HANDLE getTypeInstantiationArgument(CORINFO_CLASS_HANDLE cls, unsigned int index) override {
+        printf("getTypeInstantiationArgument not defined\r\n");
         return nullptr;
     }
 
@@ -1856,6 +1824,7 @@ public:
     }
 
     void *allocateArray(size_t cBytes) override {
+        printf("allocateArray not defined\r\n");
         return nullptr;
     }
 
@@ -1869,6 +1838,7 @@ public:
 
     const char *getMethodNameFromMetadata(CORINFO_METHOD_HANDLE ftn, const char **className, const char **namespaceName,
                                           const char **enclosingClassName) override {
+        printf("getMethodNameFromMetadata not defined\r\n");
         return nullptr;
     }
 
@@ -1878,6 +1848,7 @@ public:
     }
 
     void *getHelperFtn(CorInfoHelpFunc ftnNum, void **ppIndirection) override {
+        printf("getHelperFtn not defined\r\n");
         return nullptr;
     }
 
@@ -1886,6 +1857,7 @@ public:
     }
 
     CORINFO_CLASS_HANDLE getStaticFieldCurrentClass(CORINFO_FIELD_HANDLE field, bool *pIsSpeculative) override {
+        printf("getStaticFieldCurrentClass not defined\r\n");
         return nullptr;
     }
 
@@ -1904,6 +1876,7 @@ public:
     CORINFO_METHOD_HANDLE
     GetDelegateCtor(CORINFO_METHOD_HANDLE methHnd, CORINFO_CLASS_HANDLE clsHnd, CORINFO_METHOD_HANDLE targetMethodHnd,
                     DelegateCtorArgs *pCtorData) override {
+        printf("GetDelegateCtor not defined\r\n");
         return nullptr;
     }
 
@@ -1934,6 +1907,7 @@ public:
     }
 
     void *allocGCInfo(size_t size) override {
+        printf("allocGCInfo not defined\r\n");
         return nullptr;
     }
 

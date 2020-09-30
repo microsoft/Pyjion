@@ -98,11 +98,12 @@ public:
 
     virtual void get_call_info(CORINFO_CALL_INFO *pResult) = 0;
     virtual DWORD get_method_attrs() {
-        return CORINFO_FLG_STATIC | CORINFO_FLG_NATIVE;
+        return CORINFO_FLG_STATIC | CORINFO_FLG_NATIVE ;
     }
     virtual void findSig(CORINFO_SIG_INFO  *sig) = 0;
     virtual void* get_addr() = 0;
     virtual void getFunctionEntryPoint(CORINFO_CONST_LOOKUP *  pResult) = 0;
+    virtual CORINFO_CLASS_HANDLE getClass() = 0;
 };
 
 class Method : public BaseMethod {
@@ -146,6 +147,11 @@ public:
         pResult->accessType = IAT_PVALUE;
         pResult->addr = &m_addr;
     }
+
+    virtual CORINFO_CLASS_HANDLE getClass() {
+        // TODO: Implement
+        return NULL;
+    }
 };
 
 class IndirectDispatchMethod : public BaseMethod {
@@ -174,7 +180,14 @@ public:
         pResult->accessType = IAT_PVALUE;
         pResult->addr = &m_addr;
     }
-
+    virtual CORINFO_CLASS_HANDLE getClass() {
+        CORINFO_CLASS_HANDLE result = NULL;
+        // TODO : Infer type from method.
+//        MethodDesc* method = GetMethod(methodHnd);
+//        TypeHandle th = TypeHandle(method->GetMethodTable());
+//        result = CORINFO_CLASS_HANDLE(th.AsPtr());
+        return result;
+    }
 };
 
 // Not currently used...

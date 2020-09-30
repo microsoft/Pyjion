@@ -66,6 +66,7 @@ bool AbstractInterpreter::preprocess() {
     if (m_code->co_flags & (CO_COROUTINE | CO_GENERATOR)) {
         // Don't compile co-routines or generators.  We can't rely on
         // detecting yields because they could be optimized out.
+        printf("Skipping function because it contains a coroutine/generator.");
         return false;
     }
     for (int i = 0; i < m_code->co_argcount; i++) {
@@ -79,21 +80,9 @@ bool AbstractInterpreter::preprocess() {
     for (size_t curByte = 0; curByte < m_size; curByte += sizeof(_Py_CODEUNIT)) {
         auto opcodeIndex = curByte;
         auto byte = GET_OPCODE(curByte);
-        oparg = GET_OPARG(curByte); 
-
-        // POP_BLOCK can be removed because it is unreachable, e.g. if you do:
-        // def f():
-        //     x = 1
-        //         y = 0
-        //         try:
-        //                return x / y
-        //         except:
-        //                return 42
-        // In Python 3.5 you would always have POP_BLOCK's, but in 3.6 the POP_BLOCK
-        // that should come after return x / y is gone.  So we need to check
-        // the opcode offsets and apply the block pops here.
+        oparg = GET_OPARG(curByte);
     processOpCode:
-        while (blockStarts.size() != 0 && 
+        while (!blockStarts.empty() &&
             opcodeIndex >= blockStarts[blockStarts.size() - 1].BlockEnd) {
             auto blockStart = blockStarts.back();
             blockStarts.pop_back();
@@ -131,16 +120,6 @@ bool AbstractInterpreter::preprocess() {
                     m_assignmentState[oparg] = false;
                 }
                 break;
-            case SETUP_WITH:
-                // not supported...
-                return false;
-            case POP_BLOCK:
-            {
-                auto blockStart = blockStarts.back();
-                blockStarts.pop_back();
-                m_blockStarts[opcodeIndex] = blockStart.BlockStart;
-                break;
-            }
             case SETUP_FINALLY:
                 blockStarts.push_back(AbsIntBlockInfo(opcodeIndex, oparg + curByte + sizeof(_Py_CODEUNIT), false));
                 ehKind.push_back(true);
@@ -214,6 +193,7 @@ void AbstractInterpreter::init_starting_state() {
 
 bool AbstractInterpreter::interpret() {
     if (!preprocess()) {
+        printf("Failed to preprocess");
         return false;
     }
 
@@ -800,7 +780,14 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&String);
                     break;
                 case SETUP_WITH:
+                    lastState.push(&Any);
+                    if (update_start_state(lastState, (size_t)oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                        queue.push_back((size_t)oparg + curByte + sizeof(_Py_CODEUNIT));
+                    }
+                    lastState.push(&Any);
+                    break;
                 case YIELD_VALUE:
+                    printf("Unsupported situation..");
                     return false;
                 case BUILD_CONST_KEY_MAP:
                     lastState.pop(); //keys
@@ -1139,107 +1126,123 @@ char* AbstractInterpreter::opcode_name(int opcode) {
 #define OP_TO_STR(x)   case x: return #x;
     switch (opcode) {
         OP_TO_STR(POP_TOP)
-            OP_TO_STR(ROT_TWO)
-            OP_TO_STR(ROT_THREE)
-            OP_TO_STR(DUP_TOP)
-            OP_TO_STR(DUP_TOP_TWO)
-            OP_TO_STR(NOP)
-            OP_TO_STR(UNARY_POSITIVE)
-            OP_TO_STR(UNARY_NEGATIVE)
-            OP_TO_STR(UNARY_NOT)
-            OP_TO_STR(UNARY_INVERT)
-            OP_TO_STR(BINARY_MATRIX_MULTIPLY)
-            OP_TO_STR(INPLACE_MATRIX_MULTIPLY)
-            OP_TO_STR(BINARY_POWER)
-            OP_TO_STR(BINARY_MULTIPLY)
-            OP_TO_STR(BINARY_MODULO)
-            OP_TO_STR(BINARY_ADD)
-            OP_TO_STR(BINARY_SUBTRACT)
-            OP_TO_STR(BINARY_SUBSCR)
-            OP_TO_STR(BINARY_FLOOR_DIVIDE)
-            OP_TO_STR(BINARY_TRUE_DIVIDE)
-            OP_TO_STR(INPLACE_FLOOR_DIVIDE)
-            OP_TO_STR(INPLACE_TRUE_DIVIDE)
-            OP_TO_STR(GET_AITER)
-            OP_TO_STR(GET_ANEXT)
-            OP_TO_STR(BEFORE_ASYNC_WITH)
-            OP_TO_STR(INPLACE_ADD)
-            OP_TO_STR(INPLACE_SUBTRACT)
-            OP_TO_STR(INPLACE_MULTIPLY)
-            OP_TO_STR(INPLACE_MODULO)
-            OP_TO_STR(STORE_SUBSCR)
-            OP_TO_STR(DELETE_SUBSCR)
-            OP_TO_STR(BINARY_LSHIFT)
-            OP_TO_STR(BINARY_RSHIFT)
-            OP_TO_STR(BINARY_AND)
-            OP_TO_STR(BINARY_XOR)
-            OP_TO_STR(BINARY_OR)
-            OP_TO_STR(INPLACE_POWER)
-            OP_TO_STR(GET_ITER)
-            OP_TO_STR(PRINT_EXPR)
-            OP_TO_STR(LOAD_BUILD_CLASS)
-            OP_TO_STR(YIELD_FROM)
-            OP_TO_STR(GET_AWAITABLE)
-            OP_TO_STR(INPLACE_LSHIFT)
-            OP_TO_STR(INPLACE_RSHIFT)
-            OP_TO_STR(INPLACE_AND)
-            OP_TO_STR(INPLACE_XOR)
-            OP_TO_STR(INPLACE_OR)
-            OP_TO_STR(RETURN_VALUE)
-            OP_TO_STR(IMPORT_STAR)
-            OP_TO_STR(YIELD_VALUE)
-            OP_TO_STR(POP_BLOCK)
-            OP_TO_STR(POP_EXCEPT)
-            OP_TO_STR(STORE_NAME)
-            OP_TO_STR(DELETE_NAME)
-            OP_TO_STR(UNPACK_SEQUENCE)
-            OP_TO_STR(FOR_ITER)
-            OP_TO_STR(UNPACK_EX)
-            OP_TO_STR(STORE_ATTR)
-            OP_TO_STR(DELETE_ATTR)
-            OP_TO_STR(STORE_GLOBAL)
-            OP_TO_STR(DELETE_GLOBAL)
-            OP_TO_STR(LOAD_CONST)
-            OP_TO_STR(LOAD_NAME)
-            OP_TO_STR(BUILD_TUPLE)
-            OP_TO_STR(BUILD_LIST)
-            OP_TO_STR(BUILD_SET)
-            OP_TO_STR(BUILD_MAP)
-            OP_TO_STR(LOAD_ATTR)
-            OP_TO_STR(COMPARE_OP)
-            OP_TO_STR(IMPORT_NAME)
-            OP_TO_STR(IMPORT_FROM)
-            OP_TO_STR(JUMP_FORWARD)
-            OP_TO_STR(JUMP_IF_FALSE_OR_POP)
-            OP_TO_STR(JUMP_IF_TRUE_OR_POP)
-            OP_TO_STR(JUMP_ABSOLUTE)
-            OP_TO_STR(POP_JUMP_IF_FALSE)
-            OP_TO_STR(POP_JUMP_IF_TRUE)
-            OP_TO_STR(LOAD_GLOBAL)
-            OP_TO_STR(SETUP_FINALLY)
-            OP_TO_STR(LOAD_FAST)
-            OP_TO_STR(STORE_FAST)
-            OP_TO_STR(DELETE_FAST)
-            OP_TO_STR(RAISE_VARARGS)
-            OP_TO_STR(CALL_FUNCTION)
-            OP_TO_STR(MAKE_FUNCTION)
-            OP_TO_STR(BUILD_SLICE)
-            OP_TO_STR(LOAD_CLOSURE)
-            OP_TO_STR(LOAD_DEREF)
-            OP_TO_STR(STORE_DEREF)
-            OP_TO_STR(DELETE_DEREF)
-            OP_TO_STR(CALL_FUNCTION_EX)
-            OP_TO_STR(CALL_FUNCTION_KW)
-            OP_TO_STR(SETUP_WITH)
-            OP_TO_STR(EXTENDED_ARG)
-            OP_TO_STR(LIST_APPEND)
-            OP_TO_STR(SET_ADD)
-            OP_TO_STR(MAP_ADD)
-            OP_TO_STR(LOAD_CLASSDEREF)
-            OP_TO_STR(SETUP_ASYNC_WITH)
-            OP_TO_STR(FORMAT_VALUE)
-            OP_TO_STR(BUILD_CONST_KEY_MAP)
-            OP_TO_STR(BUILD_STRING)
+        OP_TO_STR(ROT_TWO)
+        OP_TO_STR(ROT_THREE)
+        OP_TO_STR(DUP_TOP)
+        OP_TO_STR(DUP_TOP_TWO)
+        OP_TO_STR(ROT_FOUR)
+        OP_TO_STR(NOP)
+        OP_TO_STR(UNARY_POSITIVE)
+        OP_TO_STR(UNARY_NEGATIVE)
+        OP_TO_STR(UNARY_NOT)
+        OP_TO_STR(UNARY_INVERT)
+        OP_TO_STR(BINARY_MATRIX_MULTIPLY)
+        OP_TO_STR(INPLACE_MATRIX_MULTIPLY)
+        OP_TO_STR(BINARY_POWER)
+        OP_TO_STR(BINARY_MULTIPLY)
+        OP_TO_STR(BINARY_MODULO)
+        OP_TO_STR(BINARY_ADD)
+        OP_TO_STR(BINARY_SUBTRACT)
+        OP_TO_STR(BINARY_SUBSCR)
+        OP_TO_STR(BINARY_FLOOR_DIVIDE)
+        OP_TO_STR(BINARY_TRUE_DIVIDE)
+        OP_TO_STR(INPLACE_FLOOR_DIVIDE)
+        OP_TO_STR(INPLACE_TRUE_DIVIDE)
+        OP_TO_STR(RERAISE)
+        OP_TO_STR(WITH_EXCEPT_START)
+        OP_TO_STR(GET_AITER)
+        OP_TO_STR(GET_ANEXT)
+        OP_TO_STR(BEFORE_ASYNC_WITH)
+        OP_TO_STR(END_ASYNC_FOR)
+        OP_TO_STR(INPLACE_ADD)
+        OP_TO_STR(INPLACE_SUBTRACT)
+        OP_TO_STR(INPLACE_MULTIPLY)
+        OP_TO_STR(INPLACE_MODULO)
+        OP_TO_STR(STORE_SUBSCR)
+        OP_TO_STR(DELETE_SUBSCR)
+        OP_TO_STR(BINARY_LSHIFT)
+        OP_TO_STR(BINARY_RSHIFT)
+        OP_TO_STR(BINARY_AND)
+        OP_TO_STR(BINARY_XOR)
+        OP_TO_STR(BINARY_OR)
+        OP_TO_STR(INPLACE_POWER)
+        OP_TO_STR(GET_ITER)
+        OP_TO_STR(GET_YIELD_FROM_ITER)
+        OP_TO_STR(PRINT_EXPR)
+        OP_TO_STR(LOAD_BUILD_CLASS)
+        OP_TO_STR(YIELD_FROM)
+        OP_TO_STR(GET_AWAITABLE)
+        OP_TO_STR(INPLACE_LSHIFT)
+        OP_TO_STR(INPLACE_RSHIFT)
+        OP_TO_STR(INPLACE_AND)
+        OP_TO_STR(INPLACE_XOR)
+        OP_TO_STR(INPLACE_OR)
+        OP_TO_STR(LIST_TO_TUPLE)
+        OP_TO_STR(RETURN_VALUE)
+        OP_TO_STR(IMPORT_STAR)
+        OP_TO_STR(SETUP_ANNOTATIONS)
+        OP_TO_STR(YIELD_VALUE)
+        OP_TO_STR(POP_BLOCK)
+        OP_TO_STR(POP_EXCEPT)
+        OP_TO_STR(STORE_NAME)
+        OP_TO_STR(DELETE_NAME)
+        OP_TO_STR(UNPACK_SEQUENCE)
+        OP_TO_STR(FOR_ITER)
+        OP_TO_STR(UNPACK_EX)
+        OP_TO_STR(STORE_ATTR)
+        OP_TO_STR(DELETE_ATTR)
+        OP_TO_STR(STORE_GLOBAL)
+        OP_TO_STR(DELETE_GLOBAL)
+        OP_TO_STR(LOAD_CONST)
+        OP_TO_STR(LOAD_NAME)
+        OP_TO_STR(BUILD_TUPLE)
+        OP_TO_STR(BUILD_LIST)
+        OP_TO_STR(BUILD_SET)
+        OP_TO_STR(BUILD_MAP)
+        OP_TO_STR(LOAD_ATTR)
+        OP_TO_STR(COMPARE_OP)
+        OP_TO_STR(IMPORT_NAME)
+        OP_TO_STR(IMPORT_FROM)
+        OP_TO_STR(JUMP_FORWARD)
+        OP_TO_STR(JUMP_IF_FALSE_OR_POP)
+        OP_TO_STR(JUMP_IF_TRUE_OR_POP)
+        OP_TO_STR(JUMP_ABSOLUTE)
+        OP_TO_STR(POP_JUMP_IF_FALSE)
+        OP_TO_STR(POP_JUMP_IF_TRUE)
+        OP_TO_STR(LOAD_GLOBAL)
+        OP_TO_STR(IS_OP)
+        OP_TO_STR(CONTAINS_OP)
+        OP_TO_STR(JUMP_IF_NOT_EXC_MATCH)
+        OP_TO_STR(SETUP_FINALLY)
+        OP_TO_STR(LOAD_FAST)
+        OP_TO_STR(STORE_FAST)
+        OP_TO_STR(DELETE_FAST)
+        OP_TO_STR(RAISE_VARARGS)
+        OP_TO_STR(CALL_FUNCTION)
+        OP_TO_STR(MAKE_FUNCTION)
+        OP_TO_STR(BUILD_SLICE)
+        OP_TO_STR(LOAD_CLOSURE)
+        OP_TO_STR(LOAD_DEREF)
+        OP_TO_STR(STORE_DEREF)
+        OP_TO_STR(DELETE_DEREF)
+        OP_TO_STR(CALL_FUNCTION_EX)
+        OP_TO_STR(CALL_FUNCTION_KW)
+        OP_TO_STR(SETUP_WITH)
+        OP_TO_STR(EXTENDED_ARG)
+        OP_TO_STR(LIST_APPEND)
+        OP_TO_STR(SET_ADD)
+        OP_TO_STR(MAP_ADD)
+        OP_TO_STR(LOAD_CLASSDEREF)
+        OP_TO_STR(SETUP_ASYNC_WITH)
+        OP_TO_STR(FORMAT_VALUE)
+        OP_TO_STR(BUILD_CONST_KEY_MAP)
+        OP_TO_STR(BUILD_STRING)
+        OP_TO_STR(LOAD_METHOD)
+        OP_TO_STR(CALL_METHOD)
+        OP_TO_STR(LIST_EXTEND)
+        OP_TO_STR(SET_UPDATE)
+        OP_TO_STR(DICT_MERGE)
+        OP_TO_STR(DICT_UPDATE)
     }
     return "unknown";
 }
