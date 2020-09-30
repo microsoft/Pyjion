@@ -549,7 +549,6 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Dict);
                     break;
                 case COMPARE_OP: {
-                        // TODO Implement IS_OP, _CONTAINS_OP
                         auto two = lastState.pop_no_escape();
                         auto one = lastState.pop_no_escape();
                         auto binaryRes = one.Value->compare(one.Sources, oparg, two);
@@ -814,9 +813,6 @@ bool AbstractInterpreter::interpret() {
                     }
                     lastState.push(&Any);
                     break;
-                case YIELD_VALUE:
-                    printf("Unsupported situation..");
-                    return false;
                 case BUILD_CONST_KEY_MAP:
                     lastState.pop(); //keys
                     for (auto i = 0; i < oparg; i++) {
@@ -849,9 +845,11 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Any); // push result.
                     break;
                 }
-                case IS_OP:
-                    lastState.pop(); //right
-                    break;
+                case IS_OP: {
+                    lastState.pop();
+                    lastState.pop();
+                    lastState.push(&Bool);
+                }
                 default:
                     PyErr_Format(PyExc_ValueError,
                                  "Unknown unsupported opcode: %s", opcode_name(opcode));
