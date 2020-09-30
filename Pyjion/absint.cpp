@@ -265,6 +265,34 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(second);
                     break;
                 }
+                case ROT_FOUR:
+                {
+                    auto top = lastState.pop_no_escape();
+                    auto second = lastState.pop_no_escape();
+                    auto third = lastState.pop_no_escape();
+                    auto fourth = lastState.pop_no_escape();
+
+                    auto sources = AbstractSource::combine(
+                            top.Sources,
+                            AbstractSource::combine(second.Sources,
+                                AbstractSource::combine(third.Sources, fourth.Sources)));
+                    m_opcodeSources[opcodeIndex] = sources;
+
+                    if (top.Value->kind() != second.Value->kind()
+                        || top.Value->kind() != third.Value->kind()
+                        || top.Value->kind() != fourth.Value->kind()) {
+                        top.escapes();
+                        second.escapes();
+                        third.escapes();
+                        fourth.escapes();
+                    }
+
+                    lastState.push(top);
+                    lastState.push(fourth);
+                    lastState.push(third);
+                    lastState.push(second);
+                    break;
+                }
                 case POP_TOP:
                     lastState.pop_no_escape();
                     break;
