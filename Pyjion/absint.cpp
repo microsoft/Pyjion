@@ -845,11 +845,11 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Any); // push result.
                     break;
                 }
-                case IS_OP: {
+                case IS_OP:
                     lastState.pop();
                     lastState.pop();
                     lastState.push(&Bool);
-                }
+                    break;
                 default:
                     PyErr_Format(PyExc_ValueError,
                                  "Unknown unsupported opcode: %s", opcode_name(opcode));
