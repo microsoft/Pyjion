@@ -24,7 +24,7 @@
 */
 
 
-#include <palrt.h>
+#include <windows.h>
 #include <corjit.h>
 
 #include "pycomp.h"

@@ -1216,8 +1216,7 @@ public:
     virtual const char* getHelperName(
         CorInfoHelpFunc
         ) {
-        printf("getHelperName  not implemented\r\n");
-        return nullptr;
+        return "AnyJITHelper";
     }
 
     // This function tries to initialize the class (run the class constructor).

@@ -47,6 +47,8 @@
 #include <corjit.h>
 #include <pal.h>
 #include <map>
+#include <cwchar>
+#include <string>
 
 #include "openum.h"
 
@@ -54,20 +56,16 @@ using namespace std;
 
 class CCorJitHost : public ICorJitHost {
 protected:
-    map<const WCHAR*, int> intSettings;
-    map<const WCHAR*, WCHAR*> strSettings;
+    map<const char16_t*, int> intSettings;
+    map<const char16_t*, const char16_t*> strSettings;
 
 public: CCorJitHost(){
-        intSettings = map<const WCHAR*, int>();
-        strSettings = map<const WCHAR*, WCHAR*>();
-
-#if DEBUG
-        intSettings = {
-                "JitLsraStats": 1,
-                "DumpJittedMethods": 1,
-                "JitDumpToDebugger": 1
-        };
-#endif
+        // DEBUG settings.
+        intSettings[u"JitLsraStats"] = 1;
+        intSettings[u"DumpJittedMethods"] = 1;
+        intSettings[u"JitDumpToDebugger"] = 1;
+        intSettings[u"JitDumpASCII"] = 1;
+        strSettings[u"JitDump"] = u"methodname";
     }
 
 	void * allocateMemory(size_t size) override
@@ -91,7 +89,7 @@ public: CCorJitHost(){
 	{
         if (strSettings.find(name) != strSettings.end())
             return strSettings[name];
-        return NULL;
+        return nullptr;
 	}
 
 	void freeStringConfigValue(const WCHAR* value) override

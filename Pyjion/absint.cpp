@@ -90,6 +90,15 @@ bool AbstractInterpreter::preprocess() {
         }
 
         switch (byte) {
+            case POP_BLOCK:
+            {
+                if (!blockStarts.empty()) {
+                    auto blockStart = blockStarts.back();
+                    blockStarts.pop_back();
+                    m_blockStarts[opcodeIndex] = blockStart.BlockStart;
+                }
+                break;
+            }
             case EXTENDED_ARG:
             {
                 curByte += sizeof(_Py_CODEUNIT);
@@ -213,20 +222,19 @@ bool AbstractInterpreter::interpret() {
 
             auto opcode = GET_OPCODE(curByte);
             oparg = GET_OPARG(curByte);
-
+            printf("Processing OPCODE %s\n", opcode_name(opcode));
         processOpCode:
             switch (opcode) {
-                case EXTENDED_ARG:
-                {
+                case EXTENDED_ARG: {
                     curByte += sizeof(_Py_CODEUNIT);
                     oparg = (oparg << 8) | GET_OPARG(curByte);
                     opcode = GET_OPCODE(curByte);
                     update_start_state(lastState, curByte);
                     goto processOpCode;
                 }
-                case NOP: break;
-                case ROT_TWO:
-                {
+                case NOP:
+                    break;
+                case ROT_TWO: {
                     auto top = lastState.pop_no_escape();
                     auto second = lastState.pop_no_escape();
 
@@ -242,15 +250,14 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(second);
                     break;
                 }
-                case ROT_THREE:
-                {
+                case ROT_THREE: {
                     auto top = lastState.pop_no_escape();
                     auto second = lastState.pop_no_escape();
                     auto third = lastState.pop_no_escape();
 
                     auto sources = AbstractSource::combine(
-                        top.Sources,
-                        AbstractSource::combine(second.Sources, third.Sources));
+                            top.Sources,
+                            AbstractSource::combine(second.Sources, third.Sources));
                     m_opcodeSources[opcodeIndex] = sources;
 
                     if (top.Value->kind() != second.Value->kind()
@@ -265,8 +272,7 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(second);
                     break;
                 }
-                case ROT_FOUR:
-                {
+                case ROT_FOUR: {
                     auto top = lastState.pop_no_escape();
                     auto second = lastState.pop_no_escape();
                     auto third = lastState.pop_no_escape();
@@ -275,7 +281,7 @@ bool AbstractInterpreter::interpret() {
                     auto sources = AbstractSource::combine(
                             top.Sources,
                             AbstractSource::combine(second.Sources,
-                                AbstractSource::combine(third.Sources, fourth.Sources)));
+                                                    AbstractSource::combine(third.Sources, fourth.Sources)));
                     m_opcodeSources[opcodeIndex] = sources;
 
                     if (top.Value->kind() != second.Value->kind()
@@ -299,16 +305,14 @@ bool AbstractInterpreter::interpret() {
                 case DUP_TOP:
                     lastState.push(lastState[lastState.stack_size() - 1]);
                     break;
-                case DUP_TOP_TWO:
-                {
+                case DUP_TOP_TWO: {
                     auto top = lastState[lastState.stack_size() - 1];
                     auto second = lastState[lastState.stack_size() - 2];
                     lastState.push(second);
                     lastState.push(top);
                     break;
                 }
-                case LOAD_CONST:
-                {
+                case LOAD_CONST: {
                     auto constSource = add_const_source(opcodeIndex, oparg);
                     auto value = AbstractValueWithSources(
                             to_abstract(PyTuple_GetItem(m_code->co_consts, oparg)),
@@ -317,18 +321,16 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(value);
                     break;
                 }
-                case LOAD_FAST:
-                {
+                case LOAD_FAST: {
                     auto localSource = add_local_source(opcodeIndex, oparg);
                     auto local = lastState.get_local(oparg);
-                    
+
                     local.ValueInfo.Sources = AbstractSource::combine(localSource, local.ValueInfo.Sources);
 
                     lastState.push(local.ValueInfo);
                     break;
                 }
-                case STORE_FAST:
-                {
+                case STORE_FAST: {
                     auto valueInfo = lastState.pop_no_escape();
                     m_opcodeSources[opcodeIndex] = valueInfo.Sources;
                     // STORE_FAST doesn't necessarily give us an assigned value because we
@@ -339,7 +341,7 @@ bool AbstractInterpreter::interpret() {
 
                     lastState.replace_local(oparg, AbstractLocalInfo(valueInfo, valueInfo.Value == &Undefined));
                 }
-                break;
+                    break;
                 case DELETE_FAST:
                     // We need to box any previous stores so we can delete them...  Otherwise
                     // we won't know if we should raise an unbound local error
@@ -372,8 +374,7 @@ bool AbstractInterpreter::interpret() {
                 case INPLACE_RSHIFT:
                 case INPLACE_AND:
                 case INPLACE_XOR:
-                case INPLACE_OR:
-                {
+                case INPLACE_OR: {
                     auto two = lastState.pop_no_escape();
                     auto one = lastState.pop_no_escape();
                     auto binaryRes = one.Value->binary(one.Sources, opcode, two);
@@ -381,15 +382,14 @@ bool AbstractInterpreter::interpret() {
                     // create an intermediate source which will propagate changes up...
                     auto sources = add_intermediate_source(opcodeIndex);
                     AbstractSource::combine(
-                        AbstractSource::combine(one.Sources, two.Sources),
-                        sources
-                        );
+                            AbstractSource::combine(one.Sources, two.Sources),
+                            sources
+                    );
                     auto value = AbstractValueWithSources(binaryRes, sources);
                     lastState.push(value);
                 }
-                break;
-                case POP_JUMP_IF_FALSE:
-                {
+                    break;
+                case POP_JUMP_IF_FALSE: {
                     auto value = lastState.pop_no_escape();
 
                     // merge our current state into the branched to location...
@@ -406,8 +406,7 @@ bool AbstractInterpreter::interpret() {
                     // we'll continue processing after the jump with our new state...
                     break;
                 }
-                case POP_JUMP_IF_TRUE:
-                {
+                case POP_JUMP_IF_TRUE: {
                     auto value = lastState.pop_no_escape();
 
                     // merge our current state into the branched to location...
@@ -424,8 +423,7 @@ bool AbstractInterpreter::interpret() {
                     // we'll continue processing after the jump with our new state...
                     break;
                 }
-                case JUMP_IF_TRUE_OR_POP:
-                {
+                case JUMP_IF_TRUE_OR_POP: {
                     auto curState = lastState;
                     if (update_start_state(lastState, oparg)) {
                         queue.push_back(oparg);
@@ -437,9 +435,8 @@ bool AbstractInterpreter::interpret() {
                         goto next;
                     }
                 }
-                break;
-                case JUMP_IF_FALSE_OR_POP:
-                {
+                    break;
+                case JUMP_IF_FALSE_OR_POP: {
                     auto curState = lastState;
                     if (update_start_state(lastState, oparg)) {
                         queue.push_back(oparg);
@@ -451,7 +448,7 @@ bool AbstractInterpreter::interpret() {
                         goto next;
                     }
                 }
-                break;
+                    break;
                 case JUMP_ABSOLUTE:
                     if (update_start_state(lastState, oparg)) {
                         queue.push_back(oparg);
@@ -460,14 +457,13 @@ bool AbstractInterpreter::interpret() {
                     // to the following opcodes before we'll process them.
                     goto next;
                 case JUMP_FORWARD:
-                    if (update_start_state(lastState, (size_t)oparg + curByte + sizeof(_Py_CODEUNIT))) {
-                        queue.push_back((size_t)oparg + curByte + sizeof(_Py_CODEUNIT));
+                    if (update_start_state(lastState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                        queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
                     // Done processing this basic block, we'll need to see a branch
                     // to the following opcodes before we'll process them.
                     goto next;
-                case RETURN_VALUE:
-                {
+                case RETURN_VALUE: {
                     // We don't treat returning as escaping as it would just result in a single
                     // boxing over the lifetime of the function.
                     auto retValue = lastState.pop_no_escape();
@@ -482,7 +478,7 @@ bool AbstractInterpreter::interpret() {
 
                     m_returnValue = m_returnValue->merge_with(retValue.Value);
                 }
-                goto next;
+                    goto next;
                 case LOAD_NAME:
                     // Used to load __name__ for a class def
                     lastState.push(&Any);
@@ -522,8 +518,7 @@ bool AbstractInterpreter::interpret() {
                     }
                     lastState.push(&List);
                     break;
-                case BUILD_TUPLE:
-                {
+                case BUILD_TUPLE: {
                     vector<AbstractValueWithSources> sources;
                     for (int i = 0; i < oparg; i++) {
                         lastState.pop();
@@ -549,17 +544,17 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Dict);
                     break;
                 case COMPARE_OP: {
-                        auto two = lastState.pop_no_escape();
-                        auto one = lastState.pop_no_escape();
-                        auto binaryRes = one.Value->compare(one.Sources, oparg, two);
-                        auto sources = add_intermediate_source(opcodeIndex);
-                        AbstractSource::combine(
-                                AbstractSource::combine(one.Sources, two.Sources),
-                                sources
-                        );
-                        auto value = AbstractValueWithSources(binaryRes, sources);
-                        lastState.push(value);
-                    }
+                    auto two = lastState.pop_no_escape();
+                    auto one = lastState.pop_no_escape();
+                    auto binaryRes = one.Value->compare(one.Sources, oparg, two);
+                    auto sources = add_intermediate_source(opcodeIndex);
+                    AbstractSource::combine(
+                            AbstractSource::combine(one.Sources, two.Sources),
+                            sources
+                    );
+                    auto value = AbstractValueWithSources(binaryRes, sources);
+                    lastState.push(value);
+                }
                     break;
                 case IMPORT_NAME:
                     lastState.pop();
@@ -573,8 +568,7 @@ bool AbstractInterpreter::interpret() {
                 case LOAD_CLOSURE:
                     lastState.push(&Any);
                     break;
-                case CALL_FUNCTION:
-                {
+                case CALL_FUNCTION: {
                     // TODO: Known functions could return known return types.
                     int argCnt = oparg & 0xff;
                     int kwArgCnt = (oparg >> 8) & 0xff;
@@ -597,8 +591,7 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Any);
                     break;
                 }
-                case CALL_FUNCTION_KW:
-                {
+                case CALL_FUNCTION_KW: {
                     int na = oparg;
 
                     // Pop the names tuple
@@ -628,14 +621,13 @@ bool AbstractInterpreter::interpret() {
 
                     lastState.push(&Any);
                     break;
-                case MAKE_FUNCTION:
-                {
+                case MAKE_FUNCTION: {
                     lastState.pop(); // qual name
                     lastState.pop(); // code
 
                     if (oparg & 0x08) {
                         // closure object
-                        lastState.pop(); 
+                        lastState.pop();
                     }
                     if (oparg & 0x04) {
                         // annotations
@@ -662,17 +654,16 @@ bool AbstractInterpreter::interpret() {
                 case UNARY_POSITIVE:
                 case UNARY_NEGATIVE:
                 case UNARY_INVERT:
-                case UNARY_NOT:
-                {
+                case UNARY_NOT: {
                     auto one = lastState.pop_no_escape();
 
                     auto unaryRes = one.Value->unary(one.Sources, opcode);
 
                     auto sources = add_intermediate_source(opcodeIndex);
                     AbstractSource::combine(
-                        one.Sources,
-                        sources
-                        );
+                            one.Sources,
+                            sources
+                    );
 
                     // TODO: The code generator currently assumes it is *always* dealing
                     // with an object (i.e. not an unboxed value).  Support should be
@@ -740,13 +731,12 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     lastState.push(&Any);
                     break;
-                case FOR_ITER:
-                {
+                case FOR_ITER: {
                     // For branches out with the value consumed
                     auto leaveState = lastState;
                     leaveState.pop();
-                    if (update_start_state(leaveState, (size_t)oparg + curByte + sizeof(_Py_CODEUNIT))) {
-                        queue.push_back((size_t)oparg + curByte + sizeof(_Py_CODEUNIT));
+                    if (update_start_state(leaveState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                        queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
 
                     // When we compile this we don't actually leave the value on the stack,
@@ -759,6 +749,7 @@ bool AbstractInterpreter::interpret() {
                 case POP_BLOCK:
                     // Restore the stack state to what we had on entry
                     lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
+                    // TODO  : Find out what this did, its commented out but it looks important?!
                     //merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
                     break;
                 case POP_EXCEPT:
@@ -781,17 +772,16 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     lastState.pop();
                     break;
-                case SETUP_FINALLY:
-                {
+                case SETUP_FINALLY: {
                     auto finallyState = lastState;
                     // Finally is entered with value pushed onto stack indicating reason for 
                     // the finally running...
                     finallyState.push(&Any);
-                    if (update_start_state(finallyState, (size_t)oparg + curByte + sizeof(_Py_CODEUNIT))) {
-                        queue.push_back((size_t)oparg + curByte + sizeof(_Py_CODEUNIT));
+                    if (update_start_state(finallyState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                        queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
                 }
-                break;
+                    break;
                 case FORMAT_VALUE:
                     if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
                         // format spec
@@ -806,13 +796,15 @@ bool AbstractInterpreter::interpret() {
                     }
                     lastState.push(&String);
                     break;
-                case SETUP_WITH:
-                    lastState.push(&Any);
-                    if (update_start_state(lastState, (size_t)oparg + curByte + sizeof(_Py_CODEUNIT))) {
-                        queue.push_back((size_t)oparg + curByte + sizeof(_Py_CODEUNIT));
+                case SETUP_WITH: {
+                    auto finallyState = lastState;
+                    finallyState.push(&Any);
+                    if (update_start_state(finallyState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                        queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
                     lastState.push(&Any);
                     break;
+                }
                 case BUILD_CONST_KEY_MAP:
                     lastState.pop(); //keys
                     for (auto i = 0; i < oparg; i++) {
