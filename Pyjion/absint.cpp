@@ -796,6 +796,9 @@ bool AbstractInterpreter::interpret() {
                     }
                     lastState.push(&Dict);
                     return false;
+                case LOAD_METHOD:
+                    lastState.push(&Any);
+                    break;
                 default:
                     printf("Unknown unsupported opcode: %s", opcode_name(opcode));
                     PyErr_Format(PyExc_ValueError,
