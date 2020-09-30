@@ -799,8 +799,32 @@ bool AbstractInterpreter::interpret() {
                 case LOAD_METHOD:
                     lastState.push(&Any);
                     break;
+                case CALL_METHOD:
+                {
+                    /* LOAD_METHOD could push a NULL value, but (as above)
+                     it doesn't, so instead it just considers the same scenario.
+
+                     This is a method call.  Stack layout:
+
+                         ... | method | self | arg1 | ... | argN
+                                                            ^- TOP()
+                                               ^- (-oparg)
+                                        ^- (-oparg-1)
+                               ^- (-oparg-2)
+
+                      `self` and `method` will be POPed by call_function.
+                      We'll be passing `oparg + 1` to call_function, to
+                      make it accept the `self` as a first argument.
+
+                      TODO : Add call_function opcode?
+                    */
+                    lastState.push(&Any); // push result.
+                    break;
+                }
+                case IS_OP:
+                    lastState.pop(); //right
+                    break;
                 default:
-                    printf("Unknown unsupported opcode: %s", opcode_name(opcode));
                     PyErr_Format(PyExc_ValueError,
                                  "Unknown unsupported opcode: %s", opcode_name(opcode));
                     return false;
