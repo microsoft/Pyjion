@@ -109,28 +109,17 @@ public:
     }
 
     int doAssert(const char* szFile, int iLine, const char* szExpr) override {
-        printf("Assert: %s %d", szFile, iLine);
+        printf(".NET failed assertion: %s %d", szFile, iLine);
+        // TODO : Use native warnings when it doesn't cause a recursive error.
+        // PyErr_WarnFormat(PyExc_RuntimeWarning, 1, ".NET failed assertion: %s %d", szFile, iLine);
         return 0;
     }
 
     void reportFatalError(CorJitResult result) override {
-        printf("Fatal error %X\r\n", result);
+        printf("Fatal error from .NET JIT %X\r\n", result);
+        // TODO : Enable when successful
+        // PyErr_Format(PyExc_ValueError, "Fatal error from .NET JIT %X\r\n", result);
     }
-
-#if !defined(RYUJIT_CTPBUILD)
-    // Associates a native call site, identified by its offset in the native code stream, with
-    // the signature information and method handle the JIT used to lay out the call site. If
-    // the call site has no signature information (e.g. a helper call) or has no method handle
-    // (e.g. a CALLI P/Invoke), then null should be passed instead.
-    void recordCallSite(
-        ULONG                 instrOffset,  /* IN */
-        CORINFO_SIG_INFO *    callSig,      /* IN */
-        CORINFO_METHOD_HANDLE methodHandle  /* IN */
-        ) override {
-        //printf("recordCallSite\r\n");
-    }
-
-#endif // !defined(RYUJIT_CTPBUILD)
 
     void recordRelocation(
         void *                 location,   /* IN  */
@@ -291,21 +280,6 @@ public:
         return nullptr;
     }
 
-#if defined(RYUJIT_CTPBUILD)
-    // These entry points must be called if a handle is being embedded in
-    // the code to be passed to a JIT helper function. (as opposed to just
-    // being passed back into the ICorInfo interface.)
-
-    // a module handle may not always be available. A call to embedModuleHandle should always
-    // be preceeded by a call to canEmbedModuleHandleForHelper. A dynamicMethod does not have a module
-    virtual bool canEmbedModuleHandleForHelper(
-        CORINFO_MODULE_HANDLE   handle
-        ) {
-        printf("canEmbedModuleHandleForHelper\r\n");
-        return FALSE;
-    }
-
-#else
     // get slow lazy string literal helper to use (CORINFO_HELP_STRCNS*). 
     // Returns CORINFO_HELP_UNDEF if lazy string literal helper cannot be used.
     CorInfoHelpFunc getLazyStringLiteralHelper(
@@ -313,7 +287,7 @@ public:
         ) override {
         printf("getLazyStringLiteralHelper\r\n"); return CORINFO_HELP_UNDEF;
     }
-#endif
+
     CORINFO_MODULE_HANDLE embedModuleHandle(
         CORINFO_MODULE_HANDLE   handle,
         void                  **ppIndirection
@@ -626,16 +600,6 @@ public:
         ) override {
         printf("getIntrinsicID\r\n"); return CORINFO_INTRINSIC_Object_GetType;
     }
-
-#ifndef RYUJIT_CTPBUILD
-    // Is the given module the System.Numerics.Vectors module?
-    // This defaults to false.
-    virtual bool isInSIMDModule(
-        CORINFO_CLASS_HANDLE        classHnd
-        ) {
-        return false;
-    }
-#endif // RYUJIT_CTPBUILD
 
     // return the unmanaged calling convention for a PInvoke
     CorInfoUnmanagedCallConv getUnmanagedCallConv(
@@ -1130,16 +1094,6 @@ public:
         return CORINFO_HELP_UNDEF;
     }
 
-#ifndef RYUJIT_CTPBUILD
-    virtual void getReadyToRunHelper(
-        CORINFO_RESOLVED_TOKEN * pResolvedToken,
-        CorInfoHelpFunc          id,
-        CORINFO_CONST_LOOKUP *   pLookup
-        ) {
-        printf("getReadyToRunHelper\r\n");
-    }
-#endif
-
     const char* getHelperName(
         CorInfoHelpFunc
         ) override {
@@ -1443,6 +1397,7 @@ public:
         CORINFO_ARG_LIST_HANDLE     args            /* IN */
         ) override {
         // TODO: Work out correct return type
+        printf("getArgClass not implemented\r\n");
         return nullptr;
     }
 
@@ -1520,14 +1475,6 @@ public:
     LPCWSTR getJitTimeLogFilename() override {
         return reinterpret_cast<LPCWSTR>("pyjion.log");
     }
-
-#ifdef RYUJIT_CTPBUILD
-    // Logs a SQM event for a JITting a very large method.
-    virtual void logSQMLongJitEvent(unsigned mcycles, unsigned msec, unsigned ilSize, unsigned numBasicBlocks, bool minOpts,
-        CORINFO_METHOD_HANDLE methodHnd) {
-        printf("logSQMLongJitEvent\r\n");
-    }
-#endif // RYUJIT_CTPBUILD
 
     /*********************************************************************************/
     //
@@ -1776,7 +1723,7 @@ public:
 
     void allocUnwindInfo(BYTE *pHotCode, BYTE *pColdCode, ULONG startOffset, ULONG endOffset, ULONG unwindSize,
                          BYTE *pUnwindBlock, CorJitFuncKind funcKind) override {
-
+        printf("allocUnwindInfo not implemented \r\n");
     }
 
     void *allocGCInfo(size_t size) override {
@@ -1792,11 +1739,13 @@ public:
     }
 
     HRESULT allocMethodBlockCounts(UINT32 count, BlockCounts **pBlockCounts) override {
+        printf("allocMethodBlockCounts not implemented \r\n");
         return 0;
     }
 
     HRESULT getMethodBlockCounts(CORINFO_METHOD_HANDLE ftnHnd, UINT32 *pCount, BlockCounts **pBlockCounts,
                                  UINT32 *pNumRuns) override {
+        printf("getMethodBlockCounts not implemented \r\n");
         return 0;
     }
 
@@ -1804,6 +1753,12 @@ public:
     getArgType(CORINFO_SIG_INFO *sig, CORINFO_ARG_LIST_HANDLE args, CORINFO_CLASS_HANDLE *vcTypeRet) override {
         *vcTypeRet = nullptr;
         return (CorInfoTypeWithMod)((Parameter*)args)->m_type;
+    }
+
+    void recordCallSite(ULONG instrOffset,
+                        CORINFO_SIG_INFO *callSig,
+                        CORINFO_METHOD_HANDLE methodHandle) override {
+
     }
 
 };
