@@ -59,20 +59,17 @@ protected:
     map<std::u16string, const char16_t*> strSettings;
 
 public: CCorJitHost(){
-        // DEBUG settings.
-#ifdef WINDOWS
-        // TODO: Figure out how to do this in windows!
-#else
+        // TODO: DEBUG settings only, remove these later
         intSettings[u"JitLsraStats"] = 1;
         intSettings[u"DumpJittedMethods"] = 1;
         intSettings[u"JitDumpToDebugger"] = 1;
         intSettings[u"JitDumpASCII"] = 1;
         strSettings[u"JitDump"] = u"methodname";
-#endif
     }
 
 	void * allocateMemory(size_t size) override
 	{
+        // Use CPython's memory allocator (alignment 16)
         return PyMem_Malloc(size);
 	}
 
@@ -97,7 +94,7 @@ public: CCorJitHost(){
 
 	void freeStringConfigValue(const WCHAR* value) override
 	{
-        // noop.
+        // TODO : Figure out what this is for? Delete key?
 	}
 
 	void* allocateSlab(size_t size, size_t* pActualSize) override

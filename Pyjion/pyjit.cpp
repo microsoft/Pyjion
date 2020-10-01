@@ -107,13 +107,13 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
 
     PyThreadState *tstate = PyThreadState_GET();
     if (tstate->use_tracing) {
-        if (tstate->c_tracefunc != NULL) {
+        if (tstate->c_tracefunc != nullptr) {
             return _PyEval_EvalFrameDefault(tstate, frame, 0);
         }
     }
 
     if (Py_EnterRecursiveCall("")) {
-        return NULL;
+        return nullptr;
     }
 
 	frame->f_executing = 1;
@@ -126,7 +126,7 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     Py_LeaveRecursiveCall();
     frame->f_executing = 0;
 
-    return _Py_CheckFunctionResult(NULL, res, (PyObject *) "Jit_EvalHelper", NULL);
+    return _Py_CheckFunctionResult(nullptr, res, (PyObject *) "Jit_EvalHelper", NULL);
 }
 
 static Py_tss_t* g_extraSlot;
@@ -331,6 +331,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
     }
 
     // record the new trace...
+    // TODO : This always evaluates to false. Find out what this code was supposed to accomplish
     if (target == nullptr && trace->j_optimized.size() < MAX_TRACE) {
         int argCount = frame->f_code->co_argcount + frame->f_code->co_kwonlyargcount;
         vector<PyTypeObject*> types;
@@ -388,6 +389,8 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 #if DEBUG_TRACE
 				static int failCount;
 				printf("Compilation failure #%d\r\n", ++failCount);
+
+				interp.dump();
 #endif
 				trace->j_failed = true;
 				return _PyEval_EvalFrameDefault(tstate, frame, 0);
@@ -547,17 +550,16 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 }
 
 void PyjionJitFree(void* obj) {
-	PyjionJittedCode* function = (PyjionJittedCode*)obj;
-#ifdef NO_TRACE
-    auto find = g_pyjionJittedCode.find(function);
-    if (find != g_pyjionJittedCode.end()) {
-        auto code = find->second;
-
-        delete code;
-        g_pyjionJittedCode.erase(function);
-    }
-#endif
-	delete obj;
+    // TODO : Figure out what this old code was for.
+//	auto* function = (PyjionJittedCode*)obj;
+//    auto find = g_pyjionJittedCode.find(function);
+//    if (find != g_pyjionJittedCode.end()) {
+//        auto code = find->second;
+//
+//        delete code;
+//        g_pyjionJittedCode.erase(function);
+//    }
+	PyMem_Free(obj);
 }
 
 static PyInterpreterState* inter(){

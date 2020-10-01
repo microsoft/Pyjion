@@ -36,11 +36,12 @@
 #define NUM_ARGS(n) ((n)&0xFF)
 #define NUM_KW_ARGS(n) (((n)>>8) & 0xff)
 
-#define GET_OPARG(index)  _Py_OPARG(m_byteCode[index/sizeof(_Py_CODEUNIT)])
-#define GET_OPCODE(index) _Py_OPCODE(m_byteCode[index/sizeof(_Py_CODEUNIT)])
+#define GET_OPARG(index)  _Py_OPARG(m_byteCode[(index)/sizeof(_Py_CODEUNIT)])
+#define GET_OPCODE(index) _Py_OPCODE(m_byteCode[(index)/sizeof(_Py_CODEUNIT)])
 
 
 AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* comp) : m_code(code), m_comp(comp) {
+    // TODO  : Initialize m_blockIds
     m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
     m_size = PyBytes_Size(code->co_code);
     m_returnValue = &Undefined;
@@ -869,7 +870,7 @@ bool AbstractInterpreter::interpret() {
             update_start_state(lastState, curByte + sizeof(_Py_CODEUNIT));
         }
     next:;
-    } while (queue.size() != 0);
+    } while (!queue.empty());
 
     return true;
 }
@@ -1091,8 +1092,8 @@ void AbstractInterpreter::dump() {
                 printf("    %-3Id %-22s %d (%s)\r\n",
                     byteIndex,
                     opcode_name(opcode),
-                    oparg,
-                    PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg))
+                    oparg
+                    //PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg))
                     );
                 break;
             case LOAD_CONST:
@@ -1186,7 +1187,7 @@ void AbstractInterpreter::dump_sources(AbstractSource* sources) {
     }
 }
 
-char* AbstractInterpreter::opcode_name(int opcode) {
+const char* AbstractInterpreter::opcode_name(int opcode) {
 #define OP_TO_STR(x)   case x: return #x;
     switch (opcode) {
         OP_TO_STR(POP_TOP)
@@ -1373,7 +1374,7 @@ AbstractSource* AbstractInterpreter::add_intermediate_source(size_t opcodeIndex)
 
  // Checks to see if we have a non-zero error code on the stack, and if so,
  // branches to the current error handler.  Consumes the error code in the process
-void AbstractInterpreter::int_error_check(char* reason) {
+void AbstractInterpreter::int_error_check(const char* reason) {
     auto noErr = m_comp->emit_define_label();
     m_comp->emit_int(0);
     m_comp->emit_branch(BranchEqual, noErr);
@@ -1384,7 +1385,7 @@ void AbstractInterpreter::int_error_check(char* reason) {
 
 // Checks to see if we have a null value as the last value on our stack
 // indicating an error, and if so, branches to our current error handler.
-void AbstractInterpreter::error_check(char *reason) {
+void AbstractInterpreter::error_check(const char *reason) {
     auto noErr = m_comp->emit_define_label();
     m_comp->emit_dup();
     m_comp->emit_store_local(m_errorCheckLocal);
@@ -1426,7 +1427,7 @@ vector<Label>& AbstractInterpreter::get_raise_and_free_labels(size_t blockId) {
         m_raiseAndFree.emplace_back();
     }
 
-    return m_raiseAndFree.data()[blockId];
+    return m_raiseAndFree[blockId];
 }
 
 vector<Label>& AbstractInterpreter::get_reraise_and_free_labels(size_t blockId) {
@@ -1434,7 +1435,7 @@ vector<Label>& AbstractInterpreter::get_reraise_and_free_labels(size_t blockId) 
         m_reraiseAndFree.emplace_back();
     }
 
-    return m_reraiseAndFree.data()[blockId];
+    return m_reraiseAndFree[blockId];
 }
 
 size_t AbstractInterpreter::clear_value_stack() {
@@ -1463,7 +1464,7 @@ void AbstractInterpreter::ensure_labels(vector<Label>& labels, size_t count) {
     }
 }
 
-void AbstractInterpreter::branch_raise(char *reason) {
+void AbstractInterpreter::branch_raise(const char *reason) {
     auto& ehBlock = get_ehblock();
     auto& entry_stack = ehBlock.EntryStack;
 
@@ -2608,9 +2609,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     break;
             }
             default:
-#if _DEBUG
                 printf("Unsupported opcode: %d (with related)\r\n", byte);
-#endif
                 return nullptr;
         }
     }
@@ -2619,7 +2618,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
     // information onto the stack, and then branch to the correct
     // handler.  When we take an error we'll branch down to this
     // little stub and then back up to the correct handler.
-    if (m_allHandlers.size() != 0) {
+    if (!m_allHandlers.empty()) {
         // TODO: Unify the first handler with this loop
         for (size_t i = 1; i < m_allHandlers.size(); i++) {
             auto& handler = m_allHandlers[i];
@@ -2681,7 +2680,7 @@ void AbstractInterpreter::compile_pop_block() {
 
         auto newBlock = BlockInfo(
             back.EndOffset,
-            curHandler.Kind == SETUP_FINALLY ? NULL : POP_EXCEPT, // TODO : Find equivalent
+            curHandler.Kind == SETUP_FINALLY ? 0 : POP_EXCEPT, // TODO : Find equivalent
             m_allHandlers.size(),
             curHandler.Flags,
             curHandler.ContinueOffset

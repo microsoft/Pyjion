@@ -28,6 +28,7 @@ if(NOT WIN32)
 
     add_definitions(-DTARGET_UNIX)
     message(STATUS "Enabling UNIX Patches")
+    add_compile_options(-Wswitch)
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         add_compile_options(-Wno-null-arithmetic)
     else(CMAKE_CXX_COMPILER_ID MATCHES "Clang")

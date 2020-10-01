@@ -87,7 +87,7 @@ public:
 
     bool needs_boxing();
 
-    virtual char* describe() {
+    virtual const char* describe() {
         return "unknown source";
     }
 
@@ -106,7 +106,7 @@ struct AbstractSources {
         m_escapes = true;
     }
 
-    bool needs_boxing() {
+    bool needs_boxing() const {
         return m_escapes;
     }
 
@@ -114,7 +114,7 @@ struct AbstractSources {
 
 class ConstSource : public AbstractSource {
 public:
-    virtual char* describe() {
+    const char* describe() override {
         if (needs_boxing()) {
             return "Source: Const (escapes)";
         }
@@ -126,7 +126,7 @@ public:
 
 class LocalSource : public AbstractSource {
 public:
-    virtual char* describe() {
+    const char* describe() override {
         if (needs_boxing()) {
             return "Source: Local (escapes)";
         }
@@ -138,7 +138,7 @@ public:
 
 class IntermediateSource : public AbstractSource {
 public:
-    virtual char* describe() {
+    const char* describe() override {
         if (needs_boxing()) {
             return "Source: Intermediate (escapes)";
         }
@@ -147,27 +147,6 @@ public:
         }
     }
 };
-
-/*
-class TupleSource : public AbstractSource {
-    vector<AbstractValueWithSources> m_sources;
-    bool m_escapes;
-public:
-    TupleSource(vector<AbstractValueWithSources> sources) {
-        m_sources = sources;
-    }
-
-    virtual void escapes();
-
-    virtual char* describe() {
-        if (m_escapes) {
-            return "Source: Tuple (escapes)";
-        }
-        else{
-            return "Source: Tuple";
-        }
-    }
-};*/
 
 
 class AbstractValue {
@@ -205,20 +184,20 @@ struct AbstractValueWithSources {
         Sources = source;
     }
 
-    void escapes() {
+    void escapes() const {
         if (Sources != nullptr) {
             Sources->escapes();
         }
     }
 
-    bool needs_boxing() {
+    bool needs_boxing() const {
         if (Sources != nullptr) {
             return Sources->needs_boxing();
         }
         return true;
     }
 
-    AbstractValueWithSources merge_with(AbstractValueWithSources other) {
+    AbstractValueWithSources merge_with(AbstractValueWithSources other) const {
         // TODO: Is defining a new source at the merge point better?
 
         auto newValue = Value->merge_with(other.Value);
@@ -231,13 +210,13 @@ struct AbstractValueWithSources {
                 other.Sources->escapes();
             }
         }
-        return AbstractValueWithSources(
+        return {
             Value->merge_with(other.Value),
             AbstractSource::combine(Sources, other.Sources)
-            );
+            };
     }
 
-    bool operator== (AbstractValueWithSources& other) {
+    bool operator== (AbstractValueWithSources& other) const {
         if (Value != other.Value) {
             return false;
         }
@@ -252,121 +231,120 @@ struct AbstractValueWithSources {
         return Sources->Sources.get() == other.Sources->Sources.get();
     }
 
-    bool operator!= (AbstractValueWithSources& other) {
+    bool operator!= (AbstractValueWithSources& other) const {
         return !(*this == other);
     }
 };
 
 class AnyValue : public AbstractValue {
-    virtual AbstractValueKind kind() {
+    AbstractValueKind kind() override {
         return AVK_Any;
     }
-    virtual const char* describe() {
+    const char* describe() override {
         return "Any";
     }
 };
 
 class UndefinedValue : public AbstractValue {
-    virtual AbstractValue* merge_with(AbstractValue*other) {
+    AbstractValue* merge_with(AbstractValue*other) override {
         return other;
     }
-    virtual AbstractValueKind kind() {
+    AbstractValueKind kind() override {
         return AVK_Undefined;
     }
-    virtual const char* describe() {
+    const char* describe() override {
         return "Undefined";
     }
 };
 
 class BoolValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
-    virtual void truth(AbstractSource* selfSources);
+    AbstractValueKind kind() override;
+    AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
+    void truth(AbstractSource* selfSources) override;
 };
 
 class BytesValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
 };
 
 class ComplexValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
 };
 
 class IntegerValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource*selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
-    virtual void truth(AbstractSource* sources);
+    AbstractValueKind kind() override;
+    AbstractValue* binary(AbstractSource*selfSources, int op, AbstractValueWithSources& other) override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
+    void truth(AbstractSource* sources) override;
 };
 
 class StringValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
 };
 
 class FloatValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual void truth(AbstractSource* selfSources);
-
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    void truth(AbstractSource* selfSources) override;
+    const char* describe() override;
 };
 
 class TupleValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
 };
 
 class ListValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
 };
 
 class DictValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
 };
 
 class SetValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* binary(AbstractSource* selfSources, int op, AbstractValueWithSources& other) override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
 };
 
 class NoneValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
 };
 
 class FunctionValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
 };
 
 class SliceValue : public AbstractValue {
-    virtual AbstractValueKind kind();
-    virtual AbstractValue* unary(AbstractSource* selfSources, int op);
-    virtual const char* describe();
+    AbstractValueKind kind() override;
+    AbstractValue* unary(AbstractSource* selfSources, int op) override;
+    const char* describe() override;
 };
 
 

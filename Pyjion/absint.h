@@ -1,3 +1,4 @@
+#include <limits.h>
 /*
 * The MIT License (MIT)
 *
@@ -103,10 +104,9 @@ struct ExceptionVars {
     // we don't enter the finally handler with multiple stack depths.
     Local FinallyExc, FinallyTb, FinallyValue;
 
-    ExceptionVars() {
-    }
+    ExceptionVars() = default;
 
-    ExceptionVars(IPythonCompiler* comp, bool isFinally = false) {
+    explicit ExceptionVars(IPythonCompiler* comp, bool isFinally = false) {
         PrevExc = comp->emit_define_local(false);
         PrevExcVal = comp->emit_define_local(false);
         PrevTraceback = comp->emit_define_local(false);
@@ -265,7 +265,7 @@ private:
     bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
     bool update_start_state(InterpreterState& newState, size_t index);
     void init_starting_state();
-    char* opcode_name(int opcode);
+    const char* opcode_name(int opcode);
     bool preprocess();
     void dump_sources(AbstractSource* sources);
     AbstractSource* new_source(AbstractSource* source) {
@@ -278,7 +278,6 @@ private:
     AbstractSource* add_intermediate_source(size_t opcodeIndex);
 
     void make_function(int oparg);
-    void fancy_call(int na, int nk, int flags);
     bool can_skip_lasti_update(int opcodeIndex);
     void build_tuple(size_t argCnt);
     void extend_tuple(size_t argCnt);
@@ -300,8 +299,8 @@ private:
 
     // Checks to see if we have a null value as the last value on our stack
     // indicating an error, and if so, branches to our current error handler.
-    void error_check(char* reason = nullptr);
-    void int_error_check(char* reason = nullptr);
+    void error_check(const char* reason = nullptr);
+    void int_error_check(const char* reason = nullptr);
 
     vector<Label>& get_raise_and_free_labels(size_t blockId);
     vector<Label>& get_reraise_and_free_labels(size_t blockId);
@@ -311,7 +310,7 @@ private:
 
     void ensure_labels(vector<Label>& labels, size_t count);
 
-    void branch_raise(char* reason = nullptr);
+    void branch_raise(const char* reason = nullptr);
     size_t clear_value_stack();
     void raise_on_negative_one();
 
@@ -410,28 +409,23 @@ private:
 //      This should never happen as it means the Undefined
 //      type has leaked out in an odd way
 struct AbstractLocalInfo {
+    AbstractLocalInfo() = default;
+
     AbstractValueWithSources ValueInfo;
     bool IsMaybeUndefined;
-    /*AbstractValue *Value;
-    AbstractSources Loads, Stores;*/
 
-    AbstractLocalInfo() {
-        ValueInfo = AbstractValueWithSources();
+    AbstractLocalInfo(AbstractValueWithSources valueInfo, bool isUndefined = false) : ValueInfo(valueInfo) {
         IsMaybeUndefined = true;
-    }
-
-    AbstractLocalInfo(AbstractValueWithSources valueInfo, bool isUndefined = false) {
         assert(valueInfo.Value != nullptr);
         assert(!(valueInfo.Value == &Undefined && !isUndefined));
-        ValueInfo = valueInfo;
         IsMaybeUndefined = isUndefined;
     }
 
-    AbstractLocalInfo merge_with(AbstractLocalInfo other) {
-        return AbstractLocalInfo(
+    AbstractLocalInfo merge_with(AbstractLocalInfo other) const {
+        return {
             ValueInfo.merge_with(other.ValueInfo),
             IsMaybeUndefined || other.IsMaybeUndefined
-            );
+            };
     }
 
     bool operator== (AbstractLocalInfo other) {
@@ -462,10 +456,9 @@ public:
     vector<AbstractValueWithSources> m_stack;
     CowVector<AbstractLocalInfo> m_locals;
 
-    InterpreterState() {
-    }
+    InterpreterState() = default;
 
-    InterpreterState(int numLocals) {
+    explicit InterpreterState(int numLocals) {
         m_locals = CowVector<AbstractLocalInfo>(numLocals);
     }
 
@@ -499,10 +492,11 @@ public:
     }
 
     void push(AbstractValue* value) {
+        // TODO : Use emplace_back instead?
         m_stack.push_back(value);
     }
 
-    size_t stack_size() {
+    size_t stack_size() const {
         return m_stack.size();
     }
 
@@ -515,9 +509,6 @@ public:
 struct AbsIntBlockInfo {
     size_t BlockStart, BlockEnd;
     bool IsLoop;
-
-    AbsIntBlockInfo() {
-    }
 
     AbsIntBlockInfo(size_t blockStart, size_t blockEnd, bool isLoop) {
         BlockStart = blockStart;
