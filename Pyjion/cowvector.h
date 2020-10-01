@@ -55,7 +55,7 @@ public:
 protected:
     // Returns an instance of the data which isn't shared and is safe to mutate.
     T & get_mutable() {
-        if (!m_data.unique()) {
+        if (m_data.use_count() != 1) {
             m_data = shared_ptr<T>(new T(*m_data));
         }
         return *m_data;

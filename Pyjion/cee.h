@@ -55,16 +55,25 @@ using namespace std;
 
 class CCorJitHost : public ICorJitHost {
 protected:
+#ifdef WINDOWS
+    map<const WCHAR*, int> intSettings;
+    map<const WCHAR*, const WCHAR*> strSettings;
+#else
     map<const char16_t*, int> intSettings;
     map<const char16_t*, const char16_t*> strSettings;
+#endif
 
 public: CCorJitHost(){
         // DEBUG settings.
+#ifdef WINDOWS
+        // TODO: Figure out how to do this in windows!
+#else
         intSettings[u"JitLsraStats"] = 1;
         intSettings[u"DumpJittedMethods"] = 1;
         intSettings[u"JitDumpToDebugger"] = 1;
         intSettings[u"JitDumpASCII"] = 1;
         strSettings[u"JitDump"] = u"methodname";
+#endif
     }
 
 	void * allocateMemory(size_t size) override
