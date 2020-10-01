@@ -246,67 +246,6 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
     // corresponds with our sets of arguments here.
     auto trace = (PyjionJittedCode*)state;
     auto tstate = PyThreadState_Get();
-#ifdef TRACE_TREE
-    // no match on specialized functions...
-
-    SpecializedTreeNode* curNode = trace->funcs;
-    int argCount = frame->f_code->co_argcount + frame->f_code->co_kwonlyargcount;
-    for (int i = 0; i < argCount; i++) {
-        curNode = curNode->getNextNode(GetArgType(i, frame->f_localsplus));
-    }
-
-    curNode->hitCount += 1;
-
-    if (curNode->addr != nullptr) {
-        // we have a specialized function for this, just invoke it
-        return Jit_EvalHelper(curNode->addr, frame);
-    }
-
-    // No specialized function yet, let's see if we should create one...
-    auto jittedCode = (PyjionJittedCode *)trace->code->co_extra;
-    if (curNode->hitCount > jittedCode->j_specialization_threshold) {
-        // Compile and run the now compiled code...
-        PythonCompiler jitter(trace->code);
-        AbstractInterpreter interp(trace->code, &jitter);
-
-        // provide the interpreter information about the specialized types
-        for (int i = 0; i < argCount; i++) {
-            auto type = GetAbstractType(GetArgType(i, frame->f_localsplus));
-            interp.set_local_type(i, type);
-        }
-
-        auto res = interp.compile();
-        bool isSpecialized = false;
-        for (int i = 0; i < argCount; i++) {
-            auto type = GetAbstractType(GetArgType(i, frame->f_localsplus));
-            if (type == AVK_Integer || type == AVK_Float) {
-                if (!interp.get_local_info(0, i).ValueInfo.needs_boxing()) {
-                    isSpecialized = true;
-                }
-            }
-        }
-
-        if (res == nullptr) {
-#ifdef DEBUG_TRACE
-            printf("Compilation failure #%d\r\n", ++failCount);
-#endif
-            return PyEval_EvalFrameDefault(frame, 0);
-        }
-
-        // Update the jitted information for this tree node
-        curNode->addr = (Py_EvalFunc)res->get_code_addr();
-        curNode->jittedCode = res;
-        if (!isSpecialized) {
-            trace->Generic = curNode->addr;
-            PyjionJittedCode* pyjionCode = (PyjionJittedCode*)frame->f_code->co_extra;
-            pyjionCode->j_evalfunc = Jit_EvalGeneric;
-        }
-
-        // And finally dispatch to the newly compiled code
-        return Jit_EvalHelper(curNode->addr, frame);
-    }
-#else
-
 	SpecializedTreeNode* target = nullptr;
     for (auto cur = trace->j_optimized.begin(); cur != trace->j_optimized.end() && target == nullptr; cur++) {
         PyObject** locals = frame->f_localsplus;
@@ -342,7 +281,6 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 		target = new SpecializedTreeNode(types);
         trace->j_optimized.push_back(target);
 	}
-#endif
 
 	if (target != nullptr && !trace->j_failed) {
 		if (target->addr != nullptr) {
@@ -387,6 +325,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 
 			if (res == nullptr) {
 				static int failCount;
+				printf("Result from compile operation indicates failure, defaulting to EFD.\r\n");
 				//interp.dump();
 				trace->j_failed = true;
 				return _PyEval_EvalFrameDefault(tstate, frame, 0);
@@ -394,7 +333,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 
 			// Update the jitted information for this tree node
 			target->addr = (Py_EvalFunc)res->get_code_addr();
-			//opt->jittedCode = res;
+			target->jittedCode = res;
 			if (!isSpecialized) {
 				// We didn't produce a specialized function, force all code down
 				// the generic code path.
@@ -406,24 +345,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 		}
 	}
 
-#ifdef DEBUG_CALL_TRACE
-	printf("Invoking default %s from %s line %d %p %p \r\n",
-		PyUnicode_AsUTF8(frame->f_code->co_name),
-		PyUnicode_AsUTF8(frame->f_code->co_filename),
-		frame->f_code->co_firstlineno,
-		target->addr,
-		frame
-	);
-#endif
 	auto res = _PyEval_EvalFrameDefault(tstate, frame, 0);
-#ifdef DEBUG_CALL_TRACE
-    printf("Returning default %s from %s line %d %p\r\n",
-		PyUnicode_AsUTF8(frame->f_code->co_name),
-		PyUnicode_AsUTF8(frame->f_code->co_filename),
-		frame->f_code->co_firstlineno,
-		target->addr
-	);
-#endif
 	return res;
 }
 

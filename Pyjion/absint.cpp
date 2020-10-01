@@ -812,7 +812,7 @@ bool AbstractInterpreter::interpret() {
                         lastState.pop(); // values
                     }
                     lastState.push(&Dict);
-                    return false;
+                    break;
                 case LOAD_METHOD:
                     lastState.push(&Any);
                     break;
@@ -865,7 +865,7 @@ bool AbstractInterpreter::interpret() {
                 default:
                     PyErr_Format(PyExc_ValueError,
                                  "Unknown unsupported opcode: %s", opcode_name(opcode));
-                    return false;
+                    break;
             }
             update_start_state(lastState, curByte + sizeof(_Py_CODEUNIT));
         }
@@ -3051,6 +3051,7 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
 JittedCode* AbstractInterpreter::compile() {
     bool interpreted = interpret();
     if (!interpreted) {
+        printf("Failed to interpret");
         return nullptr;
     }
     
@@ -3455,7 +3456,7 @@ void AbstractInterpreter::unwind_eh(size_t fromHandler, size_t toHandler) {
 }
 
 ExceptionHandler& AbstractInterpreter::get_ehblock() {
-    return m_allHandlers.data()[m_blockStack.back().CurrentHandler];
+    return m_allHandlers[m_blockStack.back().CurrentHandler];
 }
 
 // We want to maintain a mapping between locations in the Python byte code
