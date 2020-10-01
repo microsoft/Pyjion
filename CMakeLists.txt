@@ -7,14 +7,12 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package (Python3 COMPONENTS Interpreter Development)
+find_package (Python3 3.9 COMPONENTS Interpreter Development)
 include_directories(${Python3_INCLUDE_DIRS})
 
 set (CLR_DIR CoreCLR/src/coreclr)
 
-add_compile_options(-fexceptions)
 add_definitions(-DUSE_STL)
-add_compile_options(-fvisibility=hidden)
 
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
     message(STATUS "Enabling very verbose messages")
@@ -25,6 +23,9 @@ if(NOT WIN32)
     include_directories(CoreCLR/src/coreclr/src/pal/inc/rt CoreCLR/src/coreclr/src/pal/inc CoreCLR/src/coreclr/src/pal/prebuilt/inc)
     add_compile_options(-DPAL_STDCPP_COMPAT)
     add_compile_options(-fdeclspec)
+    add_compile_options(-fexceptions)
+    add_compile_options(-fvisibility=hidden)
+
     add_definitions(-DTARGET_UNIX)
     message(STATUS "Enabling UNIX Patches")
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -32,6 +33,10 @@ if(NOT WIN32)
     else(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         add_compile_options(-Wno-conversion-null -Wno-pointer-arith)
     endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+else()
+    if (MSVC)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++latest")
+    endif(MSVC)
 endif(NOT WIN32)
 
 
@@ -67,12 +72,12 @@ endif()
 include_directories(CoreCLR/src/coreclr/src/inc CoreCLR/src/coreclr/src/jit)
 
 if (WIN32)
-    set(CLR_OS_BUILD WIN.x64.Debug)
+    set(CLR_OS_BUILD Windows_NT.x64.Debug)
     set(CLR_JIT_LIB "clrjit.dll")
 endif()
 
 if (LINUX)
-    set(CLR_OS_BUILD OSX.x64.Debug)  # todo  - find out what this is called
+    set(CLR_OS_BUILD Linux.x64.Debug)
     set(CLR_JIT_LIB "libclrjit.so")
 endif()
 
@@ -94,8 +99,7 @@ set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jiti
 add_library(pyjion MODULE ${SOURCES})
 
 install(TARGETS pyjion
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+        LIBRARY DESTINATION ${CMAKE_BINARY_DIR})
 
 set_target_properties(
         pyjion

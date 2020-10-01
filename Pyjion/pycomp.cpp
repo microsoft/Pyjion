@@ -35,9 +35,6 @@ CCorJitHost g_jitHost;
 
 void CeeInit() {
 	jitStartup(&g_jitHost);
-#if _DEBUG
-    DisableThrowCheck();
-#endif
 }
 
 class InitHolder {

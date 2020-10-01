@@ -45,7 +45,6 @@
 #include <unordered_map>
 
 #include <corjit.h>
-#include <pal.h>
 #include <map>
 #include <cwchar>
 #include <string>
