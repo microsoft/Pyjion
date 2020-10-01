@@ -56,6 +56,7 @@ enum AbstractValueKind {
 };
 
 static bool is_known_type(AbstractValueKind kind) {
+    // TODO : AVK_Any and AVK_Undefined are missing from here, dont know if this was intentional?
     switch (kind) {
         case AVK_Integer:
         case AVK_Float:

@@ -158,6 +158,7 @@ CorInfoType PythonCompiler::to_clr_type(LocalKind kind) {
         case LK_Float: return CORINFO_TYPE_DOUBLE;
         case LK_Int: return CORINFO_TYPE_INT;
         case LK_Bool: return CORINFO_TYPE_BOOL;
+        case LK_Pointer: return CORINFO_TYPE_PTR;
     }
     return CORINFO_TYPE_NATIVEINT;
 }

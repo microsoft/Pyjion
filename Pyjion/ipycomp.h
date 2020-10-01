@@ -66,10 +66,8 @@ enum BranchType {
 
 class JittedCode {
 public:
-    virtual ~JittedCode() {
-    }
+    virtual ~JittedCode() = default;
     virtual void* get_code_addr() = 0;
-
 };
 
 // Defines the interface between the abstract compiler and code generator
