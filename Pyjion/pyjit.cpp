@@ -386,12 +386,8 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 #endif
 
 			if (res == nullptr) {
-#if DEBUG_TRACE
 				static int failCount;
-				printf("Compilation failure #%d\r\n", ++failCount);
-
-				interp.dump();
-#endif
+				//interp.dump();
 				trace->j_failed = true;
 				return _PyEval_EvalFrameDefault(tstate, frame, 0);
 			}
