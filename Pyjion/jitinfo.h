@@ -73,7 +73,7 @@ public:
         delete m_module;
     }
 
-    void* get_code_addr() {
+    void* get_code_addr() override {
         return m_codeAddr;
     }
 
@@ -1581,9 +1581,9 @@ public:
     *****************************************************************************/
 
     // Returns the HRESULT of the current exception
-    virtual HRESULT GetErrorHRESULT(
+    HRESULT GetErrorHRESULT(
     struct _EXCEPTION_POINTERS *pExceptionPointers
-        ) {
+        ) override {
         printf("GetErrorHRESULT\r\n");
         return E_FAIL;
 
@@ -1592,10 +1592,10 @@ public:
     // Fetches the message of the current exception
     // Returns the size of the message (including terminating null). This can be
     // greater than bufferLength if the buffer is insufficient.
-    virtual ULONG GetErrorMessage(
+    ULONG GetErrorMessage(
         __inout_ecount(bufferLength) LPWSTR buffer,
         ULONG bufferLength
-        ) {
+        ) override {
         printf("GetErrorMessage\r\n");
         return 0;
     }
@@ -1606,27 +1606,27 @@ public:
     //                    things like ThreadStoppedException ...
     // returns EXCEPTION_CONTINUE_EXECUTION if exception is fixed up by the EE
 
-    virtual int FilterException(
+    int FilterException(
     struct _EXCEPTION_POINTERS *pExceptionPointers
-        ) {
+        ) override {
         printf("FilterException\r\n"); return 0;
     }
 
     // Cleans up internal EE tracking when an exception is caught.
-    virtual void HandleException(
+    void HandleException(
     struct _EXCEPTION_POINTERS *pExceptionPointers
-        ) {
+        ) override {
         printf("HandleException\r\n");
     }
 
-    virtual void ThrowExceptionForJitResult(
-        HRESULT result) {
+    void ThrowExceptionForJitResult(
+        HRESULT result) override {
         printf("ThrowExceptionForJitResult\r\n");
     }
 
     //Throws an exception defined by the given throw helper.
-    virtual void ThrowExceptionForHelper(
-        const CORINFO_HELPER_DESC * throwHelper) {
+    void ThrowExceptionForHelper(
+        const CORINFO_HELPER_DESC * throwHelper) override {
         printf("ThrowExceptionForHelper\r\n");
     }
 
@@ -1638,16 +1638,15 @@ public:
     *****************************************************************************/
 
     // Return details about EE internal data structures
-    virtual void getEEInfo(
+    void getEEInfo(
         CORINFO_EE_INFO            *pEEInfoOut
-        ) {
+        ) override {
         memset(pEEInfoOut, 0, sizeof(CORINFO_EE_INFO));
         pEEInfoOut->inlinedCallFrameInfo.size = 4;
-
     }
 
     // Returns name of the JIT timer log
-    virtual LPCWSTR getJitTimeLogFilename() {
+    LPCWSTR getJitTimeLogFilename() override {
         return reinterpret_cast<LPCWSTR>("pyjion.log");
     }
 
@@ -1667,9 +1666,9 @@ public:
 
     // this function is for debugging only. Returns method token.
     // Returns mdMethodDefNil for dynamic methods.
-    virtual mdMethodDef getMethodDefFromMethod(
+    mdMethodDef getMethodDefFromMethod(
         CORINFO_METHOD_HANDLE hMethod
-        ) {
+        ) override {
         printf("getMethodDefFromMethod\r\n");
         return 0;
     }
@@ -1677,10 +1676,10 @@ public:
     // this function is for debugging only.  It returns the method name
     // and if 'moduleName' is non-null, it sets it to something that will
     // says which method (a class name, or a module name)
-    virtual const char* getMethodName(
+    const char* getMethodName(
         CORINFO_METHOD_HANDLE       ftn,        /* IN */
         const char                **moduleName  /* OUT */
-        ) {
+        ) override {
         *moduleName = "modulename";
         return "methodname";
     }
@@ -1688,29 +1687,30 @@ public:
     // this function is for debugging only.  It returns a value that
     // is will always be the same for a given method.  It is used
     // to implement the 'jitRange' functionality
-    virtual unsigned getMethodHash(
+    unsigned getMethodHash(
         CORINFO_METHOD_HANDLE       ftn         /* IN */
-        ) {
+        ) override {
         return 0;
     }
 
     // this function is for debugging only.
-    virtual size_t findNameOfToken(
+    size_t findNameOfToken(
         CORINFO_MODULE_HANDLE       module,     /* IN  */
         mdToken                     metaTOK,     /* IN  */
         __out_ecount(FQNameCapacity) char * szFQName, /* OUT */
         size_t FQNameCapacity  /* IN */
-        ) {
+        ) override {
         printf("findNameOfToken\r\n");
         return 0;
 
     }
 
-	void getAddressOfPInvokeTarget(CORINFO_METHOD_HANDLE method, CORINFO_CONST_LOOKUP * pLookup)
+	void getAddressOfPInvokeTarget(CORINFO_METHOD_HANDLE method, CORINFO_CONST_LOOKUP * pLookup) override
 	{
+        printf("getAddressOfPInvokeTarget\r\n");
 	}
 
-	DWORD getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes)
+	DWORD getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes) override
 	{
 		flags->Add(flags->CORJIT_FLAG_SKIP_VERIFICATION);
         flags->Add(flags->CORJIT_FLAG_DEBUG_CODE);

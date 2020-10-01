@@ -408,7 +408,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 	}
 
 #ifdef DEBUG_CALL_TRACE
-	printf("Invoking default %s from %s line %d %s %p %p\r\n",
+	printf("Invoking default %s from %s line %d %p %p \r\n",
 		PyUnicode_AsUTF8(frame->f_code->co_name),
 		PyUnicode_AsUTF8(frame->f_code->co_filename),
 		frame->f_code->co_firstlineno,
@@ -418,7 +418,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 #endif
 	auto res = _PyEval_EvalFrameDefault(tstate, frame, 0);
 #ifdef DEBUG_CALL_TRACE
-    printf("Returning default %s from %s line %d %s %p\r\n",
+    printf("Returning default %s from %s line %d %p\r\n",
 		PyUnicode_AsUTF8(frame->f_code->co_name),
 		PyUnicode_AsUTF8(frame->f_code->co_filename),
 		frame->f_code->co_firstlineno,
@@ -526,7 +526,7 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 	}
 	//SetLastError(err);
 #ifdef DEBUG_CALL_TRACE
-	printf("Falling to EFD %s from %s line %d %s %p\r\n",
+	printf("Falling to EFD %s from %s line %d %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),
 		PyUnicode_AsUTF8(f->f_code->co_filename),
 		f->f_code->co_firstlineno,
@@ -536,7 +536,7 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 
 	auto res = _PyEval_EvalFrameDefault(ts, f, throwflag);
 #ifdef DEBUG_CALL_TRACE
-	printf("Returning EFD %s from %s line %d %s %p\r\n",
+	printf("Returning EFD %s from %s line %d %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),
 		PyUnicode_AsUTF8(f->f_code->co_filename),
 		f->f_code->co_firstlineno,
