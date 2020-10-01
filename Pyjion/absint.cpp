@@ -748,7 +748,7 @@ bool AbstractInterpreter::interpret() {
                 }
                 case POP_BLOCK:
                     // Restore the stack state to what we had on entry
-                    lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
+                    //lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
                     // TODO  : Find out what this did, its commented out but it looks important?!
                     //merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
                     break;
@@ -842,6 +842,25 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     lastState.push(&Bool);
                     break;
+                case WITH_EXCEPT_START: {
+                    /* At the top of the stack are 7 values:
+                       - (TOP, SECOND, THIRD) = exc_info()
+                       - (FOURTH, FIFTH, SIXTH) = previous exception for EXCEPT_HANDLER
+                       - SEVENTH: the context.__exit__ bound method
+                       We call SEVENTH(TOP, SECOND, THIRD).
+                       Then we push again the TOP exception and the __exit__
+                       return value.
+                    */
+                    auto top = lastState.pop_no_escape(); // exc
+                    auto second = lastState.pop_no_escape(); // val
+                    auto third = lastState.pop_no_escape(); // tb
+                    auto seventh = lastState[lastState.stack_size() - 7]; // exit_func
+                    // TODO : Vectorcall (exit_func, stack+1, 3, ..)
+                    PyErr_Format(PyExc_ValueError,
+                                 "VectorCalls not implemented");
+                    lastState.push(&Any); // res
+                    break;
+                }
                 default:
                     PyErr_Format(PyExc_ValueError,
                                  "Unknown unsupported opcode: %s", opcode_name(opcode));
