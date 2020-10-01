@@ -79,6 +79,8 @@ public:
 
 
     void freeMem(PVOID code) {
+        // TODO: Validate
+        PyMem_Free(code);
     }
 
     void allocMem(
@@ -91,6 +93,10 @@ public:
         void **             coldCodeBlock,  /* OUT */
         void **             roDataBlock     /* OUT */
         ) override {
+        *hotCodeBlock = PyMem_Malloc(hotCodeSize);
+        *coldCodeBlock = PyMem_Malloc(coldCodeSize);
+        *roDataBlock = PyMem_Malloc(roDataSize);
+        // TODO : Honor flag (alignment.)
     }
 
     BOOL logMsg(unsigned level, const char* fmt, va_list args) override {
@@ -1428,7 +1434,6 @@ public:
     CORINFO_ARG_LIST_HANDLE getArgNext(
         CORINFO_ARG_LIST_HANDLE     args            /* IN */
         ) override {
-        printf("getArgNext %p\r\n", args);
         return (CORINFO_ARG_LIST_HANDLE)(((Parameter*)args) + 1);
     }
 
@@ -1775,8 +1780,7 @@ public:
     }
 
     void *allocGCInfo(size_t size) override {
-        printf("allocGCInfo not defined\r\n");
-        return nullptr;
+        return PyMem_Malloc(size);
     }
 
     void setEHcount(unsigned int cEH) override {
