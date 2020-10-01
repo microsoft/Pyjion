@@ -1287,7 +1287,7 @@ public:
     CORINFO_CLASS_HANDLE getFieldClass(
         CORINFO_FIELD_HANDLE    field
         ) override {
-        printf("getFieldClass\r\n");
+        printf("getFieldClass not implemented\r\n");
         return nullptr;
     }
 
@@ -1438,7 +1438,8 @@ public:
         CORINFO_ARG_LIST_HANDLE     args            /* IN */
         ) override {
         // TODO: Work out correct return type
-        return sig->retTypeClass;
+        printf("getArgClass not implemented %p\r\n", args);
+        return (CORINFO_CLASS_HANDLE)1;
     }
 
     /*****************************************************************************
@@ -1798,7 +1799,7 @@ public:
 
     CorInfoTypeWithMod
     getArgType(CORINFO_SIG_INFO *sig, CORINFO_ARG_LIST_HANDLE args, CORINFO_CLASS_HANDLE *vcTypeRet) override {
-        return CORINFO_TYPE_MASK;
+        return static_cast<CorInfoTypeWithMod>(CORINFO_TYPE_REFANY);
     }
 
 };
