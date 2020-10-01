@@ -55,13 +55,8 @@ using namespace std;
 
 class CCorJitHost : public ICorJitHost {
 protected:
-#ifdef WINDOWS
-    map<const WCHAR*, int> intSettings;
-    map<const WCHAR*, const WCHAR*> strSettings;
-#else
-    map<const char16_t*, int> intSettings;
-    map<const char16_t*, const char16_t*> strSettings;
-#endif
+    map<std::u16string, int> intSettings;
+    map<std::u16string, const char16_t*> strSettings;
 
 public: CCorJitHost(){
         // DEBUG settings.
