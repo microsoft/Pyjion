@@ -1438,8 +1438,7 @@ public:
         CORINFO_ARG_LIST_HANDLE     args            /* IN */
         ) override {
         // TODO: Work out correct return type
-        printf("getArgClass not implemented %p\r\n", args);
-        return (CORINFO_CLASS_HANDLE)1;
+        return nullptr;
     }
 
     /*****************************************************************************
@@ -1799,7 +1798,8 @@ public:
 
     CorInfoTypeWithMod
     getArgType(CORINFO_SIG_INFO *sig, CORINFO_ARG_LIST_HANDLE args, CORINFO_CLASS_HANDLE *vcTypeRet) override {
-        return static_cast<CorInfoTypeWithMod>(CORINFO_TYPE_REFANY);
+        *vcTypeRet = nullptr;
+        return (CorInfoTypeWithMod)((Parameter*)args)->m_type;
     }
 
 };
