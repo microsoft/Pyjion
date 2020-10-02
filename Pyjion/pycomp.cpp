@@ -50,8 +50,10 @@ Module g_module;
 ICorJitCompiler* g_jit;
 
 PythonCompiler::PythonCompiler(PyCodeObject *code) :
+    // TODO : This shows f(long, long) -> long as a hardcoded value, but no introspection is done on the types.
     m_il(m_module = new UserModule(g_module),
-        CORINFO_TYPE_NATIVEINT, std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) }) {
+        CORINFO_TYPE_NATIVEINT,
+        std::vector < Parameter > {Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT) }) {
     this->m_code = code;
     m_lasti = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
 }

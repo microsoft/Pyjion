@@ -94,8 +94,10 @@ public:
         void **             roDataBlock     /* OUT */
         ) override {
         *hotCodeBlock = PyMem_Malloc(hotCodeSize);
-        *coldCodeBlock = PyMem_Malloc(coldCodeSize);
-        *roDataBlock = PyMem_Malloc(roDataSize);
+        if (coldCodeSize>0) // PyMem_Malloc passes with 0 but it confuses the JIT
+            *coldCodeBlock = PyMem_Malloc(coldCodeSize);
+        if (roDataSize>0) // Same as above
+            *roDataBlock = PyMem_Malloc(roDataSize);
         // TODO : Honor flag (alignment.)
     }
 
@@ -105,7 +107,7 @@ public:
             vprintf(fmt, args);
 #endif
         }
-        return TRUE;
+        return FALSE;
     }
 
     int doAssert(const char* szFile, int iLine, const char* szExpr) override {
@@ -574,7 +576,7 @@ public:
         unsigned          EHnumber,             /* IN */
         CORINFO_EH_CLAUSE* clause               /* OUT */
         ) override {
-        printf("getEHinfo\r\n");
+        printf("getEHinfo not implemented\r\n");
     }
 
     // return class it belongs to
@@ -1459,6 +1461,11 @@ public:
         ) override {
         memset(pEEInfoOut, 0, sizeof(CORINFO_EE_INFO));
         pEEInfoOut->inlinedCallFrameInfo.size = 4;
+#ifdef WINDOWS
+        pEEInfoOut->osType = CORINFO_WINNT;
+#else
+        pEEInfoOut->osType = CORINFO_UNIX;
+#endif
     }
 
     // Returns name of the JIT timer log
@@ -1488,8 +1495,8 @@ public:
         CORINFO_METHOD_HANDLE       ftn,        /* IN */
         const char                **moduleName  /* OUT */
         ) override {
-        *moduleName = "modulename";
-        return "methodname";
+        *moduleName = PyUnicode_AsUTF8(m_code->co_filename);
+        return PyUnicode_AsUTF8(m_code->co_name);
     }
 
     // this function is for debugging only.  It returns a value that
