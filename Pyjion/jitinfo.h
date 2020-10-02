@@ -53,6 +53,9 @@
 
 using namespace std;
 
+void helperFtn(); // Does nothing, replacement function of the entry-point helper in the CLR.
+
+
 class CorJitInfo : public ICorJitInfo, public JittedCode {
     void* m_codeAddr;
     void* m_dataAddr;
@@ -96,24 +99,42 @@ public:
         void **             coldCodeBlock,  /* OUT */
         void **             roDataBlock     /* OUT */
         ) override {
-
+        // TODO : Honor flag (alignment.)
+//        int offset = 0;
+//        switch (flag){
+//            case CORJIT_ALLOCMEM_DEFAULT_CODE_ALIGN: offset=0 ; break;
+//            case CORJIT_ALLOCMEM_FLG_16BYTE_ALIGN: offset=16; break;
+//            case CORJIT_ALLOCMEM_FLG_32BYTE_ALIGN: offset=32; break;
+//            case CORJIT_ALLOCMEM_FLG_RODATA_16BYTE_ALIGN: offset=16; break;
+//            case CORJIT_ALLOCMEM_FLG_RODATA_32BYTE_ALIGN: offset=32; break;
+//        }
 #ifdef WINDOWS
         *hotCodeBlock = m_codeAddr = VirtualAlloc(NULL, hotCodeSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
 #else
+#if defined(__APPLE__) && defined(MAP_JIT)
+        const int mode = MAP_PRIVATE | MAP_ANONYMOUS | MAP_JIT;
+#elif defined(MAP_ANONYMOUS)
+        const int mode = MAP_PRIVATE | MAP_ANONYMOUS;
+#elif defined(MAP_ANON)
+		const int mode = MAP_PRIVATE | MAP_ANON;
+#else
+		#error "not supported"
+#endif
         *hotCodeBlock = m_codeAddr = mmap(
-                NULL,
+                nullptr,
                 hotCodeSize,
                 PROT_READ | PROT_WRITE | PROT_EXEC,
-                MAP_ANONYMOUS | MAP_PRIVATE,
-                0,
+                mode,
+                -1,
                 0);
+        assert (hotCodeBlock != MAP_FAILED);
 #endif
 
         if (coldCodeSize>0) // PyMem_Malloc passes with 0 but it confuses the JIT
             *coldCodeBlock = PyMem_Malloc(coldCodeSize);
         if (roDataSize>0) // Same as above
             *roDataBlock = PyMem_Malloc(roDataSize);
-        // TODO : Honor flag (alignment.)
+
     }
 
     BOOL logMsg(unsigned level, const char* fmt, va_list args) override {
@@ -1683,7 +1704,7 @@ public:
         if (ppIndirection != nullptr)
             *ppIndirection = nullptr;
         assert(ftnNum < CORINFO_HELP_COUNT);
-        return (void*)0x1001;
+        return (void*)helperFtn;
     }
 
     void getLocationOfThisType(CORINFO_METHOD_HANDLE context, CORINFO_LOOKUP_KIND *pLookupKind) override {

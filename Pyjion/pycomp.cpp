@@ -31,6 +31,8 @@
 
 using namespace std;
 
+void helperFtn(){}
+
 CCorJitHost g_jitHost;
 
 void CeeInit() {
