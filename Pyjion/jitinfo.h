@@ -47,6 +47,10 @@
 #include "cee.h"
 #include "ipycomp.h"
 
+#ifndef WINDOWS
+#include <sys/mman.h>
+#endif
+
 using namespace std;
 
 class CorJitInfo : public ICorJitInfo, public JittedCode {
@@ -92,7 +96,19 @@ public:
         void **             coldCodeBlock,  /* OUT */
         void **             roDataBlock     /* OUT */
         ) override {
+
+#ifdef WINDOWS
         *hotCodeBlock = m_codeAddr = VirtualAlloc(NULL, hotCodeSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+#else
+        *hotCodeBlock = m_codeAddr = mmap(
+                NULL,
+                hotCodeSize,
+                PROT_READ | PROT_WRITE | PROT_EXEC,
+                MAP_ANONYMOUS | MAP_PRIVATE,
+                0,
+                0);
+#endif
+
         if (coldCodeSize>0) // PyMem_Malloc passes with 0 but it confuses the JIT
             *coldCodeBlock = PyMem_Malloc(coldCodeSize);
         if (roDataSize>0) // Same as above
