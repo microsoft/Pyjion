@@ -798,16 +798,6 @@ public:
         //printf("resolveToken %d\r\n", pResolvedToken->token);
     }
 
-#ifdef MDIL
-    // Given a field or method token metaTOK return its parent token
-    // we still need this in MDIL, for example for static field access we need the 
-    // token of the enclosing type
-    virtual unsigned getMemberParent(CORINFO_MODULE_HANDLE  scopeHnd, unsigned metaTOK) { printf("getMemberParent\r\n"); return 0; }
-
-    // given a token representing an MD array of structs, get the element type token
-    virtual unsigned getArrayElementToken(CORINFO_MODULE_HANDLE  scopeHnd, unsigned metaTOK) { printf("getArrayElementToken\r\n"); return 0; }
-#endif // MDIL
-
     // Signature information about the call sig
     void findSig(
         CORINFO_MODULE_HANDLE       module,     /* IN */
@@ -1731,11 +1721,11 @@ public:
     }
 
     void setEHcount(unsigned int cEH) override {
-
+        printf("setEHcount not implemented \r\n");
     }
 
     void setEHinfo(unsigned int EHnumber, const CORINFO_EH_CLAUSE *clause) override {
-
+        printf("setEHinfo not implemented \r\n");
     }
 
     HRESULT allocMethodBlockCounts(UINT32 count, BlockCounts **pBlockCounts) override {

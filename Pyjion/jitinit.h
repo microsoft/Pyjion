@@ -17,7 +17,6 @@
 #include <intrin.h>
 
 #include <vector>
-#include <hash_map>
 
 #include <corjit.h>
 #include <openum.h>

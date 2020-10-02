@@ -54,8 +54,7 @@ class BaseMethod;
 class Module {
 public:
     unordered_map<int, BaseMethod*> m_methods;
-    Module() {
-    }
+    Module() = default;
 
     virtual BaseMethod* ResolveMethod(int tokenId) {
         return m_methods[tokenId];
@@ -65,11 +64,11 @@ public:
 class UserModule : public Module {
     Module& m_parent;
 public:
-    UserModule(Module& parent) : m_parent(parent) {
+    explicit UserModule(Module& parent) : m_parent(parent) {
 
     }
 
-    virtual BaseMethod* ResolveMethod(int tokenId) {
+    BaseMethod* ResolveMethod(int tokenId) override {
         auto res = m_methods.find(tokenId);
         if (res == m_methods.end()) {
             return m_parent.ResolveMethod(tokenId);
@@ -82,7 +81,7 @@ public:
 class Parameter {
 public:
     CorInfoType m_type;
-    Parameter(CorInfoType type) {
+    explicit Parameter(CorInfoType type) {
         m_type = type;
     }
 };
@@ -120,11 +119,11 @@ public:
         m_addr = addr;
     }
 
-    virtual void* get_addr() {
+    void* get_addr() override {
         return m_addr;
     }
 
-    virtual void get_call_info(CORINFO_CALL_INFO *pResult) {
+    void get_call_info(CORINFO_CALL_INFO *pResult) override {
         pResult->codePointerLookup.lookupKind.needsRuntimeLookup = false;
         // TODO: If we use IAT_VALUE we need to generate a jump stub
         pResult->codePointerLookup.constLookup.accessType = IAT_PVALUE;
@@ -135,22 +134,22 @@ public:
         pResult->sig.retType = m_retType;
         pResult->sig.numArgs = m_params.size();
     }
-    virtual void findSig(CORINFO_SIG_INFO  *sig) {
+    void findSig(CORINFO_SIG_INFO  *sig) override {
         sig->retType = m_retType;
         sig->callConv = CORINFO_CALLCONV_STDCALL;
         sig->retTypeClass = nullptr;
         sig->args = (CORINFO_ARG_LIST_HANDLE)(m_params.size() != 0 ? &m_params[0] : nullptr);
         sig->numArgs = m_params.size();
     }
-    virtual void getFunctionEntryPoint(CORINFO_CONST_LOOKUP *  pResult) {
+    void getFunctionEntryPoint(CORINFO_CONST_LOOKUP *  pResult) override {
         // TODO: If we use IAT_VALUE we need to generate a jump stub
         pResult->accessType = IAT_PVALUE;
         pResult->addr = &m_addr;
     }
 
-    virtual CORINFO_CLASS_HANDLE getClass() {
+    CORINFO_CLASS_HANDLE getClass() override {
         // TODO: Implement
-        return NULL;
+        return nullptr;
     }
 };
 
@@ -164,24 +163,24 @@ public:
     }
 
 public:
-    virtual void* get_addr() {
+    void* get_addr() override {
         return m_addr;
     }
 
-    virtual void get_call_info(CORINFO_CALL_INFO *pResult) {
+    void get_call_info(CORINFO_CALL_INFO *pResult) override {
         m_coreMethod->get_call_info(pResult);
         pResult->codePointerLookup.constLookup.addr = &m_addr;
     }
 
-    virtual void findSig(CORINFO_SIG_INFO  *sig) {
+    void findSig(CORINFO_SIG_INFO  *sig) override {
         m_coreMethod->findSig(sig);
     }
-    virtual void getFunctionEntryPoint(CORINFO_CONST_LOOKUP *  pResult) {
+    void getFunctionEntryPoint(CORINFO_CONST_LOOKUP *  pResult) override {
         pResult->accessType = IAT_PVALUE;
         pResult->addr = &m_addr;
     }
-    virtual CORINFO_CLASS_HANDLE getClass() {
-        CORINFO_CLASS_HANDLE result = NULL;
+    CORINFO_CLASS_HANDLE getClass() override {
+        CORINFO_CLASS_HANDLE result = nullptr;
         // TODO : Infer type from method.
 //        MethodDesc* method = GetMethod(methodHnd);
 //        TypeHandle th = TypeHandle(method->GetMethodTable());
@@ -198,7 +197,7 @@ class VirtualMethod : public Method {
         m_vtableInfo(vtableInfo) {
     }
 
-    virtual void get_call_info(CORINFO_CALL_INFO *pResult) {
+    void get_call_info(CORINFO_CALL_INFO *pResult) override {
         pResult->codePointerLookup.lookupKind.needsRuntimeLookup = true;
         pResult->codePointerLookup.lookupKind.runtimeLookupKind = CORINFO_LOOKUP_THISOBJ;
         pResult->codePointerLookup.runtimeLookup.testForNull = false;
@@ -215,7 +214,7 @@ class VirtualMethod : public Method {
         pResult->methodFlags = CORINFO_FLG_VIRTUAL;
     }
 
-    virtual DWORD get_method_attrs() {
+    DWORD get_method_attrs() override {
         return CORINFO_FLG_VIRTUAL | CORINFO_FLG_NATIVE;
     }
 };
