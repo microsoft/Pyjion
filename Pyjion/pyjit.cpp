@@ -125,8 +125,8 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
 
     Py_LeaveRecursiveCall();
     frame->f_executing = 0;
-
-    return _Py_CheckFunctionResult(nullptr, res, (PyObject *) "Jit_EvalHelper", NULL);
+    PyObject* result = PyUnicode_FromString( "Jit_EvalHelper");
+    return _Py_CheckFunctionResult(tstate, res, result, NULL);
 }
 
 static Py_tss_t* g_extraSlot;

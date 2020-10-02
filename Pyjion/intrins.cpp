@@ -532,6 +532,7 @@ PyObject* PyJit_InplaceOr(PyObject *left, PyObject *right) {
 }
 
 int PyJit_PrintExpr(PyObject *value) {
+    auto tstate = PyThreadState_GET();
     _Py_IDENTIFIER(displayhook);
     PyObject *hook = _PySys_GetObjectId(&PyId_displayhook);
     PyObject *res;
