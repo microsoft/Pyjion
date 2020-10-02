@@ -881,6 +881,10 @@ void PythonCompiler::emit_print_expr() {
     m_il.emit_call(METHOD_PRINT_EXPR_TOKEN);
 }
 
+void PythonCompiler::emit_dict_update() {
+    m_il.emit_call(METHOD_DICTUPDATE_TOKEN);
+}
+
 void PythonCompiler::emit_load_classderef(int index) {
     load_frame();
     m_il.ld_i(index);

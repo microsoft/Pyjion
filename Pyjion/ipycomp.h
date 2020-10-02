@@ -225,6 +225,9 @@ public:
     virtual void emit_list_append() = 0;
     // Extends a list with a single iterable
     virtual void emit_list_extend() = 0;
+    // Updates a dictionary with a property
+    virtual void emit_dict_update() = 0;
+
 
     // Creates a new set
     virtual void emit_new_set() = 0;

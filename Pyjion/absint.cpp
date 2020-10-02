@@ -864,6 +864,20 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Any); // res
                     break;
                 }
+                case LIST_EXTEND:
+                {
+                    // TODO : Replace peek(oparg) and implement emitter
+                    lastState.pop_no_escape(); //iterable
+                    lastState.pop(); //list
+                    break;
+                }
+                case DICT_UPDATE:
+                {
+                    // TODO : Replace peek(oparg) and implement emitter
+                    lastState.pop_no_escape(); //update
+                    lastState.pop(); //dict
+                    break;
+                }
                 default:
                     PyErr_Format(PyExc_ValueError,
                                  "Unknown unsupported opcode: %s", opcode_name(opcode));
@@ -2609,6 +2623,20 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                     inc_stack();
                     break;
+            }
+            case LIST_EXTEND:
+            {
+                m_comp->emit_list_extend();
+                dec_stack(1);
+                int_error_check("extend list failed");
+                break;
+            }
+            case DICT_UPDATE:
+            {
+                m_comp->emit_dict_update();
+                dec_stack(1);
+                int_error_check("update dict failed");
+                break;
             }
             default:
                 printf("Unsupported opcode: %d (with related)\r\n", byte);

@@ -284,6 +284,7 @@ public:
     virtual void emit_set_extend();
     virtual void emit_dict_store();
     virtual void emit_dict_store_no_decref();
+    virtual void emit_dict_update();
 
     virtual void emit_unicode_joinarray();
     virtual void emit_format_value();
