@@ -333,6 +333,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 
 			// Update the jitted information for this tree node
 			target->addr = (Py_EvalFunc)res->get_code_addr();
+			assert(target->addr != nullptr);
 			target->jittedCode = res;
 			if (!isSpecialized) {
 				// We didn't produce a specialized function, force all code down

@@ -77,7 +77,6 @@ public:
         return m_codeAddr;
     }
 
-
     void freeMem(PVOID code) {
         // TODO: Validate
         PyMem_Free(code);
@@ -93,7 +92,7 @@ public:
         void **             coldCodeBlock,  /* OUT */
         void **             roDataBlock     /* OUT */
         ) override {
-        *hotCodeBlock = PyMem_Malloc(hotCodeSize);
+        *hotCodeBlock = m_codeAddr = PyMem_Malloc(hotCodeSize);
         if (coldCodeSize>0) // PyMem_Malloc passes with 0 but it confuses the JIT
             *coldCodeBlock = PyMem_Malloc(coldCodeSize);
         if (roDataSize>0) // Same as above
@@ -130,7 +129,7 @@ public:
         WORD                   slotNum,  /* IN  */
         INT32                  addlDelta /* IN  */
         ) override {
-        //printf("recordRelocation\r\n");
+        printf("recordRelocation\r\n");
         switch (fRelocType) {
             case IMAGE_REL_BASED_DIR64:
                 *((UINT64 *)((BYTE *)location + slotNum)) = (UINT64)target;
@@ -1757,7 +1756,7 @@ public:
     void recordCallSite(ULONG instrOffset,
                         CORINFO_SIG_INFO *callSig,
                         CORINFO_METHOD_HANDLE methodHandle) override {
-
+        printf("recordCallSite not implemented \r\n");
     }
 
 };
