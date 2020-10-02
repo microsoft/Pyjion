@@ -92,7 +92,7 @@ public:
         void **             coldCodeBlock,  /* OUT */
         void **             roDataBlock     /* OUT */
         ) override {
-        *hotCodeBlock = m_codeAddr = PyMem_Malloc(hotCodeSize);
+        *hotCodeBlock = m_codeAddr = VirtualAlloc(NULL, hotCodeSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
         if (coldCodeSize>0) // PyMem_Malloc passes with 0 but it confuses the JIT
             *coldCodeBlock = PyMem_Malloc(coldCodeSize);
         if (roDataSize>0) // Same as above
