@@ -1665,8 +1665,10 @@ public:
     }
 
     void *getHelperFtn(CorInfoHelpFunc ftnNum, void **ppIndirection) override {
-        printf("getHelperFtn not defined\r\n");
-        return nullptr;
+        if (ppIndirection != nullptr)
+            *ppIndirection = nullptr;
+        assert(ftnNum < CORINFO_HELP_COUNT);
+        return (void*)0x1001;
     }
 
     void getLocationOfThisType(CORINFO_METHOD_HANDLE context, CORINFO_LOOKUP_KIND *pLookupKind) override {
