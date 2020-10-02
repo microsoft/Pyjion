@@ -475,6 +475,7 @@ public:
     }
 
     AbstractValue* pop() {
+        assert(!m_stack.empty());
         auto res = m_stack.back();
         res.escapes();
         m_stack.pop_back();
@@ -482,6 +483,7 @@ public:
     }
 
     AbstractValueWithSources pop_no_escape() {
+        assert(!m_stack.empty());
         auto res = m_stack.back();
         m_stack.pop_back();
         return res;

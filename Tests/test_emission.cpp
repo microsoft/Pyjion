@@ -28,7 +28,7 @@
 */
 
 #include "stdafx.h"
-#include "catch.hpp"
+#include <catch2/catch.hpp>
 #include "testing_util.h"
 #include <Python.h>
 #include <frameobject.h>
@@ -43,7 +43,7 @@ private:
     PyObject* run() {
         auto sysModule = PyObject_ptr(PyImport_ImportModule("sys"));
         auto globals = PyObject_ptr(PyDict_New());
-        auto builtins = PyThreadState_GET()->interp->builtins;
+        auto builtins = PyEval_GetBuiltins();
         PyDict_SetItemString(globals.get(), "__builtins__", builtins);
         PyDict_SetItemString(globals.get(), "sys", sysModule.get());
 
@@ -75,10 +75,10 @@ public:
 
         auto repr = PyUnicode_AsUTF8(PyObject_Repr(res.get()));
         auto tstate = PyThreadState_GET();
-        REQUIRE(tstate->exc_value == nullptr);
-        REQUIRE(tstate->exc_traceback == nullptr);
-        if (tstate->exc_type != nullptr) {
-            REQUIRE(tstate->exc_type == Py_None);
+        REQUIRE(tstate->curexc_value == nullptr);
+        REQUIRE(tstate->curexc_traceback == nullptr);
+        if (tstate->curexc_type != nullptr) {
+            REQUIRE(tstate->curexc_type == Py_None);
         }
 
         return std::string(repr);

@@ -52,9 +52,9 @@
 struct SpecializedTreeNode;
 class PyjionJittedCode;
 
-static void JitInit();
+void JitInit();
 PyObject* PyJit_EvalFrame(PyThreadState *, PyFrameObject *, int);
-static PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
+PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
 
 class PyjionJittedCode;
 typedef PyObject* (*Py_EvalFunc)(PyjionJittedCode*, struct _frame*);
@@ -95,6 +95,6 @@ public:
 	~PyjionJittedCode();
 };
 
-static bool jit_compile(PyCodeObject* code);
+bool jit_compile(PyCodeObject* code);
 
 #endif

@@ -28,14 +28,15 @@
 */
 
 #include "stdafx.h"
-#include "catch.hpp"
+#include <catch2/catch.hpp>
 #include "testing_util.h"
 #include <Python.h>
 #include <util.h>
 
 PyCodeObject* CompileCode(const char* code) {
     auto globals = PyObject_ptr(PyDict_New());
-    auto builtins = PyThreadState_GET()->interp->builtins;
+
+    auto builtins = PyEval_GetBuiltins();
     PyDict_SetItemString(globals.get(), "__builtins__", builtins);
 
     auto locals = PyObject_ptr(PyDict_New());

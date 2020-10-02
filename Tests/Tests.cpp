@@ -23,11 +23,10 @@
 *
 */
 
-#include "stdafx.h"
 #include <Python.h>
 #include <pyjit.h>
 #define CATCH_CONFIG_RUNNER
-#include "catch.hpp"
+#include <catch2/catch.hpp>
 
 
 int main(int argc, char* const argv[]) {

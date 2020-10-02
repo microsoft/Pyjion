@@ -128,7 +128,7 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
 
 static Py_tss_t* g_extraSlot;
 
-static void JitInit() {
+void JitInit() {
 	g_extraSlot = PyThread_tss_alloc();
 	PyThread_tss_create(g_extraSlot);
 	g_jit = getJit();
@@ -347,7 +347,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 	return res;
 }
 
-static bool jit_compile(PyCodeObject* code) {
+bool jit_compile(PyCodeObject* code) {
 	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
         return false;
     }
@@ -370,7 +370,7 @@ static bool jit_compile(PyCodeObject* code) {
 #endif
 
 
-static PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject) {
+PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject) {
 	auto index = (ssize_t)PyThread_tss_get(g_extraSlot);
 	if (index == 0) {
 		index = _PyEval_RequestCodeExtraIndex(PyjionJitFree);
@@ -475,7 +475,7 @@ void PyjionJitFree(void* obj) {
 //        delete code;
 //        g_pyjionJittedCode.erase(function);
 //    }
-	PyMem_Free(obj);
+    free(obj);
 }
 
 static PyInterpreterState* inter(){

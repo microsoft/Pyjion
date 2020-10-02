@@ -532,7 +532,6 @@ PyObject* PyJit_InplaceOr(PyObject *left, PyObject *right) {
 }
 
 int PyJit_PrintExpr(PyObject *value) {
-    auto tstate = PyThreadState_GET();
     _Py_IDENTIFIER(displayhook);
     PyObject *hook = _PySys_GetObjectId(&PyId_displayhook);
     PyObject *res;
@@ -542,7 +541,10 @@ int PyJit_PrintExpr(PyObject *value) {
         Py_DECREF(value);
         return 1;
     }
-    res = PyObject_CallFunctionObjArgs(hook, value, NULL);
+    // TODO: Fix a bug where this can be called with a const value if the last
+    // opcode was LOAD_CONST with a small integer
+
+    res = PyObject_CallOneArg(hook, value);
     Py_DECREF(value);
     if (res == NULL) {
         return 1;

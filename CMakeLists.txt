@@ -98,8 +98,8 @@ endif()
 include_directories(CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/inc)
 set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp)
 
-add_library(pyjion MODULE ${SOURCES})
-
+add_library(pyjionlib OBJECT ${SOURCES})
+add_library(pyjion MODULE $<TARGET_OBJECTS:pyjionlib>)
 install(TARGETS pyjion
         LIBRARY DESTINATION ${CMAKE_BINARY_DIR})
 
@@ -113,3 +113,12 @@ set_target_properties(
 
 target_link_libraries(pyjion ${Python3_LIBRARIES})
 target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})
+
+# Testing
+add_subdirectory(Tests/Catch)
+set(TEST_SOURCES Tests/testing_util.cpp Tests/test_emission.cpp Tests/test_inference.cpp Tests/Tests.cpp)
+add_executable(unit_tests ${TEST_SOURCES} $<TARGET_OBJECTS:pyjionlib>)
+target_include_directories(unit_tests PRIVATE Pyjion)
+target_link_libraries(unit_tests Catch2::Catch2)
+target_link_libraries(unit_tests ${Python3_LIBRARIES})
+target_link_libraries(unit_tests ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})

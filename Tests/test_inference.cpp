@@ -31,7 +31,7 @@
  with.
 */
 #include "stdafx.h"
-#include "catch.hpp"
+#include <catch2/catch.hpp>
 #include "testing_util.h"
 #include <Python.h>
 #include <absint.h>

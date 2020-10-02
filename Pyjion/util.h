@@ -30,7 +30,7 @@ public:
         m_ptr = ptr;
     }
 
-    T* get() {
+    T* get() const {
         return m_ptr;
     }
 
