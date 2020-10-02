@@ -223,7 +223,9 @@ bool AbstractInterpreter::interpret() {
 
             auto opcode = GET_OPCODE(curByte);
             oparg = GET_OPARG(curByte);
+#ifdef DEBUG
             printf("Processing OPCODE %s\n", opcode_name(opcode));
+#endif
         processOpCode:
             switch (opcode) {
                 case EXTENDED_ARG: {

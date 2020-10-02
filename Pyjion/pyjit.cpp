@@ -30,9 +30,6 @@
 #include "pycomp.h"
 
 
-#define DEBUG_CALL_TRACE 1
-#define DEBUG_TRACE 1
-
 HINSTANCE            g_pMSCorEE;
 
 // Tracks types for a function call.  Each argument has a SpecializedTreeNode with
@@ -120,7 +117,7 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     auto res = ((Py_EvalFunc)state)(nullptr, frame);
 
 #if DEBUG_CALL_TRACE
-    printf("Returning from %s", PyUnicode_AsUTF8(frame->f_code->co_name));
+    printf("Returning from %s\r\n", PyUnicode_AsUTF8(frame->f_code->co_name));
 #endif
 
     Py_LeaveRecursiveCall();
@@ -314,7 +311,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 					}
 				}
 			}
-#if DEBUG_TRACE
+#ifdef DEBUG_TRACE
 			printf("Tracing %s from %s line %d %s\r\n",
 				PyUnicode_AsUTF8(frame->f_code->co_name),
 				PyUnicode_AsUTF8(frame->f_code->co_filename),
@@ -417,7 +414,7 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 	if (jitted != nullptr && !throwflag) {
 		if (jitted->j_evalfunc != nullptr) {
 			//SetLastError(err);
-#if DEBUG_CALL_TRACE
+#ifdef DEBUG_CALL_TRACE
 			printf("Calling %s from %s line %d %p\r\n",
 				PyUnicode_AsUTF8(f->f_code->co_name),
 				PyUnicode_AsUTF8(f->f_code->co_filename),

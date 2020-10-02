@@ -61,9 +61,9 @@ protected:
 public: CCorJitHost(){
         // TODO: DEBUG settings only, remove these later
         intSettings[u"JitLsraStats"] = 0;
-        intSettings[u"DumpJittedMethods"] = 1;
-        intSettings[u"JitDumpToDebugger"] = 1;
-        intSettings[u"JitDumpASCII"] = 1;
+        intSettings[u"DumpJittedMethods"] = 0;
+        intSettings[u"JitDumpToDebugger"] = 0;
+        intSettings[u"JitDumpASCII"] = 0;
         strSettings[u"JitDump"] = u"methodname";
     }
 

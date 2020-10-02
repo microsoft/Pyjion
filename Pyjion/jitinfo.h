@@ -143,7 +143,9 @@ public:
             vprintf(fmt, args);
 #endif
         }
-        return FALSE;
+        return TRUE;
+        // Change to FALSE if you want crazy-verbose logging from the JIT
+        // return FALSE;
     }
 
     int doAssert(const char* szFile, int iLine, const char* szExpr) override {
@@ -166,7 +168,6 @@ public:
         WORD                   slotNum,  /* IN  */
         INT32                  addlDelta /* IN  */
         ) override {
-        printf("recordRelocation\r\n");
         switch (fRelocType) {
             case IMAGE_REL_BASED_DIR64:
                 *((UINT64 *)((BYTE *)location + slotNum)) = (UINT64)target;
@@ -1425,7 +1426,7 @@ public:
         CORINFO_ARG_LIST_HANDLE     args            /* IN */
         ) override {
         // TODO: Work out correct return type
-        printf("getArgClass not implemented\r\n");
+        //printf("getArgClass not implemented\r\n");
         return nullptr;
     }
 
@@ -1758,7 +1759,7 @@ public:
 
     void allocUnwindInfo(BYTE *pHotCode, BYTE *pColdCode, ULONG startOffset, ULONG endOffset, ULONG unwindSize,
                          BYTE *pUnwindBlock, CorJitFuncKind funcKind) override {
-        printf("allocUnwindInfo not implemented \r\n");
+        //printf("allocUnwindInfo not implemented \r\n");
     }
 
     void *allocGCInfo(size_t size) override {
@@ -1793,7 +1794,6 @@ public:
     void recordCallSite(ULONG instrOffset,
                         CORINFO_SIG_INFO *callSig,
                         CORINFO_METHOD_HANDLE methodHandle) override {
-        printf("recordCallSite not implemented \r\n");
     }
 
 };
