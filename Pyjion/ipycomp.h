@@ -235,6 +235,8 @@ public:
     virtual void emit_set_extend() = 0;
     // Adds a single item to a set
     virtual void emit_set_add() = 0;
+    // Updates a single item in a set
+    virtual void emit_set_update() = 0;
 
 	// Joins an array of string values into a single string (takes string values and length)
 	virtual void emit_unicode_joinarray() = 0;

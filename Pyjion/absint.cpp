@@ -866,16 +866,17 @@ bool AbstractInterpreter::interpret() {
                 }
                 case LIST_EXTEND:
                 {
-                    // TODO : Replace peek(oparg) and implement emitter
-                    lastState.pop_no_escape(); //iterable
-                    lastState.pop(); //list
+                    lastState.pop();
                     break;
                 }
                 case DICT_UPDATE:
                 {
-                    // TODO : Replace peek(oparg) and implement emitter
                     lastState.pop_no_escape(); //update
-                    lastState.pop(); //dict
+                    break;
+                }
+                case SET_UPDATE:
+                {
+                    lastState.pop_no_escape(); //update
                     break;
                 }
                 default:
@@ -2627,8 +2628,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case LIST_EXTEND:
             {
                 m_comp->emit_list_extend();
-                dec_stack(1);
+                dec_stack(2);
                 int_error_check("extend list failed");
+                inc_stack();
                 break;
             }
             case DICT_UPDATE:
@@ -2636,6 +2638,13 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_dict_update();
                 dec_stack(1);
                 int_error_check("update dict failed");
+                break;
+            }
+            case SET_UPDATE:
+            {
+                m_comp->emit_set_update();
+                dec_stack(1);
+                int_error_check("update set failed");
                 break;
             }
             default:

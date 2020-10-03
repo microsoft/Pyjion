@@ -860,6 +860,10 @@ void PythonCompiler::emit_set_add() {
     m_il.emit_call(METHOD_SET_ADD_TOKEN);
 }
 
+void PythonCompiler::emit_set_update() {
+    m_il.emit_call(METHOD_SETUPDATE_TOKEN);
+}
+
 void PythonCompiler::emit_map_add() {
     m_il.emit_call(METHOD_MAP_ADD_TOKEN);
 }
