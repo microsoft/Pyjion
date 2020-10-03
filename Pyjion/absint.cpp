@@ -879,6 +879,12 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop_no_escape(); //update
                     break;
                 }
+                case LIST_TO_TUPLE:
+                {
+                    lastState.pop_no_escape(); // list
+                    lastState.push(&Any); // tuple
+                    break;
+                }
                 default:
                     PyErr_Format(PyExc_ValueError,
                                  "Unknown unsupported opcode: %s", opcode_name(opcode));
@@ -2645,6 +2651,14 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_set_update();
                 dec_stack(1);
                 int_error_check("update set failed");
+                break;
+            }
+            case LIST_TO_TUPLE:
+            {
+                m_comp->emit_list_to_tuple();
+                dec_stack(1);
+                int_error_check("list to tuple failed");
+                inc_stack(1);
                 break;
             }
             default:
