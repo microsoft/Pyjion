@@ -23,6 +23,26 @@
 *
 */
 
+
+/*
+ * TODO : Remaining opcodes
+ *  - Test CONTAINS_OP
+ *  - Implement JUMP_IF_NOT_EXC_MATCH
+ *  - Test IS_OP
+ *  - Test DICT_UPDATE
+ *  - Test SET_UPDATE
+ *  - Test LIST_EXTEND
+ *  - Implement DICT_MERGE
+ *  - Test LIST_EXTEND
+ *  - Test LIST_TO_TUPLE
+ *  - Implement LOAD_ASSERTION_ERROR
+ *  - Implement WITH_EXCEPT_START
+ *  - Implement RERAISE
+ *  - Test SETUP_ANNOTATIONS
+ *  - Implement END_ASYNC_FOR
+ *  - Test GET_AITER
+ *  - Test ROT_FOUR
+ */
 #include <Python.h>
 #include <opcode.h>
 #include <object.h>
@@ -844,6 +864,11 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     lastState.pop();
                     lastState.push(&Bool);
+                    break;
+                case CONTAINS_OP:
+                    lastState.pop_no_escape();
+                    lastState.pop_no_escape();
+                    lastState.push(&Any);
                     break;
                 case WITH_EXCEPT_START: {
                     /* At the top of the stack are 7 values:
@@ -2661,8 +2686,26 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 inc_stack(1);
                 break;
             }
+            case IS_OP:
+            {
+                m_comp->emit_is(false);
+                dec_stack(2);
+                int_error_check("is failed");
+                inc_stack(1);
+                break;
+            }
+            case CONTAINS_OP:
+            {
+                m_comp->emit_in_push_int();
+                dec_stack(2);
+                int_error_check("contains failed");
+                inc_stack(1);
+                break;
+            }
             default:
                 printf("Unsupported opcode: %d (with related)\r\n", byte);
+
+
                 return nullptr;
         }
     }
