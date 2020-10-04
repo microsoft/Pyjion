@@ -33,6 +33,7 @@
 #include <Python.h>
 #include <util.h>
 
+
 PyCodeObject* CompileCode(const char* code) {
     auto globals = PyObject_ptr(PyDict_New());
 
@@ -50,4 +51,68 @@ PyCodeObject* CompileCode(const char* code) {
     auto codeObj = (PyCodeObject*)PyObject_GetAttrString(func.get(), "__code__");
 
     return codeObj;
+}
+
+void VerifyOldTest(AITestCase testCase) {
+    auto codeObj = CompileCode(testCase.m_code);
+
+    AbstractInterpreter interpreter(codeObj, nullptr);
+    if (!interpreter.interpret()) {
+        FAIL("Failed to interprete code");
+    }
+
+    testCase.verify(interpreter);
+
+    Py_DECREF(codeObj);
+}
+
+
+StackVerifier::StackVerifier(size_t byteCodeIndex, size_t stackIndex, AbstractValueKind kind) {
+    m_byteCodeIndex = byteCodeIndex;
+    m_stackIndex = stackIndex;
+    m_kind = kind;
+};
+
+void StackVerifier::verify(AbstractInterpreter& interpreter) {
+    auto info = interpreter.get_stack_info(m_byteCodeIndex);
+    CHECK(m_kind == info[info.size() - m_stackIndex - 1].Value->kind());
+};
+
+
+/* Verify the inferred type stored in the locals array before a specified bytecode executes. */
+VariableVerifier::VariableVerifier(size_t byteCodeIndex, size_t localIndex, AbstractValueKind kind, bool undefined) {
+    m_byteCodeIndex = byteCodeIndex;
+    m_localIndex = localIndex;
+    m_undefined = undefined;
+    m_kind = kind;
+};
+
+void VariableVerifier::verify(AbstractInterpreter& interpreter) {
+    auto local = interpreter.get_local_info(m_byteCodeIndex, m_localIndex);
+    CHECK(local.IsMaybeUndefined == m_undefined);
+    CHECK(local.ValueInfo.Value->kind() == m_kind);
+};
+
+
+ReturnVerifier::ReturnVerifier(AbstractValueKind kind) {
+    m_kind = kind;
+};
+
+void ReturnVerifier::verify(AbstractInterpreter& interpreter) {
+    CHECK(m_kind == interpreter.get_return_info()->kind());
+};
+
+BoxVerifier::BoxVerifier(size_t byteCodeIndex, bool shouldBox) {
+    m_byteCodeIndex = byteCodeIndex;
+    m_shouldBox = shouldBox;
+};
+
+void BoxVerifier::verify(AbstractInterpreter& interpreter) {
+    CHECK(m_shouldBox == interpreter.should_box(m_byteCodeIndex));
+};
+
+
+PyObject* Incremented(PyObject*o) {
+    Py_INCREF(o);
+    return o;
 }
