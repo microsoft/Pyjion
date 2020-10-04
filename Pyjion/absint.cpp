@@ -908,7 +908,7 @@ bool AbstractInterpreter::interpret() {
                 case LIST_TO_TUPLE:
                 {
                     lastState.pop_no_escape(); // list
-                    lastState.push(&Any); // tuple
+                    lastState.push(&Tuple); // tuple
                     break;
                 }
                 default:

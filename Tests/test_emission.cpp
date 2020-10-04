@@ -140,3 +140,17 @@ TEST_CASE("General dict unpacking", "[dict][BUILD_MAP_UNPACK][emission]") {
         CHECK(t.raises() == PyExc_TypeError);
     }
 }
+
+TEST_CASE("General is comparison", "[int][IS_OP][emission]") {
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): return 1 is 2");
+        CHECK(t.returns() == "False");
+    }
+}
+
+TEST_CASE("General contains comparison", "[int][CONTAINS_OP][emission]") {
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): return 'i' in 'team'");
+        CHECK(t.returns() == "False");
+    }
+}
