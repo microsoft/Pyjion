@@ -47,6 +47,7 @@
 #include <Python.h>
 #include <opcode.h>
 #include <object.h>
+#include <compile.h>
 #include <deque>
 #include <unordered_map>
 #include <algorithm>
@@ -248,6 +249,7 @@ bool AbstractInterpreter::interpret() {
             printf("Processing OPCODE %s\n", opcode_name(opcode));
 #endif
         processOpCode:
+            int curStackLen = lastState.stack_size();
             switch (opcode) {
                 case EXTENDED_ARG: {
                     curByte += sizeof(_Py_CODEUNIT);
@@ -905,6 +907,11 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop_no_escape(); //update
                     break;
                 }
+                case PRINT_EXPR:
+                {
+                    lastState.pop_no_escape(); // value
+                    break;
+                }
                 case LIST_TO_TUPLE:
                 {
                     lastState.pop_no_escape(); // list
@@ -916,8 +923,10 @@ bool AbstractInterpreter::interpret() {
                                  "Unknown unsupported opcode: %s", opcode_name(opcode));
                     break;
             }
+            assert(PyCompile_OpcodeStackEffect(opcode, oparg) == (lastState.stack_size() - curStackLen));
             update_start_state(lastState, curByte + sizeof(_Py_CODEUNIT));
         }
+
     next:;
     } while (!queue.empty());
 
@@ -2001,6 +2010,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             m_comp->emit_lasti_update(curByte);
         }
 
+        int curStackSize = m_stack.size();
         switch (byte) {
             case NOP: break;
             case ROT_TWO: 
@@ -2058,7 +2068,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 inc_stack(2);
                 m_comp->emit_dup_top_two();
                 break;
-            case COMPARE_OP: compare_op(oparg, curByte, opcodeIndex); break;
+            case COMPARE_OP:
+                // TODO : This is way too simple, validate the logic here.
+                compare_op(oparg, curByte, opcodeIndex);
+                break;
             case LOAD_BUILD_CLASS:
                 m_comp->emit_load_build_class();
                 error_check("load build class failed");
@@ -2521,6 +2534,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
             case YIELD_FROM:
             case YIELD_VALUE:
+                printf("Unsupported opcode: %d (with related)\r\n", byte);
                 return nullptr;
 
             case IMPORT_NAME:
@@ -2540,6 +2554,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 int_error_check("import star failed");
                 break;
             case SETUP_WITH:
+                printf("Unsupported opcode: %d (with related)\r\n", byte);
                 return nullptr;
             case FORMAT_VALUE:
             {
@@ -2697,7 +2712,11 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case CONTAINS_OP:
             {
-                m_comp->emit_in_push_int();
+                // Oparg is 0 if "in", and 1 if "not in"
+                if (oparg == 0)
+                    m_comp->emit_in();
+                else
+                    m_comp->emit_not_in();
                 dec_stack(2);
                 int_error_check("contains failed");
                 inc_stack(1);
@@ -2706,9 +2725,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
             default:
                 printf("Unsupported opcode: %d (with related)\r\n", byte);
 
-
                 return nullptr;
         }
+        assert(PyCompile_OpcodeStackEffect(byte, oparg) == (m_stack.size() - curStackSize));
     }
 
     // for each exception handler we need to load the exception
@@ -3248,7 +3267,7 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
     for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != (-1); blockIndex--) {
         if (m_blockStack[blockIndex].Kind == SETUP_FINALLY) {
             // we need to run the finally before returning...
-            m_blockStack.data()[blockIndex].Flags |= EHF_BlockReturns;
+            m_blockStack[blockIndex].Flags |= EHF_BlockReturns;
 
             if (!inFinally) {
                 // Only emit the store and branch to the inner most finally, but
@@ -3320,7 +3339,7 @@ void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *lo
     // CPython always generates LOAD_FAST or a GET_ITER before a FOR_ITER.
     // Therefore we know that we always fall into a FOR_ITER when it is
     // initialized, and we branch back to it for the loop condition.  We
-    // do this becaues keeping the value on the stack becomes problematic.
+    // do this because keeping the value on the stack becomes problematic.
     // At the very least it requires that we spill the value out when we
     // are doing a "continue" in a for loop.
 

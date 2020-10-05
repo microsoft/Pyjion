@@ -46,7 +46,7 @@ void VerifyOldJitTest(TestCase curCase) {
     puts(curCase.m_code);
     auto codeObj = CompileCode(curCase.m_code);
     auto addr = PyJit_EnsureExtra((PyObject *) codeObj);
-    REQUIRE (addr != nullptr) ;
+    REQUIRE(addr != nullptr);
     // For the purpose of exercising the JIT machinery while testing, the
     // code should be JITed everytime.
     addr->j_specialization_threshold = 0;
@@ -54,9 +54,7 @@ void VerifyOldJitTest(TestCase curCase) {
         CHECK(FALSE);
     }
 
-    for (auto curInput = 0; curInput < curCase.m_inputs.size(); curInput++) {
-        auto input = curCase.m_inputs[curInput];
-
+    for (auto input : curCase.m_inputs) {
         auto globals = PyDict_New();
         auto builtins = PyEval_GetBuiltins();
         PyDict_SetItemString(globals, "__builtins__", builtins);
@@ -78,7 +76,7 @@ void VerifyOldJitTest(TestCase curCase) {
         auto res = addr->j_evalfunc(addr, frame);
 
         auto repr = PyUnicode_AsUTF8(PyObject_Repr(res));
-        CHECK(input.m_expected == repr);
+        CHECK(strcmp(input.m_expected, repr) == 0);
         REQUIRE (res != nullptr) ;
         auto tstate = PyThreadState_GET();
         CHECK(tstate->curexc_value == nullptr);

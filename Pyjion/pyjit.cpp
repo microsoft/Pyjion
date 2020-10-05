@@ -114,6 +114,7 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     }
 
 	frame->f_executing = 1;
+    // TODO : Catch corrupt memory address before faulting on RIP offset.
     auto res = ((Py_EvalFunc)state)(nullptr, frame);
 
 #if DEBUG_CALL_TRACE
@@ -122,8 +123,7 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
 
     Py_LeaveRecursiveCall();
     frame->f_executing = 0;
-    PyObject* result = PyUnicode_FromString( "Jit_EvalHelper");
-    return _Py_CheckFunctionResult(tstate, res, result, NULL);
+    return res;
 }
 
 static Py_tss_t* g_extraSlot;

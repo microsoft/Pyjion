@@ -181,7 +181,7 @@ public:
     }
     CORINFO_CLASS_HANDLE getClass() override {
         CORINFO_CLASS_HANDLE result = nullptr;
-        // TODO : Infer type from method.
+        // TODO : Infer type from method, currently it uses NATIVEINT for everything so there is no class
 //        MethodDesc* method = GetMethod(methodHnd);
 //        TypeHandle th = TypeHandle(method->GetMethodTable());
 //        result = CORINFO_CLASS_HANDLE(th.AsPtr());
@@ -202,6 +202,7 @@ class VirtualMethod : public Method {
         pResult->codePointerLookup.lookupKind.runtimeLookupKind = CORINFO_LOOKUP_THISOBJ;
         pResult->codePointerLookup.runtimeLookup.testForNull = false;
         pResult->codePointerLookup.runtimeLookup.testForFixup = false;
+        // TODO : Find out why this code was commented out
         //pResult->codePointerLookup.runtimeLookup.helper = CORINFO_HELP_UNDEF;
         //pResult->codePointerLookup.runtimeLookup.indirections = method->m_vtableInfo->indirections;
         //pResult->codePointerLookup.runtimeLookup.offsets[0] = method->m_vtableInfo->offsets[0];
