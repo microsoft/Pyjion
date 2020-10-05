@@ -1160,12 +1160,14 @@ int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map) {
 }
 
 int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map) {
+    assert(map != nullptr);
 	assert(PyDict_CheckExact(map));
 	auto res = PyDict_SetItem(map, key, value);
 	return res;
 }
 
 int PyJit_DictUpdate(PyObject* dict, PyObject* other) {
+    assert(dict != nullptr);
     assert(PyDict_CheckExact(dict));
     auto res = PyDict_Update(dict, other);
     if (res < 0) {

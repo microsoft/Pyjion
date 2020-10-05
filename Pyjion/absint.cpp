@@ -869,9 +869,9 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Bool);
                     break;
                 case CONTAINS_OP:
-                    lastState.pop_no_escape();
-                    lastState.pop_no_escape();
-                    lastState.push(&Any);
+                    lastState.pop();
+                    lastState.pop();
+                    lastState.push(&Bool);
                     break;
                 case WITH_EXCEPT_START: {
                     /* At the top of the stack are 7 values:
@@ -2676,7 +2676,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
             {
                 m_comp->emit_list_extend();
                 dec_stack(2);
-                int_error_check("extend list failed");
                 inc_stack();
                 break;
             }
@@ -2691,14 +2690,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
             {
                 m_comp->emit_set_update();
                 dec_stack(1);
-                int_error_check("update set failed");
                 break;
             }
             case LIST_TO_TUPLE:
             {
                 m_comp->emit_list_to_tuple();
                 dec_stack(1);
-                int_error_check("list to tuple failed");
                 inc_stack(1);
                 break;
             }
@@ -2706,7 +2703,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
             {
                 m_comp->emit_is(false);
                 dec_stack(2);
-                int_error_check("is failed");
                 inc_stack(1);
                 break;
             }
@@ -2718,8 +2714,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 else
                     m_comp->emit_not_in();
                 dec_stack(2);
-                int_error_check("contains failed");
-                inc_stack(1);
+                inc_stack();
                 break;
             }
             default:
