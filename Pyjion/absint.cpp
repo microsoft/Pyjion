@@ -36,9 +36,9 @@
  *  - Implement GET_AITER
  *  Implemented (need unit tests)
  *  - Test SETUP_ANNOTATIONS
- *  - Test IS_OP
- *  - Test DICT_UPDATE
- *  - Test CONTAINS_OP
+ *  - Test IS_OP (DONE)
+ *  - Test DICT_UPDATE (DONE)
+ *  - Test CONTAINS_OP (DONE)
  *  - Test SET_UPDATE
  *  - Test LIST_EXTEND
  *  - Test LIST_TO_TUPLE
@@ -246,7 +246,7 @@ bool AbstractInterpreter::interpret() {
             auto opcode = GET_OPCODE(curByte);
             oparg = GET_OPARG(curByte);
 #ifdef DEBUG
-            printf("Processing OPCODE %s\n", opcode_name(opcode));
+            printf("Interpreting OPCODE %s (%d) stack %d\n", opcode_name(opcode), oparg, lastState.stack_size());
 #endif
         processOpCode:
             int curStackLen = lastState.stack_size();
@@ -786,8 +786,7 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Any);
                     break;
                 case SET_ADD:
-                    // pop the value being stored off, leave set on stack
-                    lastState.pop();
+                    lastState.pop_no_escape();
                     break;
                 case LIST_APPEND:
                     // pop the value being stored off, leave list on stack
@@ -894,17 +893,18 @@ bool AbstractInterpreter::interpret() {
                 }
                 case LIST_EXTEND:
                 {
-                    lastState.pop();
+                    lastState.pop_no_escape();
                     break;
                 }
                 case DICT_UPDATE:
                 {
-                    lastState.pop_no_escape(); //update
+                    // Calls dict.update(TOS1[-i], TOS). Used to build dicts.
+                    lastState.pop_no_escape(); // value
                     break;
                 }
                 case SET_UPDATE:
                 {
-                    lastState.pop_no_escape(); //update
+                    lastState.pop_no_escape(); // value
                     break;
                 }
                 case PRINT_EXPR:
@@ -1619,8 +1619,8 @@ void AbstractInterpreter::extend_list_recursively(Local listTmp, size_t argCnt) 
 
     extend_list_recursively(listTmp, --argCnt);
 
-    m_comp->emit_load_local(listTmp);
     m_comp->emit_load_local(valueTmp);
+    m_comp->emit_load_local(listTmp);
 
     m_comp->emit_list_extend();
     int_error_check("list extend failed");
@@ -1712,8 +1712,8 @@ void AbstractInterpreter::extend_set_recursively(Local setTmp, size_t argCnt) {
 
     extend_set_recursively(setTmp, --argCnt);
 
-    m_comp->emit_load_local(setTmp);
     m_comp->emit_load_local(valueTmp);
+    m_comp->emit_load_local(setTmp);
 
     m_comp->emit_set_extend();
     int_error_check("set extend failed");
@@ -1773,6 +1773,26 @@ void AbstractInterpreter::extend_map_recursively(Local dictTmp, size_t argCnt) {
     m_comp->emit_free_local(valueTmp);
 }
 
+void AbstractInterpreter::extend_dict_recursively(Local dictTmp, size_t argCnt) {
+    if (argCnt == 0) {
+        return;
+    }
+
+    auto valueTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(valueTmp);
+    dec_stack();
+
+    extend_dict_recursively(dictTmp, --argCnt);
+
+    m_comp->emit_load_local(dictTmp);
+    m_comp->emit_load_local(valueTmp);
+
+    m_comp->emit_dict_update();
+    int_error_check("dict update failed");
+
+    m_comp->emit_free_local(valueTmp);
+}
+
 void AbstractInterpreter::extend_map(size_t argCnt) {
     assert(argCnt > 0);
 
@@ -1785,6 +1805,74 @@ void AbstractInterpreter::extend_map(size_t argCnt) {
     extend_map_recursively(dictTmp, argCnt);
 
     m_comp->emit_load_and_free_local(dictTmp);
+}
+
+void AbstractInterpreter::extend_dict(size_t argCnt) {
+    assert(argCnt > 0);
+
+    m_comp->emit_new_dict(0);
+    error_check("new dict failed");
+
+    auto dictTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(dictTmp);
+
+    extend_dict_recursively(dictTmp, argCnt);
+
+    m_comp->emit_load_and_free_local(dictTmp);
+}
+
+void AbstractInterpreter::update_dict(size_t argCnt) {
+    assert(argCnt > 0);
+    auto dict = m_comp->emit_spill();
+    dec_stack();
+    extend_dict_recursively(dict, argCnt);
+    m_comp->emit_load_and_free_local(dict);
+    inc_stack();
+}
+
+void AbstractInterpreter::update_set(size_t argCnt) {
+    assert(argCnt > 0);
+    auto set = m_comp->emit_spill();
+    dec_stack();
+    extend_set_recursively(set, argCnt);
+    m_comp->emit_load_and_free_local(set);
+    inc_stack();
+}
+
+void AbstractInterpreter::add_to_set_recursively(Local setTmp, size_t argCnt){
+    if (argCnt == 0) {
+        return;
+    }
+
+    auto valueTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(valueTmp);
+    dec_stack();
+
+    m_comp->emit_load_local(setTmp);
+    m_comp->emit_load_local(valueTmp);
+
+    m_comp->emit_set_add();
+    int_error_check("set add failed");
+
+    m_comp->emit_free_local(valueTmp);
+}
+
+void AbstractInterpreter::add_to_list(size_t argCnt){
+    assert(argCnt > 0 );
+    auto listTmp = m_comp->emit_spill();
+    dec_stack();
+    extend_list_recursively(listTmp, argCnt);
+    m_comp->emit_load_and_free_local(listTmp);
+    inc_stack();
+}
+
+void AbstractInterpreter::add_to_set(size_t argCnt){
+    assert(argCnt > 0 );
+    auto setTmp = m_comp->emit_spill();
+    dec_stack();
+    add_to_set_recursively(setTmp, argCnt);
+    m_comp->emit_load_and_free_local(setTmp);
+    inc_stack();
 }
 
 void AbstractInterpreter::make_function(int oparg) {
@@ -1998,6 +2086,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
         if (curStackDepth != m_offsetStack.end()) {
             m_stack = curStackDepth->second;
         }
+
+#ifdef DEBUG
+        printf("Compiling OPCODE %s (%d) stack %d\n", opcode_name(byte), oparg, m_stack.size());
+#endif
 
         if (m_blockStack.size() > 1 && 
             curByte >= m_blockStack.back().EndOffset &&
@@ -2419,13 +2511,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             }
             case SET_ADD:
-                // TODO: Are these stack counts right?
-                // We error_check with the set/map/list on the
-                // stack, but it's not in the count
-                m_comp->emit_set_add();
-                dec_stack(2);
-                error_check("set add failed");
-                inc_stack();
+                add_to_set(oparg);
                 break;
             case MAP_ADD:
                 m_comp->emit_map_add();
@@ -2674,22 +2760,19 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case LIST_EXTEND:
             {
-                m_comp->emit_list_extend();
-                dec_stack(2);
-                inc_stack();
+                add_to_list(oparg); // has -1 stack effect
                 break;
             }
             case DICT_UPDATE:
             {
-                m_comp->emit_dict_update();
-                dec_stack(1);
-                int_error_check("update dict failed");
+                // Calls dict.update(TOS1[-i], TOS). Used to build dicts.
+                update_dict(oparg);
                 break;
             }
             case SET_UPDATE:
             {
-                m_comp->emit_set_update();
-                dec_stack(1);
+                // Calls set.update(TOS1[-i], TOS). Used to build sets.
+                update_set(oparg); // has -1 stack effect
                 break;
             }
             case LIST_TO_TUPLE:
@@ -2701,7 +2784,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case IS_OP:
             {
-                m_comp->emit_is(false);
+                m_comp->emit_is(oparg);
                 dec_stack(2);
                 inc_stack(1);
                 break;

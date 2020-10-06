@@ -284,9 +284,17 @@ private:
     void build_list(size_t argCnt);
     void extend_list_recursively(Local list, size_t argCnt);
     void extend_list(size_t argCnt);
+    void add_to_list(size_t argCnt);
     void build_set(size_t argCnt);
     void extend_set_recursively(Local set, size_t argCnt);
     void extend_set(size_t argCnt);
+    void update_set(size_t argCnt);
+    void add_to_set(size_t argCnt);
+    void add_to_set_recursively(Local setTmp, size_t argCnt);
+
+    void extend_dict_recursively(Local set, size_t argCnt);
+    void extend_dict(size_t argCnt);
+    void update_dict(size_t argCnt);
 
     void unpack_ex(size_t size, int opcode);
 

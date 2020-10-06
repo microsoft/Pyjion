@@ -311,6 +311,7 @@ PyObject* PyJit_UnaryInvert(PyObject* value) {
 }
 
 PyObject* PyJit_ListAppend(PyObject* list, PyObject* value) {
+    assert(list != nullptr);
     int err = PyList_Append(list, value);
     Py_DECREF(value);
     if (err) {
@@ -320,22 +321,44 @@ PyObject* PyJit_ListAppend(PyObject* list, PyObject* value) {
 }
 
 PyObject* PyJit_SetAdd(PyObject* set, PyObject* value) {
-    int err = PySet_Add(set, value);
-    Py_DECREF(value);
+    assert(set != nullptr);
+    int err ;
+    if (!PyAnySet_CheckExact(set)){
+        PyErr_Format(PyExc_TypeError,
+                     "argument must be a set, not %.200s",
+                     set->ob_type->tp_name);
+        goto error;
+    };
+    err = PySet_Add(set, value);
     if (err) {
-        return nullptr;
+        goto error;
     }
+    Py_DECREF(value);
     return set;
+error:
+    Py_DECREF(value);
+    return nullptr;
 }
 
-int PyJit_UpdateSet(PyObject* set, PyObject* value) {
-    assert(PyAnySet_CheckExact(set));
-    auto res = _PySet_Update(set, value);
-    Py_DECREF(value);
+int PyJit_UpdateSet(PyObject* set, PyObject* iterable) {
+    assert(set != nullptr);
+    int res;
+    if (!PyAnySet_CheckExact(set)){
+        PyErr_Format(PyExc_TypeError,
+                     "argument must be a set, not %.200s",
+                     set->ob_type->tp_name);
+        goto error;
+    };
+    res = _PySet_Update(set, iterable);
+    Py_DECREF(iterable);
     return res;
+error:
+    Py_DECREF(iterable);
+    return -1;
 }
 
 PyObject* PyJit_MapAdd(PyObject*map, PyObject* value, PyObject*key) {
+    assert(map != nullptr);
     int err = PyDict_SetItem(map, key, value);  /* v[w] = u */
     Py_DECREF(value);
     Py_DECREF(key);
@@ -1168,17 +1191,19 @@ int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map) {
 
 int PyJit_DictUpdate(PyObject* dict, PyObject* other) {
     assert(dict != nullptr);
-    assert(PyDict_CheckExact(dict));
-    auto res = PyDict_Update(dict, other);
-    if (res < 0) {
-        if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
-            PyErr_Format(PyExc_TypeError,
-                "'%.200s' object is not a mapping",
-                other->ob_type->tp_name);
-        }
+    int res ;
+    if (!PyDict_CheckExact(dict)) {
+        PyErr_Format(PyExc_TypeError,
+                     "argument must be a dict, not %.200s",
+                     dict->ob_type->tp_name);
+        goto error;
     }
+    res = PyDict_Update(dict, other);
     Py_DECREF(other);
     return res;
+error:
+    Py_DECREF(other);
+    return -1;
 }
 
 int PyJit_StoreSubscr(PyObject* value, PyObject *container, PyObject *index) {

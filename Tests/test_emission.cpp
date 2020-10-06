@@ -117,22 +117,51 @@ TEST_CASE("General tuple unpacking", "[tuple][BUILD_TUPLE_UNPACK][emission]") {
     }
 }
 
-TEST_CASE("General set unpacking", "[set][BUILD_SET_UNPACK][emission]") {
+TEST_CASE("General list building") {
+    SECTION("static list") {
+        auto t = EmissionTest("def f(): return [1, 2, 3]");
+        CHECK(t.returns() == "[1, 2, 3]");
+    }
+
+    SECTION("combine lists") {
+        auto t = EmissionTest("def f(): return [1,2,3] + [4,5,6]");
+        CHECK(t.returns() == "[1, 2, 3, 4, 5, 6]");
+    }
+}
+
+TEST_CASE("General set building") {
+    SECTION("frozenset") {
+        auto t = EmissionTest("def f(): return {1, 2, 3}");
+        CHECK(t.returns() == "frozenset({1, 2, 3})");
+    }
+
+    SECTION("combine sets") {
+        auto t = EmissionTest("def f(): return {1, 2, 3} | {4, 5, 6}");
+        CHECK(t.returns() == "frozenset({1, 2, 3, 4, 5, 6})");
+    }
+
+    SECTION("and operator set") {
+        auto t = EmissionTest("def f(): return {1, 2, 3, 4} & {4, 5, 6}");
+        CHECK(t.returns() == "frozenset({4})");
+    }
+}
+
+TEST_CASE("General set unpacking") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): return {1, *[2], 3}");
         CHECK(t.returns() == "{1, 2, 3}");
     }
 
     SECTION("unpacking a non-iterable") {
-        auto t = EmissionTest("def f(): return {1, *2, 3}");
+        auto t = EmissionTest("def f(): return {1, [], 3}");
         CHECK(t.raises() == PyExc_TypeError);
     }
 }
 
-TEST_CASE("General dict unpacking", "[dict][BUILD_MAP_UNPACK][emission]") {
+TEST_CASE("General dict unpacking") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): return {1:'a', **{2:'b'}, 3:'c'}");
-        CHECK(t.returns() == "{1: 'a', 2: 'b', 3: 'c'}");
+        CHECK(t.returns() == "{3: 'c', 2: 'b', 1: 'a'}");
     }
 
     SECTION("unpacking a non-mapping") {
@@ -141,16 +170,20 @@ TEST_CASE("General dict unpacking", "[dict][BUILD_MAP_UNPACK][emission]") {
     }
 }
 
-TEST_CASE("General is comparison", "[int][IS_OP][emission]") {
+TEST_CASE("General is comparison") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): return 1 is 2");
         CHECK(t.returns() == "False");
     }
 }
 
-TEST_CASE("General contains comparison", "[int][CONTAINS_OP][emission]") {
-    SECTION("common case") {
+TEST_CASE("General contains comparison") {
+    SECTION("in case") {
         auto t = EmissionTest("def f(): return 'i' in 'team'");
         CHECK(t.returns() == "False");
+    }
+    SECTION("not in case") {
+        auto t = EmissionTest("def f(): return 'i' not in 'team'");
+        CHECK(t.returns() == "True");
     }
 }
