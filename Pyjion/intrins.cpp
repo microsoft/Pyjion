@@ -1155,17 +1155,25 @@ PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg) {
     return value;
 }
 
-int PyJit_ExtendList(PyObject *list, PyObject *extension) {
+int PyJit_ExtendList(PyObject *list, PyObject *iterable) {
     assert(PyList_CheckExact(list));
-    auto res = _PyList_Extend((PyListObject*)list, extension);
-    Py_DECREF(extension);
-    int flag = 1;  // Assume error unless we prove to ourselves otherwise.
-    if (res == Py_None) {
-        flag = 0;
-        Py_DECREF(res);
+    PyObject *none_val = _PyList_Extend((PyListObject *)list, iterable);
+    if (none_val == nullptr) {
+        if (Py_TYPE(iterable)->tp_iter == NULL && !PySequence_Check(iterable))
+        {
+            PyErr_Format(PyExc_TypeError,
+                         "argument must be an iterable, not %.200s",
+                         iterable->ob_type->tp_name);
+            goto error;
+        }
+        Py_DECREF(iterable);
+        goto error;
     }
-
-    return flag;
+    Py_DECREF(none_val);
+    Py_DECREF(iterable);
+    return 0;
+error:
+    return -1;
 }
 
 PyObject* PyJit_ListToTuple(PyObject *list) {
