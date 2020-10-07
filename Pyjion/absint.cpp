@@ -1619,8 +1619,8 @@ void AbstractInterpreter::extend_list_recursively(Local listTmp, size_t argCnt) 
 
     extend_list_recursively(listTmp, --argCnt);
 
-    m_comp->emit_load_local(valueTmp);
-    m_comp->emit_load_local(listTmp);
+    m_comp->emit_load_local(valueTmp); // arg 2
+    m_comp->emit_load_local(listTmp);  // arg 1
 
     m_comp->emit_list_extend();
     int_error_check("list extend failed");
@@ -1630,16 +1630,11 @@ void AbstractInterpreter::extend_list_recursively(Local listTmp, size_t argCnt) 
 
 void AbstractInterpreter::extend_list(size_t argCnt) {
     assert(argCnt > 0);
-
-    m_comp->emit_new_list(0);
-    error_check("new list failed");
-
-    auto listTmp = m_comp->emit_define_local();
-    m_comp->emit_store_local(listTmp);
-
+    auto listTmp = m_comp->emit_spill();
+    dec_stack();
     extend_list_recursively(listTmp, argCnt);
-
     m_comp->emit_load_and_free_local(listTmp);
+    inc_stack();
 }
 
 void AbstractInterpreter::build_set(size_t argCnt) {
@@ -1857,15 +1852,6 @@ void AbstractInterpreter::add_to_set_recursively(Local setTmp, size_t argCnt){
     m_comp->emit_free_local(valueTmp);
 }
 
-void AbstractInterpreter::add_to_list(size_t argCnt){
-    assert(argCnt > 0 );
-    auto listTmp = m_comp->emit_spill();
-    dec_stack();
-    extend_list_recursively(listTmp, argCnt);
-    m_comp->emit_load_and_free_local(listTmp);
-    inc_stack();
-}
-
 void AbstractInterpreter::add_to_set(size_t argCnt){
     assert(argCnt > 0 );
     auto setTmp = m_comp->emit_spill();
@@ -1873,6 +1859,35 @@ void AbstractInterpreter::add_to_set(size_t argCnt){
     add_to_set_recursively(setTmp, argCnt);
     m_comp->emit_load_and_free_local(setTmp);
     inc_stack();
+}
+
+void AbstractInterpreter::append_list(size_t argCnt){
+    assert(argCnt > 0 );
+    auto listTmp = m_comp->emit_spill();
+    dec_stack();
+    append_list_recursively(listTmp, argCnt);
+    m_comp->emit_load_and_free_local(listTmp);
+    inc_stack();
+}
+
+void AbstractInterpreter::append_list_recursively(Local listTmp, size_t argCnt){
+    if (argCnt == 0) {
+        return;
+    }
+
+    auto valueTmp = m_comp->emit_define_local();
+    m_comp->emit_store_local(valueTmp);
+    dec_stack();
+
+    append_list_recursively(listTmp, --argCnt);
+
+    m_comp->emit_load_local(valueTmp); // arg 2
+    m_comp->emit_load_local(listTmp); // arg 1
+
+    m_comp->emit_list_append();
+    error_check("list append failed");
+
+    m_comp->emit_free_local(valueTmp);
 }
 
 void AbstractInterpreter::make_function(int oparg) {
@@ -2519,12 +2534,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 error_check("map add failed");
                 inc_stack();
                 break;
-            case LIST_APPEND:
-                m_comp->emit_list_append();
-                dec_stack(2);
-                error_check("list append failed");
-                inc_stack();
+            case LIST_APPEND: {
+                append_list(oparg);
                 break;
+            }
             case PRINT_EXPR:
                 m_comp->emit_print_expr();
                 dec_stack();
@@ -2760,7 +2773,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case LIST_EXTEND:
             {
-                add_to_list(oparg); // has -1 stack effect
+                extend_list(oparg); // has -1 stack effect
                 break;
             }
             case DICT_UPDATE:

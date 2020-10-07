@@ -97,17 +97,17 @@ public:
     }
 };
 
-TEST_CASE("General list unpacking", "[list][BUILD_LIST_UNPACK][emission]") {
-    SECTION("common case") {
-        auto t = EmissionTest("def f(): return [1, *[2], 3, 4]");
-        CHECK(t.returns() == "[1, 2, 3, 4]");
-    }
-
-    SECTION("unpacking an iterable") {
-        auto t = EmissionTest("def f(): return [1, {2}, 3]");
-        CHECK(t.raises() == PyExc_TypeError);
-    }
-}
+//TEST_CASE("General list unpacking", "[list][BUILD_LIST_UNPACK][emission]") {
+//    SECTION("common case") {
+//        auto t = EmissionTest("def f(): return [1, *[2], 3, 4]");
+//        CHECK(t.returns() == "[1, 2, 3, 4]");
+//    }
+//
+//    SECTION("unpacking an iterable") {
+//        auto t = EmissionTest("def f(): return [1, {2}, 3]");
+//        CHECK(t.raises() == PyExc_TypeError);
+//    }
+//}
 
 TEST_CASE("General tuple unpacking", "[tuple][BUILD_TUPLE_UNPACK][emission]") {
     SECTION("common case") {
