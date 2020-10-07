@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 find_package (Python3 3.9 COMPONENTS Interpreter Development)
+
 include_directories(${Python3_INCLUDE_DIRS})
 
 set (CLR_DIR CoreCLR/src/coreclr)

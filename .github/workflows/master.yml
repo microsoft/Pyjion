@@ -27,6 +27,13 @@ jobs:
       - uses: actions/setup-dotnet@v1
         with:
           dotnet-version: '5.0.100-rc.1.20452.10'
+
+      - name: Install CLR requirements
+        run: |
+          sudo apt-get install -y cmake llvm-9 clang-9 autoconf automake \
+          libtool build-essential python curl git lldb-6.0 liblldb-6.0-dev \
+          libunwind8 libunwind8-dev gettext libicu-dev liblttng-ust-dev \
+          libssl-dev libnuma-dev libkrb5-dev zlib1g-dev
       - name: Build CLR
         run: ./build.sh clr
         working-directory: CoreCLR
