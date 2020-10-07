@@ -71,7 +71,11 @@ public:
     std::string returns() {
         auto res = PyObject_ptr(run());
         REQUIRE(res.get() != nullptr);
-        REQUIRE(!PyErr_Occurred());
+        if (PyErr_Occurred()){
+            PyErr_PrintEx(-1);
+            FAIL("Error on Python execution");
+            return nullptr;
+        }
 
         auto repr = PyUnicode_AsUTF8(PyObject_Repr(res.get()));
         auto tstate = PyThreadState_GET();
@@ -95,12 +99,12 @@ public:
 
 TEST_CASE("General list unpacking", "[list][BUILD_LIST_UNPACK][emission]") {
     SECTION("common case") {
-        auto t = EmissionTest("def f(): return [1, *[2], 3]");
-        CHECK(t.returns() == "[1, 2, 3]");
+        auto t = EmissionTest("def f(): return [1, *[2], 3, 4]");
+        CHECK(t.returns() == "[1, 2, 3, 4]");
     }
 
-    SECTION("unpacking a non-iterable") {
-        auto t = EmissionTest("def f(): return [1, *2, 3]");
+    SECTION("unpacking an iterable") {
+        auto t = EmissionTest("def f(): return [1, {2}, 3]");
         CHECK(t.raises() == PyExc_TypeError);
     }
 }

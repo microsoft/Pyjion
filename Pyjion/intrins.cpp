@@ -312,6 +312,7 @@ PyObject* PyJit_UnaryInvert(PyObject* value) {
 
 PyObject* PyJit_ListAppend(PyObject* list, PyObject* value) {
     assert(list != nullptr);
+    assert(PyList_CheckExact(list));
     int err = PyList_Append(list, value);
     Py_DECREF(value);
     if (err) {
@@ -336,7 +337,6 @@ PyObject* PyJit_SetAdd(PyObject* set, PyObject* value) {
     Py_DECREF(value);
     return set;
 error:
-    Py_DECREF(value);
     return nullptr;
 }
 
@@ -1156,6 +1156,7 @@ PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg) {
 }
 
 int PyJit_ExtendList(PyObject *list, PyObject *iterable) {
+    assert(list != nullptr);
     assert(PyList_CheckExact(list));
     PyObject *none_val = _PyList_Extend((PyListObject *)list, iterable);
     if (none_val == nullptr) {

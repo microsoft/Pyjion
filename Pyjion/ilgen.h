@@ -114,7 +114,7 @@ public:
         else {
             localList = &(existing->second);
         }
-#if _DEBUG
+#if DEBUG
         for (int i = 0; i < localList->size(); i++) {
             if ((*localList)[i].m_index == local.m_index) {
                 // locals shouldn't be double freed...
@@ -373,6 +373,9 @@ public:
 
     void emit_call(int token) {
         m_il.push_back(CEE_CALL);
+#ifdef DEBUG
+        printf("Emitting token %#010x\n", token);
+#endif
         emit_int(token);
     }
 
