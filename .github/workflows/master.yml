@@ -17,6 +17,7 @@ jobs:
         python-version: [3.9]
     steps:
       - uses: actions/checkout@v2
+        submodules: 'recursive'
       - uses: actions/setup-dotnet@v1
         with:
           dotnet-version: '5.0.100-rc.1.20452.10'
@@ -44,6 +45,7 @@ jobs:
         python-version: [3.9]
     steps:
       - uses: actions/checkout@v2
+        submodules: 'recursive'
       - uses: actions/setup-dotnet@v1
         with:
           dotnet-version: '5.0.100-rc.1.20452.10'
@@ -73,6 +75,7 @@ jobs:
       - name: Add VC to path
         run: echo '::add-path::C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\bin'
       - uses: actions/checkout@v2
+        submodules: 'recursive'
       - uses: actions/setup-dotnet@v1
         with:
           dotnet-version: '5.0.100-rc.1.20452.10'
