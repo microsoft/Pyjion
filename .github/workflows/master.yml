@@ -21,6 +21,11 @@ jobs:
       - uses: actions/setup-dotnet@v1
         with:
           dotnet-version: '5.0.100-rc.1.20452.10'
+      - name: Install new Python
+        run: |
+          sudo add-apt-repository ppa:deadsnakes/ppa
+          sudo apt-get update -y
+          sudo apt-get install python3.9-dev
       - name: Create Build Environment
         run: cmake -E make_directory ${{runner.workspace}}/build
 
