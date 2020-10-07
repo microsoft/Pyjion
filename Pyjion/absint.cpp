@@ -856,9 +856,11 @@ bool AbstractInterpreter::interpret() {
                       `self` and `method` will be POPed by call_function.
                       We'll be passing `oparg + 1` to call_function, to
                       make it accept the `self` as a first argument.
-
-                      TODO : Add call_function opcode?
                     */
+                    lastState.pop();
+                    lastState.pop();
+                    for (int i = 0 ; i < oparg; i++)
+                        lastState.pop();
                     lastState.push(&Any); // push result.
                     break;
                 }
@@ -893,7 +895,9 @@ bool AbstractInterpreter::interpret() {
                 }
                 case LIST_EXTEND:
                 {
-                    lastState.pop_no_escape();
+                    lastState.pop();
+                    lastState.pop();
+                    lastState.push(&List);
                     break;
                 }
                 case DICT_UPDATE:
@@ -2811,6 +2815,28 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_not_in();
                 dec_stack(2);
                 inc_stack();
+                break;
+            }
+            case LOAD_METHOD:
+            {
+                m_comp->emit_load_name(PyTuple_GetItem(m_code->co_names, oparg)); // name
+                error_check("load name failed");
+                m_comp->emit_spill();
+
+                m_comp->emit_load_method();
+                inc_stack();
+                break;
+            }
+            case CALL_METHOD:
+            {
+                auto stackInfo = get_stack_info(opcodeIndex);
+                if (stackInfo[-oparg+2].Value->kind() == AVK_None)
+                {
+                    m_comp->emit_call(oparg);
+                    dec_stack(2);
+                }
+
+
                 break;
             }
             default:

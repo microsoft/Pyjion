@@ -190,6 +190,10 @@
 
 #define METHOD_CALL0_OPT_TOKEN      0x00010200
 
+// method helpers
+
+#define METHOD_LOAD_METHOD      0x00010400
+#define METHOD_CALL_METHOD      0x00010401
 
 
 // Py* helpers
@@ -432,6 +436,9 @@ public:
     virtual void emit_incref(bool maybeTagged = false);
 
     virtual void emit_debug_msg(const char* msg);
+
+    virtual void emit_load_method();
+    virtual void emit_call_method();
 
     virtual void emit_periodic_work();
 

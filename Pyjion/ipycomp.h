@@ -384,7 +384,7 @@ public:
      // Raises an exception taking the exception, type, and cause
     virtual void emit_raise_varargs() = 0;
     // Clears the current exception
-    // Updates the trace back as it propagtes through a function
+    // Updates the trace back as it propagates through a function
     virtual void emit_eh_trace() = 0;
     // Performs exception handling unwind as we go through loops
     virtual void emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback) = 0;
@@ -402,8 +402,15 @@ public:
     virtual void emit_incref(bool maybeTagged = false) = 0; 
 
     virtual void emit_debug_msg(const char* msg) = 0;
+
+    // Python 3.7 method calls
+    virtual void emit_load_method() = 0;
+    virtual void emit_call_method() = 0;
+
     /* Compiles the generated code */
     virtual JittedCode* emit_compile() = 0;
+
+
 };
 
 #endif

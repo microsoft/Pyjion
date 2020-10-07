@@ -150,6 +150,13 @@ TEST_CASE("General set building") {
     }
 }
 
+TEST_CASE("General method calls") {
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): a={False};a.add(True);return a");
+        CHECK(t.returns() == "{False, True}");
+    }
+}
+
 TEST_CASE("General set unpacking") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): return {1, *[2], 3}");

@@ -1125,6 +1125,14 @@ bool PythonCompiler::emit_compare_object_push_int(int compareType) {
     return false;
 }
 
+void PythonCompiler::emit_load_method() {
+    m_il.emit_call(METHOD_LOAD_METHOD);
+}
+
+void PythonCompiler::emit_call_method() {
+    m_il.emit_call(METHOD_CALL_METHOD);
+}
+
 void PythonCompiler::emit_periodic_work() {
     m_il.emit_call(METHOD_PERIODIC_WORK);
 }
@@ -1148,6 +1156,8 @@ JittedCode* PythonCompiler::emit_compile() {
 void PythonCompiler::emit_tagged_int_to_float() {
     m_il.emit_call(METHOD_INT_TO_FLOAT);
 }
+
+
 
 /************************************************************************
 * End Compiler interface implementation
@@ -1368,3 +1378,6 @@ GLOBAL_METHOD(METHOD_INT_TO_FLOAT, PyJit_Int_ToFloat, CORINFO_TYPE_BOOL, Paramet
 GLOBAL_METHOD(METHOD_PYUNICODE_JOINARRAY, &PyJit_UnicodeJoinArray, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_FORMAT_VALUE, &PyJit_FormatValue, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_FORMAT_OBJECT, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_CALL_METHOD, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_LOAD_METHOD, &_PyObject_GetMethod, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
