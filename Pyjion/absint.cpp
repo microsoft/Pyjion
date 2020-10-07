@@ -1638,7 +1638,7 @@ void AbstractInterpreter::extend_list(size_t argCnt) {
     dec_stack();
     extend_list_recursively(listTmp, argCnt);
     m_comp->emit_load_and_free_local(listTmp);
-    inc_stack();
+    inc_stack(1, STACK_KIND_OBJECT);
 }
 
 void AbstractInterpreter::build_set(size_t argCnt) {
@@ -1862,7 +1862,7 @@ void AbstractInterpreter::add_to_set(size_t argCnt){
     dec_stack();
     add_to_set_recursively(setTmp, argCnt);
     m_comp->emit_load_and_free_local(setTmp);
-    inc_stack();
+    inc_stack(1, STACK_KIND_OBJECT);
 }
 
 void AbstractInterpreter::append_list(size_t argCnt){
@@ -2744,36 +2744,35 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case BUILD_CONST_KEY_MAP:
             {
-                    auto names = m_comp->emit_spill();
-                    m_comp->emit_new_dict(oparg);
-                    auto dict = m_comp->emit_spill();
-                    for (auto i = 0; i < oparg; i++) {
-                        auto value = m_comp->emit_spill();
-                        // key
-                        m_comp->emit_load_local(names);
-                        m_comp->emit_tuple_load(i);
+                /*
+                 * The version of BUILD_MAP specialized for constant keys.
+                 * Pops the top element on the stack which contains a tuple of keys,
+                 * then starting from TOS1, pops count values to form values
+                 * in the built dictionary.
+                 */
+                auto keys = m_comp->emit_spill();
+                m_comp->emit_new_dict(oparg);
+                auto dict = m_comp->emit_spill();
+                for (auto i = 0; i < oparg; i++) {
+                    auto value = m_comp->emit_spill();
+                    // key
+                    m_comp->emit_load_local(keys); // arg 2 (key)
+                    m_comp->emit_tuple_load(i);
+                    m_comp->emit_load_and_free_local(value); // arg 1 (val)
+                    m_comp->emit_load_local(dict); // arg 0 (dict/map)
+                    m_comp->emit_dict_store_no_decref();
+                    dec_stack(1);
+                }
+                dec_stack(1); // keys
+                m_comp->emit_load_local(keys);
+                m_comp->emit_pop_top();
 
-                        // value
-                        m_comp->emit_load_and_free_local(value);
+                m_comp->emit_free_local(keys);
 
-                        // dict
-                        m_comp->emit_load_local(dict);
+                m_comp->emit_load_local(dict);
 
-                        m_comp->emit_dict_store_no_decref();
-
-                        dec_stack(1);
-                    }
-
-                    dec_stack(1); // names
-                    m_comp->emit_load_local(names);
-                    m_comp->emit_pop_top();
-
-                    m_comp->emit_free_local(names);
-
-                    m_comp->emit_load_local(dict);
-
-                    inc_stack();
-                    break;
+                inc_stack();
+                break;
             }
             case LIST_EXTEND:
             {
@@ -2835,7 +2834,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_call(oparg);
                     dec_stack(2);
                 }
-
 
                 break;
             }

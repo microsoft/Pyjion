@@ -1185,6 +1185,7 @@ PyObject* PyJit_ListToTuple(PyObject *list) {
 
 int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map) {
     assert(PyDict_CheckExact(map));
+    assert(value != nullptr);
     auto res = PyDict_SetItem(map, key, value);
     Py_DECREF(key);
     Py_DECREF(value);
@@ -1193,6 +1194,7 @@ int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map) {
 
 int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map) {
     assert(map != nullptr);
+    assert(value != nullptr);
 	assert(PyDict_CheckExact(map));
 	auto res = PyDict_SetItem(map, key, value);
 	return res;

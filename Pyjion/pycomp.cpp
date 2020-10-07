@@ -356,7 +356,7 @@ void PythonCompiler::emit_dict_store() {
 }
 
 void PythonCompiler::emit_dict_store_no_decref() {
-	m_il.emit_call(METHOD_STOREMAP_TOKEN);
+	m_il.emit_call(METHOD_STOREMAP_NO_DECREF_TOKEN);
 }
 
 void PythonCompiler::emit_map_extend() {

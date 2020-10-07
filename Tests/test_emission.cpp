@@ -150,14 +150,19 @@ TEST_CASE("General set building") {
     }
 }
 
-TEST_CASE("General method calls") {
-    SECTION("common case") {
-        auto t = EmissionTest("def f(): a={False};a.add(True);return a");
-        CHECK(t.returns() == "{False, True}");
-    }
-}
+//TEST_CASE("General method calls") {
+//    SECTION("common case") {
+//        auto t = EmissionTest("def f(): a={False};a.add(True);return a");
+//        CHECK(t.returns() == "{False, True}");
+//    }
+//}
 
 TEST_CASE("General set unpacking") {
+    SECTION("string unpack"){
+        auto t = EmissionTest("def f(): return {*'hello'}");
+        CHECK(t.returns() == "{'l', 'e', 'o', 'h'}");
+    }
+
     SECTION("common case") {
         auto t = EmissionTest("def f(): return {1, *[2], 3}");
         CHECK(t.returns() == "{1, 2, 3}");
@@ -166,6 +171,13 @@ TEST_CASE("General set unpacking") {
     SECTION("unpacking a non-iterable") {
         auto t = EmissionTest("def f(): return {1, [], 3}");
         CHECK(t.raises() == PyExc_TypeError);
+    }
+}
+
+TEST_CASE("General dict building") {
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): return {1:'a', 2: 'b', 3:'c'}");
+        CHECK(t.returns() == "{3: 'c', 2: 'b', 1: 'a'}");
     }
 }
 
