@@ -47,13 +47,13 @@
 #include <Python.h>
 #include <opcode.h>
 #include <object.h>
-#include <compile.h>
 #include <deque>
 #include <unordered_map>
 #include <algorithm>
 
 #include "absint.h"
 #include "taggedptr.h"
+#include "disasm.h"
 
 #define NUM_ARGS(n) ((n)&0xFF)
 #define NUM_KW_ARGS(n) (((n)>>8) & 0xff)
@@ -1530,7 +1530,7 @@ void AbstractInterpreter::branch_raise(const char *reason) {
     auto& ehBlock = get_ehblock();
     auto& entry_stack = ehBlock.EntryStack;
 
-#if DEBUG_TRACE
+#ifdef DEBUG
     if (reason != nullptr) {
         m_comp->emit_debug_msg(reason);
     }
@@ -2108,6 +2108,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
 #ifdef DEBUG
         printf("Compiling OPCODE %s (%d) stack %d\n", opcode_name(byte), oparg, m_stack.size());
+        int ilLen = m_comp->il_length();
 #endif
 
         if (m_blockStack.size() > 1 && 
@@ -2753,7 +2754,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 auto keys = m_comp->emit_spill();
                 m_comp->emit_new_dict(oparg);
                 auto dict = m_comp->emit_spill();
+
                 for (auto i = 0; i < oparg; i++) {
+
                     auto value = m_comp->emit_spill();
                     // key
                     m_comp->emit_load_local(keys); // arg 2 (key)
@@ -2843,6 +2846,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 return nullptr;
         }
         assert(PyCompile_OpcodeStackEffect(byte, oparg) == (m_stack.size() - curStackSize));
+
+#ifdef DEBUG
+        m_comp->dump(ilLen);
+#endif
     }
 
     // for each exception handler we need to load the exception

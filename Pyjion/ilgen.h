@@ -49,8 +49,10 @@
 
 #include "codemodel.h"
 #include "ipycomp.h"
+#include "disasm.h"
 
 using namespace std;
+
 
 class LabelInfo {
 public:
@@ -373,9 +375,6 @@ public:
 
     void emit_call(int token) {
         m_il.push_back(CEE_CALL);
-#ifdef DEBUG
-        printf("Emitting token %#010x\n", token);
-#endif
         emit_int(token);
     }
 
@@ -492,6 +491,7 @@ public:
                 &nativeEntry,
                 &nativeSizeOfCode
         );
+
         switch (result){
             case CORJIT_OK:
                 res.m_addr = nativeEntry;
@@ -501,10 +501,32 @@ public:
             case CORJIT_INTERNALERROR:
             case CORJIT_SKIPPED:
             case CORJIT_RECOVERABLEERROR:
-                printf("Got failure code from JIT.");
+#ifdef DEBUG
+                dump();
+#endif
                 break;
         }
         return res;
+    }
+
+    void dump () {
+        printf("Labels         \n");
+        printf("---------------\n");
+        for (auto & m_label : m_labels) {
+            printf("%d : \n", m_label.m_location);
+        }
+
+        printf("Locals         \n");
+        printf("---------------\n");
+        for (auto & m_local : m_locals) {
+            printf("%d : \n", m_local.m_type);
+        }
+
+        printf("IL          \n");
+        printf("---------------\n");
+        for (int i =0 ; i < m_il.size(); i ++) {
+           printf("%s\n", opcodename((OPCODE)m_il[i]));
+        }
     }
 
     void add() {

@@ -60,11 +60,14 @@ protected:
 
 public: CCorJitHost(){
         // TODO: DEBUG settings only, remove these later
+#ifdef DEBUG
         intSettings[u"JitLsraStats"] = 0;
-        intSettings[u"DumpJittedMethods"] = 0;
-        intSettings[u"JitDumpToDebugger"] = 0;
+        intSettings[u"DumpJittedMethods"] = 1;
+        intSettings[u"JitDumpToDebugger"] = 1;
+        intSettings[u"JitDumpIR"] = 1;
         intSettings[u"JitDumpASCII"] = 0;
         strSettings[u"JitDump"] = u"methodname";
+#endif
     }
 
 	void * allocateMemory(size_t size) override

@@ -40,6 +40,7 @@
 #include "ilgen.h"
 #include "intrins.h"
 #include "absint.h"
+#include "disasm.h"
 
 // binary operator helpers
 #define METHOD_ADD_TOKEN                         0x00000000
@@ -242,6 +243,16 @@ class PythonCompiler : public IPythonCompiler {
 
 public:
     PythonCompiler(PyCodeObject *code);
+
+    int il_length() {
+        return m_il.m_il.size();
+    };
+
+    void dump(int start = 0) {
+        for (int i = start; i < m_il.m_il.size(); i++){
+            printf("%s\n", opcodename((OPCODE)m_il.m_il[i]));
+        }
+    }
 
     virtual void emit_rot_two(LocalKind kind = LK_Pointer);
 

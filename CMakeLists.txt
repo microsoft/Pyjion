@@ -96,7 +96,7 @@ if (APPLE)
 endif()
 
 include_directories(CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/inc)
-set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp)
+set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp Pyjion/disasm.cpp)
 
 add_library(pyjionlib OBJECT ${SOURCES})
 add_library(pyjion MODULE $<TARGET_OBJECTS:pyjionlib>)
