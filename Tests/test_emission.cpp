@@ -136,7 +136,7 @@ TEST_CASE("General list building") {
 TEST_CASE("General set building") {
     SECTION("frozenset") {
         auto t = EmissionTest("def f(): return {1, 2, 3}");
-        CHECK(t.returns() == "frozenset({1, 2, 3})");
+        CHECK(t.returns() == "{1, 2, 3}");
     }
 
     SECTION("combine sets") {
@@ -183,8 +183,8 @@ TEST_CASE("General set unpacking") {
 
 TEST_CASE("General dict unpacking") {
     SECTION("common case") {
-        auto t = EmissionTest("def f(): return {1:'a', **{2:'b'}, 3:'c'}");
-        CHECK(t.returns() == "{3: 'c', 2: 'b', 1: 'a'}");
+        auto t = EmissionTest("def f(): return {'c': 'carrot', **{'b': 'banana'}, 'a': 'apple'}");
+        CHECK(t.returns() == "{'c': 'carrot', 'b': 'banana', 'a': 'apple'}");
     }
 
     SECTION("unpacking a non-mapping") {

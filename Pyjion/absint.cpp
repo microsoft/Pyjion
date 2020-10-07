@@ -245,7 +245,7 @@ bool AbstractInterpreter::interpret() {
 
             auto opcode = GET_OPCODE(curByte);
             oparg = GET_OPARG(curByte);
-#ifdef DEBUG
+#ifdef DUMP_TRACES
             printf("Interpreting OPCODE %s (%d) stack %d\n", opcode_name(opcode), oparg, lastState.stack_size());
 #endif
         processOpCode:
@@ -1700,40 +1700,6 @@ void AbstractInterpreter::build_set(size_t argCnt) {
     inc_stack();
 }
 
-void AbstractInterpreter::extend_set_recursively(Local setTmp, size_t argCnt) {
-    if (argCnt == 0) {
-        return;
-    }
-
-    auto valueTmp = m_comp->emit_define_local();
-    m_comp->emit_store_local(valueTmp);
-    dec_stack();
-
-    extend_set_recursively(setTmp, --argCnt);
-
-    m_comp->emit_load_local(valueTmp);
-    m_comp->emit_load_local(setTmp);
-
-    m_comp->emit_set_extend();
-    int_error_check("set extend failed");
-
-    m_comp->emit_free_local(valueTmp);
-}
-
-void AbstractInterpreter::extend_set(size_t argCnt) {
-    assert(argCnt > 0);
-
-    m_comp->emit_new_set();
-    error_check("new set failed");
-
-    auto setTmp = m_comp->emit_define_local();
-    m_comp->emit_store_local(setTmp);
-
-    extend_set_recursively(setTmp, argCnt);
-
-    m_comp->emit_load_and_free_local(setTmp);
-}
-
 void AbstractInterpreter::build_map(size_t  argCnt) {
     m_comp->emit_new_dict(argCnt);
     error_check("build map failed");
@@ -1820,23 +1786,6 @@ void AbstractInterpreter::extend_dict(size_t argCnt) {
     m_comp->emit_load_and_free_local(dictTmp);
 }
 
-void AbstractInterpreter::update_dict(size_t argCnt) {
-    assert(argCnt > 0);
-    auto dict = m_comp->emit_spill();
-    dec_stack();
-    extend_dict_recursively(dict, argCnt);
-    m_comp->emit_load_and_free_local(dict);
-    inc_stack();
-}
-
-void AbstractInterpreter::update_set(size_t argCnt) {
-    assert(argCnt > 0);
-    auto set = m_comp->emit_spill();
-    dec_stack();
-    extend_set_recursively(set, argCnt);
-    m_comp->emit_load_and_free_local(set);
-    inc_stack();
-}
 
 void AbstractInterpreter::add_to_set_recursively(Local setTmp, size_t argCnt){
     if (argCnt == 0) {
@@ -2106,7 +2055,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             m_stack = curStackDepth->second;
         }
 
-#ifdef DEBUG
+#ifdef DUMP_TRACES
         printf("Compiling OPCODE %s (%d) stack %d\n", opcode_name(byte), oparg, m_stack.size());
         int ilLen = m_comp->il_length();
 #endif
@@ -2327,9 +2276,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_build_slice();
                 inc_stack();
                 break;
-            case BUILD_SET: build_set(oparg); break;
-                extend_set(oparg);
-                inc_stack();
+            case BUILD_SET:
+                build_set(oparg);
                 break;
             case UNARY_POSITIVE: unary_positive(opcodeIndex); break;
             case UNARY_NEGATIVE: unary_negative(opcodeIndex); break;
@@ -2528,6 +2476,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     opcodeIndex, 
                     loopBlock
                 );
+                inc_stack();
                 break;
             }
             case SET_ADD:
@@ -2779,13 +2728,28 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case LIST_EXTEND:
             {
-                extend_list(oparg); // has -1 stack effect
+                auto value = m_comp->emit_spill();
+                auto list = m_comp->emit_spill();
+                m_comp->emit_load_local(list);
+                m_comp->emit_load_local(value);
+                m_comp->emit_list_extend();
+                m_comp->emit_free_local(value);
+                m_comp->emit_load_local(list);
+                dec_stack();
                 break;
             }
             case DICT_UPDATE:
             {
                 // Calls dict.update(TOS1[-i], TOS). Used to build dicts.
-                update_dict(oparg);
+                auto value = m_comp->emit_spill();
+                auto dict = m_comp->emit_spill();
+                m_comp->emit_load_local(dict);
+                m_comp->emit_load_local(value);
+                m_comp->emit_dict_update();
+                int_error_check();
+                m_comp->emit_free_local(value);
+                m_comp->emit_load_local(dict);
+                dec_stack();
                 break;
             }
             case SET_UPDATE:
@@ -2853,7 +2817,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
         }
         assert(PyCompile_OpcodeStackEffect(byte, oparg) == (m_stack.size() - curStackSize));
 
-#ifdef DEBUG
+#ifdef DUMP_TRACES
         m_comp->dump(ilLen);
 #endif
     }

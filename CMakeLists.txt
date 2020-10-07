@@ -118,6 +118,7 @@ target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/$
 add_subdirectory(Tests/Catch)
 set(TEST_SOURCES Tests/testing_util.cpp Tests/test_emission.cpp Tests/test_inference.cpp Tests/test_compiler.cpp Tests/test_absint.cpp Tests/Tests.cpp)
 add_executable(unit_tests ${TEST_SOURCES} $<TARGET_OBJECTS:pyjionlib>)
+target_compile_definitions(unit_tests PUBLIC -DDUMP_TRACES)
 target_include_directories(unit_tests PRIVATE Pyjion)
 target_link_libraries(unit_tests Catch2::Catch2)
 target_link_libraries(unit_tests ${Python3_LIBRARIES})

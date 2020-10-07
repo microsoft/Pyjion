@@ -289,9 +289,6 @@ private:
 
 
     void build_set(size_t argCnt);
-    void extend_set_recursively(Local set, size_t argCnt);
-    void extend_set(size_t argCnt);
-    void update_set(size_t argCnt);
     void add_to_set(size_t argCnt);
     void add_to_set_recursively(Local setTmp, size_t argCnt);
 
