@@ -2791,7 +2791,14 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case SET_UPDATE:
             {
                 // Calls set.update(TOS1[-i], TOS). Used to build sets.
-                update_set(oparg); // has -1 stack effect
+                auto value = m_comp->emit_spill();
+                auto set = m_comp->emit_spill();
+                m_comp->emit_load_local(set);
+                m_comp->emit_load_local(value);
+                m_comp->emit_set_extend();
+                m_comp->emit_free_local(value);
+                m_comp->emit_load_local(set);
+                dec_stack();
                 break;
             }
             case LIST_TO_TUPLE:
@@ -2815,8 +2822,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_in();
                 else
                     m_comp->emit_not_in();
-                dec_stack(2);
-                inc_stack();
+                dec_stack(2); // in/not in takes two
+                inc_stack(); // pushes result
                 break;
             }
             case LOAD_METHOD:
@@ -2837,7 +2844,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_call(oparg);
                     dec_stack(2);
                 }
-
                 break;
             }
             default:
