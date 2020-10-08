@@ -261,6 +261,10 @@ void PythonCompiler::emit_new_list(size_t argCnt) {
     m_il.emit_call(METHOD_PYLIST_NEW, 1);
 }
 
+void PythonCompiler::emit_load_assertion_error() {
+    m_il.emit_call(METHOD_LOAD_ASSERTION_ERROR, 0);
+}
+
 void PythonCompiler::emit_list_store(size_t argCnt) {
     auto valueTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
     auto listTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
@@ -1107,7 +1111,7 @@ void PythonCompiler::emit_compare_tagged_int(int compareType) {
 }
 
 void PythonCompiler::emit_compare_object(int compareType) {
-    m_il.ld_i(compareType);
+    m_il.ld_i4(compareType);
     m_il.emit_call(METHOD_RICHCMP_TOKEN, 3);
 }
 
@@ -1382,3 +1386,5 @@ GLOBAL_METHOD(METHOD_FORMAT_OBJECT, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT,
 
 GLOBAL_METHOD(METHOD_CALL_METHOD, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_LOAD_METHOD, &_PyObject_GetMethod, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_LOAD_ASSERTION_ERROR, &PyJit_LoadAssertionError, CORINFO_TYPE_NATIVEINT);

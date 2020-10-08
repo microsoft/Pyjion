@@ -49,7 +49,7 @@ PyObject* PyJit_Add(PyObject *left, PyObject *right);
 
 PyObject* PyJit_Subscr(PyObject *left, PyObject *right);
 
-PyObject* PyJit_RichCompare(PyObject *left, PyObject *right, int op);
+PyObject* PyJit_RichCompare(PyObject *left, PyObject *right, size_t op);
 
 int PyJit_RichEquals_Generic(PyObject *left, PyObject *right, void** addr);
 
@@ -182,6 +182,8 @@ int PyJit_Raise(PyObject *exc, PyObject *cause);
 PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg);
 
 PyObject* PyJit_ExtendList(PyObject *list, PyObject *extension);
+
+PyObject* PyJit_LoadAssertionError();
 
 PyObject* PyJit_ListToTuple(PyObject *list);
 

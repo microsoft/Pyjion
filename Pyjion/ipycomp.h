@@ -411,6 +411,8 @@ public:
     virtual void emit_load_method() = 0;
     virtual void emit_call_method() = 0;
 
+    virtual void emit_load_assertion_error() = 0;
+
     /* Compiles the generated code */
     virtual JittedCode* emit_compile() = 0;
 

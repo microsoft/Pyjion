@@ -570,16 +570,9 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Dict);
                     break;
                 case COMPARE_OP: {
-                    auto two = lastState.pop_no_escape();
-                    auto one = lastState.pop_no_escape();
-                    auto binaryRes = one.Value->compare(one.Sources, oparg, two);
-                    auto sources = add_intermediate_source(opcodeIndex);
-                    AbstractSource::combine(
-                            AbstractSource::combine(one.Sources, two.Sources),
-                            sources
-                    );
-                    auto value = AbstractValueWithSources(binaryRes, sources);
-                    lastState.push(value);
+                    lastState.pop_no_escape();
+                    lastState.pop_no_escape();
+                    lastState.push(&Any);
                 }
                     break;
                 case IMPORT_NAME:
@@ -924,12 +917,18 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Tuple); // tuple
                     break;
                 }
+                case LOAD_ASSERTION_ERROR:
+                {
+                    lastState.push(&Any);
+                    break;
+                }
                 default:
                     PyErr_Format(PyExc_ValueError,
                                  "Unknown unsupported opcode: %s", opcode_name(opcode));
+                    return false;
                     break;
             }
-            assert(PyCompile_OpcodeStackEffect(opcode, oparg) == (lastState.stack_size() - curStackLen));
+            assert(PyCompile_OpcodeStackEffectWithJump(opcode, oparg, 0) == (lastState.stack_size() - curStackLen));
             update_start_state(lastState, curByte + sizeof(_Py_CODEUNIT));
         }
 
@@ -1301,6 +1300,7 @@ const char* AbstractInterpreter::opcode_name(int opcode) {
         OP_TO_STR(LOAD_BUILD_CLASS)
         OP_TO_STR(YIELD_FROM)
         OP_TO_STR(GET_AWAITABLE)
+        OP_TO_STR(LOAD_ASSERTION_ERROR)
         OP_TO_STR(INPLACE_LSHIFT)
         OP_TO_STR(INPLACE_RSHIFT)
         OP_TO_STR(INPLACE_AND)
@@ -2044,8 +2044,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_dup_top_two();
                 break;
             case COMPARE_OP:
-                // TODO : This is way too simple, validate the logic here.
-                compare_op(oparg, curByte, opcodeIndex);
+                m_comp->emit_compare_object(oparg);
+                dec_stack(2);
+                error_check("failed to compare");
+                inc_stack(1);
                 break;
             case LOAD_BUILD_CLASS:
                 m_comp->emit_load_build_class();
@@ -2726,6 +2728,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 }
                 break;
             }
+            case LOAD_ASSERTION_ERROR :
+            {
+                m_comp->emit_load_assertion_error();
+                inc_stack();
+                break;
+            }
             default:
                 printf("Unsupported opcode: %d (with related)\r\n", byte);
 
@@ -3380,77 +3388,19 @@ void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *lo
 }
 
 void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
-    switch (compareType) {
-        case Py_EQ:
-            if (get_extended_opcode(i + sizeof(_Py_CODEUNIT)) == POP_JUMP_IF_FALSE) {
-                m_comp->emit_compare_exceptions_int();
-                dec_stack(2);
-                branch_or_error(i);
-            }
-            else {
-                // this will actually not currently be reached due to the way
-                // CPython generates code, but is left for completeness.
-                m_comp->emit_compare_exceptions();
-                dec_stack(2);
-                error_check("exc match failed");
-                inc_stack();
-            }
-            break;
-        default:
-            if (!should_box(opcodeIndex)) {
-                auto stackInfo = get_stack_info(opcodeIndex);
-                // We only optimize floats so far...
-                if (stackInfo[stackInfo.size() - 1].Value->kind() == AVK_Float &&
-                    stackInfo[stackInfo.size() - 2].Value->kind() == AVK_Float) {
-
-                    assert(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
-                    assert(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
-
-                    m_comp->emit_compare_float(compareType);
-                    dec_stack();
-
-                    if (can_optimize_pop_jump(i)) {
-                        branch(i);
-                    }
-                    else {
-                        // push Python bool onto the stack
-                        m_comp->emit_box_bool();
-                    }
-                    return;
-                }
-                else if (stackInfo[stackInfo.size() - 1].Value->kind() == AVK_Integer &&
-                    stackInfo[stackInfo.size() - 2].Value->kind() == AVK_Integer) {
-
-                    m_comp->emit_compare_tagged_int(compareType);
-                    dec_stack();
-
-                    if (can_optimize_pop_jump(i)) {
-                        branch(i);
-                    }
-                    else {
-                        // push Python bool onto the stack
-                        m_comp->emit_box_bool();
-                    }
-                    return;
-                }
-            }
-
-            bool generated = false;
-            if (can_optimize_pop_jump(i)) {
-                generated = m_comp->emit_compare_object_push_int(compareType);
-                if (generated) {
-                    dec_stack(2);
-                    branch_or_error(i);
-                }
-            }
-
-            if (!generated) {
-                m_comp->emit_compare_object(compareType);
-                dec_stack(2);
-                error_check("compare failed");
-                inc_stack();
-            }
-            break;
+    // TODO : Validate against new opcode
+    if (get_extended_opcode(i + sizeof(_Py_CODEUNIT)) == POP_JUMP_IF_FALSE) {
+        m_comp->emit_compare_exceptions_int();
+        dec_stack(2);
+        branch_or_error(i);
+    }
+    else {
+        // this will actually not currently be reached due to the way
+        // CPython generates code, but is left for completeness.
+        m_comp->emit_compare_exceptions();
+        dec_stack(2);
+        error_check("exc match failed");
+        inc_stack();
     }
 }
 

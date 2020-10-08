@@ -94,7 +94,7 @@ public:
 };
 
 TEST_CASE("Legacy JIT Tests", "[float][binary op][inference]") {
-    SECTION("test") {
+    SECTION("test1") {
         // EXTENDED_ARG FOR_ITER:
         auto t = CompilerTest(
                 "def f():\n"
@@ -105,76 +105,76 @@ TEST_CASE("Legacy JIT Tests", "[float][binary op][inference]") {
                 "        return x\n"
         );
         CHECK(t.returns() == "369");
-    }SECTION("test") {
+    }SECTION("test2") {
         auto t = CompilerTest(
                 "def f(): 1.0 / 0"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test3") {
         auto t = CompilerTest(
                 "def f(): print(f'x {42}')"
         );
         CHECK(t.returns() == "None");
-    }SECTION("test") {
+    }SECTION("test4") {
         auto t = CompilerTest(
                 "def f(): return f'abc {42}'"
         );
         CHECK(t.returns() == "'abc 42'");
     }
 
-    SECTION("test") {
+    SECTION("test5") {
         auto t = CompilerTest(
                 "def f(): return f'abc {42:3}'"
         );
         CHECK(t.returns() == "'abc  42'");
-    }SECTION("test") {
+    }SECTION("test6") {
         auto t = CompilerTest(
                 "def f(): return f'abc {\"abc\"!a}'"
         );
         CHECK(t.returns() == "\"abc 'abc'\"");
     }
 
-    SECTION("test") {
+    SECTION("test7") {
         auto t = CompilerTest(
                 "def f(): return f'abc {\"abc\"!a:6}'"
         );
         CHECK(t.returns() == "\"abc 'abc' \"");
-    }SECTION("test") {
+    }SECTION("test8") {
         auto t = CompilerTest(
                 "def f(): return f'abc {\"abc\"!r:6}'"
         );
         CHECK(t.returns() == "\"abc 'abc' \"");
-    }SECTION("test") {
+    }SECTION("test9") {
         auto t = CompilerTest(
                 "def f(): return f'abc {\"abc\"!s}'"
         );
         CHECK(t.returns() == "'abc abc'");
-    }SECTION("test") {
+    }SECTION("test10") {
         auto t = CompilerTest(
                 "def f():\n    for b in range(1):\n        x = b & 1 and -1.0 or 1.0\n    return x"
         );
         CHECK(t.returns() == "1.0");
-    }SECTION("test") {
+    }SECTION("test11") {
         auto t = CompilerTest(
                 "def f():\n    x = y\n    y = 1"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test12") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise TypeError('hi')\n    except Exception as e:\n         pass\n    finally:\n         pass"
         );
         CHECK(t.returns() == "None");
-    }SECTION("test") {
+    }SECTION("test13") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        try:\n             raise Exception('hi')\n        finally:\n             pass\n    finally:\n        pass"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test14") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        try:\n             try:\n                  raise TypeError('err')\n             except BaseException:\n                  raise\n        finally:\n             pass\n    finally:\n        return 42\n"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }SECTION("test15") {
         auto t = CompilerTest(
                 "def f():\n    def f(self) -> 42 : pass\n    return 42"
         );
@@ -186,95 +186,89 @@ TEST_CASE("Legacy JIT Tests", "[float][binary op][inference]") {
 //CHECK(t.returns() == "42",
 //                                  vector<PyObject *>({PyLong_FromLong(2), PyLong_FromLong(4), PyLong_FromLong(7)}))
 //                }
-        // Break from nested try/finally needs to use BranchLeave to clear the stack
-    SECTION("test") {
+
+    SECTION("Break from nested try/finally needs to use BranchLeave to clear the stack") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                break\n            finally:\n                pass\n    return 42"
         );
         CHECK(t.returns() == "42");
     }
-        // Break from a double nested try/finally needs to unwind all exceptions
-    SECTION("test") {
+    SECTION("Break from a double nested try/finally needs to unwind all exceptions") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                raise Exception()\n            finally:\n                try:\n                     break\n                finally:\n                    pass\n    return 42"
         );
         CHECK(t.returns() == "42");
     }
-        // return from nested try/finally should use BranchLeave to clear stack when branching to return label
-    SECTION("test") {
+    SECTION("return from nested try/finally should use BranchLeave to clear stack when branching to return label") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            return 42\n        finally:\n            pass"
         );
         CHECK(t.returns() == "42");
     }
-        // Return from nested try/finally should unwind nested exception handlers
-    SECTION("test") {
+    SECTION("Return from nested try/finally should unwind nested exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            raise Exception()\n        finally:\n            try:\n                return 42\n            finally:\n                pass\n    return 23"
         );
         CHECK(t.returns() == "42");
     }
-        // Break from a nested exception handler needs to unwind all exception handlers
-    SECTION("test") {
+    SECTION("Break from a nested exception handler needs to unwind all exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  break\n    return 42"
         );
         CHECK(t.returns() == "42");
     }
-        // Return from a nested exception handler needs to unwind all exception handlers
-    SECTION("test") {
+    SECTION("Return from a nested exception handler needs to unwind all exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  return 23\n    return 42"
         );
         CHECK(t.returns() == "23");
     }
-        // We need to do BranchLeave to clear the stack when doing a break inside of a finally
-    SECTION("test") {
+    SECTION("We need to do BranchLeave to clear the stack when doing a break inside of a finally") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            break\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }SECTION("test exception raise") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test binary multiply") {
         auto t = CompilerTest(
                 "def f():\n    x = b'abc'*3\n    return x"
         );
         CHECK(t.returns() == "b'abcabcabc'");
-    }SECTION("test") {
+    }SECTION("test increment unbound ") {
         auto t = CompilerTest(
                 "def f():\n    unbound += 1"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test modulus") {
         auto t = CompilerTest(
                 "def f():\n    5 % 0"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test modulus floats") {
         auto t = CompilerTest(
                 "def f():\n    5.0 % 0.0"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test floor divide") {
         auto t = CompilerTest(
                 "def f():\n    5.0 // 0.0"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test divide") {
         auto t = CompilerTest(
                 "def f():\n    5.0 / 0.0"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test string multiply") {
         auto t = CompilerTest(
                 "def f():\n    x = 'abc'*3\n    return x"
         );
         CHECK(t.returns() == "'abcabcabc'");
-    }SECTION("test") {
+    }SECTION("test boundary ranging") {
         auto t = CompilerTest(
                 "def f():\n    if 0.0 < 1.0 <= 1.0 == 1.0 >= 1.0 > 0.0 != 1.0:  return 42"
         );

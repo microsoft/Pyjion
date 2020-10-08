@@ -218,6 +218,7 @@
 #define METHOD_DELETEATTR_TOKEN      0x00030003
 #define METHOD_STOREGLOBAL_TOKEN     0x00030004
 #define METHOD_DELETEGLOBAL_TOKEN    0x00030005
+#define METHOD_LOAD_ASSERTION_ERROR  0x00030006
 
 #define METHOD_FLOAT_POWER_TOKEN    0x00050000
 #define METHOD_FLOAT_FLOOR_TOKEN    0x00050001
@@ -450,6 +451,8 @@ public:
 
     virtual void emit_load_method();
     virtual void emit_call_method();
+
+    virtual void emit_load_assertion_error();
 
     virtual void emit_periodic_work();
 

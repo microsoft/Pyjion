@@ -107,7 +107,7 @@ PyObject* PyJit_Subscr(PyObject *left, PyObject *right) {
     return res;
 }
 
-PyObject* PyJit_RichCompare(PyObject *left, PyObject *right, int op) {
+PyObject* PyJit_RichCompare(PyObject *left, PyObject *right, size_t op) {
     auto res = PyObject_RichCompare(left, right, op);
     Py_DECREF(left);
     Py_DECREF(right);
@@ -1188,6 +1188,12 @@ int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map) {
 	return res;
 }
 
+PyObject* PyJit_LoadAssertionError() {
+    PyObject *value = PyExc_AssertionError;
+    Py_INCREF(value);
+    return value;
+}
+
 PyObject* PyJit_DictUpdate(PyObject* dict, PyObject* other) {
     assert(dict != nullptr);
     int res ;
@@ -1195,6 +1201,12 @@ PyObject* PyJit_DictUpdate(PyObject* dict, PyObject* other) {
         PyErr_Format(PyExc_TypeError,
                      "argument must be a dict, not %.200s",
                      dict->ob_type->tp_name);
+        goto error;
+    }
+    if (!PyDict_CheckExact(other)) {
+        PyErr_Format(PyExc_TypeError,
+                     "argument must be a dict, not %.200s",
+                     other->ob_type->tp_name);
         goto error;
     }
     res = PyDict_Update(dict, other);
