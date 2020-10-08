@@ -168,7 +168,7 @@ public:
     // Pops the current Python frame from the list of frames
     virtual void emit_pop_frame() = 0;
     // Returns from the current function
-    virtual void emit_ret() = 0;
+    virtual void emit_ret(int size) = 0;
     // Initializes state associated with updating the frames lasti value
     virtual void emit_lasti_init() = 0;
     // Updates the current value of last

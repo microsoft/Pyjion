@@ -274,7 +274,7 @@ public:
     void emit_lasti_init();
     void emit_lasti_update(int index);
 
-    virtual void emit_ret();
+    virtual void emit_ret(int size);
 
     virtual void emit_store_name(void* name);
     virtual void emit_delete_name(void* name);
@@ -461,7 +461,7 @@ private:
     void load_local(int oparg);
     void decref();
 
-    void call_optimizing_function(int baseFunction);
+    void call_optimizing_function(int baseFunction, int size);
 
     CorInfoType to_clr_type(LocalKind kind);
 };

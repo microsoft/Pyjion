@@ -2760,6 +2760,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_load_local(set);
                 m_comp->emit_load_local(value);
                 m_comp->emit_set_extend();
+                int_error_check("set extend failed");
                 m_comp->emit_free_local(value);
                 m_comp->emit_load_local(set);
                 dec_stack();
@@ -2871,7 +2872,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
     m_comp->emit_mark_label(finalRet);
     m_comp->emit_pop_frame();
 
-    m_comp->emit_ret();
+    m_comp->emit_ret(1);
 
     return m_comp->emit_compile();
 }

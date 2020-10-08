@@ -66,17 +66,17 @@ void PythonCompiler::load_frame() {
 
 void PythonCompiler::emit_push_frame() {
     load_frame();
-    m_il.emit_call(METHOD_PY_PUSHFRAME);
+    m_il.emit_call(METHOD_PY_PUSHFRAME, 1);
 }
 
 void PythonCompiler::emit_pop_frame() {
     load_frame();
-    m_il.emit_call(METHOD_PY_POPFRAME);
+    m_il.emit_call(METHOD_PY_POPFRAME, 1);
 }
 
 void PythonCompiler::emit_eh_trace() {
     load_frame();
-    m_il.emit_call(METHOD_EH_TRACE);
+    m_il.emit_call(METHOD_EH_TRACE, 1);
 }
 
 void PythonCompiler::emit_lasti_init() {
@@ -129,7 +129,7 @@ void PythonCompiler::emit_incref(bool maybeTagged) {
 }
 
 void PythonCompiler::decref() {
-    m_il.emit_call(METHOD_DECREF_TOKEN);
+    m_il.emit_call(METHOD_DECREF_TOKEN, 1);
 }
 
 
@@ -150,7 +150,7 @@ Local PythonCompiler::emit_allocate_stack_array(size_t bytes) {
 void PythonCompiler::emit_unbound_local_check() {
     //// TODO: Remove this check for definitely assigned values (e.g. params w/ no dels, 
     //// locals that are provably assigned)
-    m_il.emit_call(METHOD_UNBOUND_LOCAL);
+    m_il.emit_call(METHOD_UNBOUND_LOCAL, 1);
 }
 
 void PythonCompiler::emit_load_fast(int local) {
@@ -258,7 +258,7 @@ void PythonCompiler::emit_dup_top_two() {
 
 void PythonCompiler::emit_new_list(size_t argCnt) {
     m_il.ld_i(argCnt);
-    m_il.emit_call(METHOD_PYLIST_NEW);
+    m_il.emit_call(METHOD_PYLIST_NEW, 1);
 }
 
 void PythonCompiler::emit_list_store(size_t argCnt) {
@@ -306,117 +306,117 @@ void PythonCompiler::emit_list_store(size_t argCnt) {
 }
 
 void PythonCompiler::emit_list_extend() {
-    m_il.emit_call(METHOD_EXTENDLIST_TOKEN);
+    m_il.emit_call(METHOD_EXTENDLIST_TOKEN, 2);
 }
 
 void PythonCompiler::emit_list_to_tuple() {
-    m_il.emit_call(METHOD_LISTTOTUPLE_TOKEN);
+    m_il.emit_call(METHOD_LISTTOTUPLE_TOKEN, 1);
 }
 
 void PythonCompiler::emit_new_set() {
     m_il.load_null();
-    m_il.emit_call(METHOD_PYSET_NEW);
+    m_il.emit_call(METHOD_PYSET_NEW, 1);
 }
 
 void PythonCompiler::emit_pyobject_str() {
-	m_il.emit_call(METHOD_PYOBJECT_STR);
+	m_il.emit_call(METHOD_PYOBJECT_STR, 1);
 }
 
 void PythonCompiler::emit_pyobject_repr() {
-	m_il.emit_call(METHOD_PYOBJECT_REPR);
+	m_il.emit_call(METHOD_PYOBJECT_REPR, 1);
 }
 
 void PythonCompiler::emit_pyobject_ascii() {
-	m_il.emit_call(METHOD_PYOBJECT_ASCII);
+	m_il.emit_call(METHOD_PYOBJECT_ASCII, 1);
 }
 
 void PythonCompiler::emit_pyobject_format() {
-	m_il.emit_call(METHOD_FORMAT_OBJECT);
+	m_il.emit_call(METHOD_FORMAT_OBJECT, 2);
 }
 
 void PythonCompiler::emit_unicode_joinarray() {
-	m_il.emit_call(METHOD_PYUNICODE_JOINARRAY);
+	m_il.emit_call(METHOD_PYUNICODE_JOINARRAY, 2);
 }
 
 void PythonCompiler::emit_format_value() {
-	m_il.emit_call(METHOD_FORMAT_VALUE);
+	m_il.emit_call(METHOD_FORMAT_VALUE, 1);
 }
 
 void PythonCompiler::emit_set_extend() {
-    m_il.emit_call(METHOD_SETUPDATE_TOKEN);
+    m_il.emit_call(METHOD_SETUPDATE_TOKEN, 2);
 }
 
 void PythonCompiler::emit_new_dict(size_t size) {
     m_il.ld_i(size);
-    m_il.emit_call(METHOD_PYDICT_NEWPRESIZED);
+    m_il.emit_call(METHOD_PYDICT_NEWPRESIZED, 1);
 }
 
 void PythonCompiler::emit_dict_store() {
-    m_il.emit_call(METHOD_STOREMAP_TOKEN);
+    m_il.emit_call(METHOD_STOREMAP_TOKEN, 3);
 }
 
 void PythonCompiler::emit_dict_store_no_decref() {
-	m_il.emit_call(METHOD_STOREMAP_NO_DECREF_TOKEN);
+	m_il.emit_call(METHOD_STOREMAP_NO_DECREF_TOKEN, 3);
 }
 
 void PythonCompiler::emit_map_extend() {
-    m_il.emit_call(METHOD_DICTUPDATE_TOKEN);
+    m_il.emit_call(METHOD_DICTUPDATE_TOKEN, 2);
 }
 
 void PythonCompiler::emit_is_true() {
-    m_il.emit_call(METHOD_PYOBJECT_ISTRUE);
+    m_il.emit_call(METHOD_PYOBJECT_ISTRUE, 1);
 }
 
 void PythonCompiler::emit_load_name(void* name) {
     load_frame();
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_LOADNAME_TOKEN);
+    m_il.emit_call(METHOD_LOADNAME_TOKEN, 2);
 }
 
 void PythonCompiler::emit_store_name(void* name) {
     load_frame();
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_STORENAME_TOKEN);
+    m_il.emit_call(METHOD_STORENAME_TOKEN, 3);
 }
 
 void PythonCompiler::emit_delete_name(void* name) {
     load_frame();
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_DELETENAME_TOKEN);
+    m_il.emit_call(METHOD_DELETENAME_TOKEN, 2);
 }
 
 void PythonCompiler::emit_store_attr(void* name) {
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_STOREATTR_TOKEN);
+    m_il.emit_call(METHOD_STOREATTR_TOKEN, 3);
 }
 
 void PythonCompiler::emit_delete_attr(void* name) {
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_DELETEATTR_TOKEN);
+    m_il.emit_call(METHOD_DELETEATTR_TOKEN, 2);
 }
 
 void PythonCompiler::emit_load_attr(void* name) {
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_LOADATTR_TOKEN);
+    m_il.emit_call(METHOD_LOADATTR_TOKEN, 2);
 }
 
 void PythonCompiler::emit_store_global(void* name) {
     // value is on the stack
     load_frame();
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_STOREGLOBAL_TOKEN);
+    m_il.emit_call(METHOD_STOREGLOBAL_TOKEN, 3);
 }
 
 void PythonCompiler::emit_delete_global(void* name) {
     load_frame();
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_DELETEGLOBAL_TOKEN);
+    m_il.emit_call(METHOD_DELETEGLOBAL_TOKEN, 2);
 }
 
 void PythonCompiler::emit_load_global(void* name) {
     load_frame();
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_LOADGLOBAL_TOKEN);
+    m_il.emit_call(METHOD_LOADGLOBAL_TOKEN, 2);
 }
 
 void PythonCompiler::emit_delete_fast(int index) {
@@ -437,7 +437,7 @@ void PythonCompiler::emit_new_tuple(size_t size) {
     }
     else {
         m_il.ld_i(size);
-        m_il.emit_call(METHOD_PYTUPLE_NEW);
+        m_il.emit_call(METHOD_PYTUPLE_NEW, 1);
     }
 }
 
@@ -476,32 +476,32 @@ void PythonCompiler::emit_tuple_store(size_t argCnt) {
 
 void PythonCompiler::emit_store_subscr() {
     // stack is value, container, index
-    m_il.emit_call(METHOD_STORESUBSCR_TOKEN);
+    m_il.emit_call(METHOD_STORESUBSCR_TOKEN, 3);
 }
 
 void PythonCompiler::emit_delete_subscr() {
     // stack is container, index
-    m_il.emit_call(METHOD_DELETESUBSCR_TOKEN);
+    m_il.emit_call(METHOD_DELETESUBSCR_TOKEN, 2);
 }
 
 void PythonCompiler::emit_build_slice() {
-    m_il.emit_call(METHOD_BUILD_SLICE);
+    m_il.emit_call(METHOD_BUILD_SLICE, 3);
 }
 
 void PythonCompiler::emit_unary_positive() {
-    m_il.emit_call(METHOD_UNARY_POSITIVE);
+    m_il.emit_call(METHOD_UNARY_POSITIVE, 1);
 }
 
 void PythonCompiler::emit_unary_negative() {
-    m_il.emit_call(METHOD_UNARY_NEGATIVE);
+    m_il.emit_call(METHOD_UNARY_NEGATIVE, 1);
 }
 
 void PythonCompiler::emit_unary_not_push_int() {
-    m_il.emit_call(METHOD_UNARY_NOT_INT);
+    m_il.emit_call(METHOD_UNARY_NOT_INT, 1);
 }
 
 void PythonCompiler::emit_unary_not() {
-    m_il.emit_call(METHOD_UNARY_NOT);
+    m_il.emit_call(METHOD_UNARY_NOT, 1);
 }
 
 void PythonCompiler::emit_unary_negative_float() {
@@ -509,7 +509,7 @@ void PythonCompiler::emit_unary_negative_float() {
 }
 
 void PythonCompiler::emit_unary_negative_tagged_int() {
-    m_il.emit_call(METHOD_UNARY_NEGATIVE_INT);
+    m_il.emit_call(METHOD_UNARY_NEGATIVE_INT, 1);
 }
 
 void PythonCompiler::emit_unary_not_float_push_bool() {
@@ -518,33 +518,33 @@ void PythonCompiler::emit_unary_not_float_push_bool() {
 }
 
 void PythonCompiler::emit_unary_not_tagged_int_push_bool() {
-    m_il.emit_call(METHOD_UNARY_NOT_INT_PUSH_BOOL);
+    m_il.emit_call(METHOD_UNARY_NOT_INT_PUSH_BOOL, 1);
 }
 
 void PythonCompiler::emit_unary_invert() {
-    m_il.emit_call(METHOD_UNARY_INVERT);
+    m_il.emit_call(METHOD_UNARY_INVERT, 1);
 }
 
 void PythonCompiler::emit_import_name(void* name) {
     m_il.ld_i(name);
     load_frame();
-    m_il.emit_call(METHOD_PY_IMPORTNAME);
+    m_il.emit_call(METHOD_PY_IMPORTNAME, 4);
 }
 
 void PythonCompiler::emit_import_from(void* name) {
     m_il.dup();
     m_il.ld_i(name);
-    m_il.emit_call(METHOD_PY_IMPORTFROM);
+    m_il.emit_call(METHOD_PY_IMPORTFROM, 2);
 }
 
 void PythonCompiler::emit_import_star() {
     load_frame();
-    m_il.emit_call(METHOD_PY_IMPORTSTAR);
+    m_il.emit_call(METHOD_PY_IMPORTSTAR, 2);
 }
 
 void PythonCompiler::emit_load_build_class() {
     load_frame();
-    m_il.emit_call(METHOD_GETBUILDCLASS_TOKEN);
+    m_il.emit_call(METHOD_GETBUILDCLASS_TOKEN, 1);
 }
 
 void PythonCompiler::emit_unpack_sequence(Local sequence, Local sequenceStorage, Label success, size_t size) {
@@ -553,7 +553,7 @@ void PythonCompiler::emit_unpack_sequence(Local sequence, Local sequenceStorage,
     m_il.ld_loc(sequence);
     m_il.ld_i(size);
     m_il.ld_loc(sequenceStorage);
-    m_il.emit_call(METHOD_UNPACK_SEQUENCE_TOKEN);
+    m_il.emit_call(METHOD_UNPACK_SEQUENCE_TOKEN, 3);
 
     m_il.dup();
     m_il.load_null();
@@ -599,30 +599,30 @@ void PythonCompiler::emit_unpack_ex(Local sequence, size_t leftSize, size_t righ
     m_il.ld_loc(sequenceStorage);
     m_il.ld_loca(list);
     m_il.ld_loca(remainder);
-    m_il.emit_call(METHOD_UNPACK_SEQUENCEEX_TOKEN);
+    m_il.emit_call(METHOD_UNPACK_SEQUENCEEX_TOKEN, 6);
 }
 
 void PythonCompiler::emit_call_args() {
-	m_il.emit_call(METHOD_CALL_ARGS);
+	m_il.emit_call(METHOD_CALL_ARGS, 2);
 }
 
 void PythonCompiler::emit_call_kwargs() {
-	m_il.emit_call(METHOD_CALL_KWARGS);
+	m_il.emit_call(METHOD_CALL_KWARGS, 3);
 }
 
 bool PythonCompiler::emit_call(size_t argCnt) {
     switch (argCnt) {
-        case 0: call_optimizing_function(METHOD_CALL0_OPT_TOKEN); return true;
-        case 1: m_il.emit_call(METHOD_CALL1_TOKEN); return true;
-        case 2: m_il.emit_call(METHOD_CALL2_TOKEN); return true;
-        case 3: m_il.emit_call(METHOD_CALL3_TOKEN); return true;
-        case 4: m_il.emit_call(METHOD_CALL4_TOKEN); return true;
+        case 0: call_optimizing_function(METHOD_CALL0_OPT_TOKEN, 1); return true;
+        case 1: m_il.emit_call(METHOD_CALL1_TOKEN, 2); return true;
+        case 2: m_il.emit_call(METHOD_CALL2_TOKEN, 3); return true;
+        case 3: m_il.emit_call(METHOD_CALL3_TOKEN, 4); return true;
+        case 4: m_il.emit_call(METHOD_CALL4_TOKEN, 5); return true;
     }
     return false;
 }
 
 void PythonCompiler::emit_call_with_tuple() {
-    m_il.emit_call(METHOD_CALLN_TOKEN);
+    m_il.emit_call(METHOD_CALLN_TOKEN, 2);
 }
 
 bool PythonCompiler::emit_kwcall(size_t argCnt) {
@@ -634,19 +634,20 @@ bool PythonCompiler::emit_kwcall(size_t argCnt) {
 //		case 4: m_il.emit_call(METHOD_KWCALL4_TOKEN); return true;
 //		default: m_il.emit_call(METHOD_KWCALLN_TOKEN); return true;
 //	}
+    assert(false); // why is this commented out?
 	return false;
 }
 
 void PythonCompiler::emit_kwcall_with_tuple() {
-	m_il.emit_call(METHOD_KWCALLN_TOKEN);
+	m_il.emit_call(METHOD_KWCALLN_TOKEN, 3);
 }
 
-void PythonCompiler::call_optimizing_function(int baseFunction) {
+void PythonCompiler::call_optimizing_function(int baseFunction, int size) {
     auto id = new IndirectDispatchMethod(g_module.m_methods[baseFunction]);
     m_il.ld_i(&id->m_addr);
     auto token = (int)(FIRST_USER_FUNCTION_TOKEN + m_module->m_methods.size());
     m_module->m_methods[token] = id;
-    m_il.emit_call(token);
+    m_il.emit_call(token, size);
 }
 
 void PythonCompiler::emit_store_local(Local local) {
@@ -693,28 +694,28 @@ void PythonCompiler::emit_compare_equal() {
 }
 
 void PythonCompiler::emit_restore_err() {
-    m_il.emit_call(METHOD_PYERR_RESTORE);
+    m_il.emit_call(METHOD_PYERR_RESTORE, 3);
 }
 
 void PythonCompiler::emit_compare_exceptions() {
-    m_il.emit_call(METHOD_COMPARE_EXCEPTIONS);
+    m_il.emit_call(METHOD_COMPARE_EXCEPTIONS, 2);
 }
 
 void PythonCompiler::emit_compare_exceptions_int() {
-    m_il.emit_call(METHOD_COMPARE_EXCEPTIONS_INT);
+    m_il.emit_call(METHOD_COMPARE_EXCEPTIONS_INT, 2);
 }
 
 void PythonCompiler::emit_pyerr_setstring(void* exception, const char*msg) {
     emit_ptr(exception);
     emit_ptr((void*)msg);
-    m_il.emit_call(METHOD_PYERR_SETSTRING);
+    m_il.emit_call(METHOD_PYERR_SETSTRING, 2);
 }
 
 void PythonCompiler::emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback) {
     m_il.ld_loc(prevExc);
     m_il.ld_loc(prevExcVal);
     m_il.ld_loc(prevTraceback);
-    m_il.emit_call(METHOD_UNWIND_EH);
+    m_il.emit_call(METHOD_UNWIND_EH, 3);
 }
 
 void PythonCompiler::emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback) {
@@ -729,7 +730,7 @@ void PythonCompiler::emit_prepare_exception(Local prevExc, Local prevExcVal, Loc
     m_il.ld_loca(prevExcVal);
     m_il.ld_loca(prevTraceback);
 
-    m_il.emit_call(METHOD_PREPARE_EXCEPTION);
+    m_il.emit_call(METHOD_PREPARE_EXCEPTION, 6);
     m_il.ld_loc(tb);
     m_il.ld_loc(ehVal);
     m_il.ld_loc(excType);
@@ -744,7 +745,7 @@ void PythonCompiler::emit_int(int value) {
 }
 
 void PythonCompiler::emit_unbox_int_tagged() {
-    m_il.emit_call(METHOD_UNBOX_LONG_TAGGED);
+    m_il.emit_call(METHOD_UNBOX_LONG_TAGGED, 1);
 }
 
 void PythonCompiler::emit_unbox_float() {
@@ -773,7 +774,7 @@ void PythonCompiler::emit_bool(bool value) {
 // the qualified name.
 void PythonCompiler::emit_new_function() {
     load_frame();
-    m_il.emit_call(METHOD_NEWFUNCTION_TOKEN);
+    m_il.emit_call(METHOD_NEWFUNCTION_TOKEN, 3);
 }
 
 void PythonCompiler::emit_set_closure() {
@@ -824,7 +825,7 @@ void PythonCompiler::emit_load_deref(int index) {
     //m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + oparg) * sizeof(size_t));
     //m_il.add();
     //m_il.ld_ind_i();
-    m_il.emit_call(METHOD_PYCELL_GET);
+    m_il.emit_call(METHOD_PYCELL_GET, 2);
 }
 
 void PythonCompiler::emit_store_deref(int index) {
@@ -832,7 +833,7 @@ void PythonCompiler::emit_store_deref(int index) {
     m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + index) * sizeof(size_t));
     m_il.add();
     m_il.ld_ind_i();
-    m_il.emit_call(METHOD_PYCELL_SET_TOKEN);
+    m_il.emit_call(METHOD_PYCELL_SET_TOKEN, 2);
 }
 
 void PythonCompiler::emit_delete_deref(int index) {
@@ -841,7 +842,7 @@ void PythonCompiler::emit_delete_deref(int index) {
     m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + index) * sizeof(size_t));
     m_il.add();
     m_il.ld_ind_i();
-    m_il.emit_call(METHOD_PYCELL_SET_TOKEN);
+    m_il.emit_call(METHOD_PYCELL_SET_TOKEN, 2);
 }
 
 void PythonCompiler::emit_load_closure(int index) {
@@ -857,19 +858,19 @@ void PythonCompiler::emit_set_add() {
     // due to FOR_ITER magic we store the
     // iterable off the stack, and oparg here is based upon the stacking
     // of the generator indexes, so we don't need to spill anything...
-    m_il.emit_call(METHOD_SET_ADD_TOKEN);
+    m_il.emit_call(METHOD_SET_ADD_TOKEN, 2);
 }
 
 void PythonCompiler::emit_set_update() {
-    m_il.emit_call(METHOD_SETUPDATE_TOKEN);
+    m_il.emit_call(METHOD_SETUPDATE_TOKEN, 2);
 }
 
 void PythonCompiler::emit_map_add() {
-    m_il.emit_call(METHOD_MAP_ADD_TOKEN);
+    m_il.emit_call(METHOD_MAP_ADD_TOKEN, 3);
 }
 
 void PythonCompiler::emit_list_append() {
-    m_il.emit_call(METHOD_LIST_APPEND_TOKEN);
+    m_il.emit_call(METHOD_LIST_APPEND_TOKEN, 2);
 }
 
 void PythonCompiler::emit_null() {
@@ -878,33 +879,33 @@ void PythonCompiler::emit_null() {
 
 void PythonCompiler::emit_raise_varargs() {
     // raise exc
-    m_il.emit_call(METHOD_DO_RAISE);
+    m_il.emit_call(METHOD_DO_RAISE, 2);
 }
 
 void PythonCompiler::emit_print_expr() {
-    m_il.emit_call(METHOD_PRINT_EXPR_TOKEN);
+    m_il.emit_call(METHOD_PRINT_EXPR_TOKEN, 1);
 }
 
 void PythonCompiler::emit_dict_update() {
-    m_il.emit_call(METHOD_DICTUPDATE_TOKEN);
+    m_il.emit_call(METHOD_DICTUPDATE_TOKEN, 2);
 }
 
 void PythonCompiler::emit_load_classderef(int index) {
     load_frame();
     m_il.ld_i(index);
-    m_il.emit_call(METHOD_LOAD_CLASSDEREF_TOKEN);
+    m_il.emit_call(METHOD_LOAD_CLASSDEREF_TOKEN, 2);
 }
 
 void PythonCompiler::emit_getiter() {
-    m_il.emit_call(METHOD_GETITER_TOKEN);
+    m_il.emit_call(METHOD_GETITER_TOKEN, 1);
 }
 
 Label PythonCompiler::emit_define_label() {
     return m_il.define_label();
 }
 
-void PythonCompiler::emit_ret() {
-    m_il.ret();
+void PythonCompiler::emit_ret(int size) {
+    m_il.ret(size);
 }
 
 void PythonCompiler::emit_mark_label(Label label) {
@@ -912,15 +913,15 @@ void PythonCompiler::emit_mark_label(Label label) {
 }
 
 void PythonCompiler::emit_box_bool() {
-    m_il.emit_call(METHOD_BOOL_FROM_LONG);
+    m_il.emit_call(METHOD_BOOL_FROM_LONG, 1);
 }
 
 void PythonCompiler::emit_box_float() {
-    m_il.emit_call(METHOD_FLOAT_FROM_DOUBLE);
+    m_il.emit_call(METHOD_FLOAT_FROM_DOUBLE, 1);
 }
 
 void PythonCompiler::emit_box_tagged_ptr() {
-    m_il.emit_call(METHOD_BOX_TAGGED_PTR);
+    m_il.emit_call(METHOD_BOX_TAGGED_PTR, 1);
 }
 
 void PythonCompiler::emit_for_next(Label processValue, Local iterValue) {
@@ -935,7 +936,7 @@ void PythonCompiler::emit_for_next(Label processValue, Local iterValue) {
     }
     else*/
     {
-        m_il.emit_call(SIG_ITERNEXT_TOKEN);
+        m_il.emit_call(SIG_ITERNEXT_TOKEN, 2);
     }
     m_il.dup();
     m_il.ld_i(nullptr);
@@ -963,7 +964,7 @@ void PythonCompiler::emit_getiter_opt() {
 
 void PythonCompiler::emit_debug_msg(const char* msg) {
     m_il.ld_i((void*)msg);
-    m_il.emit_call(METHOD_DEBUG_TRACE);
+    m_il.emit_call(METHOD_DEBUG_TRACE, 1);
 }
 
 void PythonCompiler::emit_binary_float(int opcode) {
@@ -977,7 +978,7 @@ void PythonCompiler::emit_binary_float(int opcode) {
             // TODO: We should be able to generate a mod and provide the JIT
             // with a helper call method (CORINFO_HELP_DBLREM), but that's 
             // currently crashing for some reason...
-            m_il.emit_call(METHOD_FLOAT_MODULUS_TOKEN);
+            m_il.emit_call(METHOD_FLOAT_MODULUS_TOKEN, 2);
             //m_il.mod(); 
             break;
         case INPLACE_MULTIPLY:
@@ -986,9 +987,9 @@ void PythonCompiler::emit_binary_float(int opcode) {
         case BINARY_SUBTRACT:  m_il.sub(); break;
 
         case BINARY_POWER:
-        case INPLACE_POWER: m_il.emit_call(METHOD_FLOAT_POWER_TOKEN); break;
+        case INPLACE_POWER: m_il.emit_call(METHOD_FLOAT_POWER_TOKEN, 2); break;
         case BINARY_FLOOR_DIVIDE:
-        case INPLACE_FLOOR_DIVIDE: m_il.div(); m_il.emit_call(METHOD_FLOAT_FLOOR_TOKEN); break;
+        case INPLACE_FLOOR_DIVIDE: m_il.div(); m_il.emit_call(METHOD_FLOAT_FLOOR_TOKEN, 1); break;
 
     }
 }
@@ -996,89 +997,89 @@ void PythonCompiler::emit_binary_float(int opcode) {
 void PythonCompiler::emit_binary_tagged_int(int opcode) {
     switch (opcode) {
         case INPLACE_ADD:
-        case BINARY_ADD: m_il.emit_call(METHOD_ADD_INT_TOKEN); break;
+        case BINARY_ADD: m_il.emit_call(METHOD_ADD_INT_TOKEN, 2); break;
         case INPLACE_TRUE_DIVIDE:
-        case BINARY_TRUE_DIVIDE: m_il.emit_call(METHOD_DIVIDE_INT_TOKEN); break;
+        case BINARY_TRUE_DIVIDE: m_il.emit_call(METHOD_DIVIDE_INT_TOKEN, 2); break;
         case INPLACE_FLOOR_DIVIDE:
-        case BINARY_FLOOR_DIVIDE: m_il.emit_call(METHOD_FLOORDIVIDE_INT_TOKEN); break;
+        case BINARY_FLOOR_DIVIDE: m_il.emit_call(METHOD_FLOORDIVIDE_INT_TOKEN, 2); break;
         case INPLACE_POWER:
-        case BINARY_POWER: m_il.emit_call(METHOD_POWER_INT_TOKEN); break;
+        case BINARY_POWER: m_il.emit_call(METHOD_POWER_INT_TOKEN, 2); break;
         case INPLACE_MODULO:
-        case BINARY_MODULO: m_il.emit_call(METHOD_MODULO_INT_TOKEN); break;
+        case BINARY_MODULO: m_il.emit_call(METHOD_MODULO_INT_TOKEN, 2); break;
         case INPLACE_LSHIFT:
-        case BINARY_LSHIFT: m_il.emit_call(METHOD_BINARY_LSHIFT_INT_TOKEN); break;
+        case BINARY_LSHIFT: m_il.emit_call(METHOD_BINARY_LSHIFT_INT_TOKEN, 2); break;
         case INPLACE_RSHIFT:
-        case BINARY_RSHIFT: m_il.emit_call(METHOD_BINARY_RSHIFT_INT_TOKEN); break;
+        case BINARY_RSHIFT: m_il.emit_call(METHOD_BINARY_RSHIFT_INT_TOKEN, 2); break;
         case INPLACE_AND:
-        case BINARY_AND: m_il.emit_call(METHOD_BINARY_AND_INT_TOKEN); break;
+        case BINARY_AND: m_il.emit_call(METHOD_BINARY_AND_INT_TOKEN, 2); break;
         case INPLACE_XOR:
-        case BINARY_XOR: m_il.emit_call(METHOD_BINARY_XOR_INT_TOKEN); break;
+        case BINARY_XOR: m_il.emit_call(METHOD_BINARY_XOR_INT_TOKEN, 2); break;
         case INPLACE_OR:
-        case BINARY_OR: m_il.emit_call(METHOD_BINARY_OR_INT_TOKEN); break;
+        case BINARY_OR: m_il.emit_call(METHOD_BINARY_OR_INT_TOKEN, 2); break;
         case INPLACE_MULTIPLY:
-        case BINARY_MULTIPLY: m_il.emit_call(METHOD_MULTIPLY_INT_TOKEN); break;
+        case BINARY_MULTIPLY: m_il.emit_call(METHOD_MULTIPLY_INT_TOKEN, 2); break;
         case INPLACE_SUBTRACT:
-        case BINARY_SUBTRACT: m_il.emit_call(METHOD_SUBTRACT_INT_TOKEN); break;
+        case BINARY_SUBTRACT: m_il.emit_call(METHOD_SUBTRACT_INT_TOKEN, 2); break;
     }
 }
 
 void PythonCompiler::emit_binary_object(int opcode) {
     switch (opcode) {
-        case BINARY_SUBSCR: m_il.emit_call(METHOD_SUBSCR_TOKEN); break;
-        case BINARY_ADD: m_il.emit_call(METHOD_ADD_TOKEN); break;
-        case BINARY_TRUE_DIVIDE: m_il.emit_call(METHOD_DIVIDE_TOKEN); break;
-        case BINARY_FLOOR_DIVIDE: m_il.emit_call(METHOD_FLOORDIVIDE_TOKEN); break;
-        case BINARY_POWER: m_il.emit_call(METHOD_POWER_TOKEN); break;
-        case BINARY_MODULO: m_il.emit_call(METHOD_MODULO_TOKEN); break;
-        case BINARY_MATRIX_MULTIPLY: m_il.emit_call(METHOD_MATRIX_MULTIPLY_TOKEN); break;
-        case BINARY_LSHIFT: m_il.emit_call(METHOD_BINARY_LSHIFT_TOKEN); break;
-        case BINARY_RSHIFT: m_il.emit_call(METHOD_BINARY_RSHIFT_TOKEN); break;
-        case BINARY_AND: m_il.emit_call(METHOD_BINARY_AND_TOKEN); break;
-        case BINARY_XOR: m_il.emit_call(METHOD_BINARY_XOR_TOKEN); break;
-        case BINARY_OR: m_il.emit_call(METHOD_BINARY_OR_TOKEN); break;
-        case BINARY_MULTIPLY: m_il.emit_call(METHOD_MULTIPLY_TOKEN); break;
-        case BINARY_SUBTRACT: m_il.emit_call(METHOD_SUBTRACT_TOKEN); break;
-        case INPLACE_POWER: m_il.emit_call(METHOD_INPLACE_POWER_TOKEN); break;
-        case INPLACE_MULTIPLY: m_il.emit_call(METHOD_INPLACE_MULTIPLY_TOKEN); break;
-        case INPLACE_MATRIX_MULTIPLY: m_il.emit_call(METHOD_INPLACE_MATRIX_MULTIPLY_TOKEN); break;
-        case INPLACE_TRUE_DIVIDE: m_il.emit_call(METHOD_INPLACE_TRUE_DIVIDE_TOKEN); break;
-        case INPLACE_FLOOR_DIVIDE: m_il.emit_call(METHOD_INPLACE_FLOOR_DIVIDE_TOKEN); break;
-        case INPLACE_MODULO: m_il.emit_call(METHOD_INPLACE_MODULO_TOKEN); break;
+        case BINARY_SUBSCR: m_il.emit_call(METHOD_SUBSCR_TOKEN, 2); break;
+        case BINARY_ADD: m_il.emit_call(METHOD_ADD_TOKEN, 2); break;
+        case BINARY_TRUE_DIVIDE: m_il.emit_call(METHOD_DIVIDE_TOKEN, 2); break;
+        case BINARY_FLOOR_DIVIDE: m_il.emit_call(METHOD_FLOORDIVIDE_TOKEN, 2); break;
+        case BINARY_POWER: m_il.emit_call(METHOD_POWER_TOKEN, 2); break;
+        case BINARY_MODULO: m_il.emit_call(METHOD_MODULO_TOKEN, 2); break;
+        case BINARY_MATRIX_MULTIPLY: m_il.emit_call(METHOD_MATRIX_MULTIPLY_TOKEN, 2); break;
+        case BINARY_LSHIFT: m_il.emit_call(METHOD_BINARY_LSHIFT_TOKEN, 2); break;
+        case BINARY_RSHIFT: m_il.emit_call(METHOD_BINARY_RSHIFT_TOKEN, 2); break;
+        case BINARY_AND: m_il.emit_call(METHOD_BINARY_AND_TOKEN, 2); break;
+        case BINARY_XOR: m_il.emit_call(METHOD_BINARY_XOR_TOKEN, 2); break;
+        case BINARY_OR: m_il.emit_call(METHOD_BINARY_OR_TOKEN, 2); break;
+        case BINARY_MULTIPLY: m_il.emit_call(METHOD_MULTIPLY_TOKEN, 2); break;
+        case BINARY_SUBTRACT: m_il.emit_call(METHOD_SUBTRACT_TOKEN, 2); break;
+        case INPLACE_POWER: m_il.emit_call(METHOD_INPLACE_POWER_TOKEN, 2); break;
+        case INPLACE_MULTIPLY: m_il.emit_call(METHOD_INPLACE_MULTIPLY_TOKEN, 2); break;
+        case INPLACE_MATRIX_MULTIPLY: m_il.emit_call(METHOD_INPLACE_MATRIX_MULTIPLY_TOKEN, 2); break;
+        case INPLACE_TRUE_DIVIDE: m_il.emit_call(METHOD_INPLACE_TRUE_DIVIDE_TOKEN, 2); break;
+        case INPLACE_FLOOR_DIVIDE: m_il.emit_call(METHOD_INPLACE_FLOOR_DIVIDE_TOKEN, 2); break;
+        case INPLACE_MODULO: m_il.emit_call(METHOD_INPLACE_MODULO_TOKEN, 2); break;
         case INPLACE_ADD:
             // TODO: We should do the unicode_concatenate ref count optimization
-            m_il.emit_call(METHOD_INPLACE_ADD_TOKEN);
+            m_il.emit_call(METHOD_INPLACE_ADD_TOKEN, 2);
             break;
-        case INPLACE_SUBTRACT: m_il.emit_call(METHOD_INPLACE_SUBTRACT_TOKEN); break;
-        case INPLACE_LSHIFT: m_il.emit_call(METHOD_INPLACE_LSHIFT_TOKEN); break;
-        case INPLACE_RSHIFT:m_il.emit_call(METHOD_INPLACE_RSHIFT_TOKEN); break;
-        case INPLACE_AND: m_il.emit_call(METHOD_INPLACE_AND_TOKEN); break;
-        case INPLACE_XOR:m_il.emit_call(METHOD_INPLACE_XOR_TOKEN); break;
-        case INPLACE_OR: m_il.emit_call(METHOD_INPLACE_OR_TOKEN); break;
+        case INPLACE_SUBTRACT: m_il.emit_call(METHOD_INPLACE_SUBTRACT_TOKEN, 2); break;
+        case INPLACE_LSHIFT: m_il.emit_call(METHOD_INPLACE_LSHIFT_TOKEN, 2); break;
+        case INPLACE_RSHIFT:m_il.emit_call(METHOD_INPLACE_RSHIFT_TOKEN, 2); break;
+        case INPLACE_AND: m_il.emit_call(METHOD_INPLACE_AND_TOKEN, 2); break;
+        case INPLACE_XOR:m_il.emit_call(METHOD_INPLACE_XOR_TOKEN, 2); break;
+        case INPLACE_OR: m_il.emit_call(METHOD_INPLACE_OR_TOKEN, 2); break;
     }
 }
 
 void PythonCompiler::emit_is_push_int(bool isNot) {
-    m_il.emit_call(isNot ? METHOD_ISNOT_BOOL : METHOD_IS_BOOL);
+    m_il.emit_call(isNot ? METHOD_ISNOT_BOOL : METHOD_IS_BOOL, 2);
 }
 
 void PythonCompiler::emit_is(bool isNot) {
-    m_il.emit_call(isNot ? METHOD_ISNOT : METHOD_IS);
+    m_il.emit_call(isNot ? METHOD_ISNOT : METHOD_IS, 2);
 }
 
 void PythonCompiler::emit_in_push_int() {
-    m_il.emit_call(METHOD_CONTAINS_INT_TOKEN);
+    m_il.emit_call(METHOD_CONTAINS_INT_TOKEN, 2);
 }
 
 void PythonCompiler::emit_in() {
-    m_il.emit_call(METHOD_CONTAINS_TOKEN);
+    m_il.emit_call(METHOD_CONTAINS_TOKEN, 2);
 }
 
 void PythonCompiler::emit_not_in_push_int() {
-    m_il.emit_call(METHOD_NOTCONTAINS_INT_TOKEN);
+    m_il.emit_call(METHOD_NOTCONTAINS_INT_TOKEN, 2);
 }
 
 void PythonCompiler::emit_not_in() {
-    m_il.emit_call(METHOD_NOTCONTAINS_TOKEN);
+    m_il.emit_call(METHOD_NOTCONTAINS_TOKEN, 2);
 }
 
 void PythonCompiler::emit_compare_float(int compareType) {
@@ -1096,24 +1097,24 @@ void PythonCompiler::emit_compare_float(int compareType) {
 
 void PythonCompiler::emit_compare_tagged_int(int compareType) {
     switch (compareType) {
-        case Py_EQ:  m_il.emit_call(METHOD_EQUALS_INT_TOKEN); break;
-        case Py_LT: m_il.emit_call(METHOD_LESS_THAN_INT_TOKEN); break;
-        case Py_LE: m_il.emit_call(METHOD_LESS_THAN_EQUALS_INT_TOKEN); break;
-        case Py_NE: m_il.emit_call(METHOD_NOT_EQUALS_INT_TOKEN); break;
-        case Py_GT: m_il.emit_call(METHOD_GREATER_THAN_INT_TOKEN); break;
-        case Py_GE: m_il.emit_call(METHOD_GREATER_THAN_EQUALS_INT_TOKEN); break;
+        case Py_EQ:  m_il.emit_call(METHOD_EQUALS_INT_TOKEN, 2); break;
+        case Py_LT: m_il.emit_call(METHOD_LESS_THAN_INT_TOKEN, 2); break;
+        case Py_LE: m_il.emit_call(METHOD_LESS_THAN_EQUALS_INT_TOKEN, 2); break;
+        case Py_NE: m_il.emit_call(METHOD_NOT_EQUALS_INT_TOKEN, 2); break;
+        case Py_GT: m_il.emit_call(METHOD_GREATER_THAN_INT_TOKEN, 2); break;
+        case Py_GE: m_il.emit_call(METHOD_GREATER_THAN_EQUALS_INT_TOKEN, 2); break;
     }
 }
 
 void PythonCompiler::emit_compare_object(int compareType) {
     m_il.ld_i(compareType);
-    m_il.emit_call(METHOD_RICHCMP_TOKEN);
+    m_il.emit_call(METHOD_RICHCMP_TOKEN, 3);
 }
 
 bool PythonCompiler::emit_compare_object_push_int(int compareType) {
     switch (compareType) {
         case Py_EQ:
-            call_optimizing_function(METHOD_RICHEQUALS_GENERIC_TOKEN);
+            call_optimizing_function(METHOD_RICHEQUALS_GENERIC_TOKEN, 3);
             return true;
         case Py_LT:
         case Py_LE:
@@ -1126,15 +1127,15 @@ bool PythonCompiler::emit_compare_object_push_int(int compareType) {
 }
 
 void PythonCompiler::emit_load_method() {
-    m_il.emit_call(METHOD_LOAD_METHOD);
+    m_il.emit_call(METHOD_LOAD_METHOD, 3);
 }
 
 void PythonCompiler::emit_call_method() {
-    m_il.emit_call(METHOD_CALL_METHOD);
+    m_il.emit_call(METHOD_CALL_METHOD, 2);
 }
 
 void PythonCompiler::emit_periodic_work() {
-    m_il.emit_call(METHOD_PERIODIC_WORK);
+    m_il.emit_call(METHOD_PERIODIC_WORK, 0);
 }
 
 JittedCode* PythonCompiler::emit_compile() {
@@ -1154,7 +1155,7 @@ JittedCode* PythonCompiler::emit_compile() {
 }
 
 void PythonCompiler::emit_tagged_int_to_float() {
-    m_il.emit_call(METHOD_INT_TO_FLOAT);
+    m_il.emit_call(METHOD_INT_TO_FLOAT, 2);
 }
 
 
@@ -1380,4 +1381,4 @@ GLOBAL_METHOD(METHOD_FORMAT_VALUE, &PyJit_FormatValue, CORINFO_TYPE_NATIVEINT, P
 GLOBAL_METHOD(METHOD_FORMAT_OBJECT, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_CALL_METHOD, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_LOAD_METHOD, &_PyObject_GetMethod, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_LOAD_METHOD, &_PyObject_GetMethod, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
