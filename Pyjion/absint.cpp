@@ -250,6 +250,7 @@ bool AbstractInterpreter::interpret() {
 #endif
         processOpCode:
             int curStackLen = lastState.stack_size();
+            int jump = 0;
             switch (opcode) {
                 case EXTENDED_ARG: {
                     curByte += sizeof(_Py_CODEUNIT);
@@ -767,7 +768,10 @@ bool AbstractInterpreter::interpret() {
                 }
                 case POP_BLOCK:
                     // Restore the stack state to what we had on entry
-                    //lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
+                    lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
+                    // Reset stack effect
+                    jump = 1;
+                    curStackLen = lastState.stack_size();
                     // TODO  : Find out what this did, its commented out but it looks important?!
                     //merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
                     break;
@@ -798,7 +802,14 @@ bool AbstractInterpreter::interpret() {
                     // the finally running...
                     finallyState.push(&Any);
                     if (update_start_state(finallyState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                        jump = 1;
                         queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
+                        lastState.push(&Any);
+                        lastState.push(&Any);
+                        lastState.push(&Any);
+                        lastState.push(&Any);
+                        lastState.push(&Any);
+                        lastState.push(&Any);
                     }
                 }
                     break;
@@ -820,6 +831,7 @@ bool AbstractInterpreter::interpret() {
                     auto finallyState = lastState;
                     finallyState.push(&Any);
                     if (update_start_state(finallyState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                        jump = 1;
                         queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
                     lastState.push(&Any);
@@ -928,7 +940,7 @@ bool AbstractInterpreter::interpret() {
                     return false;
                     break;
             }
-            assert(PyCompile_OpcodeStackEffectWithJump(opcode, oparg, 0) == (lastState.stack_size() - curStackLen));
+            assert(PyCompile_OpcodeStackEffectWithJump(opcode, oparg, jump) == (lastState.stack_size() - curStackLen));
             update_start_state(lastState, curByte + sizeof(_Py_CODEUNIT));
         }
 
@@ -1663,8 +1675,6 @@ void AbstractInterpreter::build_set(size_t argCnt) {
             m_comp->emit_load_local(setTmp);
             m_comp->emit_load_local(tmps[i]);
             m_comp->emit_set_add();
-            error_check("set add failed");
-            inc_stack();
             frees[i] = m_comp->emit_define_label();
             m_comp->emit_branch(BranchFalse, frees[i]);
         }
@@ -1675,7 +1685,6 @@ void AbstractInterpreter::build_set(size_t argCnt) {
         m_comp->emit_mark_label(err);
         m_comp->emit_load_local(setTmp);
         m_comp->emit_pop_top();
-        dec_stack();
         
         // In the event of an error we need to free any
         // args that weren't processed.  We'll always process
@@ -2231,95 +2240,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case INPLACE_AND:
             case INPLACE_XOR:
             case INPLACE_OR:
-                if (!should_box(opcodeIndex)) {
-                    auto stackInfo = get_stack_info(opcodeIndex);
-                    auto one = stackInfo[stackInfo.size() - 1];
-                    auto two = stackInfo[stackInfo.size() - 2];
-
-                    // Currently we only optimize floating point numbers..
-                    if (one.Value->kind() == AVK_Integer && two.Value->kind() == AVK_Float) {
-                        // tagged ints might be objects, so we track the stack kind as object
-                        assert(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT); 
-                        assert(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
-
-                        if (byte == BINARY_AND || byte == INPLACE_AND || byte == INPLACE_OR || byte == BINARY_OR ||
-                            byte == INPLACE_LSHIFT || byte == BINARY_LSHIFT || byte == INPLACE_RSHIFT || byte == BINARY_RSHIFT ||
-                            byte == INPLACE_XOR || byte == BINARY_XOR) {
-                            char buf[100];
-                            sprintf(buf, "unsupported operand type(s) for %s: 'float' and 'int'", op_to_string(byte));
-                            m_comp->emit_pyerr_setstring(PyExc_TypeError, buf);
-                            branch_raise();
-                            break;
-                        } else if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE ||
-                            byte == INPLACE_FLOOR_DIVIDE || byte == BINARY_FLOOR_DIVIDE ||
-                            byte == INPLACE_MODULO || byte == BINARY_MODULO) {
-                            // Check and see if the right hand side is zero, and if so, raise
-                            // an exception.
-                            m_comp->emit_dup();
-                            m_comp->emit_unary_not_tagged_int_push_bool();
-                            auto noErr = m_comp->emit_define_label();
-                            m_comp->emit_branch(BranchFalse, noErr);
-                            m_comp->emit_pyerr_setstring(PyExc_ZeroDivisionError, "float division by zero");
-                            branch_raise();
-
-                            m_comp->emit_mark_label(noErr);
-                        }
-
-                        // Convert int to float
-                        auto floatValue = m_comp->emit_define_local(LK_Float);
-                        m_comp->emit_load_local_addr(floatValue);
-                        m_comp->emit_tagged_int_to_float();
-
-                        dec_stack(1);   // we've consumed the int
-
-                        int_error_check("int too big for float");
-
-                        m_comp->emit_load_and_free_local(floatValue);
-
-                        m_comp->emit_binary_float(byte);
-
-                        dec_stack(1);
-                        inc_stack(1, STACK_KIND_VALUE);
-                        break;
-                    } else if (one.Value->kind() == AVK_Float && two.Value->kind() == AVK_Float) {
-                        assert(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
-                        assert(m_stack[m_stack.size() - 2] == STACK_KIND_VALUE);
-
-                        dec_stack(2);
-
-                        if (byte == INPLACE_TRUE_DIVIDE || byte == BINARY_TRUE_DIVIDE ||
-                            byte == INPLACE_FLOOR_DIVIDE || byte == BINARY_FLOOR_DIVIDE ||
-                            byte == INPLACE_MODULO || byte == BINARY_MODULO) {
-                            m_comp->emit_dup();
-                            m_comp->emit_float(0);
-                            auto noErr = m_comp->emit_define_label();
-                            m_comp->emit_compare_equal();
-                            m_comp->emit_branch(BranchFalse, noErr);
-                            // Move the stack depth down to zero (we already did the decstack above)
-                            m_comp->emit_pop();
-                            m_comp->emit_pop();
-                            m_comp->emit_pyerr_setstring(PyExc_ZeroDivisionError, "float division by zero");
-                            branch_raise();
-
-                            m_comp->emit_mark_label(noErr);
-                        }
-
-                        m_comp->emit_binary_float(byte);
-
-                        inc_stack(1, STACK_KIND_VALUE);
-                        break;
-                    }
-                    else if (one.Value->kind() == AVK_Integer && two.Value->kind() == AVK_Integer) {
-                        dec_stack(2);
-
-                        m_comp->emit_binary_tagged_int(byte);
-
-                        error_check("tagged binary add failed");
-
-                        inc_stack();
-                        break;
-                    }
-                }
                 dec_stack(2);
 
                 m_comp->emit_binary_object(byte);
@@ -3020,6 +2940,7 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
     m_comp->emit_pop_top();
 
     m_comp->emit_free_local(tmp);
+    inc_stack();
 }
 
 void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) {
@@ -3211,47 +3132,12 @@ bool AbstractInterpreter::can_skip_lasti_update(int opcodeIndex) {
 }
 
 void AbstractInterpreter::store_fast(int local, int opcodeIndex) {
-    if (!should_box(opcodeIndex)) {
-        auto stackInfo = get_stack_info(opcodeIndex);
-        auto stackValue = stackInfo[stackInfo.size() - 1];
-        // We only optimize floats so far...
-
-        if (stackValue.Value->kind() == AVK_Float) {
-            assert(m_stack[m_stack.size() - 1] == STACK_KIND_VALUE);
-            m_comp->emit_store_local(get_optimized_local(local, AVK_Float));
-            dec_stack();
-            return;
-        }
-        else if (stackValue.Value->kind() == AVK_Integer) {
-            m_comp->emit_store_local(get_optimized_local(local, AVK_Any));
-            dec_stack();
-            return;
-        }
-    }
-
-    assert(m_stack[m_stack.size() - 1] == STACK_KIND_OBJECT);
     m_comp->emit_store_fast(local);
     dec_stack();
 }
 
 void AbstractInterpreter::load_const(int constIndex, int opcodeIndex) {
     auto constValue = PyTuple_GetItem(m_code->co_consts, constIndex);
-    if (!should_box(opcodeIndex)) {
-        if (PyFloat_CheckExact(constValue)) {
-            m_comp->emit_float(PyFloat_AsDouble(constValue));
-            inc_stack(1, STACK_KIND_VALUE);
-            return;
-        }
-        else if (PyLong_CheckExact(constValue)) {
-            int overflow;
-            auto value = PyLong_AsLongLongAndOverflow(constValue, &overflow);
-            if (!overflow && can_tag(value)) {
-                m_comp->emit_tagged_int(value);
-                inc_stack();
-                return;
-            }
-        }
-    }
     m_comp->emit_ptr(constValue);
     m_comp->emit_dup();
     m_comp->emit_incref();

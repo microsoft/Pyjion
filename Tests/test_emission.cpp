@@ -97,17 +97,17 @@ public:
     }
 };
 
-//TEST_CASE("General list unpacking", "[list][BUILD_LIST_UNPACK][emission]") {
-//    SECTION("common case") {
-//        auto t = EmissionTest("def f(): return [1, *[2], 3, 4]");
-//        CHECK(t.returns() == "[1, 2, 3, 4]");
-//    }
-//
-//    SECTION("unpacking an iterable") {
-//        auto t = EmissionTest("def f(): return [1, {2}, 3]");
-//        CHECK(t.raises() == PyExc_TypeError);
-//    }
-//}
+TEST_CASE("General list unpacking", "[list][BUILD_LIST_UNPACK][emission]") {
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): return [1, *[2], 3, 4]");
+        CHECK(t.returns() == "[1, 2, 3, 4]");
+    }
+
+    SECTION("unpacking an iterable") {
+        auto t = EmissionTest("def f(): return [1, {2}, 3]");
+        CHECK(t.returns() == "[1, {2}, 3]");
+    }
+}
 
 TEST_CASE("General tuple unpacking", "[tuple][BUILD_TUPLE_UNPACK][emission]") {
     SECTION("common case") {
@@ -163,16 +163,15 @@ TEST_CASE("General set unpacking") {
         CHECK(t.returns() == "{'o'}");
     }
 
-    // TODO : Find the bug in these cases. Looks like a spill-error on BUILD_SET
-//    SECTION("common case") {
-//        auto t = EmissionTest("def f(): return {1, *[2], 3}");
-//        CHECK(t.returns() == "{1, 2, 3}");
-//    }
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): return {1, *[2], 3}");
+        CHECK(t.returns() == "{1, 2, 3}");
+    }
 
-//    SECTION("unpacking a non-iterable") {
-//        auto t = EmissionTest("def f(): return {1, [], 3}");
-//        CHECK(t.raises() == PyExc_TypeError);
-//    }
+    SECTION("unpacking a non-iterable") {
+        auto t = EmissionTest("def f(): return {1, [], 3}");
+        CHECK(t.raises() == PyExc_TypeError);
+    }
 }
 
 // TODO : Find bug in BUILD_CONST_KEY_MAP
@@ -233,6 +232,14 @@ TEST_CASE("General contains comparison") {
 TEST_CASE("Assertions") {
     SECTION("assert simple case") {
         auto t = EmissionTest("def f(): assert '1' == '2'");
+        CHECK(t.raises() == PyExc_AssertionError);
+    }
+    SECTION("assert simple case short int") {
+        auto t = EmissionTest("def f(): assert 1 == 2");
+        CHECK(t.raises() == PyExc_AssertionError);
+    }
+    SECTION("assert simple case long int") {
+        auto t = EmissionTest("def f(): assert 1000000000 == 200000000");
         CHECK(t.raises() == PyExc_AssertionError);
     }
 }

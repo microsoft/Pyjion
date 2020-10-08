@@ -53,6 +53,7 @@ private:
 
 public:
     CompilerTest(const char *code) {
+        PyErr_Clear();
         m_code.reset(CompileCode(code));
         if (m_code.get() == nullptr) {
             FAIL("failed to compile code");
@@ -93,7 +94,7 @@ public:
     }
 };
 
-TEST_CASE("Legacy JIT Tests", "[float][binary op][inference]") {
+TEST_CASE("Test ITER", "[float][binary op][inference]") {
     SECTION("test1") {
         // EXTENDED_ARG FOR_ITER:
         auto t = CompilerTest(
@@ -105,12 +106,18 @@ TEST_CASE("Legacy JIT Tests", "[float][binary op][inference]") {
                 "        return x\n"
         );
         CHECK(t.returns() == "369");
-    }SECTION("test2") {
+    }
+}
+TEST_CASE("Test math errors") {
+    SECTION("test2") {
         auto t = CompilerTest(
                 "def f(): 1.0 / 0"
         );
-        CHECK(t.returns() == "<NULL>");
-    }SECTION("test3") {
+        CHECK(t.raises() == PyExc_ZeroDivisionError);
+    }
+}
+TEST_CASE("Test f-strings") {
+    SECTION("test3") {
         auto t = CompilerTest(
                 "def f(): print(f'x {42}')"
         );
@@ -134,47 +141,56 @@ TEST_CASE("Legacy JIT Tests", "[float][binary op][inference]") {
         CHECK(t.returns() == "\"abc 'abc'\"");
     }
 
-    SECTION("test7") {
+    SECTION("test f-strings") {
         auto t = CompilerTest(
                 "def f(): return f'abc {\"abc\"!a:6}'"
         );
         CHECK(t.returns() == "\"abc 'abc' \"");
-    }SECTION("test8") {
+    }SECTION("test f-strings 1") {
         auto t = CompilerTest(
                 "def f(): return f'abc {\"abc\"!r:6}'"
         );
         CHECK(t.returns() == "\"abc 'abc' \"");
-    }SECTION("test9") {
+    }SECTION("test f-strings 2") {
         auto t = CompilerTest(
                 "def f(): return f'abc {\"abc\"!s}'"
         );
         CHECK(t.returns() == "'abc abc'");
-    }SECTION("test10") {
+    }
+}
+TEST_CASE("Test ranges") {
+    SECTION("test in range") {
         auto t = CompilerTest(
                 "def f():\n    for b in range(1):\n        x = b & 1 and -1.0 or 1.0\n    return x"
         );
         CHECK(t.returns() == "1.0");
-    }SECTION("test11") {
+    }
+}
+TEST_CASE("X Test general errors") {
+    SECTION("test UnboundLocalError") {
         auto t = CompilerTest(
-                "def f():\n    x = y\n    y = 1"
+                "def f():\n  x = y\n  y = 1"
         );
-        CHECK(t.returns() == "<NULL>");
-    }SECTION("test12") {
+        CHECK(t.raises() == PyExc_UnboundLocalError);
+    }SECTION("test reraise exception") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise TypeError('hi')\n    except Exception as e:\n         pass\n    finally:\n         pass"
         );
         CHECK(t.returns() == "None");
-    }SECTION("test13") {
+    }SECTION("test generic exception") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        try:\n             raise Exception('hi')\n        finally:\n             pass\n    finally:\n        pass"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test14") {
+    }SECTION("test exception filters") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        try:\n             try:\n                  raise TypeError('err')\n             except BaseException:\n                  raise\n        finally:\n             pass\n    finally:\n        return 42\n"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test15") {
+    }
+}
+TEST_CASE("X Annotation tests") {
+    SECTION("test annotations") {
         auto t = CompilerTest(
                 "def f():\n    def f(self) -> 42 : pass\n    return 42"
         );
@@ -192,38 +208,32 @@ TEST_CASE("Legacy JIT Tests", "[float][binary op][inference]") {
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                break\n            finally:\n                pass\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }
-    SECTION("Break from a double nested try/finally needs to unwind all exceptions") {
+    }SECTION("Break from a double nested try/finally needs to unwind all exceptions") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                raise Exception()\n            finally:\n                try:\n                     break\n                finally:\n                    pass\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }
-    SECTION("return from nested try/finally should use BranchLeave to clear stack when branching to return label") {
+    }SECTION("return from nested try/finally should use BranchLeave to clear stack when branching to return label") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            return 42\n        finally:\n            pass"
         );
         CHECK(t.returns() == "42");
-    }
-    SECTION("Return from nested try/finally should unwind nested exception handlers") {
+    }SECTION("Return from nested try/finally should unwind nested exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            raise Exception()\n        finally:\n            try:\n                return 42\n            finally:\n                pass\n    return 23"
         );
         CHECK(t.returns() == "42");
-    }
-    SECTION("Break from a nested exception handler needs to unwind all exception handlers") {
+    }SECTION("Break from a nested exception handler needs to unwind all exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  break\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }
-    SECTION("Return from a nested exception handler needs to unwind all exception handlers") {
+    }SECTION("Return from a nested exception handler needs to unwind all exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  return 23\n    return 42"
         );
         CHECK(t.returns() == "23");
-    }
-    SECTION("We need to do BranchLeave to clear the stack when doing a break inside of a finally") {
+    }SECTION("We need to do BranchLeave to clear the stack when doing a break inside of a finally") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            break\n    return 42"
         );
@@ -233,7 +243,10 @@ TEST_CASE("Legacy JIT Tests", "[float][binary op][inference]") {
                 "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test binary multiply") {
+    }
+}
+TEST_CASE("Test math operations") {
+    SECTION("test binary multiply") {
         auto t = CompilerTest(
                 "def f():\n    x = b'abc'*3\n    return x"
         );
@@ -273,88 +286,109 @@ TEST_CASE("Legacy JIT Tests", "[float][binary op][inference]") {
                 "def f():\n    if 0.0 < 1.0 <= 1.0 == 1.0 >= 1.0 > 0.0 != 1.0:  return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }
+}
+TEST_CASE("Test try") {
+    SECTION("test1") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        try:\n            pass\n        finally:\n            raise OSError\n    except OSError as e:\n        return 1\n    return 0\n"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }
+
+    SECTION("test2") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise\n    except RuntimeError:\n        return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }
+
+    SECTION("test3") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        while True:\n            try:\n                raise Exception()\n            except Exception:\n                break\n    finally:\n        pass\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }
+
+    SECTION("test4") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        pass\n    finally:\n        raise"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }
+
+    SECTION("test5") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        pass\n    finally:\n        raise OSError"
         );
         CHECK(t.returns() == "<NULL>");
     }
-        // partial should be boxed because it's consumed by print after being assigned in the break loop
-    SECTION("test") {
+}
+TEST_CASE("Test boxing"){
+    SECTION("partial should be boxed because it's consumed by print after being assigned in the break loop") {
         auto t = CompilerTest(
                 "def f():\n    partial = 0\n    while 1:\n        partial = 1\n        break\n    if not partial:\n        print(partial)\n        return True\n    return False\n"
         );
         CHECK(t.returns() == "False");
     }
 
-        // UNARY_NOT/POP_JUMP_IF_FALSE with optimized value on stack should be compiled correctly w/o crashing
-    SECTION("test") {
+    SECTION("UNARY_NOT/POP_JUMP_IF_FALSE with optimized value on stack should be compiled correctly w/o crashing") {
         auto t = CompilerTest(
                 "def f():\n    abc = 1.0\n    i = 0\n    n = 0\n    if i == n and not abc:\n        return 42\n    return 23"
         );
         CHECK(t.returns() == "23");
-    }SECTION("test") {
+    }
+
+    SECTION("test3") {
         auto t = CompilerTest(
                 "def f():\n    abc = 1\n    i = 0\n    n = 0\n    if i == n and not abc:\n        return 42\n    return 23"
         );
         CHECK(t.returns() == "23");
-    }SECTION("test") {
+    }
+
+    SECTION("test4") {
         auto t = CompilerTest(
                 "def f():\n    abc = 0.0\n    i = 0\n    n = 0\n    if i == n and not abc:\n        return 42\n    return 23"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }
+
+    SECTION("test5") {
         auto t = CompilerTest(
                 "def f():\n    abc = 0\n    i = 0\n    n = 0\n    if i == n and not abc:\n        return 42\n    return 23"
         );
         CHECK(t.returns() == "42");
     }
-        // Too many items to unpack from list/tuple shouldn't crash
-    SECTION("test") {
+
+    SECTION("Too many items to unpack from list/tuple shouldn't crash") {
         auto t = CompilerTest(
                 "def f():\n    x = [1,2,3]\n    a, b = x"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }
+
+    SECTION("test6") {
         auto t = CompilerTest(
                 "def f():\n    x = (1,2,3)\n    a, b = x"
         );
         CHECK(t.returns() == "<NULL>");
     }
-        // failure to unpack shouldn't crash, should raise Python exception
-    SECTION("test") {
+
+    SECTION("failure to unpack shouldn't crash, should raise Python exception") {
         auto t = CompilerTest(
                 "def f():\n    x = [1]\n    a, b, *c = x"
         );
         CHECK(t.returns() == "<NULL>");
     }
-        // unpacking non-iterable shouldn't crash
-    SECTION("test") {
+
+    SECTION("unpacking non-iterable shouldn't crash") {
         auto t = CompilerTest(
                 "def f():\n    a, b, c = len"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }
+
+    SECTION("test stack dump") {
         auto t = CompilerTest(
                 "def x():\n     try:\n         b\n     except:\n         c\n\ndef f():\n    try:\n        x()\n    except:\n        pass\n    return sys.exc_info()[0]\n\n"
         );
