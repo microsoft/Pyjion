@@ -55,11 +55,16 @@ using namespace std;
 
 class CCorJitHost : public ICorJitHost {
 protected:
+#ifndef WINDOWS
+    map<const WCHAR *, int> intSettings;
+    map<const WCHAR *,const WCHAR *> strSettings;
+#else
     map<std::u16string, int> intSettings;
     map<std::u16string, const char16_t*> strSettings;
+#endif
 
 public: CCorJitHost(){
-        // TODO: DEBUG settings only, remove these later
+#ifndef WINDOWS
 #ifdef DEBUG
         intSettings[u"JitLsraStats"] = 0;
         intSettings[u"DumpJittedMethods"] = 1;
@@ -67,6 +72,7 @@ public: CCorJitHost(){
         intSettings[u"JitDumpIR"] = 1;
         intSettings[u"JitDumpASCII"] = 0;
         strSettings[u"JitDump"] = u"methodname";
+#endif
 #endif
     }
 

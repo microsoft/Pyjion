@@ -193,6 +193,13 @@ TEST_CASE("General dict unpacking") {
     }
 }
 
+TEST_CASE("Dict Merging"){
+    SECTION("merging a dict") {
+        auto t = EmissionTest("def f(): \n  a=dict()\n  b=dict()\n  a['x']=1\n  b['y']=2\n  return a | b");
+        CHECK(t.returns() == "{'x': 1, 'y': 2}");
+    }
+}
+
 TEST_CASE("General is comparison") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): return 1 is 2");

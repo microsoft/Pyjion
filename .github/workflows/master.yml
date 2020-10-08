@@ -50,10 +50,10 @@ jobs:
         shell: bash
         run: cmake --build . --config $BUILD_TYPE
 
-      - name: Test
+      - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: ctest -C $BUILD_TYPE
+        run: unit_tests
   build-mac:
     runs-on: macos-latest
     strategy:
@@ -87,10 +87,10 @@ jobs:
         shell: bash
         run: cmake --build . --config $BUILD_TYPE
 
-      - name: Test
+      - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: ctest -C $BUILD_TYPE
+        run: unit_tests
   build-windows:
     runs-on: windows-latest
     strategy:
@@ -126,7 +126,7 @@ jobs:
         shell: bash
         run: cmake --build . --config $BUILD_TYPE
 
-      - name: Test
+      - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: ctest -C $BUILD_TYPE
+        run: unit_tests
