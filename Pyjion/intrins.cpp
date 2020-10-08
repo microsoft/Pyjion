@@ -324,17 +324,11 @@ PyObject* PyJit_ListAppend(PyObject* list, PyObject* value) {
 PyObject* PyJit_SetAdd(PyObject* set, PyObject* value) {
     assert(set != nullptr);
     int err ;
-    if (!PyAnySet_CheckExact(set)){
-        PyErr_Format(PyExc_TypeError,
-                     "argument must be a set, not %.200s",
-                     set->ob_type->tp_name);
-        goto error;
-    };
     err = PySet_Add(set, value);
-    if (err) {
+    Py_DECREF(value);
+    if (err != 0) {
         goto error;
     }
-    Py_DECREF(value);
     return set;
 error:
     return nullptr;
@@ -342,20 +336,12 @@ error:
 
 PyObject* PyJit_UpdateSet(PyObject* set, PyObject* iterable) {
     assert(set != nullptr);
-    int res;
-    if (!PyAnySet_CheckExact(set)){
-        PyErr_Format(PyExc_TypeError,
-                     "argument must be a set, not %.200s",
-                     set->ob_type->tp_name);
-        goto error;
-    };
-    res = _PySet_Update(set, iterable);
-    if (res != 0)
-        goto error;
+    int res = _PySet_Update(set, iterable);
     Py_DECREF(iterable);
+    if (res < 0)
+        goto error;
     return set;
 error:
-    Py_DECREF(iterable);
     return nullptr;
 }
 
