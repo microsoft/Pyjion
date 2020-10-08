@@ -53,7 +53,7 @@ jobs:
       - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: unit_tests
+        run: ./unit_tests
   build-mac:
     runs-on: macos-latest
     strategy:
@@ -90,7 +90,7 @@ jobs:
       - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: unit_tests
+        run: ./unit_tests
   build-windows:
     runs-on: windows-latest
     strategy:
@@ -129,4 +129,4 @@ jobs:
       - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: unit_tests
+        run: .\unit_tests

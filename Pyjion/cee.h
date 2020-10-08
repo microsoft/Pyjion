@@ -90,14 +90,14 @@ public: CCorJitHost(){
 	int getIntConfigValue(const WCHAR* name, int defaultValue) override
 	{
         if (intSettings.find(name) != intSettings.end())
-            return intSettings[name];
+            return intSettings.at(name);
         return defaultValue;
 	}
 
 	const WCHAR * getStringConfigValue(const WCHAR* name) override
 	{
         if (strSettings.find(name) != strSettings.end())
-            return strSettings[name];
+            return strSettings.at(name);
         return nullptr;
 	}
 
