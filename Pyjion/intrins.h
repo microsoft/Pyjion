@@ -81,7 +81,7 @@ PyObject* PyJit_ListAppend(PyObject* list, PyObject* value);
 
 PyObject* PyJit_SetAdd(PyObject* set, PyObject* value);
 
-int PyJit_UpdateSet(PyObject* set, PyObject* value);
+PyObject * PyJit_UpdateSet(PyObject* set, PyObject* value);
 
 PyObject* PyJit_MapAdd(PyObject*map, PyObject* value, PyObject*key);
 
@@ -181,14 +181,14 @@ int PyJit_Raise(PyObject *exc, PyObject *cause);
 
 PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg);
 
-int PyJit_ExtendList(PyObject *list, PyObject *extension);
+PyObject* PyJit_ExtendList(PyObject *list, PyObject *extension);
 
 PyObject* PyJit_ListToTuple(PyObject *list);
 
 int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map);
 int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map);
 
-int PyJit_DictUpdate(PyObject *dict, PyObject* other);
+PyObject * PyJit_DictUpdate(PyObject *dict, PyObject* other);
 
 int PyJit_StoreSubscr(PyObject* value, PyObject *container, PyObject *index);
 

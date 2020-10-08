@@ -141,12 +141,12 @@ TEST_CASE("General set building") {
 
     SECTION("combine sets") {
         auto t = EmissionTest("def f(): return {1, 2, 3} | {4, 5, 6}");
-        CHECK(t.returns() == "frozenset({1, 2, 3, 4, 5, 6})");
+        CHECK(t.returns() == "{1, 2, 3, 4, 5, 6}");
     }
 
     SECTION("and operator set") {
         auto t = EmissionTest("def f(): return {1, 2, 3, 4} & {4, 5, 6}");
-        CHECK(t.returns() == "frozenset({4})");
+        CHECK(t.returns() == "{4}");
     }
 }
 

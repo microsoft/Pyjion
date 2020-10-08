@@ -1786,34 +1786,6 @@ void AbstractInterpreter::extend_dict(size_t argCnt) {
     m_comp->emit_load_and_free_local(dictTmp);
 }
 
-
-void AbstractInterpreter::add_to_set_recursively(Local setTmp, size_t argCnt){
-    if (argCnt == 0) {
-        return;
-    }
-
-    auto valueTmp = m_comp->emit_define_local();
-    m_comp->emit_store_local(valueTmp);
-    dec_stack();
-
-    m_comp->emit_load_local(setTmp);
-    m_comp->emit_load_local(valueTmp);
-
-    m_comp->emit_set_add();
-    int_error_check("set add failed");
-
-    m_comp->emit_free_local(valueTmp);
-}
-
-void AbstractInterpreter::add_to_set(size_t argCnt){
-    assert(argCnt > 0 );
-    auto setTmp = m_comp->emit_spill();
-    dec_stack();
-    add_to_set_recursively(setTmp, argCnt);
-    m_comp->emit_load_and_free_local(setTmp);
-    inc_stack(1, STACK_KIND_OBJECT);
-}
-
 void AbstractInterpreter::append_list(size_t argCnt){
     assert(argCnt > 0 );
     auto listTmp = m_comp->emit_spill();
@@ -2480,7 +2452,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             }
             case SET_ADD:
-                add_to_set(oparg);
+                assert(oparg == 1); // TODO : Shift down stack to oparg when != 1
+                // Calls set.update(TOS1[-i], TOS). Used to build sets.
+                m_comp->emit_set_add();
+                dec_stack(2); // set, value
+                error_check("set update failed");
+                inc_stack(1); // set
                 break;
             case MAP_ADD:
                 m_comp->emit_map_add();
@@ -2728,49 +2705,40 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case LIST_EXTEND:
             {
-                auto value = m_comp->emit_spill();
-                auto list = m_comp->emit_spill();
-                m_comp->emit_load_local(list);
-                m_comp->emit_load_local(value);
+                assert(oparg == 1); // TODO : Shift down stack to oparg when != 1
                 m_comp->emit_list_extend();
-                m_comp->emit_free_local(value);
-                m_comp->emit_load_local(list);
-                dec_stack();
+                dec_stack(2);
+                error_check("list extend failed");
+                inc_stack(1);
+                // Takes list, value from stack and pushes list back onto stack
                 break;
             }
             case DICT_UPDATE:
             {
+                assert(oparg == 1); // TODO : Shift down stack to oparg when != 1
                 // Calls dict.update(TOS1[-i], TOS). Used to build dicts.
-                auto value = m_comp->emit_spill();
-                auto dict = m_comp->emit_spill();
-                m_comp->emit_load_local(dict);
-                m_comp->emit_load_local(value);
                 m_comp->emit_dict_update();
-                int_error_check();
-                m_comp->emit_free_local(value);
-                m_comp->emit_load_local(dict);
-                dec_stack();
+                dec_stack(2); // dict, item
+                error_check("dict update failed");
+                inc_stack(1);
                 break;
             }
             case SET_UPDATE:
             {
+                assert(oparg == 1); // TODO : Shift down stack to oparg when != 1
                 // Calls set.update(TOS1[-i], TOS). Used to build sets.
-                auto value = m_comp->emit_spill();
-                auto set = m_comp->emit_spill();
-                m_comp->emit_load_local(set);
-                m_comp->emit_load_local(value);
                 m_comp->emit_set_extend();
-                int_error_check("set extend failed");
-                m_comp->emit_free_local(value);
-                m_comp->emit_load_local(set);
-                dec_stack();
+                dec_stack(2); // set, iterable
+                error_check("set update failed");
+                inc_stack(1); // set
                 break;
             }
             case LIST_TO_TUPLE:
             {
                 m_comp->emit_list_to_tuple();
-                dec_stack(1);
-                inc_stack(1);
+                dec_stack(1); // list
+                error_check("list to tuple failed");
+                inc_stack(1); // tuple
                 break;
             }
             case IS_OP:

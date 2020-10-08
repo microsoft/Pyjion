@@ -340,7 +340,7 @@ error:
     return nullptr;
 }
 
-int PyJit_UpdateSet(PyObject* set, PyObject* iterable) {
+PyObject* PyJit_UpdateSet(PyObject* set, PyObject* iterable) {
     assert(set != nullptr);
     int res;
     if (!PyAnySet_CheckExact(set)){
@@ -350,11 +350,13 @@ int PyJit_UpdateSet(PyObject* set, PyObject* iterable) {
         goto error;
     };
     res = _PySet_Update(set, iterable);
+    if (res != 0)
+        goto error;
     Py_DECREF(iterable);
-    return res;
+    return set;
 error:
     Py_DECREF(iterable);
-    return -1;
+    return nullptr;
 }
 
 PyObject* PyJit_MapAdd(PyObject*map, PyObject* value, PyObject*key) {
@@ -1155,7 +1157,7 @@ PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg) {
     return value;
 }
 
-int PyJit_ExtendList(PyObject *list, PyObject *iterable) {
+PyObject* PyJit_ExtendList(PyObject *list, PyObject *iterable) {
     assert(list != nullptr);
     assert(PyList_CheckExact(list));
     PyObject *none_val = _PyList_Extend((PyListObject *)list, iterable);
@@ -1172,9 +1174,9 @@ int PyJit_ExtendList(PyObject *list, PyObject *iterable) {
     }
     Py_DECREF(none_val);
     Py_DECREF(iterable);
-    return 0;
+    return list;
 error:
-    return -1;
+    return nullptr;
 }
 
 PyObject* PyJit_ListToTuple(PyObject *list) {
@@ -1200,7 +1202,7 @@ int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map) {
 	return res;
 }
 
-int PyJit_DictUpdate(PyObject* dict, PyObject* other) {
+PyObject* PyJit_DictUpdate(PyObject* dict, PyObject* other) {
     assert(dict != nullptr);
     int res ;
     if (!PyDict_CheckExact(dict)) {
@@ -1210,11 +1212,13 @@ int PyJit_DictUpdate(PyObject* dict, PyObject* other) {
         goto error;
     }
     res = PyDict_Update(dict, other);
+    if (res != 0)
+        goto error;
     Py_DECREF(other);
-    return res;
+    return dict;
 error:
     Py_DECREF(other);
-    return -1;
+    return nullptr;
 }
 
 int PyJit_StoreSubscr(PyObject* value, PyObject *container, PyObject *index) {
