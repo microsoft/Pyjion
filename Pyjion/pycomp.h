@@ -200,7 +200,6 @@
 // method helpers
 
 #define METHOD_LOAD_METHOD      0x00010400
-#define METHOD_CALL_METHOD      0x00010401
 
 
 // Py* helpers

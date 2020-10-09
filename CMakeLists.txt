@@ -37,6 +37,7 @@ if(NOT WIN32)
     endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 else()
     add_definitions(-DWINDOWS)
+    add_definitions(-D_HAS_STD_BYTE=0)
     if (MSVC)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++latest")
     endif(MSVC)
@@ -76,7 +77,6 @@ include_directories(CoreCLR/src/coreclr/src/inc CoreCLR/src/coreclr/src/jit)
 
 if (WIN32)
     set(CLR_OS_BUILD Windows_NT.x64.Debug)
-    set(CLR_JIT_LIB "lib/coreclr_static.lib")
 endif()
 
 if (LINUX)
@@ -116,7 +116,9 @@ set_target_properties(
 )
 
 target_link_libraries(pyjion ${Python3_LIBRARIES})
-target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})
+if (NOT WIN32)
+    target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})
+endif()
 
 # Testing
 add_subdirectory(Tests/Catch)

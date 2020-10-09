@@ -2581,10 +2581,6 @@ PyObject* PyJit_LoadMethod(PyObject* object, PyObject* name) {
     return method;
 }
 
-PyObject* PyJit_CallMethod(PyObject* item, PyObject* item2) {
-
-}
-
 PyObject* PyJit_FormatValue(PyObject* item) {
 	if (PyUnicode_CheckExact(item)) {
 		return item;

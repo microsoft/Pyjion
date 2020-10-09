@@ -413,7 +413,6 @@ public:
 
     // Python 3.7 method calls
     virtual void emit_load_method(void* name) = 0;
-    virtual void emit_call_method() = 0;
 
     virtual void emit_load_assertion_error() = 0;
 
