@@ -801,6 +801,10 @@ bool AbstractInterpreter::interpret() {
                     merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
                     goto next;
                 case POP_EXCEPT:
+                    // pop traceback values
+                    lastState.pop_no_escape();
+                    lastState.pop_no_escape();
+                    lastState.pop_no_escape();
                     break;
                 case LOAD_BUILD_CLASS:
                     // TODO: if we know this is __builtins__.__build_class__ we can push a special value
@@ -826,18 +830,17 @@ bool AbstractInterpreter::interpret() {
                     // Finally is entered with value pushed onto stack indicating reason for 
                     // the finally running...
                     finallyState.push(&Any);
+                    finallyState.push(&Any);
+                    finallyState.push(&Any);
+                    finallyState.push(&Any);
+                    finallyState.push(&Any);
+                    finallyState.push(&Any);
                     if (update_start_state(finallyState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
-                        jump = 1;
                         queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
-                        lastState.push(&Any);
-                        lastState.push(&Any);
-                        lastState.push(&Any);
-                        lastState.push(&Any);
-                        lastState.push(&Any);
-                        lastState.push(&Any);
                     }
+                    goto next;
                 }
-                    break;
+                break;
                 case FORMAT_VALUE:
                     if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
                         // format spec
@@ -861,7 +864,7 @@ bool AbstractInterpreter::interpret() {
                         queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
                     lastState.push(&Any);
-                    break;
+                    goto next;
                 }
                 case BUILD_CONST_KEY_MAP:
                     lastState.pop(); //keys
@@ -916,6 +919,7 @@ bool AbstractInterpreter::interpret() {
                        Then we push again the TOP exception and the __exit__
                        return value.
                     */
+                    return false; // not implemented
                     auto top = lastState.pop_no_escape(); // exc
                     auto second = lastState.pop_no_escape(); // val
                     auto third = lastState.pop_no_escape(); // tb
@@ -2053,10 +2057,15 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             case UNARY_POSITIVE: unary_positive(opcodeIndex); break;
             case UNARY_NEGATIVE: unary_negative(opcodeIndex); break;
-            case UNARY_NOT: unary_not(curByte); break;
-            case UNARY_INVERT:
+            case UNARY_NOT:
+                m_comp->emit_unary_not();
                 dec_stack(1);
+                error_check("unary not failed");
+                inc_stack();
+                break;
+            case UNARY_INVERT:
                 m_comp->emit_unary_invert();
+                dec_stack(1);
                 error_check("unary invert failed");
                 inc_stack();
                 break;
@@ -2273,6 +2282,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 vector<bool> newStack = m_stack;
                 newStack.push_back(STACK_KIND_OBJECT);
                 m_offsetStack[oparg + curByte + sizeof(_Py_CODEUNIT)] = newStack;
+                inc_stack(6);
             }
             break;
             case POP_EXCEPT: pop_except(); break;
@@ -2461,6 +2471,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             {
                 m_comp->emit_is(oparg);
                 dec_stack(2);
+                error_check("is check failed");
                 inc_stack(1);
                 break;
             }
@@ -2480,19 +2491,26 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_load_name(PyTuple_GetItem(m_code->co_names, oparg)); // name
                 error_check("load name failed");
                 m_comp->emit_spill();
-
-                m_comp->emit_load_method();
                 inc_stack();
+                m_comp->emit_load_method();
+                dec_stack(2);
+                error_check();
+                inc_stack(2);
                 break;
             }
             case CALL_METHOD:
             {
-                auto stackInfo = get_stack_info(opcodeIndex);
-                if (stackInfo[-oparg+2].Value->kind() == AVK_None)
-                {
-                    m_comp->emit_call(oparg);
-                    dec_stack(2);
+                if (!m_comp->emit_call(oparg)) {
+                    build_tuple(oparg);
+                    m_comp->emit_call_with_tuple();
+                    dec_stack();// method
                 }
+                else {
+                    dec_stack(oparg + 2); // + method + name
+                }
+
+                error_check("call function failed");
+                inc_stack();
                 break;
             }
             case LOAD_ASSERTION_ERROR :

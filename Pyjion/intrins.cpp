@@ -270,18 +270,21 @@ PyObject* PyJit_BuildSlice(PyObject* start, PyObject* stop, PyObject* step) {
 }
 
 PyObject* PyJit_UnaryPositive(PyObject* value) {
+    assert(value != nullptr);
     auto res = PyNumber_Positive(value);
     Py_DECREF(value);
     return res;
 }
 
 PyObject* PyJit_UnaryNegative(PyObject* value) {
+    assert(value != nullptr);
     auto res = PyNumber_Negative(value);
     Py_DECREF(value);
     return res;
 }
 
 PyObject* PyJit_UnaryNot(PyObject* value) {
+    assert(value != nullptr);
     int err = PyObject_IsTrue(value);
     Py_DECREF(value);
     if (err == 0) {
@@ -296,6 +299,7 @@ PyObject* PyJit_UnaryNot(PyObject* value) {
 }
 
 int PyJit_UnaryNot_Int(PyObject* value) {
+    assert(value != nullptr);
     int err = PyObject_IsTrue(value);
     Py_DECREF(value);
     if (err < 0) {
@@ -305,6 +309,7 @@ int PyJit_UnaryNot_Int(PyObject* value) {
 }
 
 PyObject* PyJit_UnaryInvert(PyObject* value) {
+    assert(value != nullptr);
     auto res = PyNumber_Invert(value);
     Py_DECREF(value);
     return res;
@@ -2539,6 +2544,20 @@ PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec) {
 	Py_DECREF(item);
 	Py_DECREF(fmtSpec);
 	return res;
+}
+
+PyObject* PyJit_LoadMethod(PyObject* object, PyObject* name) {
+    PyObject* method = NULL;
+    int meth_found = _PyObject_GetMethod(object, name, &method);
+    // TODO : handle method not found
+
+    if (meth_found)
+        return nullptr;
+    return method;
+}
+
+PyObject* PyJit_CallMethod(PyObject* item, PyObject* item2) {
+
 }
 
 PyObject* PyJit_FormatValue(PyObject* item) {

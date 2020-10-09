@@ -291,4 +291,8 @@ int _PyJit_PeriodicWork();
 PyObject* PyJit_UnicodeJoinArray(PyObject** items, Py_ssize_t count);
 PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec);
 PyObject* PyJit_FormatValue(PyObject* item);
+
+PyObject* PyJit_LoadMethod(PyObject* object, PyObject* name);
+PyObject* PyJit_CallMethod(PyObject* item, PyObject* item2);
+
 #endif

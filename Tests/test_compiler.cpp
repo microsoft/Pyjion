@@ -166,6 +166,16 @@ TEST_CASE("Test ranges") {
         CHECK(t.returns() == "1.0");
     }
 }
+
+TEST_CASE("Test method loads and calls") {
+    SECTION("Test method call"){
+        auto t = CompilerTest(
+                "def f():\n  a = [1,2,3]\n  a.append(4)\n  return a"
+        );
+        CHECK(t.returns() == "[1, 2, 3, 4]");
+    }
+}
+
 TEST_CASE("Test general errors") {
     SECTION("test UnboundLocalError") {
         auto t = CompilerTest(
@@ -325,21 +335,21 @@ TEST_CASE("Test try") {
         CHECK(t.returns() == "42");
     }
 
-    SECTION("test4") {
+    SECTION("test raise in finally causes runtime error") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        pass\n    finally:\n        raise"
         );
-        CHECK(t.returns() == "<NULL>");
+        CHECK(t.raises() == PyExc_RuntimeError);
     }
 
-    SECTION("test5") {
+    SECTION("test raise custom exception in finally") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        pass\n    finally:\n        raise OSError"
         );
-        CHECK(t.returns() == "<NULL>");
+        CHECK(t.raises() == PyExc_OSError);
     }
 }
-TEST_CASE("X Test boxing"){
+TEST_CASE("X Test boxing") {
     SECTION("partial should be boxed because it's consumed by print after being assigned in the break loop") {
         auto t = CompilerTest(
                 "def f():\n    partial = 0\n    while 1:\n        partial = 1\n        break\n    if not partial:\n        print(partial)\n        return True\n    return False\n"
@@ -417,7 +427,9 @@ TEST_CASE("X Test boxing"){
         CHECK(t.returns() == "None");
     }
 
-        // +=, -= checks are to avoid constant folding
+}
+TEST_CASE("X Conditional returns") {
+    // +=, -= checks are to avoid constant folding
     SECTION("test") {
         auto t = CompilerTest(
                 "def f():\n    x = 0\n    x += 1\n    x -= 1\n    return x or 1"
@@ -476,7 +488,8 @@ TEST_CASE("X Test boxing"){
         );
         CHECK(t.returns() == "4611686018427387904");
     }
-
+}
+TEST_CASE("Unary tests"){
     SECTION("test") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    y = not x\n    return y"
