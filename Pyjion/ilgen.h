@@ -140,12 +140,13 @@ public:
 
     void mark_label(Label label) {
         auto info = &m_labels[label.m_index];
-        assert(info->m_location == -1);
         info->m_location = (int)m_il.size();
         for (int i = 0; i < info->m_branchOffsets.size(); i++) {
             auto from = info->m_branchOffsets[i];
             auto offset = info->m_location - (from + 4);		// relative to the end of the instruction
-
+#ifdef DEBUG
+            printf("Marking label[%d] for %x : %x\n", label.m_index, from, offset);
+#endif
             m_il[from] = offset & 0xFF;
             m_il[from + 1] = (offset >> 8) & 0xFF;
             m_il[from + 2] = (offset >> 16) & 0xFF;
