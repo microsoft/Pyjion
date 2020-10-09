@@ -172,12 +172,14 @@ TEST_CASE("Test general errors") {
                 "def f():\n  x = y\n  y = 1"
         );
         CHECK(t.raises() == PyExc_UnboundLocalError);
-    }SECTION("test reraise exception") {
+    }
+    SECTION("test reraise exception") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise TypeError('hi')\n    except Exception as e:\n         pass\n    finally:\n         pass"
         );
         CHECK(t.returns() == "None");
-    }SECTION("test generic exception") {
+    }
+    SECTION("test generic exception") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        try:\n             raise Exception('hi')\n        finally:\n             pass\n    finally:\n        pass"
         );
@@ -225,22 +227,26 @@ TEST_CASE("X Annotation tests") {
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            raise Exception()\n        finally:\n            try:\n                return 42\n            finally:\n                pass\n    return 23"
         );
         CHECK(t.returns() == "42");
-    }SECTION("Break from a nested exception handler needs to unwind all exception handlers") {
+    }
+    SECTION("Break from a nested exception handler needs to unwind all exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  break\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("Return from a nested exception handler needs to unwind all exception handlers") {
+    }
+    SECTION("Return from a nested exception handler needs to unwind all exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  return 23\n    return 42"
         );
         CHECK(t.returns() == "23");
-    }SECTION("We need to do BranchLeave to clear the stack when doing a break inside of a finally") {
+    }
+    SECTION("We need to do BranchLeave to clear the stack when doing a break inside of a finally") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            break\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test exception raise") {
+    }
+    SECTION("test exception raise") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()"
         );
@@ -253,42 +259,49 @@ TEST_CASE("Test math operations") {
                 "def f():\n    x = b'abc'*3\n    return x"
         );
         CHECK(t.returns() == "b'abcabcabc'");
-    }SECTION("test increment unbound ") {
+    }
+    SECTION("test increment unbound ") {
         auto t = CompilerTest(
                 "def f():\n    unbound += 1"
         );
-        CHECK(t.returns() == "<NULL>");
-    }SECTION("test modulus") {
+        CHECK(t.raises() == PyExc_UnboundLocalError);
+    }
+    SECTION("test modulus by zero") {
         auto t = CompilerTest(
                 "def f():\n    5 % 0"
         );
-        CHECK(t.returns() == "<NULL>");
-    }SECTION("test modulus floats") {
+        CHECK(t.raises() == PyExc_ZeroDivisionError);
+    }
+    SECTION("test modulus floats by zero") {
         auto t = CompilerTest(
                 "def f():\n    5.0 % 0.0"
         );
-        CHECK(t.returns() == "<NULL>");
-    }SECTION("test floor divide") {
+        CHECK(t.raises() == PyExc_ZeroDivisionError);
+    }
+    SECTION("test floor divide by zero") {
         auto t = CompilerTest(
                 "def f():\n    5.0 // 0.0"
         );
-        CHECK(t.returns() == "<NULL>");
-    }SECTION("test divide") {
+        CHECK(t.raises() == PyExc_ZeroDivisionError);
+    }
+    SECTION("test divide by zero") {
         auto t = CompilerTest(
                 "def f():\n    5.0 / 0.0"
         );
-        CHECK(t.returns() == "<NULL>");
-    }SECTION("test string multiply") {
+        CHECK(t.raises() == PyExc_ZeroDivisionError);
+    }
+    SECTION("test string multiply") {
         auto t = CompilerTest(
                 "def f():\n    x = 'abc'*3\n    return x"
         );
         CHECK(t.returns() == "'abcabcabc'");
-    }SECTION("test boundary ranging") {
-        auto t = CompilerTest(
-                "def f():\n    if 0.0 < 1.0 <= 1.0 == 1.0 >= 1.0 > 0.0 != 1.0:  return 42"
-        );
-        CHECK(t.returns() == "42");
     }
+//    SECTION("test boundary ranging") {
+//        auto t = CompilerTest(
+//                "def f():\n    if 0.0 < 1.0 <= 1.0 == 1.0 >= 1.0 > 0.0 != 1.0:  return 42"
+//        );
+//        CHECK(t.returns() == "42");
+//    }
 }
 TEST_CASE("Test try") {
     SECTION("test1") {

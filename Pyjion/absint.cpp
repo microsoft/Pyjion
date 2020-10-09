@@ -262,6 +262,7 @@ bool AbstractInterpreter::interpret() {
             printf("Interpreting %d - OPCODE %s (%d) stack %d\n", opcodeIndex, opcode_name(opcode), oparg, lastState.stack_size());
 #endif
         processOpCode:
+
             int curStackLen = lastState.stack_size();
             int jump = 0;
             switch (opcode) {
@@ -353,6 +354,8 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case RERAISE: {
+                    // RERAISE not implemented
+                    return false;
                     lastState.pop_no_escape();
                     lastState.pop_no_escape();
                     lastState.pop_no_escape();
@@ -497,9 +500,13 @@ bool AbstractInterpreter::interpret() {
                     break;
                 case JUMP_IF_NOT_EXC_MATCH: {
                     auto curState = lastState;
+                    lastState.pop_no_escape();
+                    lastState.pop_no_escape();
+
                     if (update_start_state(lastState, oparg)) {
                         queue.push_back(oparg);
                     }
+                    goto next;
                 }
                 break;
                 case JUMP_ABSOLUTE:
@@ -731,10 +738,17 @@ bool AbstractInterpreter::interpret() {
                     }
                     break;
                 case RAISE_VARARGS:
-                    for (int i = 0; i < oparg; i++) {
-                        lastState.pop();
+                    switch (oparg) {
+                        case 2:
+                            lastState.pop_no_escape(); /* cause */
+                            /* fall through */
+                        case 1:
+                            lastState.pop_no_escape(); /* exc */
+                            /* fall through */
+                        case 0:
+                            break;
                     }
-                    goto next;
+                    break;
                 case STORE_SUBSCR:
                     // TODO: Do we want to track types on store for lists?
                     lastState.pop();
@@ -783,14 +797,9 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case POP_BLOCK:
-                    // Restore the stack state to what we had on entry
-                    lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
-                    // Reset stack effect
-                    jump = 1;
-                    curStackLen = lastState.stack_size();
-                    // TODO  : Find out what this did, its commented out but it looks important?!
-                    //merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
-                    break;
+                    // Save the state for when break back into this block
+                    merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
+                    goto next;
                 case POP_EXCEPT:
                     break;
                 case LOAD_BUILD_CLASS:
@@ -1004,7 +1013,7 @@ bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterSt
     }
     else {
         // need to merge the stacks...
-        assert(mergeTo.stack_size() == newState.stack_size());
+        assert(mergeTo.stack_size() >= newState.stack_size());
         for (size_t i = 0; i < newState.stack_size(); i++) {
             auto newType = mergeTo[i].merge_with(newState[i]);
             if (mergeTo[i] != newType) {
