@@ -455,7 +455,6 @@ public:
     virtual void emit_debug_msg(const char* msg);
 
     virtual void emit_load_method(void* name);
-    virtual void emit_call_method();
     virtual bool emit_method_call(size_t argCnt);
 
     virtual void emit_load_assertion_error();
