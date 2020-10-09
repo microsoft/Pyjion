@@ -2491,6 +2491,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case LOAD_METHOD:
             {
+                m_comp->emit_dup_top();
                 m_comp->emit_load_method(PyTuple_GetItem(m_code->co_names, oparg));
                 inc_stack(1);
                 break;

@@ -2028,32 +2028,32 @@ error:
     return res;
 }
 
-PyObject* MethCall0(PyObject* method, PyObject *self) {
-    assert(false);
-    return nullptr;
+PyObject* MethCall0(PyObject* self, PyObject *method) {
+    PyObject* res = Call1(method, self);
+    return res;
 }
 
-PyObject* MethCall1(PyObject* method, PyObject *self, PyObject* arg0) {
-    assert(false);
-    return nullptr;
+PyObject* MethCall1(PyObject* self, PyObject *method, PyObject* arg0) {
+    PyObject* res = Call2(method, self, arg0);
+    return res;
 }
 
-PyObject* MethCall2(PyObject* method, PyObject *self, PyObject* arg0, PyObject* arg1) {
-    assert(false);
-    return nullptr;
+PyObject* MethCall2(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1) {
+    PyObject* res = Call3(method, self, arg0, arg1);
+    return res;
 }
 
-PyObject* MethCall3(PyObject* method, PyObject *self, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
-    assert(false);
-    return nullptr;
+PyObject* MethCall3(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
+    PyObject* res = Call4(method, self, arg0, arg1, arg2);
+    return res;
 }
 
-PyObject* MethCall4(PyObject* method, PyObject *self, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
+PyObject* MethCall4(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
     assert(false);
-    return nullptr;
+    return nullptr; // TODO : Implement a better approach.
 }
 
-PyObject* PyJit_KwCall1(PyObject *target, PyObject* arg0, PyObject* names) {
+PyObject* PyJit_KwCall1(PyObject* target, PyObject* arg0, PyObject* names) {
 	return nullptr;
 }
 
@@ -2576,7 +2576,7 @@ PyObject* PyJit_LoadMethod(PyObject* object, PyObject* name) {
     int meth_found = _PyObject_GetMethod(object, name, &method);
     // TODO : handle method not found
 
-    if (meth_found)
+    if (!meth_found)
         return nullptr;
     return method;
 }

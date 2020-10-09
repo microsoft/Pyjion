@@ -294,11 +294,11 @@ PyObject* PyJit_FormatValue(PyObject* item);
 
 PyObject* PyJit_LoadMethod(PyObject* object, PyObject* name);
 
-PyObject* MethCall0(PyObject* method, PyObject *self);
-PyObject* MethCall1(PyObject* method, PyObject *self, PyObject* arg0);
-PyObject* MethCall2(PyObject* method, PyObject *self, PyObject* arg0, PyObject* arg1);
-PyObject* MethCall3(PyObject* method, PyObject *self, PyObject* arg0, PyObject* arg1, PyObject* arg2);
-PyObject* MethCall4(PyObject* method, PyObject *self, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3);
+PyObject* MethCall0(PyObject* self, PyObject *method);
+PyObject* MethCall1(PyObject* self, PyObject *method, PyObject* arg0);
+PyObject* MethCall2(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1);
+PyObject* MethCall3(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1, PyObject* arg2);
+PyObject* MethCall4(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3);
 
 
 #endif

@@ -1148,7 +1148,6 @@ bool PythonCompiler::emit_compare_object_push_int(int compareType) {
 
 void PythonCompiler::emit_load_method(void* name) {
     m_il.ld_i(name);
-    load_frame();
     m_il.emit_call(METHOD_LOAD_METHOD, 2);
 }
 
