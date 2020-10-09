@@ -128,6 +128,11 @@ void PythonCompiler::emit_incref(bool maybeTagged) {
 
 }
 
+void PythonCompiler::emit_breakpoint(){
+    // Emits a breakpoint in the IL. useful for debugging
+    m_il.brk();
+}
+
 void PythonCompiler::decref() {
     m_il.emit_call(METHOD_DECREF_TOKEN, 1);
 }
@@ -621,6 +626,17 @@ bool PythonCompiler::emit_call(size_t argCnt) {
         case 2: m_il.emit_call(METHOD_CALL2_TOKEN, 3); return true;
         case 3: m_il.emit_call(METHOD_CALL3_TOKEN, 4); return true;
         case 4: m_il.emit_call(METHOD_CALL4_TOKEN, 5); return true;
+    }
+    return false;
+}
+
+bool PythonCompiler::emit_method_call(size_t argCnt) {
+    switch (argCnt) {
+        case 0: m_il.emit_call(METHOD_METHCALL0_TOKEN, 2); return true;
+        case 1: m_il.emit_call(METHOD_METHCALL1_TOKEN, 3); return true;
+        case 2: m_il.emit_call(METHOD_METHCALL2_TOKEN, 4); return true;
+        case 3: m_il.emit_call(METHOD_METHCALL3_TOKEN, 5); return true;
+        case 4: m_il.emit_call(METHOD_METHCALL4_TOKEN, 6); return true;
     }
     return false;
 }
@@ -1130,7 +1146,9 @@ bool PythonCompiler::emit_compare_object_push_int(int compareType) {
     return false;
 }
 
-void PythonCompiler::emit_load_method() {
+void PythonCompiler::emit_load_method(void* name) {
+    m_il.ld_i(name);
+    load_frame();
     m_il.emit_call(METHOD_LOAD_METHOD, 2);
 }
 
@@ -1386,5 +1404,12 @@ GLOBAL_METHOD(METHOD_FORMAT_OBJECT, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT,
 
 GLOBAL_METHOD(METHOD_CALL_METHOD, &PyJit_CallMethod, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_LOAD_METHOD, &PyJit_LoadMethod, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
+GLOBAL_METHOD(METHOD_METHCALL0_TOKEN, &MethCall0, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL1_TOKEN, &MethCall1, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL2_TOKEN, &MethCall2, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL3_TOKEN, &MethCall3, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL4_TOKEN, &MethCall4, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+
 
 GLOBAL_METHOD(METHOD_LOAD_ASSERTION_ERROR, &PyJit_LoadAssertionError, CORINFO_TYPE_NATIVEINT);

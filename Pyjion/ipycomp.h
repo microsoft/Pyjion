@@ -293,6 +293,10 @@ public:
     // and emit_call_with_tuple is used to call with a variable sized
     // tuple instead.
     virtual bool emit_call(size_t argCnt) = 0;
+
+    // Emits a call for the specified argument count.
+    virtual bool emit_method_call(size_t argCnt) = 0;
+
     // Emits a call with the arguments to be invoked in a tuple object
     virtual void emit_call_with_tuple() = 0;
 
@@ -408,10 +412,13 @@ public:
     virtual void emit_debug_msg(const char* msg) = 0;
 
     // Python 3.7 method calls
-    virtual void emit_load_method() = 0;
+    virtual void emit_load_method(void* name) = 0;
     virtual void emit_call_method() = 0;
 
     virtual void emit_load_assertion_error() = 0;
+
+    virtual void emit_breakpoint() = 0;
+
 
     /* Compiles the generated code */
     virtual JittedCode* emit_compile() = 0;

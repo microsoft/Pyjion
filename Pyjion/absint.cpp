@@ -1846,6 +1846,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
         }
 
         int curStackSize = m_stack.size();
+
+        m_comp->emit_breakpoint();
+
         switch (byte) {
             case NOP: break;
             case ROT_TWO: 
@@ -2488,28 +2491,22 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case LOAD_METHOD:
             {
-                m_comp->emit_load_name(PyTuple_GetItem(m_code->co_names, oparg)); // name
-                error_check("load name failed");
-                m_comp->emit_spill();
-                inc_stack();
-                m_comp->emit_load_method();
-                dec_stack(2);
-                error_check();
-                inc_stack(2);
+                m_comp->emit_load_method(PyTuple_GetItem(m_code->co_names, oparg));
+                inc_stack(1);
                 break;
             }
             case CALL_METHOD:
             {
-                if (!m_comp->emit_call(oparg)) {
+                if (!m_comp->emit_method_call(oparg)) {
                     build_tuple(oparg);
                     m_comp->emit_call_with_tuple();
-                    dec_stack();// method
+                    dec_stack(2);// method
                 }
                 else {
                     dec_stack(oparg + 2); // + method + name
                 }
 
-                error_check("call function failed");
+                //error_check("call method failed");
                 inc_stack();
                 break;
             }

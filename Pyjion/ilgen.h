@@ -159,6 +159,11 @@ public:
         push_back((BYTE)CEE_LOCALLOC); // PopI + PushI
     }
 
+    void brk(){
+        // emit a breakpoint in the IL
+        push_back(CEE_BREAK);
+    }
+
     void ret(int size) {
         push_back(CEE_RET); DEC_CEE_STACK(size); // VarPop (size)
     }

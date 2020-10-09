@@ -176,6 +176,12 @@
 #define METHOD_CALL8_TOKEN        0x00010008
 #define METHOD_CALL9_TOKEN        0x00010009
 
+#define METHOD_METHCALL0_TOKEN        0x00011000
+#define METHOD_METHCALL1_TOKEN        0x00011001
+#define METHOD_METHCALL2_TOKEN        0x00011002
+#define METHOD_METHCALL3_TOKEN        0x00011003
+#define METHOD_METHCALL4_TOKEN        0x00011004
+
 #define METHOD_CALL_ARGS            0x0001000A
 #define METHOD_CALL_KWARGS          0x0001000B
 #define METHOD_PYUNICODE_JOINARRAY  0x0002000C
@@ -449,12 +455,15 @@ public:
 
     virtual void emit_debug_msg(const char* msg);
 
-    virtual void emit_load_method();
+    virtual void emit_load_method(void* name);
     virtual void emit_call_method();
+    virtual bool emit_method_call(size_t argCnt);
 
     virtual void emit_load_assertion_error();
 
     virtual void emit_periodic_work();
+
+    virtual void emit_breakpoint();
 
     virtual JittedCode* emit_compile();
 

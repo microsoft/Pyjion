@@ -2028,6 +2028,31 @@ error:
     return res;
 }
 
+PyObject* MethCall0(PyObject* method, PyObject *self) {
+    assert(false);
+    return nullptr;
+}
+
+PyObject* MethCall1(PyObject* method, PyObject *self, PyObject* arg0) {
+    assert(false);
+    return nullptr;
+}
+
+PyObject* MethCall2(PyObject* method, PyObject *self, PyObject* arg0, PyObject* arg1) {
+    assert(false);
+    return nullptr;
+}
+
+PyObject* MethCall3(PyObject* method, PyObject *self, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
+    assert(false);
+    return nullptr;
+}
+
+PyObject* MethCall4(PyObject* method, PyObject *self, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
+    assert(false);
+    return nullptr;
+}
+
 PyObject* PyJit_KwCall1(PyObject *target, PyObject* arg0, PyObject* names) {
 	return nullptr;
 }
