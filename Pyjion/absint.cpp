@@ -2467,11 +2467,13 @@ JittedCode* AbstractInterpreter::compile_worker() {
             {
                 if (!m_comp->emit_method_call(oparg)) {
                     // TODO : emit method call with >4 args
+                    printf("can't handle large method calls now\n");
+                    assert(false);
                 }
                 else {
                     dec_stack(oparg + 2); // + method + name + nargs
                 }
-
+                error_check("failed to call method");
                 inc_stack(); //result
                 break;
             }

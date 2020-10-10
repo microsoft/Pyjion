@@ -2029,22 +2029,38 @@ error:
 }
 
 PyObject* MethCall0(PyObject* self, PyObject *method) {
-    PyObject* res = Call1(method, self);
+    PyObject* res;
+    if (method != nullptr)
+        res = Call1(method, self);
+    else
+        res = Call0(self);
     return res;
 }
 
 PyObject* MethCall1(PyObject* self, PyObject *method, PyObject* arg0) {
-    PyObject* res = Call2(method, self, arg0);
+    PyObject* res;
+    if (method != nullptr)
+        res = Call2(method, self, arg0);
+    else
+        res = Call1(self, arg0);
     return res;
 }
 
 PyObject* MethCall2(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1) {
-    PyObject* res = Call3(method, self, arg0, arg1);
+    PyObject* res;
+    if (method != nullptr)
+        res = Call3(method, self, arg0, arg1);
+    else
+        res = Call2(self, arg0, arg1);
     return res;
 }
 
 PyObject* MethCall3(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
-    PyObject* res = Call4(method, self, arg0, arg1, arg2);
+    PyObject* res;
+    if (method != nullptr)
+        res = Call4(method, self, arg0, arg1, arg2);
+    else
+        res = Call3(self, arg0, arg1, arg2);
     return res;
 }
 
@@ -2572,11 +2588,10 @@ PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec) {
 }
 
 PyObject* PyJit_LoadMethod(PyObject* object, PyObject* name) {
-    PyObject* method = NULL;
+    PyObject* method = nullptr;
     int meth_found = _PyObject_GetMethod(object, name, &method);
-    // TODO : handle method not found
-
     if (!meth_found)
+        Py_DECREF(object);
         return nullptr;
     return method;
 }
