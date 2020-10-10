@@ -143,13 +143,13 @@ public:
             vprintf(fmt, args);
 #endif
         }
-        return TRUE;
+        //return TRUE;
         // Change to FALSE if you want crazy-verbose logging from the JIT
-        // return FALSE;
+        return FALSE;
     }
 
     int doAssert(const char* szFile, int iLine, const char* szExpr) override {
-        printf(".NET failed assertion: %s %d", szFile, iLine);
+        printf(".NET failed assertion: %s %d\n", szFile, iLine);
         // TODO : Use native warnings when it doesn't cause a recursive error.
         // PyErr_WarnFormat(PyExc_RuntimeWarning, 1, ".NET failed assertion: %s %d", szFile, iLine);
         return 0;

@@ -37,6 +37,8 @@
  *  Implemented (need unit tests)
  *  - Test LOAD_ASSERTION_ERROR
  *  - Implement SETUP_ANNOTATIONS
+ *  - Test LOAD_METHOD (Done)
+ *  - Test CALL_METHOD (done)
  *  - Test IS_OP (DONE)
  *  - Test DICT_UPDATE (DONE)
  *  - Test CONTAINS_OP (DONE)
@@ -202,13 +204,13 @@ bool AbstractInterpreter::preprocess() {
 
 void AbstractInterpreter::set_local_type(int index, AbstractValueKind kind) {
     auto& lastState = m_startStates[0];
-    if (kind == AVK_Integer || kind == AVK_Float) {
-        // Replace our starting state with a local which has a known source
-        // so that we know it's boxed...
-        auto localInfo = AbstractLocalInfo(to_abstract(kind));
-        localInfo.ValueInfo.Sources = new_source(new LocalSource());
-        lastState.replace_local(index, localInfo);
-    }
+//    if (kind == AVK_Integer || kind == AVK_Float) {
+//        // Replace our starting state with a local which has a known source
+//        // so that we know it's boxed...
+//        auto localInfo = AbstractLocalInfo(to_abstract(kind));
+//        localInfo.ValueInfo.Sources = new_source(new LocalSource());
+//        lastState.replace_local(index, localInfo);
+//    }
 }
 
 void AbstractInterpreter::init_starting_state() {
@@ -341,7 +343,7 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case POP_TOP:
-                    lastState.pop_no_escape();
+                    lastState.pop();
                     break;
                 case DUP_TOP:
                     lastState.push(lastState[lastState.stack_size() - 1]);
@@ -356,9 +358,9 @@ bool AbstractInterpreter::interpret() {
                 case RERAISE: {
                     // RERAISE not implemented
                     return false;
-                    lastState.pop_no_escape();
-                    lastState.pop_no_escape();
-                    lastState.pop_no_escape();
+                    lastState.pop();
+                    lastState.pop();
+                    lastState.pop();
                     break;
                 }
                 case LOAD_CONST: {
@@ -382,12 +384,6 @@ bool AbstractInterpreter::interpret() {
                 case STORE_FAST: {
                     auto valueInfo = lastState.pop_no_escape();
                     m_opcodeSources[opcodeIndex] = valueInfo.Sources;
-                    // STORE_FAST doesn't necessarily give us an assigned value because we
-                    // could be assigning an unassigned value.  e.g:
-                    // def f():
-                    //     x = y
-                    //     y = 1
-
                     lastState.replace_local(oparg, AbstractLocalInfo(valueInfo, valueInfo.Value == &Undefined));
                 }
                     break;
@@ -424,18 +420,9 @@ bool AbstractInterpreter::interpret() {
                 case INPLACE_AND:
                 case INPLACE_XOR:
                 case INPLACE_OR: {
-                    auto two = lastState.pop_no_escape();
-                    auto one = lastState.pop_no_escape();
-                    auto binaryRes = one.Value->binary(one.Sources, opcode, two);
-
-                    // create an intermediate source which will propagate changes up...
-                    auto sources = add_intermediate_source(opcodeIndex);
-                    AbstractSource::combine(
-                            AbstractSource::combine(one.Sources, two.Sources),
-                            sources
-                    );
-                    auto value = AbstractValueWithSources(binaryRes, sources);
-                    lastState.push(value);
+                    auto two = lastState.pop();
+                    auto one = lastState.pop();
+                    lastState.push(&Any);
                 }
                     break;
                 case POP_JUMP_IF_FALSE: {
@@ -500,8 +487,8 @@ bool AbstractInterpreter::interpret() {
                     break;
                 case JUMP_IF_NOT_EXC_MATCH: {
                     auto curState = lastState;
-                    lastState.pop_no_escape();
-                    lastState.pop_no_escape();
+                    lastState.pop();
+                    lastState.pop();
 
                     if (update_start_state(lastState, oparg)) {
                         queue.push_back(oparg);
@@ -595,8 +582,8 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Dict);
                     break;
                 case COMPARE_OP: {
-                    lastState.pop_no_escape();
-                    lastState.pop_no_escape();
+                    lastState.pop();
+                    lastState.pop();
                     lastState.push(&Any);
                 }
                     break;
@@ -699,25 +686,8 @@ bool AbstractInterpreter::interpret() {
                 case UNARY_NEGATIVE:
                 case UNARY_INVERT:
                 case UNARY_NOT: {
-                    auto one = lastState.pop_no_escape();
-
-                    auto unaryRes = one.Value->unary(one.Sources, opcode);
-
-                    auto sources = add_intermediate_source(opcodeIndex);
-                    AbstractSource::combine(
-                            one.Sources,
-                            sources
-                    );
-
-                    // TODO: The code generator currently assumes it is *always* dealing
-                    // with an object (i.e. not an unboxed value).  Support should be
-                    // added to the code generator for dealing with unboxed values.  The
-                    // code below that forces an escape should then be removed.
-                    if (opcode == UNARY_INVERT)
-                        one.escapes();
-
-                    auto value = AbstractValueWithSources(unaryRes, sources);
-                    lastState.push(value);
+                    lastState.pop();
+                    lastState.push(&Any);
                     break;
                 }
                 case UNPACK_EX:
@@ -802,9 +772,9 @@ bool AbstractInterpreter::interpret() {
                     goto next;
                 case POP_EXCEPT:
                     // pop traceback values
-                    lastState.pop_no_escape();
-                    lastState.pop_no_escape();
-                    lastState.pop_no_escape();
+                    lastState.pop();
+                    lastState.pop();
+                    lastState.pop();
                     break;
                 case LOAD_BUILD_CLASS:
                     // TODO: if we know this is __builtins__.__build_class__ we can push a special value
@@ -812,7 +782,7 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Any);
                     break;
                 case SET_ADD:
-                    lastState.pop_no_escape();
+                    lastState.pop();
                     break;
                 case LIST_APPEND:
                     // pop the value being stored off, leave list on stack
@@ -920,9 +890,9 @@ bool AbstractInterpreter::interpret() {
                        return value.
                     */
                     return false; // not implemented
-                    auto top = lastState.pop_no_escape(); // exc
-                    auto second = lastState.pop_no_escape(); // val
-                    auto third = lastState.pop_no_escape(); // tb
+                    auto top = lastState.pop(); // exc
+                    auto second = lastState.pop(); // val
+                    auto third = lastState.pop(); // tb
                     auto seventh = lastState[lastState.stack_size() - 7]; // exit_func
                     // TODO : Vectorcall (exit_func, stack+1, 3, ..)
                     assert(false);
@@ -939,22 +909,22 @@ bool AbstractInterpreter::interpret() {
                 case DICT_UPDATE:
                 {
                     // Calls dict.update(TOS1[-i], TOS). Used to build dicts.
-                    lastState.pop_no_escape(); // value
+                    lastState.pop(); // value
                     break;
                 }
                 case SET_UPDATE:
                 {
-                    lastState.pop_no_escape(); // value
+                    lastState.pop(); // value
                     break;
                 }
                 case PRINT_EXPR:
                 {
-                    lastState.pop_no_escape(); // value
+                    lastState.pop(); // value
                     break;
                 }
                 case LIST_TO_TUPLE:
                 {
-                    lastState.pop_no_escape(); // list
+                    lastState.pop(); // list
                     lastState.push(&Tuple); // tuple
                     break;
                 }
@@ -2099,13 +2069,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case INPLACE_AND:
             case INPLACE_XOR:
             case INPLACE_OR:
-                dec_stack(2);
-
                 m_comp->emit_binary_object(byte);
-
+                dec_stack(2);
                 error_check("binary op failed");
                 inc_stack();
-
                 break;
             case RETURN_VALUE: return_value(opcodeIndex); break;
             case EXTENDED_ARG:
@@ -2491,7 +2458,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case LOAD_METHOD:
             {
-                m_comp->emit_dup_top();
+                m_comp->emit_dup_top(); // dup self as needs to remain on stack
                 m_comp->emit_load_method(PyTuple_GetItem(m_code->co_names, oparg));
                 inc_stack(1);
                 break;
@@ -2499,16 +2466,13 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case CALL_METHOD:
             {
                 if (!m_comp->emit_method_call(oparg)) {
-                    build_tuple(oparg);
-                    m_comp->emit_call_with_tuple();
-                    dec_stack(2);// method
+                    // TODO : emit method call with >4 args
                 }
                 else {
-                    dec_stack(oparg + 2); // + method + name
+                    dec_stack(oparg + 2); // + method + name + nargs
                 }
 
-                //error_check("call method failed");
-                inc_stack();
+                inc_stack(); //result
                 break;
             }
             case LOAD_ASSERTION_ERROR :
@@ -3222,13 +3186,13 @@ ExceptionHandler& AbstractInterpreter::get_ehblock() {
 void AbstractInterpreter::mark_offset_label(int index) {
     auto existingLabel = m_offsetLabels.find(index);
     if (existingLabel != m_offsetLabels.end()) {
-#ifdef DEBUG
+#ifdef DUMP_TRACES
         printf("Label for %d exists, marking label %d\n", index, existingLabel->second.m_index);
 #endif
         m_comp->emit_mark_label(existingLabel->second);
     }
     else {
-#ifdef DEBUG
+#ifdef DUMP_TRACES
         printf("Label for %d doesnt exist, defining new\n", index);
 #endif
         auto label = m_comp->emit_define_label();

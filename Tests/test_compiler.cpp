@@ -489,893 +489,905 @@ TEST_CASE("X Conditional returns") {
         CHECK(t.returns() == "4611686018427387904");
     }
 }
-TEST_CASE("Unary tests"){
-    SECTION("test") {
+TEST_CASE("Unary tests") {
+    SECTION("most basic unary not") {
+        auto t = CompilerTest(
+                "def f():\n  x=True\n  return not x\n"
+        );
+        CHECK(t.returns() == "False");
+    }SECTION("in place add") {
+        auto t = CompilerTest(
+                "def f():\n  x=1\n  x+=1\n  return x"
+        );
+        CHECK(t.returns() == "2");
+    }SECTION("test1") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    y = not x\n    return y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test2") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    if x:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test3") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    x -= 4611686018427387903\n    if x:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
     }
 
-    SECTION("test") {
+    SECTION("test4") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    if not x:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test5") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    x -= 4611686018427387903\n    if not x:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
     }
 
-    SECTION("test") {
+    SECTION("test6") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    x -= 4611686018427387903\n    y = not x\n    return y"
         );
         CHECK(t.returns() == "True");
     }
 
-    SECTION("test") {
+    SECTION("test7") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x == y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test8") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x <= y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test9") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x >= y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test10") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x != y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test11") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x < y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test12") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    if x > y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test13") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    if x < y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test14") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    if x > y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test15") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    if x < y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test16") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    if x > y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
     }
 
-    SECTION("test") {
+    SECTION("test17") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x == y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test18") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    return x == y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test19") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    y -= 1\n    return x == y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test20") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    return x == y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test21") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    return x == y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test22") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 1\n    return x == y"
         );
         CHECK(t.returns() == "True");
     }
 
-    SECTION("test") {
+    SECTION("test23") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x != y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test24") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    return x != y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test25") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    y -= 1\n    return x != y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test26") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    return x != y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test27") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    return x != y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test28") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 1\n    return x != y"
         );
         CHECK(t.returns() == "False");
     }
 
-    SECTION("test") {
+    SECTION("test29") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x >= y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test30") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    return x >= y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test31") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    y -= 1\n    return x >= y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test32") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 1\n    return x >= y"
         );
         CHECK(t.returns() == "True");
     }
 
-    SECTION("test") {
+    SECTION("test33") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x <= y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test34") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    x -= 1\n    return x <= y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test35") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    y -= 1\n    return x <= y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test36") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 1\n    return x <= y"
         );
         CHECK(t.returns() == "True");
     }
 
-    SECTION("test") {
+    SECTION("test37") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x > y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test38") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775808\n    y = 9223372036854775807\n    return x > y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test39") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775808\n    return x > y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test40") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    return x > y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test41") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    return x > y"
         );
         CHECK(t.returns() == "False");
     }
 
-    SECTION("test") {
+    SECTION("test42") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x < y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test43") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775808\n    y = 9223372036854775807\n    return x < y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test44") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775808\n    return x < y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test45") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    x += 1\n    return x < y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test46") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 4611686018427387903\n    y += 1\n    return x < y"
         );
         CHECK(t.returns() == "True");
     }
 
-    SECTION("test") {
+    SECTION("test47") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 1\n    return x == y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test48") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 9223372036854775807\n    return x % y"
         );
         CHECK(t.returns() == "1");
     }
 
-    SECTION("test") {
+    SECTION("test49") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 2\n    return x / y"
         );
         CHECK(t.returns() == "0.5");
-    }SECTION("test") {
+    }SECTION("test50") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 4611686018427387903\n    return x / y"
         );
         CHECK(t.returns() == "2.168404344971009e-19");
-    }SECTION("test") {
+    }SECTION("test51") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 9223372036854775807\n    return x / y"
         );
         CHECK(t.returns() == "1.0842021724855044e-19");
-    }SECTION("test") {
+    }SECTION("test52") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 1\n    return x / y"
         );
         CHECK(t.returns() == "4.611686018427388e+18");
-    }SECTION("test") {
+    }SECTION("test53") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 1\n    return x / y"
         );
         CHECK(t.returns() == "9.223372036854776e+18");
-    }SECTION("test") {
+    }SECTION("test54") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x / y"
         );
         CHECK(t.returns() == "1.0");
     }
 
-    SECTION("test") {
+    SECTION("test55") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 2\n    return x >> y"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test56") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 4611686018427387903\n    return x >> y"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test57") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 9223372036854775807\n    return x >> y"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test58") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 1\n    return x >> y"
         );
         CHECK(t.returns() == "2305843009213693951");
-    }SECTION("test") {
+    }SECTION("test59") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 1\n    return x >> y"
         );
         CHECK(t.returns() == "4611686018427387903");
-    }SECTION("test") {
+    }SECTION("test60") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x >> y"
         );
         CHECK(t.returns() == "0");
     }
 
-    SECTION("test") {
+    SECTION("test61") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 2\n    return x << y"
         );
         CHECK(t.returns() == "4");
-    }SECTION("test") {
+    }SECTION("test62") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 32\n    return x << y"
         );
         CHECK(t.returns() == "4294967296");
-    }SECTION("test") {
+    }SECTION("test63") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 62\n    return x << y"
         );
         CHECK(t.returns() == "4611686018427387904");
-    }SECTION("test") {
+    }SECTION("test64") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 63\n    return x << y"
         );
         CHECK(t.returns() == "9223372036854775808");
-    }SECTION("test") {
+    }SECTION("test65") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 64\n    return x << y"
         );
         CHECK(t.returns() == "18446744073709551616");
-    }SECTION("test") {
+    }SECTION("test66") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 1\n    return x << y"
         );
         CHECK(t.returns() == "9223372036854775806");
-    }SECTION("test") {
+    }SECTION("test67") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 1\n    return x << y"
         );
         CHECK(t.returns() == "18446744073709551614");
-    }SECTION("test") {
+    }SECTION("test68") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x << y"
         );
         CHECK(t.returns() == "<NULL>");
     }
 
-    SECTION("test") {
+    SECTION("test69") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 2\n    return x ** y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test70") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 32\n    return x ** y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test71") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 4611686018427387903\n    return x ** y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test72") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 9223372036854775807\n    return x ** y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test73") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 1\n    return x ** y"
         );
         CHECK(t.returns() == "4611686018427387903");
-    }SECTION("test") {
+    }SECTION("test74") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 1\n    return x ** y"
         );
         CHECK(t.returns() == "9223372036854775807");
     }
 
-    SECTION("test") {
+    SECTION("test75") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 2\n    return x // y"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test76") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 4611686018427387903\n    return x // y"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test77") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 9223372036854775807\n    return x // y"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test78") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 1\n    return x // y"
         );
         CHECK(t.returns() == "4611686018427387903");
-    }SECTION("test") {
+    }SECTION("test79") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 4611686018427387903\n    return x // y"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test80") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = -4611686018427387903\n    return x // y"
         );
         CHECK(t.returns() == "-3");
-    }SECTION("test") {
+    }SECTION("test81") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 1\n    return x // y"
         );
         CHECK(t.returns() == "9223372036854775807");
-    }SECTION("test") {
+    }SECTION("test82") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = -1\n    return x // y"
         );
         CHECK(t.returns() == "-9223372036854775807");
-    }SECTION("test") {
+    }SECTION("test83") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x // y"
         );
         CHECK(t.returns() == "1");
     }
 
-    SECTION("test") {
+    SECTION("test84") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 2\n    return x % y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test85") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 4611686018427387903\n    return x % y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test86") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 1\n    return x % y"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test87") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 4611686018427387903\n    return x % y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test88") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = -4611686018427387903\n    return x % y"
         );
         CHECK(t.returns() == "-4611686018427387902");
-    }SECTION("test") {
+    }SECTION("test89") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 1\n    return x % y"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test90") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = -1\n    return x % y"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test91") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x % y"
         );
         CHECK(t.returns() == "0");
     }
 
-    SECTION("test") {
+    SECTION("test92") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 2\n    return x | y"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test") {
+    }SECTION("test93") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 4611686018427387903\n    return x | y"
         );
         CHECK(t.returns() == "4611686018427387903");
-    }SECTION("test") {
+    }SECTION("test94") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 9223372036854775807\n    return x | y"
         );
         CHECK(t.returns() == "9223372036854775807");
-    }SECTION("test") {
+    }SECTION("test95") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 1\n    return x | y"
         );
         CHECK(t.returns() == "4611686018427387903");
-    }SECTION("test") {
+    }SECTION("test96") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 1\n    return x | y"
         );
         CHECK(t.returns() == "9223372036854775807");
-    }SECTION("test") {
+    }SECTION("test97") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x | y"
         );
         CHECK(t.returns() == "9223372036854775807");
-    }SECTION("test") {
+    }SECTION("test98") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 2\n    return x & y"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test99") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 3\n    return x & y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test100") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 4611686018427387903\n    return x & y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test101") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 9223372036854775807\n    return x & y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test102") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 1\n    return x & y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test103") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 1\n    return x & y"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test104") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x & y"
         );
         CHECK(t.returns() == "9223372036854775807");
     }
 
-    SECTION("test") {
+    SECTION("test105") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 2\n    return x ^ y"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test") {
+    }SECTION("test106") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 3\n    return x ^ y"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test107") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 4611686018427387903\n    return x ^ y"
         );
         CHECK(t.returns() == "4611686018427387902");
-    }SECTION("test") {
+    }SECTION("test108") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 9223372036854775807\n    return x ^ y"
         );
         CHECK(t.returns() == "9223372036854775806");
-    }SECTION("test") {
+    }SECTION("test109") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 1\n    return x ^ y"
         );
         CHECK(t.returns() == "4611686018427387902");
-    }SECTION("test") {
+    }SECTION("test110") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 1\n    return x ^ y"
         );
         CHECK(t.returns() == "9223372036854775806");
-    }SECTION("test") {
+    }SECTION("test111") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x ^ y"
         );
         CHECK(t.returns() == "0");
     }
 
-    SECTION("test") {
+    SECTION("test112") {
         auto t = CompilerTest(
                 "def f():\n    x = -9223372036854775808\n    y = 1\n    return x - y"
         );
         CHECK(t.returns() == "-9223372036854775809");
-    }SECTION("test") {
+    }SECTION("test113") {
         auto t = CompilerTest(
                 "def f():\n    x = -1\n    y = 4611686018427387904\n    return x - y"
         );
         CHECK(t.returns() == "-4611686018427387905");
-    }SECTION("test") {
+    }SECTION("test114") {
         auto t = CompilerTest(
                 "def f():\n    x = -1\n    y = 9223372036854775808\n    return x - y"
         );
         CHECK(t.returns() == "-9223372036854775809");
-    }SECTION("test") {
+    }SECTION("test115") {
         auto t = CompilerTest(
                 "def f():\n    x =  -4611686018427387904\n    y = 1\n    return x - y"
         );
         CHECK(t.returns() == "-4611686018427387905");
     }
 
-    SECTION("test") {
+    SECTION("test116") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 4611686018427387903\n    return x + y"
         );
         CHECK(t.returns() == "4611686018427387904");
-    }SECTION("test") {
+    }SECTION("test117") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 9223372036854775807\n    return x + y"
         );
         CHECK(t.returns() == "9223372036854775808");
-    }SECTION("test") {
+    }SECTION("test118") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 1\n    return x + y"
         );
         CHECK(t.returns() == "4611686018427387904");
-    }SECTION("test") {
+    }SECTION("test119") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 1\n    return x + y"
         );
         CHECK(t.returns() == "9223372036854775808");
-    }SECTION("test") {
+    }SECTION("test120") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x + y"
         );
         CHECK(t.returns() == "18446744073709551614");
     }
 
-    SECTION("test") {
+    SECTION("test121") {
         auto t = CompilerTest(
                 "def f():\n    x = 2\n    y = 4611686018427387903\n    return x * y"
         );
         CHECK(t.returns() == "9223372036854775806");
-    }SECTION("test") {
+    }SECTION("test122") {
         auto t = CompilerTest(
                 "def f():\n    x = 2\n    y = 9223372036854775807\n    return x * y"
         );
         CHECK(t.returns() == "18446744073709551614");
-    }SECTION("test") {
+    }SECTION("test123") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    y = 2\n    return x * y"
         );
         CHECK(t.returns() == "9223372036854775806");
-    }SECTION("test") {
+    }SECTION("test124") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 2\n    return x * y"
         );
         CHECK(t.returns() == "18446744073709551614");
-    }SECTION("test") {
+    }SECTION("test125") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x * y"
         );
         CHECK(t.returns() == "85070591730234615847396907784232501249");
-    }SECTION("test") {
+    }SECTION("test126") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        min(1,2)\n    finally:\n        try:\n            min(1,2)\n        except EnvironmentError:\n            pass\n    return 1"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test127") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        min(1,2)\n    finally:\n        try:\n            min(1,2)\n        finally:\n            pass\n    return 1"
         );
         CHECK(t.returns() == "1");
     }
+}
+TEST_CASE("optimized cases") {
         // Simple optimized code test cases...
     SECTION("test") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = +x\n    return y"
         );
         CHECK(t.returns() == "1.0");
-    }SECTION("test") {
+    }SECTION("test2") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    if not x:\n        return 1\n    return 2"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test3") {
         auto t = CompilerTest(
                 "def f():\n    x = 0.0\n    if not x:\n        return 1\n    return 2"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test4") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = -x\n    return y"
         );
         CHECK(t.returns() == "-1.0");
-    }SECTION("test") {
+    }SECTION("test5") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = not x\n    return y"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test6") {
         auto t = CompilerTest(
                 "def f():\n    x = 0.0\n    y = not x\n    return y"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test7") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    return x"
         );
         CHECK(t.returns() == "1.0");
-    }SECTION("test") {
+    }SECTION("test8") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    z = x + y\n    return z"
         );
         CHECK(t.returns() == "3.0");
-    }SECTION("test") {
+    }SECTION("test9") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    z = x - y\n    return z"
         );
         CHECK(t.returns() == "-1.0");
-    }SECTION("test") {
+    }SECTION("test10") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    z = x / y\n    return z"
         );
         CHECK(t.returns() == "0.5");
-    }SECTION("test") {
+    }SECTION("test11") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    z = x // y\n    return z"
         );
         CHECK(t.returns() == "0.0");
-    }SECTION("test") {
+    }SECTION("test12") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    z = x % y\n    return z"
         );
         CHECK(t.returns() == "1.0");
-    }SECTION("test") {
+    }SECTION("test13") {
         auto t = CompilerTest(
                 "def f():\n    x = 2.0\n    y = 3.0\n    z = x * y\n    return z"
         );
         CHECK(t.returns() == "6.0");
-    }SECTION("test") {
+    }SECTION("test14") {
         auto t = CompilerTest(
                 "def f():\n    x = 2.0\n    y = 3.0\n    z = x ** y\n    return z"
         );
         CHECK(t.returns() == "8.0");
-    }SECTION("test") {
+    }SECTION("test15") {
         auto t = CompilerTest(
                 "def f():\n    x = 2.0\n    y = 3.0\n    if x == y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test16") {
         auto t = CompilerTest(
                 "def f():\n    x = 3.0\n    y = 3.0\n    if x == y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test17") {
         auto t = CompilerTest(
                 "def f():\n    x = 'a'\n    y = 'b'\n    if x == y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test18") {
         auto t = CompilerTest(
                 "def f():\n    x = 'a'\n    y = 'a'\n    if x == y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test19") {
         auto t = CompilerTest(
                 "def f():\n    class Foo(str): pass\n    x = Foo(1)\n    y = Foo(2)\n    if x == y:        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test20") {
         auto t = CompilerTest(
                 "def f():\n    class Foo(str): pass\n    x = Foo(1)\n    y = Foo(1)\n    if x == y:        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test21") {
         auto t = CompilerTest(
                 "def f():\n    x = 2.0\n    y = 3.0\n    if x != y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test22") {
         auto t = CompilerTest(
                 "def f():\n    x = 3.0\n    y = 3.0\n    if x != y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test23") {
         auto t = CompilerTest(
                 "def f():\n    x = 2.0\n    y = 3.0\n    if x >= y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test24") {
         auto t = CompilerTest(
                 "def f():\n    x = 3.0\n    y = 3.0\n    if x >= y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test25") {
         auto t = CompilerTest(
                 "def f():\n    x = 2.0\n    y = 3.0\n    if x > y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test26") {
         auto t = CompilerTest(
                 "def f():\n    x = 4.0\n    y = 3.0\n    if x > y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test27") {
         auto t = CompilerTest(
                 "def f():\n    x = 3.0\n    y = 2.0\n    if x <= y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test28") {
         auto t = CompilerTest(
                 "def f():\n    x = 3.0\n    y = 3.0\n    if x <= y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test29") {
         auto t = CompilerTest(
                 "def f():\n    x = 3.0\n    y = 2.0\n    if x < y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "False");
-    }SECTION("test") {
+    }SECTION("test30") {
         auto t = CompilerTest(
                 "def f():\n    x = 3.0\n    y = 4.0\n    if x < y:\n        return True\n    return False"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test31") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    x += y\n    return x"
         );
         CHECK(t.returns() == "3.0");
-    }SECTION("test") {
+    }SECTION("test32") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    x -= y\n    return x"
         );
         CHECK(t.returns() == "-1.0");
-    }SECTION("test") {
+    }SECTION("test33") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    x /= y\n    return x"
         );
         CHECK(t.returns() == "0.5");
-    }SECTION("test") {
+    }SECTION("test34") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    x //= y\n    return x"
         );
         CHECK(t.returns() == "0.0");
-    }SECTION("test") {
+    }SECTION("test35") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    x %= y\n    return x"
         );
         CHECK(t.returns() == "1.0");
-    }SECTION("test") {
+    }SECTION("test36") {
         auto t = CompilerTest(
                 "def f():\n    x = 2.0\n    y = 3.0\n    x *= y\n    return x"
         );
         CHECK(t.returns() == "6.0");
-    }SECTION("test") {
+    }SECTION("test37") {
         auto t = CompilerTest(
                 "def f():\n    x = 2.0\n    y = 3.0\n    x **= y\n    return x"
         );
         CHECK(t.returns() == "8.0");
     }
         // fully optimized complex code
-    SECTION("test") {
+    SECTION("test38") {
         auto t = CompilerTest(
                 "def f():\n    pi = 0.\n    k = 0.\n    while k < 256.:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi"
         );
         CHECK(t.returns() == "3.141592653589793");
     }
         // division error handling code gen with value on the stack
-    SECTION("test") {
+    SECTION("test39") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = 2.0\n    z = 3.0\n    return x + y / z"
         );
         CHECK(t.returns() == "1.6666666666666665");
     }
         // division by zero error case
-    SECTION("test") {
+    SECTION("test40") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 0\n    try:\n        return x / y\n    except:\n        return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }SECTION("test41") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    y = 0\n    try:\n        return x // y\n    except:\n        return 42"
         );
@@ -1430,102 +1442,102 @@ TEST_CASE("Unary tests"){
 //                        );
 //CHECK(t.returns() == "<NULL>", vector<PyObject *>({PyLong_FromLong(1), PyLong_FromLong(2)}))
 //                }
-    SECTION("test") {
+    SECTION("test43") {
         auto t = CompilerTest(
                 "def f():\n    a = RefCountCheck()\n    del a\n    return finalized"
         );
         CHECK(t.returns() == "True");
-    }SECTION("test") {
+    }SECTION("test44") {
         auto t = CompilerTest(
                 "def f():\n    for i in {2:3}:\n        pass\n    return i"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test45") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            break\n        finally:\n            pass"
         );
         CHECK(t.returns() == "None");
-    }SECTION("test") {
+    }SECTION("test46") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            pass\n        finally:\n            return i"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test47") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            break\n        finally:\n            return i"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test48") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception(2)\n    except Exception as e:\n        return e.args[0]"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test49") {
         auto t = CompilerTest(
                 "def f():\n    def g(b:1, *, a = 2):\n     return a\n    return g.__annotations__['b']"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test50") {
         auto t = CompilerTest(
                 "def f():\n    def g(b:1, *, a = 2):\n     return a\n    return g(3)"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test51") {
         auto t = CompilerTest(
                 "def f():\n    def g(*, a = 2):\n     return a\n    return g()"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test52") {
         auto t = CompilerTest(
                 "def f():\n    def g(a:1, b:2): pass\n    return g.__annotations__['a']"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test53") {
         auto t = CompilerTest(
                 "def f():\n    from sys import winver, version_info\n    return winver[0]"
         );
         CHECK(t.returns() == "'3'");
-    }SECTION("test") {
+    }SECTION("test54") {
         auto t = CompilerTest(
                 "def f():\n    from sys import winver\n    return winver[0]"
         );
         CHECK(t.returns() == "'3'");
-    }SECTION("test") {
+    }SECTION("test55") {
         auto t = CompilerTest(
                 "def f():\n    def g(*a): return a\n    return g(1, 2, 3, **{})"
         );
         CHECK(t.returns() == "(1, 2, 3)");
-    }SECTION("test") {
+    }SECTION("test56") {
         auto t = CompilerTest(
                 "def f():\n    def g(**a): return a\n    return g(y = 3, **{})"
         );
         CHECK(t.returns() == "{'y': 3}");
-    }SECTION("test") {
+    }SECTION("test57") {
         auto t = CompilerTest(
                 "def f():\n    def g(**a): return a\n    return g(**{'x':2})"
         );
         CHECK(t.returns() == "{'x': 2}");
-    }SECTION("test") {
+    }SECTION("test58") {
         auto t = CompilerTest(
                 "def f():\n    def g(**a): return a\n    return g(x = 2, *())"
         );
         CHECK(t.returns() == "{'x': 2}");
-    }SECTION("test") {
+    }SECTION("test59") {
         auto t = CompilerTest(
                 "def f():\n    def g(*a): return a\n    return g(*(1, 2, 3))"
         );
         CHECK(t.returns() == "(1, 2, 3)");
-    }SECTION("test") {
+    }SECTION("test60") {
         auto t = CompilerTest(
                 "def f():\n    def g(*a): return a\n    return g(1, *(2, 3))"
         );
         CHECK(t.returns() == "(1, 2, 3)");
-    }SECTION("test") {
+    }SECTION("test61") {
         auto t = CompilerTest(
                 "def f():\n    def g(): pass\n    g.abc = {fn.lower() for fn in ['A']}\n    return g.abc"
         );
         CHECK(t.returns() == "{'a'}");
-    }SECTION("test") {
+    }SECTION("test62") {
         auto t = CompilerTest(
                 "def f():\n    for abc in [1,2,3]:\n        try:\n            break\n        except ImportError:\n            continue\n    return abc"
         );
@@ -1541,17 +1553,17 @@ TEST_CASE("Unary tests"){
 //                        );
 //CHECK(t.returns() == "1", vector<PyObject *>({NULL, PyCell_New(NULL), PyCell_New(NULL)}))
 //                }
-    SECTION("test") {
+    SECTION("test63") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }SECTION("test64") {
         auto t = CompilerTest(
                 "def f():\n	try:\n		pass\n	except ImportError:\n		pass\n	except Exception as e:\n		pass"
         );
         CHECK(t.returns() == "None");
-    }SECTION("test") {
+    }SECTION("test65") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception('hi')\n    except:\n        return 42"
         );
@@ -1562,17 +1574,17 @@ TEST_CASE("Unary tests"){
         //	);
         // CHECK(t.returns() == "42");
         //}
-    SECTION("test") {
+    SECTION("test66") {
         auto t = CompilerTest(
                 "def f():\n    x = {}\n    try:\n        return x[42]\n    except KeyError:\n        return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }SECTION("test67") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        pass\n    finally:\n        pass\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }SECTION("test68") {
         auto t = CompilerTest(
                 "def f():\n    x = {}\n    x.update(y=2)\n    return x"
         );
@@ -1614,42 +1626,42 @@ TEST_CASE("Unary tests"){
 //                        );
 //CHECK(t.returns() == "2", vector<PyObject *>({NULL, PyCell_New(NULL)}))
 //                }
-    SECTION("test") {
+    SECTION("test69") {
         auto t = CompilerTest(
                 "def f():\n    def g(a=2): return a\n    return g()"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test70") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            continue\n        finally:\n            return i"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test71") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        pass"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test72") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        pass\n    finally:\n        return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test") {
+    }SECTION("test73") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    except:\n        return 2"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test74") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    except Exception:\n        return 2"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test75") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    except AssertionError:\n        return 2\n    return 4"
         );
         CHECK(t.returns() == "<NULL>");
-    }SECTION("test") {
+    }SECTION("test76") {
         auto t = CompilerTest(
                 "def f():\n    global x\n    x = 2\n    return x"
         );
@@ -1814,32 +1826,32 @@ TEST_CASE("Unary tests"){
 //CHECK(t.returns() == "False", vector<PyObject *>({PyLong_FromLong(1)}));
 //CHECK(t.returns() == "True", vector<PyObject *>({PyLong_FromLong(0)}));
 //                                          })}
-    SECTION("test") {
+    SECTION("test77") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(3):\n        if i == 0: continue\n        break\n    return i"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test78") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(3):\n        if i == 1: break\n    return i"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test79") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][1:]"
         );
         CHECK(t.returns() == "[2, 3]");
-    }SECTION("test") {
+    }SECTION("test80") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][:1]"
         );
         CHECK(t.returns() == "[1]");
-    }SECTION("test") {
+    }SECTION("test81") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][1:2]"
         );
         CHECK(t.returns() == "[2]");
-    }SECTION("test") {
+    }SECTION("test82") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][0::2]"
         );
@@ -1850,97 +1862,97 @@ TEST_CASE("Unary tests"){
 //                        );
 //CHECK(t.returns() == "2", vector<PyObject *>({NULL, PyCell_New(NULL)}))
 //                }
-    SECTION("test") {
+    SECTION("test83") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = range(3)\n    return a"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test84") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = range(3)\n    return b"
         );
         CHECK(t.returns() == "[1]");
-    }SECTION("test") {
+    }SECTION("test85") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = range(3)\n    return c"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }SECTION("test86") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 2, 3\n    return a"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test87") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 2, 3\n    return b"
         );
         CHECK(t.returns() == "[2]");
-    }SECTION("test") {
+    }SECTION("test88") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 2, 3\n    return c"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test") {
+    }SECTION("test89") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 3\n    return c"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test") {
+    }SECTION("test90") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 3\n    return b"
         );
         CHECK(t.returns() == "[]");
-    }SECTION("test") {
+    }SECTION("test91") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 2, 3]\n    return a"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test92") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 2, 3]\n    return b"
         );
         CHECK(t.returns() == "[2]");
-    }SECTION("test") {
+    }SECTION("test92") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 2, 3]\n    return c"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test") {
+    }SECTION("test93") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 3]\n    return c"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test") {
+    }SECTION("test94") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 3]\n    return b"
         );
         CHECK(t.returns() == "[]");
-    }SECTION("test") {
+    }SECTION("test95") {
         auto t = CompilerTest(
                 "def f():\n    a, b = range(2)\n    return a"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }SECTION("test96") {
         auto t = CompilerTest(
                 "def f():\n    a, b = 1, 2\n    return a"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test97") {
         auto t = CompilerTest(
                 "def f():\n    class C:\n        pass\n    return C"
         );
         CHECK(t.returns() == "<class 'C'>");
-    }SECTION("test") {
+    }SECTION("test98") {
         auto t = CompilerTest(
                 "def f():\n    a = 0\n    for x in[1]:\n        a = a + 1\n    return a"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }SECTION("test99") {
         auto t = CompilerTest(
                 "def f(): return [x for x in range(2)]"
         );
         CHECK(t.returns() == "[0, 1]");
-    }SECTION("test") {
+    }SECTION("test100") {
         auto t = CompilerTest(
                 "def f():\n    def g(): pass\n    return g.__name__"
         );
