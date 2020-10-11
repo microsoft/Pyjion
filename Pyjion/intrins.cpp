@@ -1195,6 +1195,33 @@ int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map) {
 	return res;
 }
 
+PyObject * PyJit_BuildDictFromTuples(PyObject *keys, PyObject* values) {
+    assert(keys != nullptr);
+    assert(values != nullptr);
+    assert(PyTuple_CheckExact(keys));
+    auto len = PyTuple_GET_SIZE(keys);
+    assert(len == PyTuple_GET_SIZE(values));
+    auto map = _PyDict_NewPresized(len);
+    if (map == NULL) {
+        goto error;
+    }
+    for (auto i = 0; i < len; i++) {
+        int err;
+        PyObject *key = PyTuple_GET_ITEM(keys, i);
+        PyObject *value = PyTuple_GET_ITEM(values, i);
+        err = PyDict_SetItem(map, key, value);
+        if (err != 0) {
+            Py_DECREF(map);
+            goto error;
+        }
+        Py_DECREF(value);
+    }
+    Py_DECREF(keys);
+    Py_DECREF(values);
+error:
+    return nullptr;
+}
+
 PyObject* PyJit_LoadAssertionError() {
     PyObject *value = PyExc_AssertionError;
     Py_INCREF(value);

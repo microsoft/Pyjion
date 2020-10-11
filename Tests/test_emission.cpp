@@ -174,13 +174,12 @@ TEST_CASE("General set unpacking") {
     }
 }
 
-// TODO : Find bug in BUILD_CONST_KEY_MAP
-//TEST_CASE("General dict building") {
-//    SECTION("common case") {
-//        auto t = EmissionTest("def f(): return {1:'a', 2: 'b', 3:'c'}");
-//        CHECK(t.returns() == "{3: 'c', 2: 'b', 1: 'a'}");
-//    }
-//}
+TEST_CASE("General dict building") {
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): return {1:'a', 2: 'b', 3:'c'}");
+        CHECK(t.returns() == "{3: 'c', 2: 'b', 1: 'a'}");
+    }
+}
 
 TEST_CASE("General dict unpacking") {
     SECTION("common case") {

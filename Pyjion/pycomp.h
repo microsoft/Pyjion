@@ -162,7 +162,7 @@
 #define METHOD_STOREMAP_NO_DECREF_TOKEN          0x00000073
 #define METHOD_FORMAT_VALUE                      0x00000074
 #define METHOD_FORMAT_OBJECT                     0x00000075
-
+#define METHOD_BUILD_DICT_FROM_TUPLES            0x00000076
 
 // call helpers
 #define METHOD_CALL0_TOKEN        0x00010000
@@ -307,6 +307,7 @@ public:
     virtual void emit_dict_store();
     virtual void emit_dict_store_no_decref();
     virtual void emit_dict_update();
+    virtual void emit_dict_build_from_map();
 
     virtual void emit_unicode_joinarray();
     virtual void emit_format_value();

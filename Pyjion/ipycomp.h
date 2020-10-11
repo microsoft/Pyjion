@@ -264,6 +264,8 @@ public:
     virtual void emit_map_add() = 0;
     // Extends a map by another mapping
     virtual void emit_map_extend() = 0;
+    // Creates a dictionary from key, values
+    virtual void emit_dict_build_from_map() = 0;
 
     // Creates a slice object from values on the stack
     virtual void emit_build_slice() = 0;

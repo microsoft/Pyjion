@@ -192,6 +192,8 @@ int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map);
 int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map);
 
 PyObject * PyJit_DictUpdate(PyObject *dict, PyObject* other);
+PyObject * PyJit_BuildDictFromTuples(PyObject *keys, PyObject* values);
+
 
 int PyJit_StoreSubscr(PyObject* value, PyObject *container, PyObject *index);
 

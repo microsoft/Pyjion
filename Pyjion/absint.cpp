@@ -1871,6 +1871,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case DUP_TOP:
                 m_comp->emit_dup_top();
                 m_stack.push_back(m_stack.back());
+                inc_stack();
                 break;
             case DUP_TOP_TWO:
                 inc_stack(2);
@@ -2156,7 +2157,20 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 inc_stack();
                 break;
             case LIST_APPEND: {
-                assert(oparg == 1); // TODO : Shift down stack to oparg when != 1
+                switch (oparg){
+                    case 1:
+                        break;
+                    case 2:
+                        m_comp->emit_rot_two();
+                        break;
+                    case 3:
+                        m_comp->emit_rot_three();
+                        break;
+                    default:
+                        // TODO
+                        assert(false);
+
+                }
                 // Calls list.append(TOS1[-i], TOS).
                 m_comp->emit_list_append();
                 dec_stack(2); // list, value
@@ -2373,30 +2387,18 @@ JittedCode* AbstractInterpreter::compile_worker() {
                  * then starting from TOS1, pops count values to form values
                  * in the built dictionary.
                  */
+                // spill TOP into keys and then build a tuple for stack
                 auto keys = m_comp->emit_spill();
-                m_comp->emit_new_dict(oparg);
-                auto dict = m_comp->emit_spill();
-
-                for (auto i = 0; i < oparg; i++) {
-
-                    auto value = m_comp->emit_spill();
-                    // key
-                    m_comp->emit_load_local(keys); // arg 2 (key)
-                    m_comp->emit_tuple_load(i);
-                    m_comp->emit_load_and_free_local(value); // arg 1 (val)
-                    m_comp->emit_load_local(dict); // arg 0 (dict/map)
-                    m_comp->emit_dict_store_no_decref();
-                    dec_stack(1);
-                }
-                dec_stack(1); // keys
-                m_comp->emit_load_local(keys);
-                m_comp->emit_pop_top();
-
-                m_comp->emit_free_local(keys);
-
-                m_comp->emit_load_local(dict);
-
+                dec_stack();
+                build_tuple(oparg);
                 inc_stack();
+                // put the keys back on top of the stack
+                m_comp->emit_load_and_free_local(keys);
+                inc_stack();
+                m_comp->emit_dict_build_from_map();
+                dec_stack(2);
+                error_check("dict map failed");
+                inc_stack(1);
                 break;
             }
             case LIST_EXTEND:

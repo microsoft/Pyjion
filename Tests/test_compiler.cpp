@@ -202,13 +202,12 @@ TEST_CASE("Test general errors") {
         );
         CHECK(t.raises() == PyExc_Exception);
     }
-    // TODO : Resolve POP_TOP offset bug
-//    SECTION("test exception filters") {
-//        auto t = CompilerTest(
-//                "def f():\n    try:\n        try:\n             try:\n                  raise TypeError('err')\n             except BaseException:\n                  raise\n        finally:\n             pass\n    finally:\n        return 42\n"
-//        );
-//        CHECK(t.returns() == "42");
-//    }
+    SECTION("test exception filters") {
+        auto t = CompilerTest(
+                "def f():\n    try:\n        try:\n             try:\n                  raise TypeError('err')\n             except BaseException:\n                  raise\n        finally:\n             pass\n    finally:\n        return 42\n"
+        );
+        CHECK(t.returns() == "42");
+    }
 }
 TEST_CASE("X Annotation tests") {
     SECTION("test annotations") {
