@@ -107,7 +107,7 @@ TEST_CASE("Escape tests", "[float][binary op][inference]") {
                 AITestCase(
                         "def f():\n    pi = 0.\n    k = 0.\n    while k < 256.:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
                         {
-                                new ReturnVerifier(AVK_Float),
+                                new ReturnVerifier(AVK_Any),
                                 new BoxVerifier(0, false),  // LOAD_CONST 0
                                 new BoxVerifier(4, false),  // LOAD_CONST 0.0
                                 new BoxVerifier(10, false),  // LOAD_FAST k
@@ -120,7 +120,7 @@ TEST_CASE("Escape tests", "[float][binary op][inference]") {
                 AITestCase(
                         "def f():\n    pi = 0.\n    k = 0.\n    while k < 256:\n        pi += (4. / (8.*k + 1.) - 2. / (8.*k + 4.) - 1. / (8.*k + 5.) - 1. / (8.*k + 6.)) / 16.**k\n        k += 1.\n    return pi",
                         {
-                                new ReturnVerifier(AVK_Float),
+                                new ReturnVerifier(AVK_Any),
                                 new BoxVerifier(0, true),  // LOAD_CONST 0
                                 new BoxVerifier(4, true),  // LOAD_CONST 0.0
                                 new BoxVerifier(10, true),  // LOAD_FAST k

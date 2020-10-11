@@ -163,6 +163,8 @@
 #define METHOD_FORMAT_VALUE                      0x00000074
 #define METHOD_FORMAT_OBJECT                     0x00000075
 #define METHOD_BUILD_DICT_FROM_TUPLES            0x00000076
+#define METHOD_DICT_MERGE                        0x00000077
+
 
 // call helpers
 #define METHOD_CALL0_TOKEN        0x00010000
@@ -457,6 +459,8 @@ public:
 
     virtual void emit_load_method(void* name);
     virtual bool emit_method_call(size_t argCnt);
+
+    virtual void emit_dict_merge();
 
     virtual void emit_load_assertion_error();
 

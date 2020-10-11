@@ -28,8 +28,6 @@
  * TODO : New opcodes since 3.6:
  * Need implementation:
  *  - Implement JUMP_IF_NOT_EXC_MATCH
- *  - Implement DICT_MERGE
-
  *  - Implement WITH_EXCEPT_START
  *  - Implement RERAISE
  *  - Implement END_ASYNC_FOR
@@ -37,6 +35,7 @@
  *  Implemented (need unit tests)
  *  - Test LOAD_ASSERTION_ERROR
  *  - Implement SETUP_ANNOTATIONS
+ *  - Test DICT_MERGE
  *  - Test LOAD_METHOD (Done)
  *  - Test CALL_METHOD (done)
  *  - Test IS_OP (DONE)
@@ -907,16 +906,8 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case DICT_UPDATE:
-                {
-                    // Calls dict.update(TOS1[-i], TOS). Used to build dicts.
-                    lastState.pop(); // value
-                    break;
-                }
                 case SET_UPDATE:
-                {
-                    lastState.pop(); // value
-                    break;
-                }
+                case DICT_MERGE:
                 case PRINT_EXPR:
                 {
                     lastState.pop(); // value
@@ -1871,7 +1862,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case DUP_TOP:
                 m_comp->emit_dup_top();
                 m_stack.push_back(m_stack.back());
-                inc_stack();
                 break;
             case DUP_TOP_TWO:
                 inc_stack(2);
@@ -2161,13 +2151,11 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     case 1:
                         break;
                     case 2:
-                        m_comp->emit_rot_two();
-                        break;
-                    case 3:
                         m_comp->emit_rot_three();
                         break;
                     default:
                         // TODO
+                        printf("unsupported operation");
                         assert(false);
 
                 }
@@ -2175,6 +2163,25 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_list_append();
                 dec_stack(2); // list, value
                 error_check("list append failed");
+                inc_stack(1);
+                break;
+            }
+            case DICT_MERGE: {
+                switch (oparg){
+                    case 1:
+                        break;
+                    case 2:
+                        m_comp->emit_rot_three();
+                        break;
+                    default:
+                        // TODO
+                        printf("unsupported operation");
+                        assert(false);
+
+                }
+                m_comp->emit_dict_merge();
+                dec_stack(2); // list, value
+                error_check("dict merge failed");
                 inc_stack(1);
                 break;
             }
@@ -3222,7 +3229,7 @@ void AbstractInterpreter::pop_except() {
     // clear the exception.
     auto block = m_blockStack.back();
     unwind_eh(block.CurrentHandler, m_allHandlers[block.CurrentHandler].BackHandler);
-#ifdef DEBUG_TRACE
+#ifdef DEBUG_TRACES
     m_il.ld_i("Exception cleared");
     m_il.emit_call(METHOD_DEBUG_TRACE);
 #endif

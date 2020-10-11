@@ -704,7 +704,7 @@ void PyJit_DebugTrace(char* msg) {
 const char * ObjInfo(PyObject *obj);
 
 void PyJit_PyErrRestore(PyObject*tb, PyObject*value, PyObject*exception) {
-#ifdef DEBUG_TRACE
+#ifdef DEBUG_TRACES
     printf("Restoring exception %p %s\r\n", exception, ObjInfo(exception));
     printf("Restoring value %p %s\r\n", value, ObjInfo(value));
     printf("Restoring tb %p %s\r\n", tb, ObjInfo(tb));
@@ -1252,6 +1252,31 @@ error:
     return nullptr;
 }
 
+PyObject* PyJit_DictMerge(PyObject* dict, PyObject* other) {
+    assert(dict != nullptr);
+    int res ;
+    if (!PyDict_CheckExact(dict)) {
+        PyErr_Format(PyExc_TypeError,
+                     "argument must be a dict, not %.200s",
+                     dict->ob_type->tp_name);
+        goto error;
+    }
+    if (!PyDict_CheckExact(other)) {
+        PyErr_Format(PyExc_TypeError,
+                     "argument must be a dict, not %.200s",
+                     other->ob_type->tp_name);
+        goto error;
+    }
+    res = _PyDict_MergeEx(dict, other, 2);
+    if (res != 0)
+        goto error;
+    Py_DECREF(other);
+    return dict;
+    error:
+    Py_DECREF(other);
+    return nullptr;
+}
+
 int PyJit_StoreSubscr(PyObject* value, PyObject *container, PyObject *index) {
     auto res = PyObject_SetItem(container, index, value);
     Py_DECREF(index);
@@ -1277,7 +1302,7 @@ PyObject* PyJit_CallN(PyObject *target, PyObject* args) {
 
 PyObject* PyJit_CallNKW(PyObject *target, PyObject* args, PyObject* kwargs) {
     // we stole references for the tuple...
-#ifdef DEBUG_TRACE
+#ifdef DEBUG_TRACES
     printf("Target: %s\r\n", ObjInfo(target));
 
     printf("Tuple: %s\r\n", ObjInfo(args));
@@ -1287,7 +1312,7 @@ PyObject* PyJit_CallNKW(PyObject *target, PyObject* args, PyObject* kwargs) {
     printf("%d\r\n", kwargs->ob_refcnt);
 #endif
     auto res = PyObject_Call(target, args, kwargs);
-#ifdef DEBUG_TRACE
+#ifdef DEBUG_TRACES
     printf("%d\r\n", kwargs->ob_refcnt);
 #endif
     Py_DECREF(target);
@@ -1634,7 +1659,7 @@ PyObject** PyJit_UnpackSequence(PyObject* seq, size_t size, PyObject** tempStora
 PyObject* PyJit_LoadAttr(PyObject* owner, PyObject* name) {
     PyObject *res = PyObject_GetAttr(owner, name);
     Py_DECREF(owner);
-#ifdef DEBUG_TRACE
+#ifdef DEBUG_TRACES
     if (res == nullptr) {
         printf("Load attr failed: %s\r\n", PyUnicode_AsUTF8(name));
     }

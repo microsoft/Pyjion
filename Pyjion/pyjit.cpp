@@ -142,7 +142,7 @@ unordered_map<PyjionJittedCode*, JittedCode*> g_pyjionJittedCode;
 __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
     auto jittedCode = (PyjionJittedCode *)code->co_extra;
 
-#ifdef DEBUG_TRACE
+#ifdef DEBUG_TRACES
     static int compileCount = 0, failCount = 0;
     printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n",
         PyUnicode_AsUTF8(code->co_name),
@@ -157,7 +157,7 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
     auto res = interp.compile();
 
     if (res == nullptr) {
-#ifdef DEBUG_TRACE
+#ifdef DEBUG_TRACES
         printf("Compilation failure #%d\r\n", ++failCount);
 #endif
         jittedCode->j_failed = true;
@@ -293,7 +293,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 
 			auto res = interp.compile();
 			bool isSpecialized = false;
-#ifdef DEBUG_TRACE
+#ifdef DEBUG_TRACES
 			printf("Tracing %s from %s line %d %s\r\n",
 				PyUnicode_AsUTF8(frame->f_code->co_name),
 				PyUnicode_AsUTF8(frame->f_code->co_filename),
@@ -335,7 +335,7 @@ bool jit_compile(PyCodeObject* code) {
 	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
         return false;
     }
-#ifdef DEBUG_TRACE
+#ifdef DEBUG_TRACES
     static int compileCount = 0, failCount = 0;
     printf("Tracing %s from %s line %d #%d (%d failures so far)\r\n",
         PyUnicode_AsUTF8(code->co_name),

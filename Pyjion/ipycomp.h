@@ -420,6 +420,7 @@ public:
 
     virtual void emit_breakpoint() = 0;
 
+    virtual void emit_dict_merge() = 0;
 
     /* Compiles the generated code */
     virtual JittedCode* emit_compile() = 0;

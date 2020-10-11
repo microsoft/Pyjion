@@ -871,7 +871,7 @@ TEST_CASE("Unary tests") {
         auto t = CompilerTest(
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x << y"
         );
-        CHECK(t.returns() == "<NULL>");
+        CHECK(t.raises() == PyExc_MemoryError);
     }
 
     SECTION("test69") {
