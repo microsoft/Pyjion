@@ -2388,15 +2388,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                  * in the built dictionary.
                  */
                 // spill TOP into keys and then build a tuple for stack
-                auto keys = m_comp->emit_spill();
-                dec_stack();
-                build_tuple(oparg);
-                inc_stack();
-                // put the keys back on top of the stack
-                m_comp->emit_load_and_free_local(keys);
+                build_tuple(oparg + 1);
                 inc_stack();
                 m_comp->emit_dict_build_from_map();
-                dec_stack(2);
+                dec_stack(1);
                 error_check("dict map failed");
                 inc_stack(1);
                 break;

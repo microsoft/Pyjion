@@ -1195,12 +1195,10 @@ int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map) {
 	return res;
 }
 
-PyObject * PyJit_BuildDictFromTuples(PyObject *keys, PyObject* values) {
-    assert(keys != nullptr);
-    assert(values != nullptr);
-    assert(PyTuple_CheckExact(keys));
-    auto len = PyTuple_GET_SIZE(keys);
-    assert(len == PyTuple_GET_SIZE(values));
+PyObject * PyJit_BuildDictFromTuples(PyObject *keys_and_values) {
+    assert(keys_and_values != nullptr);
+    auto len = PyTuple_GET_SIZE(keys_and_values) - 1;
+    PyObject* keys = PyTuple_GET_ITEM(keys_and_values, len);
     auto map = _PyDict_NewPresized(len);
     if (map == NULL) {
         goto error;
@@ -1208,7 +1206,7 @@ PyObject * PyJit_BuildDictFromTuples(PyObject *keys, PyObject* values) {
     for (auto i = 0; i < len; i++) {
         int err;
         PyObject *key = PyTuple_GET_ITEM(keys, i);
-        PyObject *value = PyTuple_GET_ITEM(values, i);
+        PyObject *value = PyTuple_GET_ITEM(keys_and_values, i);
         err = PyDict_SetItem(map, key, value);
         if (err != 0) {
             Py_DECREF(map);
@@ -1217,7 +1215,8 @@ PyObject * PyJit_BuildDictFromTuples(PyObject *keys, PyObject* values) {
         Py_DECREF(value);
     }
     Py_DECREF(keys);
-    Py_DECREF(values);
+    Py_DECREF(keys_and_values);
+    return map;
 error:
     return nullptr;
 }

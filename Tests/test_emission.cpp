@@ -177,7 +177,7 @@ TEST_CASE("General set unpacking") {
 TEST_CASE("General dict building") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): return {1:'a', 2: 'b', 3:'c'}");
-        CHECK(t.returns() == "{3: 'c', 2: 'b', 1: 'a'}");
+        CHECK(t.returns() == "{1: 'a', 2: 'b', 3: 'c'}");
     }
 }
 
