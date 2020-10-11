@@ -93,7 +93,14 @@ public:
         return excType;
     }
 };
-
+TEST_CASE("test imports"){
+    SECTION("import this") {
+        auto t = CompilerTest(
+                "def f():\n  import this"
+        );
+        CHECK(t.returns() == "None");
+    };
+}
 TEST_CASE("Test ITER", "[float][binary op][inference]") {
     SECTION("test1") {
         // EXTENDED_ARG FOR_ITER:

@@ -646,6 +646,7 @@ void PythonCompiler::emit_call_with_tuple() {
 }
 
 bool PythonCompiler::emit_kwcall(size_t argCnt) {
+    // TODO: Implement KWARG calls in the same way as function and method calls 0-4
 //	switch (argCnt) {
 //        case 0: m_il.emit_call(METHOD_KWCALL0_TOKEN); return true;
 //		case 1: m_il.emit_call(METHOD_KWCALL1_TOKEN); return true;
@@ -654,7 +655,6 @@ bool PythonCompiler::emit_kwcall(size_t argCnt) {
 //		case 4: m_il.emit_call(METHOD_KWCALL4_TOKEN); return true;
 //		default: m_il.emit_call(METHOD_KWCALLN_TOKEN); return true;
 //	}
-    assert(false); // why is this commented out?
 	return false;
 }
 

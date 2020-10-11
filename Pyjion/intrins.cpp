@@ -40,6 +40,8 @@ using namespace msl::utilities;
 //#define DEBUG_TRACE
 PyObject* g_emptyTuple;
 #include <dictobject.h>
+#include <vector>
+
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
 
@@ -2028,43 +2030,43 @@ error:
     return res;
 }
 
-PyObject* MethCall0(PyObject* self, PyObject *method) {
+PyObject* MethCall0(PyObject* self, std::vector<PyObject*>* method_info) {
     PyObject* res;
-    if (method != nullptr)
-        res = Call1(method, self);
+    if (method_info->back() != nullptr)
+        res = Call1(method_info->at(0), method_info->at(1));
     else
-        res = Call0(self);
+        res = Call0(method_info->at(0));
     return res;
 }
 
-PyObject* MethCall1(PyObject* self, PyObject *method, PyObject* arg0) {
+PyObject* MethCall1(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0) {
     PyObject* res;
-    if (method != nullptr)
-        res = Call2(method, self, arg0);
+    if (method_info->back() != nullptr)
+        res = Call2(method_info->at(0), method_info->at(1), arg0);
     else
-        res = Call1(self, arg0);
+        res = Call1(method_info->at(0), arg0);
     return res;
 }
 
-PyObject* MethCall2(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1) {
+PyObject* MethCall2(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1) {
     PyObject* res;
-    if (method != nullptr)
-        res = Call3(method, self, arg0, arg1);
+    if (method_info->back() != nullptr)
+        res = Call3(method_info->at(0), method_info->at(1), arg0, arg1);
     else
-        res = Call2(self, arg0, arg1);
+        res = Call2(method_info->at(0), arg0, arg1);
     return res;
 }
 
-PyObject* MethCall3(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
+PyObject* MethCall3(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
     PyObject* res;
-    if (method != nullptr)
-        res = Call4(method, self, arg0, arg1, arg2);
+    if (method_info->back() != nullptr)
+        res = Call4(method_info->at(0), method_info->at(1), arg0, arg1, arg2);
     else
-        res = Call3(self, arg0, arg1, arg2);
+        res = Call3(method_info->at(0), arg0, arg1, arg2);
     return res;
 }
 
-PyObject* MethCall4(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
+PyObject* MethCall4(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
     assert(false);
     return nullptr; // TODO : Implement a better approach.
 }
@@ -2587,13 +2589,18 @@ PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec) {
 	return res;
 }
 
-PyObject* PyJit_LoadMethod(PyObject* object, PyObject* name) {
+std::vector<PyObject*>* PyJit_LoadMethod(PyObject* object, PyObject* name) {
+    std::vector<PyObject*> * result = new std::vector<PyObject*>(0);
     PyObject* method = nullptr;
     int meth_found = _PyObject_GetMethod(object, name, &method);
-    if (!meth_found)
+    result->push_back(method);
+    if (!meth_found) {
         Py_DECREF(object);
-        return nullptr;
-    return method;
+        result->push_back(nullptr);
+    } else {
+        result->push_back(object);
+    }
+    return result;
 }
 
 PyObject* PyJit_FormatValue(PyObject* item) {

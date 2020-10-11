@@ -28,6 +28,7 @@
 
 #include <Python.h>
 #include <frameobject.h>
+#include <vector>
 
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
@@ -292,13 +293,13 @@ PyObject* PyJit_UnicodeJoinArray(PyObject** items, Py_ssize_t count);
 PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec);
 PyObject* PyJit_FormatValue(PyObject* item);
 
-PyObject* PyJit_LoadMethod(PyObject* object, PyObject* name);
+std::vector<PyObject *> * PyJit_LoadMethod(PyObject* object, PyObject* name);
 
-PyObject* MethCall0(PyObject* self, PyObject *method);
-PyObject* MethCall1(PyObject* self, PyObject *method, PyObject* arg0);
-PyObject* MethCall2(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1);
-PyObject* MethCall3(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1, PyObject* arg2);
-PyObject* MethCall4(PyObject* self, PyObject *method, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3);
+PyObject* MethCall0(PyObject* self, std::vector<PyObject*>* method_info);
+PyObject* MethCall1(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0);
+PyObject* MethCall2(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1);
+PyObject* MethCall3(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2);
+PyObject* MethCall4(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3);
 
 
 #endif
