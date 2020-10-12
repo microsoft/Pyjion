@@ -377,7 +377,7 @@ public:
             m_il.push_back((value >> 40) & 0xff);
             m_il.push_back((value >> 48) & 0xff);
             m_il.push_back((value >> 56) & 0xff);
-            m_il.push_back(CEE_CONV_I); DEC_CEE_STACK(1); // Pop1, PushI
+            m_il.push_back(CEE_CONV_I); // DEC_CEE_STACK(1); // Pop1, PushI
         }
 #else
         ld_i(value);

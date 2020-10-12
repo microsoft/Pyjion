@@ -1565,8 +1565,9 @@ public:
 	{
 		flags->Add(flags->CORJIT_FLAG_SKIP_VERIFICATION);
         flags->Add(flags->CORJIT_FLAG_DEBUG_CODE);
-        flags->Add(flags->CORJIT_FLAG_NO_INLINING);
-        flags->Add(flags->CORJIT_FLAG_MIN_OPT);
+        // Extra flags available
+        //flags->Add(flags->CORJIT_FLAG_NO_INLINING);
+        //flags->Add(flags->CORJIT_FLAG_MIN_OPT);
 		return sizeof(CORJIT_FLAGS);
 	}
 

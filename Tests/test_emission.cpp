@@ -150,12 +150,16 @@ TEST_CASE("General set building") {
     }
 }
 
-//TEST_CASE("General method calls") {
-//    SECTION("common case") {
-//        auto t = EmissionTest("def f(): a={False};a.add(True);return a");
-//        CHECK(t.returns() == "{False, True}");
-//    }
-//}
+TEST_CASE("General method calls") {
+    SECTION("easy case") {
+        auto t = EmissionTest("def f(): a=set();a.add(1);return a");
+        CHECK(t.returns() == "{1}");
+    }
+    SECTION("common case") {
+        auto t = EmissionTest("def f(): a={False};a.add(True);return a");
+        CHECK(t.returns() == "{False, True}");
+    }
+}
 
 TEST_CASE("General set unpacking") {
     SECTION("string unpack"){

@@ -1848,7 +1848,7 @@ PyObject* Call0(PyObject *target) {
         res = fast_function(target, empty, 0);
     }
     else if (PyCFunction_Check(target)) {
-        res = PyCFunction_Call(target, g_emptyTuple, nullptr);
+        res = PyObject_Call(target, g_emptyTuple, nullptr);
     }
     else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
         PyObject *self = PyMethod_GET_SELF(target);
@@ -1968,23 +1968,7 @@ error:
 
 PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1) {
     PyObject* res = nullptr;
-    auto args = PyTuple_New(2);
-    if (PyFunction_Check(target)) {
-        PyObject* stack[2] = { arg0, arg1 };
-        res = fast_function(target, stack, 2);
-        Py_DECREF(arg0);
-        Py_DECREF(arg1);
-        goto error;
-    }
-    else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
-        PyObject *self = PyMethod_GET_SELF(target);
-        PyObject* func = PyMethod_GET_FUNCTION(target);
-        Py_INCREF(self);
-        Py_INCREF(func);
-        res = Call3(func, self, arg0, arg1);
-        goto error;
-    }
-
+    PyObject* args = PyTuple_New(2);
     if (args == nullptr) {
         Py_DECREF(arg0);
         Py_DECREF(arg1);
@@ -1993,7 +1977,7 @@ PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1) {
     PyTuple_SET_ITEM(args, 0, arg0);
     PyTuple_SET_ITEM(args, 1, arg1);
     if (PyCFunction_Check(target)) {
-        res = PyCFunction_Call(target, args, nullptr);
+        res = PyObject_Vectorcall(target, reinterpret_cast<PyObject *const *>(args), 2, nullptr);
     }
     else {
         res = PyObject_Call(target, args, nullptr);

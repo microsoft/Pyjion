@@ -1802,13 +1802,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
         }
 
         // update f_lasti
-        if (!can_skip_lasti_update(curByte)) {
-            m_comp->emit_lasti_update(curByte);
-        }
+        //if (!can_skip_lasti_update(curByte)) {
+        m_comp->emit_lasti_update(curByte);
+        //}
 
         int curStackSize = m_stack.size();
         bool skipEffect = false;
-        m_comp->emit_breakpoint();
 
         switch (byte) {
             case NOP: break;
@@ -1857,7 +1856,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case POP_TOP:
                 m_comp->emit_pop_top();
-                skipEffect = true;
+                dec_stack();
+                //skipEffect = true;
                 break;
             case DUP_TOP:
                 m_comp->emit_dup_top();
@@ -2091,14 +2091,13 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_load_closure(oparg);
                 inc_stack();
                 break;
-            case GET_ITER:
-            {
+            case GET_ITER: {
                 m_comp->emit_getiter();
                 dec_stack();
                 error_check("get iter failed");
                 inc_stack();
+                break;
             }
-            break;
             case FOR_ITER:
             {
                 BlockInfo *loopBlock = nullptr;
@@ -2135,7 +2134,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         // TODO
                         printf("unsupported operation");
                         assert(false);
-
                 }
                 // Calls list.append(TOS1[-i], TOS).
                 m_comp->emit_list_append();

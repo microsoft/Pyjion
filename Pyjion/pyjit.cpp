@@ -222,6 +222,11 @@ PyTypeObject* GetArgType(int arg, PyObject** locals) {
     PyTypeObject* type = nullptr;
     if (objValue != nullptr) {
         type = objValue->ob_type;
+        // We currently only generate optimal code for ints and floats,
+        // so don't bother specializing on other types...
+        if (type != &PyLong_Type && type != &PyFloat_Type) {
+            type = nullptr;
+        }
     }
     return type;
 }
@@ -247,6 +252,11 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
             PyTypeObject *argType = nullptr;
             if (*locals != nullptr) {
                 argType = (*locals)->ob_type;
+                // We currently only generate optimal code for ints and floats,
+                // so don't bother specializing on other types...
+                if (argType != &PyLong_Type && argType != &PyFloat_Type) {
+                    argType = nullptr;
+                }
             }
 
             if (*type != argType) {
@@ -293,7 +303,15 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 
 			auto res = interp.compile();
 			bool isSpecialized = false;
-#ifdef DEBUG_TRACES
+			for (int i = 0; i < argCount; i++) {
+				auto type = GetAbstractType(GetArgType(i, frame->f_localsplus));
+				if (type == AVK_Integer || type == AVK_Float) {
+					if (!interp.get_local_info(0, i).ValueInfo.needs_boxing()) {
+						isSpecialized = true;
+					}
+				}
+			}
+#ifdef DEBUG_TRACE
 			printf("Tracing %s from %s line %d %s\r\n",
 				PyUnicode_AsUTF8(frame->f_code->co_name),
 				PyUnicode_AsUTF8(frame->f_code->co_filename),
