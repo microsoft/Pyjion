@@ -391,32 +391,32 @@ TEST_CASE("X Test boxing") {
         CHECK(t.returns() == "42");
     }
 
-    SECTION("Too many items to unpack from list/tuple shouldn't crash") {
+    SECTION("Too many items to unpack from list raises valueerror") {
         auto t = CompilerTest(
                 "def f():\n    x = [1,2,3]\n    a, b = x"
         );
-        CHECK(t.returns() == "<NULL>");
+        CHECK(t.raises() == PyExc_ValueError);
     }
 
-    SECTION("test6") {
+    SECTION("Too many items to unpack from tuple raises valueerror") {
         auto t = CompilerTest(
                 "def f():\n    x = (1,2,3)\n    a, b = x"
         );
-        CHECK(t.returns() == "<NULL>");
+        CHECK(t.raises() == PyExc_ValueError);
     }
 
     SECTION("failure to unpack shouldn't crash, should raise Python exception") {
         auto t = CompilerTest(
                 "def f():\n    x = [1]\n    a, b, *c = x"
         );
-        CHECK(t.returns() == "<NULL>");
+        CHECK(t.raises() == PyExc_ValueError);
     }
 
     SECTION("unpacking non-iterable shouldn't crash") {
         auto t = CompilerTest(
                 "def f():\n    a, b, c = len"
         );
-        CHECK(t.returns() == "<NULL>");
+        CHECK(t.raises() == PyExc_TypeError);
     }
 
     SECTION("test stack dump") {
@@ -1399,60 +1399,11 @@ TEST_CASE("optimized cases") {
         );
         CHECK(t.returns() == "42");
     }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(x):\n    if not x:\n        return True\n    return False",
-//                        vector<TestInput>({
-//                                                  );
-//CHECK(t.returns() == "False", vector<PyObject *>({PyLong_FromLong(1)})),
-//                                                  );
-//CHECK(t.returns() == "True", vector<PyObject *>({PyLong_FromLong(0)}))
-//                                          })}
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    if a in b:\n        return True\n    return False",
-//                        vector<TestInput>({
-//                                                  );
-//CHECK(t.returns() == "True", vector<PyObject *>(
-//                                                          {PyLong_FromLong(42), Incremented((PyObject *) tupleOfOne)})),
-//                                                  );
-//CHECK(t.returns() == "False", vector<PyObject *>(
-//                                                          {PyLong_FromLong(1), Incremented((PyObject *) tupleOfOne)}))
-//                                          })}
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    if a not in b:\n        return True\n    return False",
-//                        vector<TestInput>({
-//                                                  );
-//CHECK(t.returns() == "False", vector<PyObject *>(
-//                                                          {PyLong_FromLong(42), Incremented((PyObject *) tupleOfOne)})),
-//                                                  );
-//CHECK(t.returns() == "True", vector<PyObject *>(
-//                                                          {PyLong_FromLong(1), Incremented((PyObject *) tupleOfOne)}))
-//                                          })
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    if a is b:\n        return True",
-//                        );
-//CHECK(t.returns() == "True", vector<PyObject *>({PyLong_FromLong(1), PyLong_FromLong(1)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    if a is not b:\n        return True",
-//                        );
-//CHECK(t.returns() == "True", vector<PyObject *>({PyLong_FromLong(1), PyLong_FromLong(2)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    assert a is b\n    return True",
-//                        );
-//CHECK(t.returns() == "True", vector<PyObject *>({PyLong_FromLong(1), PyLong_FromLong(1)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    assert a is b\n    return True",
-//                        );
-//CHECK(t.returns() == "<NULL>", vector<PyObject *>({PyLong_FromLong(1), PyLong_FromLong(2)}))
-//                }
     SECTION("test43") {
         auto t = CompilerTest(
                 "def f():\n    a = RefCountCheck()\n    del a\n    return finalized"
         );
-        CHECK(t.returns() == "True");
+        CHECK(t.raises() == PyExc_NameError);
     }SECTION("test44") {
         auto t = CompilerTest(
                 "def f():\n    for i in {2:3}:\n        pass\n    return i"
@@ -1498,16 +1449,6 @@ TEST_CASE("optimized cases") {
                 "def f():\n    def g(a:1, b:2): pass\n    return g.__annotations__['a']"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test53") {
-        auto t = CompilerTest(
-                "def f():\n    from sys import winver, version_info\n    return winver[0]"
-        );
-        CHECK(t.returns() == "'3'");
-    }SECTION("test54") {
-        auto t = CompilerTest(
-                "def f():\n    from sys import winver\n    return winver[0]"
-        );
-        CHECK(t.returns() == "'3'");
     }SECTION("test55") {
         auto t = CompilerTest(
                 "def f():\n    def g(*a): return a\n    return g(1, 2, 3, **{})"
@@ -1646,7 +1587,7 @@ TEST_CASE("optimized cases") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        pass"
         );
-        CHECK(t.returns() == "<NULL>");
+        CHECK(t.raises() == PyExc_Exception);
     }SECTION("test72") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        pass\n    finally:\n        return 42"
@@ -1666,7 +1607,7 @@ TEST_CASE("optimized cases") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    except AssertionError:\n        return 2\n    return 4"
         );
-        CHECK(t.returns() == "<NULL>");
+        CHECK(t.raises() == PyExc_Exception);
     }SECTION("test76") {
         auto t = CompilerTest(
                 "def f():\n    global x\n    x = 2\n    return x"

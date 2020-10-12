@@ -1807,7 +1807,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
         }
 
         int curStackSize = m_stack.size();
-
+        bool skipEffect = false;
         m_comp->emit_breakpoint();
 
         switch (byte) {
@@ -1857,7 +1857,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case POP_TOP:
                 m_comp->emit_pop_top();
-                dec_stack();
+                skipEffect = true;
                 break;
             case DUP_TOP:
                 m_comp->emit_dup_top();
@@ -2254,7 +2254,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 inc_stack(6);
             }
             break;
-            case POP_EXCEPT: pop_except(); break;
+            case POP_EXCEPT: pop_except(); skipEffect = true; break;
             case POP_BLOCK: compile_pop_block(); break;
 
             case YIELD_FROM:
@@ -2470,7 +2470,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                 return nullptr;
         }
-        assert(PyCompile_OpcodeStackEffect(byte, oparg) == (m_stack.size() - curStackSize));
+        assert(skipEffect || PyCompile_OpcodeStackEffect(byte, oparg) == (m_stack.size() - curStackSize));
 
 #ifdef DUMP_TRACES
         m_comp->dump(ilLen);
