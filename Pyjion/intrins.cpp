@@ -1842,125 +1842,34 @@ fast_function(PyObject *func, PyObject **pp_stack, int n) {
 }
 
 PyObject* Call0(PyObject *target) {
-    PyObject* res;
-    if (PyFunction_Check(target)) {
-        PyObject* empty[1] = { nullptr };
-        res = fast_function(target, empty, 0);
-    }
-    else if (PyCFunction_Check(target)) {
-        res = PyObject_Call(target, g_emptyTuple, nullptr);
-    }
-    else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
-        PyObject *self = PyMethod_GET_SELF(target);
-        PyObject* func = PyMethod_GET_FUNCTION(target);
-        Py_INCREF(self);
-        Py_INCREF(func);
-        res = Call1(func, self);
-    }
-    else {
-        res = PyObject_Call(target, g_emptyTuple, nullptr);
-    }
-    Py_DECREF(target);
-    return res;
-}
-
-PyObject* Call0_Function(PyObject *target, void** addr) {
-    PyObject* res;
-    if (PyFunction_Check(target)) {
-        PyObject* empty[1] = { nullptr };
-        res = fast_function(target, empty, 0);
-    }
-    else {
-        return Call0_Generic(target, addr);
-    }
-
-    Py_DECREF(target);
-    return res;
-}
-
-PyObject* Call0_Method(PyObject *target, void** addr) {
-    PyObject* res;
-    if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
-        PyObject *self = PyMethod_GET_SELF(target);
-        PyObject* func = PyMethod_GET_FUNCTION(target);
-        Py_INCREF(self);
-        Py_INCREF(func);
-        res = Call1(func, self);
-    }
-    else {
-        return Call0_Generic(target, addr);
-    }
-
-    Py_DECREF(target);
-    return res;
-}
-
-PyObject* Call0_CFunction(PyObject *target, void** addr) {
-    PyObject* res;
+    PyObject* res = nullptr;
     if (PyCFunction_Check(target)) {
-        res = PyCFunction_Call(target, g_emptyTuple, nullptr);
+        PyObject* args[0] = {};
+        res = PyObject_Vectorcall(target, args, 0 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
     }
     else {
-        return Call0_Generic(target, addr);
-    }
-
-    Py_DECREF(target);
-    return res;
-}
-
-
-PyObject* Call0_Generic(PyObject *target, void** addr) {
-    PyObject* res;
-    if (PyFunction_Check(target)) {
-        *addr = (void*)&Call0_Function;
-        return Call0_Function(target, addr);
-    }
-    else if (PyCFunction_Check(target)) {
-        *addr = (void*)Call0_CFunction;
-        return Call0_CFunction(target, addr);
-    }
-    else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
-        *addr = (void*)Call0_Method;
-        return Call0_Method(target, addr);
-    }
-    else {
-        res = PyObject_Call(target, g_emptyTuple, nullptr);
+        res = PyObject_CallNoArgs(target);
     }
     Py_DECREF(target);
     return res;
 }
-
 
 PyObject* Call1(PyObject *target, PyObject* arg0) {
     PyObject* res = nullptr;
-    auto args = PyTuple_New(1);
-    if (PyFunction_Check(target)) {
-        PyObject* stack[1] = { arg0 };
-        res = fast_function(target, stack, 1);
-        Py_DECREF(arg0);
-        goto error;
-    }
-    else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
-        PyObject *self = PyMethod_GET_SELF(target);
-        PyObject* func = PyMethod_GET_FUNCTION(target);
-        Py_INCREF(self);
-        Py_INCREF(func);
-        res = Call2(func, self, arg0);
-        goto error;
-    }
-
-    if (args == nullptr) {
-        Py_DECREF(arg0);
-        goto error;
-    }
-    PyTuple_SET_ITEM(args, 0, arg0);
     if (PyCFunction_Check(target)) {
-        res = PyCFunction_Call(target, args, nullptr);
+        PyObject* args[1] = {arg0};
+        res = PyObject_Vectorcall(target, args, 1 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
     }
     else {
+        auto args = PyTuple_New(1);
+        if (args == nullptr) {
+            Py_DECREF(arg0);
+            goto error;
+        }
+        PyTuple_SET_ITEM(args, 0, arg0);
         res = PyObject_Call(target, args, nullptr);
+        Py_DECREF(args);
     }
-    Py_DECREF(args);
 error:
     Py_DECREF(target);
     return res;
@@ -1968,99 +1877,75 @@ error:
 
 PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1) {
     PyObject* res = nullptr;
-    PyObject* args = PyTuple_New(2);
-    if (args == nullptr) {
-        Py_DECREF(arg0);
-        Py_DECREF(arg1);
-        goto error;
-    }
-    PyTuple_SET_ITEM(args, 0, arg0);
-    PyTuple_SET_ITEM(args, 1, arg1);
     if (PyCFunction_Check(target)) {
-        res = PyObject_Vectorcall(target, reinterpret_cast<PyObject *const *>(args), 2, nullptr);
+        PyObject* args[2] = {arg0, arg1};
+        res = PyObject_Vectorcall(target, args, 2 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
     }
     else {
+        auto args = PyTuple_New(2);
+        if (args == nullptr) {
+            Py_DECREF(arg0);
+            Py_DECREF(arg1);
+            goto error;
+        }
+        PyTuple_SET_ITEM(args, 0, arg0);
+        PyTuple_SET_ITEM(args, 1, arg1);
         res = PyObject_Call(target, args, nullptr);
+        Py_DECREF(args);
     }
-    Py_DECREF(args);
-error:
+    error:
     Py_DECREF(target);
     return res;
 }
 
 PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
     PyObject* res = nullptr;
-    auto args = PyTuple_New(3);
-    if (PyFunction_Check(target)) {
-        PyObject* stack[3] = { arg0, arg1, arg2 };
-        res = fast_function(target, stack, 3);
-        Py_DECREF(arg0);
-        Py_DECREF(arg1);
-        Py_DECREF(arg2);
-        goto error;
-    }
-    else if (PyMethod_Check(target) && PyMethod_GET_SELF(target) != NULL) {
-        PyObject *self = PyMethod_GET_SELF(target);
-        PyObject* func = PyMethod_GET_FUNCTION(target);
-        Py_INCREF(self);
-        Py_INCREF(func);
-        res = Call4(func, self, arg0, arg1, arg2);
-        goto error;
-    }
-
-    if (args == nullptr) {
-        Py_DECREF(arg0);
-        Py_DECREF(arg1);
-        Py_DECREF(arg2);
-        goto error;
-    }
-    PyTuple_SET_ITEM(args, 0, arg0);
-    PyTuple_SET_ITEM(args, 1, arg1);
-    PyTuple_SET_ITEM(args, 2, arg2);
     if (PyCFunction_Check(target)) {
-        res = PyCFunction_Call(target, args, nullptr);
+        PyObject* args[3] = {arg0, arg1, arg2};
+        res = PyObject_Vectorcall(target, args, 3 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
     }
     else {
+        auto args = PyTuple_New(3);
+        if (args == nullptr) {
+            Py_DECREF(arg0);
+            Py_DECREF(arg1);
+            Py_DECREF(arg2);
+            goto error;
+        }
+        PyTuple_SET_ITEM(args, 0, arg0);
+        PyTuple_SET_ITEM(args, 1, arg1);
+        PyTuple_SET_ITEM(args, 2, arg2);
         res = PyObject_Call(target, args, nullptr);
+        Py_DECREF(args);
     }
-    Py_DECREF(args);
-error:
+    error:
     Py_DECREF(target);
     return res;
 }
 
 PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
     PyObject* res = nullptr;
-    auto args = PyTuple_New(4);
-    if (PyFunction_Check(target)) {
-        PyObject* stack[4] = { arg0, arg1, arg2, arg3 };
-        res = fast_function(target, stack, 4);
-        Py_DECREF(arg0);
-        Py_DECREF(arg1);
-        Py_DECREF(arg2);
-        Py_DECREF(arg3);
-        goto error;
-    }
-
-    if (args == nullptr) {
-        Py_DECREF(arg0);
-        Py_DECREF(arg1);
-        Py_DECREF(arg2);
-        Py_DECREF(arg3);
-        goto error;
-    }
-    PyTuple_SET_ITEM(args, 0, arg0);
-    PyTuple_SET_ITEM(args, 1, arg1);
-    PyTuple_SET_ITEM(args, 2, arg2);
-    PyTuple_SET_ITEM(args, 3, arg3);
     if (PyCFunction_Check(target)) {
-        res = PyCFunction_Call(target, args, nullptr);
+        PyObject* args[4] = {arg0, arg1, arg2, arg3};
+        res = PyObject_Vectorcall(target, args, 4 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
     }
     else {
+        auto args = PyTuple_New(3);
+        if (args == nullptr) {
+            Py_DECREF(arg0);
+            Py_DECREF(arg1);
+            Py_DECREF(arg2);
+            Py_DECREF(arg3);
+            goto error;
+        }
+        PyTuple_SET_ITEM(args, 0, arg0);
+        PyTuple_SET_ITEM(args, 1, arg1);
+        PyTuple_SET_ITEM(args, 2, arg2);
+        PyTuple_SET_ITEM(args, 3, arg3);
         res = PyObject_Call(target, args, nullptr);
+        Py_DECREF(args);
     }
-    Py_DECREF(args);
-error:
+    error:
     Py_DECREF(target);
     return res;
 }
@@ -2104,22 +1989,6 @@ PyObject* MethCall3(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
 PyObject* MethCall4(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
     assert(false);
     return nullptr; // TODO : Implement a better approach.
-}
-
-PyObject* PyJit_KwCall1(PyObject* target, PyObject* arg0, PyObject* names) {
-	return nullptr;
-}
-
-PyObject* PyJit_KwCall2(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* names) {
-	return nullptr;
-}
-
-PyObject* PyJit_KwCall3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* names) {
-	return nullptr;
-}
-
-PyObject* PyJit_KwCall4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3, PyObject* names) {
-	return nullptr;
 }
 
 PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names) {

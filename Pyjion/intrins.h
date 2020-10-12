@@ -165,10 +165,6 @@ int PyJit_ImportStar(PyObject*from, PyFrameObject* f);
 PyObject* PyJit_CallArgs(PyObject* func, PyObject*callargs);
 PyObject* PyJit_CallKwArgs(PyObject* func, PyObject*callargs, PyObject*kwargs);
 
-PyObject* PyJit_KwCall1(PyObject *target, PyObject* arg0, PyObject* names);
-PyObject* PyJit_KwCall2(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* names);
-PyObject* PyJit_KwCall3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* names);
-PyObject* PyJit_KwCall4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3, PyObject* names);
 PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names);
 
 void PyJit_DebugDumpFrame(PyFrameObject* frame);
@@ -253,8 +249,6 @@ PyObject* Call1(PyObject *target, PyObject* arg0);
 PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1);
 PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2);
 PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3);
-
-PyObject* Call0_Generic(PyObject *target, void**addr);
 
 extern PyObject* g_emptyTuple;
 
