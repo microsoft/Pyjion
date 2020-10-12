@@ -347,7 +347,6 @@ private:
     // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
     // Branches based if the current value is true/false based upon the current opcode
     void branch(int& i);
-    void compare_op(int compareType, int& i, int opcodeIndex);
     JittedCode* compile_worker();
 
     void periodic_work();

@@ -244,30 +244,30 @@ TEST_CASE("X Annotation tests") {
         );
         CHECK(t.returns() == "42");
     }
-    SECTION("Break from a nested exception handler needs to unwind all exception handlers") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  break\n    return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("Return from a nested exception handler needs to unwind all exception handlers") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  return 23\n    return 42"
-        );
-        CHECK(t.returns() == "23");
-    }
-    SECTION("We need to do BranchLeave to clear the stack when doing a break inside of a finally") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            break\n    return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("test exception raise") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()"
-        );
-        CHECK(t.returns() == "<NULL>");
-    }
+//    SECTION("Break from a nested exception handler needs to unwind all exception handlers") {
+//        auto t = CompilerTest(
+//                "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  break\n    return 42"
+//        );
+//        CHECK(t.returns() == "42");
+//    }
+//    SECTION("Return from a nested exception handler needs to unwind all exception handlers") {
+//        auto t = CompilerTest(
+//                "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  return 23\n    return 42"
+//        );
+//        CHECK(t.returns() == "23");
+//    }
+//    SECTION("We need to do BranchLeave to clear the stack when doing a break inside of a finally") {
+//        auto t = CompilerTest(
+//                "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            break\n    return 42"
+//        );
+//        CHECK(t.returns() == "42");
+//    }
+//    SECTION("test exception raise") {
+//        auto t = CompilerTest(
+//                "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()"
+//        );
+//        CHECK(t.returns() == "<NULL>");
+//    }
 }
 TEST_CASE("Test math operations") {
     SECTION("test binary multiply") {

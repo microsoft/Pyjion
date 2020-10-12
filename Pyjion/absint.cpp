@@ -3017,43 +3017,7 @@ void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *lo
     inc_stack();
 }
 
-void AbstractInterpreter::compare_op(int compareType, int& i, int opcodeIndex) {
-    // TODO : Validate against new opcode
-    if (get_extended_opcode(i + sizeof(_Py_CODEUNIT)) == POP_JUMP_IF_FALSE) {
-        m_comp->emit_compare_exceptions_int();
-        dec_stack(2);
-        branch_or_error(i);
-    }
-    else {
-        // this will actually not currently be reached due to the way
-        // CPython generates code, but is left for completeness.
-        m_comp->emit_compare_exceptions();
-        dec_stack(2);
-        error_check("exc match failed");
-        inc_stack();
-    }
-}
-
 void AbstractInterpreter::load_fast(int local, int opcodeIndex) {
-    if (!should_box(opcodeIndex)) {
-        // We have an optimized local...
-        auto localInfo = get_local_info(opcodeIndex, local);
-        auto kind = localInfo.ValueInfo.Value->kind();
-        // We only optimize floats so far...
-        if (kind == AVK_Float) {
-            m_comp->emit_load_local(get_optimized_local(local, AVK_Float));
-            inc_stack(1, STACK_KIND_VALUE);
-            return;
-        }
-        else if (kind == AVK_Integer) {
-            m_comp->emit_load_local(get_optimized_local(local, AVK_Any));
-            m_comp->emit_dup();
-            m_comp->emit_incref(true);
-            inc_stack();
-            return;
-        }
-    }
-
     bool checkUnbound = m_assignmentState.find(local) == m_assignmentState.end() || !m_assignmentState.find(local)->second;
     load_fast_worker(local, checkUnbound);
     inc_stack();
