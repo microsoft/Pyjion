@@ -1439,7 +1439,8 @@ TEST_CASE("optimized cases") {
                 "def f():\n    def g(b:1, *, a = 2):\n     return a\n    return g(3)"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test51") {
+    }
+    SECTION("test51") {
         auto t = CompilerTest(
                 "def f():\n    def g(*, a = 2):\n     return a\n    return g()"
         );

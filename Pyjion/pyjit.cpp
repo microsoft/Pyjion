@@ -304,8 +304,8 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 
 			if (res == nullptr) {
 				static int failCount;
-				printf("Result from compile operation indicates failure, defaulting to EFD.\r\n");
 #ifdef DEBUG_TRACES
+                printf("Result from compile operation indicates failure, defaulting to EFD.\r\n");
 				interp.dump();
 #endif
 				trace->j_failed = true;

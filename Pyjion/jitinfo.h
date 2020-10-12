@@ -138,14 +138,13 @@ public:
     }
 
     BOOL logMsg(unsigned level, const char* fmt, va_list args) override {
-        if (level < 7) {
-#if JIT_FAIL_LOG
-            vprintf(fmt, args);
-#endif
-        }
-        //return TRUE;
-        // Change to FALSE if you want crazy-verbose logging from the JIT
+#ifdef DUMP_TRACES
+        vprintf(fmt, args);
         return FALSE;
+#else
+        return TRUE;
+#endif
+
     }
 
     int doAssert(const char* szFile, int iLine, const char* szExpr) override {
