@@ -2092,33 +2092,11 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 inc_stack();
                 break;
             case GET_ITER:
-                // GET_ITER can be followed by FOR_ITER, or a CALL_FUNCTION.                
             {
-                /*
-                bool optFor = false;
-                Local loopOpt1, loopOpt2;
-                if (GET_OPCODE(curByte + sizeof(_Py_CODEUNIT)) == FOR_ITER) {
-                for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != (-1); blockIndex--) {
-                if (m_blockStack[blockIndex].Kind == SETUP_LOOP) {
-                // save our iter variable so we can free it on break, continue, return, and
-                // when encountering an exception.
-                m_blockStack.data()[blockIndex].LoopOpt1 = loopOpt1 = m_comp->emit_define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-                m_blockStack.data()[blockIndex].LoopOpt2 = loopOpt2 = m_comp->emit_define_local(Parameter(CORINFO_TYPE_NATIVEINT));
-                optFor = true;
-                break;
-                }
-                }
-                }
-                */
-                /*if (optFor) {
-                m_comp->emit_getiter_opt();
-                }
-                else*/ {
-                    m_comp->emit_getiter();
-                    dec_stack();
-                    error_check("get iter failed");
-                    inc_stack();
-                }
+                m_comp->emit_getiter();
+                dec_stack();
+                error_check("get iter failed");
+                inc_stack();
             }
             break;
             case FOR_ITER:
