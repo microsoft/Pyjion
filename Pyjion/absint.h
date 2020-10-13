@@ -51,8 +51,6 @@ struct AbsIntBlockInfo {
     }
 };
 
-class InterpreterState;
-
 // The abstract interpreter implementation.  The abstract interpreter performs
 // static analysis of the Python byte code to determine what types are known.
 // Ultimately this information will feedback into code generation allowing
@@ -172,11 +170,138 @@ struct BlockInfo {
 };
 
 
+
+
+// Tracks the state of a local variable at each location in the function.
+// Each local has a known type associated with it as well as whether or not
+// the value is potentially undefined.  When a variable is definitely assigned
+// IsMaybeUndefined is false.
+//
+// Initially all locals start out as being marked as IsMaybeUndefined and a special
+// typeof Undefined.  The special type is really just for convenience to avoid
+// having null types.  Merging with the undefined type will produce the other type.
+// Assigning to a variable will cause the undefined marker to be removed, and the
+// new type to be specified.
+//
+// When we merge locals if the undefined flag is specified from either side we will
+// propagate it to the new state.  This could result in:
+//
+// State 1: Type != Undefined, IsMaybeUndefined = false
+//      The value is definitely assigned and we have valid type information
+//
+// State 2: Type != Undefined, IsMaybeUndefined = true
+//      The value is assigned in one code path, but not in another.
+//
+// State 3: Type == Undefined, IsMaybeUndefined = true
+//      The value is definitely unassigned.
+//
+// State 4: Type == Undefined, IsMaybeUndefined = false
+//      This should never happen as it means the Undefined
+//      type has leaked out in an odd way
+struct AbstractLocalInfo {
+    AbstractLocalInfo() = default;
+
+    AbstractValueWithSources ValueInfo;
+    bool IsMaybeUndefined;
+
+    AbstractLocalInfo(AbstractValueWithSources valueInfo, bool isUndefined = false) : ValueInfo(valueInfo) {
+        IsMaybeUndefined = true;
+        assert(valueInfo.Value != nullptr);
+        assert(!(valueInfo.Value == &Undefined && !isUndefined));
+        IsMaybeUndefined = isUndefined;
+    }
+
+    AbstractLocalInfo merge_with(AbstractLocalInfo other) const {
+        return {
+            ValueInfo.merge_with(other.ValueInfo),
+            IsMaybeUndefined || other.IsMaybeUndefined
+            };
+    }
+
+    bool operator== (AbstractLocalInfo other) {
+        return other.ValueInfo == ValueInfo &&
+            other.IsMaybeUndefined == IsMaybeUndefined;
+    }
+    bool operator!= (AbstractLocalInfo other) {
+        return other.ValueInfo != ValueInfo ||
+            other.IsMaybeUndefined != IsMaybeUndefined;
+    }
+};
+
+// Represents the state of the program at each opcode.  Captures the state of both
+// the Python stack and the local variables.  We store the state for each opcode in
+// AbstractInterpreter.m_startStates which represents the state before the indexed
+// opcode has been executed.
+//
+// The stack is a unique vector for each interpreter state.  There's currently no
+// attempts at sharing because most instructions will alter the value stack.
+//
+// The locals are shared between InterpreterState's using a shared_ptr because the
+// values of locals won't change between most opcodes (via CowVector).  When updating
+// a local we first check if the locals are currently shared, and if not simply update
+// them in place.  If they are shared then we will issue a copy.
+class InterpreterState {
+public:
+    vector<AbstractValueWithSources> m_stack;
+    CowVector<AbstractLocalInfo> m_locals;
+
+    InterpreterState() = default;
+
+    explicit InterpreterState(int numLocals) {
+        m_locals = CowVector<AbstractLocalInfo>(numLocals);
+    }
+
+    AbstractLocalInfo get_local(size_t index) {
+        return m_locals[index];
+    }
+
+    size_t local_count() {
+        return m_locals.size();
+    }
+
+    void replace_local(size_t index, AbstractLocalInfo value) {
+        m_locals.replace(index, value);
+    }
+
+    AbstractValue* pop() {
+        assert(!m_stack.empty());
+        auto res = m_stack.back();
+        res.escapes();
+        m_stack.pop_back();
+        return res.Value;
+    }
+
+    AbstractValueWithSources pop_no_escape() {
+        assert(!m_stack.empty());
+        auto res = m_stack.back();
+        m_stack.pop_back();
+        return res;
+    }
+
+    void push(AbstractValueWithSources& value) {
+        m_stack.push_back(value);
+    }
+
+    void push(AbstractValue* value) {
+        // TODO : Use emplace_back instead?
+        m_stack.push_back(value);
+    }
+
+    size_t stack_size() const {
+        return m_stack.size();
+    }
+
+    AbstractValueWithSources& operator[](const size_t index) {
+        return m_stack[index];
+    }
+};
+
+
 #ifdef _WIN32
 class __declspec(dllexport) AbstractInterpreter {
 #pragma warning (disable:4251)
 #else
-    class AbstractInterpreter {
+class AbstractInterpreter {
 #endif
     // ** Results produced:
     // Tracks the interpreter state before each opcode
@@ -185,7 +310,7 @@ class __declspec(dllexport) AbstractInterpreter {
 
     // ** Inputs:
     PyCodeObject* m_code;
-	_Py_CODEUNIT *m_byteCode;
+    _Py_CODEUNIT *m_byteCode;
     size_t m_size;
     Local m_errorCheckLocal;
 
@@ -271,7 +396,7 @@ public:
 
 private:
     const char * op_to_string(int op);
-	void compile_pop_block();
+    void compile_pop_block();
     AbstractValue* to_abstract(PyObject* obj);
     AbstractValue* to_abstract(AbstractValueKind kind);
     bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
@@ -348,8 +473,8 @@ private:
 
     void inc_stack(size_t size = 1, bool kind = STACK_KIND_OBJECT);
 
-	// Gets the next opcode skipping for EXTENDED_ARG
-	int get_extended_opcode(int curByte);
+    // Gets the next opcode skipping for EXTENDED_ARG
+    int get_extended_opcode(int curByte);
 
     // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
     // If the value on the stack is -1, we branch to the current error handler.
@@ -386,134 +511,6 @@ private:
 
     void debug_log(const char* fmt, ...);
 };
-
-
-
-// Tracks the state of a local variable at each location in the function.
-// Each local has a known type associated with it as well as whether or not
-// the value is potentially undefined.  When a variable is definitely assigned
-// IsMaybeUndefined is false.
-//
-// Initially all locals start out as being marked as IsMaybeUndefined and a special
-// typeof Undefined.  The special type is really just for convenience to avoid
-// having null types.  Merging with the undefined type will produce the other type.
-// Assigning to a variable will cause the undefined marker to be removed, and the
-// new type to be specified.
-//
-// When we merge locals if the undefined flag is specified from either side we will
-// propagate it to the new state.  This could result in:
-//
-// State 1: Type != Undefined, IsMaybeUndefined = false
-//      The value is definitely assigned and we have valid type information
-//
-// State 2: Type != Undefined, IsMaybeUndefined = true
-//      The value is assigned in one code path, but not in another.
-//
-// State 3: Type == Undefined, IsMaybeUndefined = true
-//      The value is definitely unassigned.
-//
-// State 4: Type == Undefined, IsMaybeUndefined = false
-//      This should never happen as it means the Undefined
-//      type has leaked out in an odd way
-struct AbstractLocalInfo {
-    AbstractLocalInfo() = default;
-
-    AbstractValueWithSources ValueInfo;
-    bool IsMaybeUndefined;
-
-    AbstractLocalInfo(AbstractValueWithSources valueInfo, bool isUndefined = false) : ValueInfo(valueInfo) {
-        IsMaybeUndefined = true;
-        assert(valueInfo.Value != nullptr);
-        assert(!(valueInfo.Value == &Undefined && !isUndefined));
-        IsMaybeUndefined = isUndefined;
-    }
-
-    AbstractLocalInfo merge_with(AbstractLocalInfo other) const {
-        return {
-            ValueInfo.merge_with(other.ValueInfo),
-            IsMaybeUndefined || other.IsMaybeUndefined
-            };
-    }
-
-    bool operator== (AbstractLocalInfo other) {
-        return other.ValueInfo == ValueInfo &&
-            other.IsMaybeUndefined == IsMaybeUndefined;
-    }
-    bool operator!= (AbstractLocalInfo other) {
-        return other.ValueInfo != ValueInfo ||
-            other.IsMaybeUndefined != IsMaybeUndefined;
-    }
-};
-
-
-// Represents the state of the program at each opcode.  Captures the state of both
-// the Python stack and the local variables.  We store the state for each opcode in
-// AbstractInterpreter.m_startStates which represents the state before the indexed
-// opcode has been executed.
-//
-// The stack is a unique vector for each interpreter state.  There's currently no
-// attempts at sharing because most instructions will alter the value stack.
-//
-// The locals are shared between InterpreterState's using a shared_ptr because the
-// values of locals won't change between most opcodes (via CowVector).  When updating
-// a local we first check if the locals are currently shared, and if not simply update
-// them in place.  If they are shared then we will issue a copy.
-class InterpreterState {
-public:
-    vector<AbstractValueWithSources> m_stack;
-    CowVector<AbstractLocalInfo> m_locals;
-
-    InterpreterState() = default;
-
-    explicit InterpreterState(int numLocals) {
-        m_locals = CowVector<AbstractLocalInfo>(numLocals);
-    }
-
-    AbstractLocalInfo get_local(size_t index) {
-        return m_locals[index];
-    }
-
-    size_t local_count() {
-        return m_locals.size();
-    }
-
-    void replace_local(size_t index, AbstractLocalInfo value) {
-        m_locals.replace(index, value);
-    }
-
-    AbstractValue* pop() {
-        assert(!m_stack.empty());
-        auto res = m_stack.back();
-        res.escapes();
-        m_stack.pop_back();
-        return res.Value;
-    }
-
-    AbstractValueWithSources pop_no_escape() {
-        assert(!m_stack.empty());
-        auto res = m_stack.back();
-        m_stack.pop_back();
-        return res;
-    }
-
-    void push(AbstractValueWithSources& value) {
-        m_stack.push_back(value);
-    }
-
-    void push(AbstractValue* value) {
-        // TODO : Use emplace_back instead?
-        m_stack.push_back(value);
-    }
-
-    size_t stack_size() const {
-        return m_stack.size();
-    }
-
-    AbstractValueWithSources& operator[](const size_t index) {
-        return m_stack[index];
-    }
-};
-
 
 
 #endif
