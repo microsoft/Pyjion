@@ -1783,6 +1783,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
         auto curStackDepth = m_offsetStack.find(curByte);
         if (curStackDepth != m_offsetStack.end()) {
+#ifdef DUMP_TRACES
+            printf("Recovering stack position to size %d\n", curStackDepth->second.size());
+#endif
             m_stack = curStackDepth->second;
         }
 
@@ -1797,10 +1800,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             compile_pop_block();
         }
 
-        // update f_lasti
-        //if (!can_skip_lasti_update(curByte)) {
         m_comp->emit_lasti_update(curByte);
-        //}
 
         int curStackSize = m_stack.size();
         bool skipEffect = false;
@@ -1809,6 +1809,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case NOP: break;
             case ROT_TWO: 
             {
+                assert(curStackSize >= 2);
                 std::swap(m_stack[m_stack.size() - 1], m_stack[m_stack.size() - 2]);
 
                 if (!should_box(opcodeIndex)) {
@@ -1829,6 +1830,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case ROT_THREE: 
             {
+                assert(curStackSize >= 3);
                 std::swap(m_stack[m_stack.size() - 1], m_stack[m_stack.size() - 2]);
                 std::swap(m_stack[m_stack.size() - 2], m_stack[m_stack.size() - 3]);
 
@@ -1853,7 +1855,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case POP_TOP:
                 m_comp->emit_pop_top();
                 dec_stack();
-                //skipEffect = true;
                 break;
             case DUP_TOP:
                 m_comp->emit_dup_top();
@@ -2244,8 +2245,14 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                 vector<bool> newStack = m_stack;
                 newStack.push_back(STACK_KIND_OBJECT);
+                newStack.push_back(STACK_KIND_OBJECT);
+                newStack.push_back(STACK_KIND_OBJECT);
+                newStack.push_back(STACK_KIND_OBJECT);
+                newStack.push_back(STACK_KIND_OBJECT);
+                newStack.push_back(STACK_KIND_OBJECT);
+
                 m_offsetStack[oparg + curByte + sizeof(_Py_CODEUNIT)] = newStack;
-                inc_stack(6);
+                skipEffect = true; // has jump
             }
             break;
             case POP_EXCEPT: pop_except(); skipEffect = true; break;
@@ -2467,7 +2474,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
         assert(skipEffect || PyCompile_OpcodeStackEffect(byte, oparg) == (m_stack.size() - curStackSize));
 
 #ifdef DUMP_TRACES
-        m_comp->dump(ilLen);
+        //m_comp->dump(ilLen);
 #endif
     }
 
