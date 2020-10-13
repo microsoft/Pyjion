@@ -1844,8 +1844,7 @@ fast_function(PyObject *func, PyObject **pp_stack, int n) {
 PyObject* Call0(PyObject *target) {
     PyObject* res = nullptr;
     if (PyCFunction_Check(target)) {
-        PyObject* args[0] = {};
-        res = PyObject_Vectorcall(target, args, 0 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
+        res = PyObject_Vectorcall(target, nullptr, 0 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
     }
     else {
         res = PyObject_CallNoArgs(target);

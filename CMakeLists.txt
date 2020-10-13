@@ -116,9 +116,7 @@ set_target_properties(
 )
 
 target_link_libraries(pyjion ${Python3_LIBRARIES})
-if (NOT WIN32)
-    target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})
-endif()
+
 
 # Testing
 add_subdirectory(Tests/Catch)
@@ -127,4 +125,11 @@ add_executable(unit_tests ${TEST_SOURCES} $<TARGET_OBJECTS:pyjionlib>)
 target_include_directories(unit_tests PRIVATE Pyjion)
 target_link_libraries(unit_tests Catch2::Catch2)
 target_link_libraries(unit_tests ${Python3_LIBRARIES})
-target_link_libraries(unit_tests ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})
+
+if (NOT WIN32)
+    target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})
+    target_link_libraries(unit_tests ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD}/${CLR_JIT_LIB})
+else ()
+    target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
+    target_link_libraries(unit_tests ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
+endif()
