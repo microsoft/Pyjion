@@ -2102,7 +2102,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     opcodeIndex, 
                     loopBlock
                 );
-                inc_stack();
+                skipEffect = true; // has jump effect
                 break;
             }
             case SET_ADD:
