@@ -358,8 +358,7 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     lastState.pop();
                     lastState.pop();
-                    merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
-                    goto next;
+                    break;
                 }
                 case LOAD_CONST: {
                     auto constSource = add_const_source(opcodeIndex, oparg);
@@ -1844,11 +1843,13 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 error_check("load build class failed");
                 inc_stack();
                 break;
-            case RERAISE:
+            case RERAISE: {
                 m_comp->emit_reraise();
                 dec_stack(3);
-                m_blockStack.pop_back();
+                auto& curHandler = get_ehblock();
+                m_comp->emit_branch(BranchAlways, curHandler.ReRaise);
                 break;
+            }
             case JUMP_ABSOLUTE: jump_absolute(oparg, opcodeIndex); break;
             case JUMP_FORWARD:  jump_absolute(oparg + curByte + sizeof(_Py_CODEUNIT), opcodeIndex); break;
             case JUMP_IF_FALSE_OR_POP:
