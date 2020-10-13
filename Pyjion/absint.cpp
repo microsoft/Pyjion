@@ -1847,7 +1847,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case JUMP_FORWARD:  jump_absolute(oparg + curByte + sizeof(_Py_CODEUNIT), opcodeIndex); break;
             case JUMP_IF_FALSE_OR_POP:
             case JUMP_IF_TRUE_OR_POP: jump_if_or_pop(byte != JUMP_IF_FALSE_OR_POP, opcodeIndex, oparg); break;
-            case JUMP_IF_NOT_EXC_MATCH: jump_if_not_exact(opcodeIndex, oparg); break;
+            case JUMP_IF_NOT_EXC_MATCH:
+                jump_if_not_exact(opcodeIndex, oparg);
+                break;
             case POP_JUMP_IF_TRUE:
             case POP_JUMP_IF_FALSE: pop_jump_if(byte != POP_JUMP_IF_FALSE, opcodeIndex, oparg); break;
             case LOAD_NAME:
@@ -3002,27 +3004,14 @@ void AbstractInterpreter::jump_absolute(size_t index, size_t from) {
 }
 
 void AbstractInterpreter::jump_if_not_exact(int opcodeIndex, int jumpTo) {
-    if (jumpTo <= opcodeIndex) {
+    if (jumpTo <= opcodeIndex) { // if going backward, spin the CPU a bit
         periodic_work();
     }
     auto target = getOffsetLabel(jumpTo);
-
-    auto noJump = m_comp->emit_define_label();
-    auto willJump = m_comp->emit_define_label();
-
     m_comp->emit_compare_exceptions_int();
     dec_stack(2);
-//    m_comp->emit_dup();
-//    int_error_check("failed to check exact match");
-
-    m_comp->emit_int(0);
-    m_comp->emit_branch(BranchEqual, noJump);
-
-    m_comp->emit_mark_label(willJump);
-    m_comp->emit_branch(BranchAlways, target);
-
-    m_comp->emit_mark_label(noJump);
-
+    raise_on_negative_one();
+    m_comp->emit_branch(BranchFalse, target);
     m_offsetStack[jumpTo] = m_stack;
 }
 
