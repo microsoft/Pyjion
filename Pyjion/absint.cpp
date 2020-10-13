@@ -29,7 +29,7 @@
  * Need implementation:
  *  - Implement JUMP_IF_NOT_EXC_MATCH
  *  - Implement WITH_EXCEPT_START
- *  - Implement RERAISE
+ *  - Test RERAISE
  *  - Implement END_ASYNC_FOR
  *  - Implement GET_AITER
  *  Implemented (need unit tests)
@@ -355,12 +355,11 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case RERAISE: {
-                    // RERAISE not implemented
-                    return false;
                     lastState.pop();
                     lastState.pop();
                     lastState.pop();
-                    break;
+                    merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
+                    goto next;
                 }
                 case LOAD_CONST: {
                     auto constSource = add_const_source(opcodeIndex, oparg);
@@ -1809,47 +1808,17 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case NOP: break;
             case ROT_TWO: 
             {
-                assert(curStackSize >= 2);
-                std::swap(m_stack[m_stack.size() - 1], m_stack[m_stack.size() - 2]);
-
-                if (!should_box(opcodeIndex)) {
-                    auto stackInfo = get_stack_info(opcodeIndex);
-                    auto top_kind = stackInfo[stackInfo.size() - 1].Value->kind();
-                    auto second_kind = stackInfo[stackInfo.size() - 2].Value->kind();
-
-                    if (top_kind == AVK_Float && second_kind == AVK_Float) {
-                        m_comp->emit_rot_two(LK_Float);
-                        break;
-                    } else if (top_kind == AVK_Integer && second_kind == AVK_Integer) {
-                        m_comp->emit_rot_two(LK_Pointer);
-                        break;
-                    }
-                }
                 m_comp->emit_rot_two();
                 break;
             }
             case ROT_THREE: 
             {
-                assert(curStackSize >= 3);
-                std::swap(m_stack[m_stack.size() - 1], m_stack[m_stack.size() - 2]);
-                std::swap(m_stack[m_stack.size() - 2], m_stack[m_stack.size() - 3]);
-
-                if (!should_box(opcodeIndex)) {
-                    auto stackInfo = get_stack_info(opcodeIndex);
-                    auto top_kind = stackInfo[stackInfo.size() - 1].Value->kind();
-                    auto second_kind = stackInfo[stackInfo.size() - 2].Value->kind();
-                    auto third_kind = stackInfo[stackInfo.size() - 3].Value->kind();
-
-                    if (top_kind == AVK_Float && second_kind == AVK_Float && third_kind == AVK_Float) {
-                        m_comp->emit_rot_three(LK_Float);
-                        break;
-                    }
-                    else if (top_kind == AVK_Integer && second_kind == AVK_Integer && third_kind == AVK_Integer) {
-                        m_comp->emit_rot_three(LK_Pointer);
-                        break;
-                    }
-                }
                 m_comp->emit_rot_three();
+                break;
+            }
+            case ROT_FOUR:
+            {
+                m_comp->emit_rot_four();
                 break;
             }
             case POP_TOP:
@@ -1858,7 +1827,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             case DUP_TOP:
                 m_comp->emit_dup_top();
-                m_stack.push_back(m_stack.back());
+                m_stack.push_back(m_stack.back()); // does inc_stack
                 break;
             case DUP_TOP_TWO:
                 inc_stack(2);
@@ -1874,6 +1843,11 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_load_build_class();
                 error_check("load build class failed");
                 inc_stack();
+                break;
+            case RERAISE:
+                m_comp->emit_reraise();
+                dec_stack(3);
+                m_blockStack.pop_back();
                 break;
             case JUMP_ABSOLUTE: jump_absolute(oparg, opcodeIndex); break;
             case JUMP_FORWARD:  jump_absolute(oparg + curByte + sizeof(_Py_CODEUNIT), opcodeIndex); break;
@@ -2579,27 +2553,6 @@ void AbstractInterpreter::compile_pop_block() {
     }
 }
 
-const char* AbstractInterpreter::op_to_string(int op) {
-    switch(op) {
-        case BINARY_AND: 
-        case INPLACE_AND:
-            return "&";
-        case  INPLACE_OR:
-        case  BINARY_OR:
-            return "|";
-        case  INPLACE_LSHIFT: 
-        case  BINARY_LSHIFT: 
-            return "<<";
-        case  INPLACE_RSHIFT:
-        case  BINARY_RSHIFT:
-            return ">>";
-        case  INPLACE_XOR:
-        case  BINARY_XOR:
-            return "^";
-    }
-    return "?";
-}
-
 void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
     auto handler = m_allHandlers[handlerIndex];
     auto reraiseAndFreeLabels = get_reraise_and_free_labels(handler.RaiseAndFreeId);
@@ -2707,24 +2660,7 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
     auto target = getOffsetLabel(jumpTo);
     m_offsetStack[jumpTo] = m_stack;
     dec_stack();
-    
-    if (!one.needs_boxing()) {
-        switch (one.Value->kind()) {
-            case AVK_Float:
-                m_comp->emit_dup();
-                m_comp->emit_float(0);
-                m_comp->emit_branch(isTrue ? BranchNotEqual : BranchEqual, target);
-                m_comp->emit_pop_top();
-                return;
-            case AVK_Integer:
-                m_comp->emit_dup();
-                m_comp->emit_unary_not_tagged_int_push_bool();
-                m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, target);
-                m_comp->emit_pop_top();
-                return;
-        }
-    }
-    
+
     auto tmp = m_comp->emit_spill();
     auto noJump = m_comp->emit_define_label();
     auto willJump = m_comp->emit_define_label();

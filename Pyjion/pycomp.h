@@ -263,6 +263,8 @@ public:
 
     virtual void emit_rot_three(LocalKind kind = LK_Pointer);
 
+    virtual void emit_rot_four(LocalKind kind = LK_Pointer);
+
     virtual void emit_pop_top();
 
     virtual void emit_dup_top();
@@ -435,6 +437,7 @@ public:
 
     virtual void emit_unwind_eh(Local prevExc, Local prevExcVal, Local prevTraceback);
     virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback);
+    virtual void emit_reraise();
     virtual void emit_restore_err();
     virtual void emit_pyerr_setstring(void* exception, const char*msg);
 

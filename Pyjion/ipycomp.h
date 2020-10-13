@@ -86,6 +86,8 @@ public:
      * Basic Python stack manipulations */
     virtual void emit_rot_two(LocalKind kind = LK_Pointer) = 0;
     virtual void emit_rot_three(LocalKind kind = LK_Pointer) = 0;
+    virtual void emit_rot_four(LocalKind kind = LK_Pointer) = 0;
+
     // Pops the top value from the stack and decrements its refcount
     virtual void emit_pop_top() = 0;
     // Dups the top value on the stack (and bumps its ref count)
@@ -400,6 +402,8 @@ public:
     virtual void emit_prepare_exception(Local prevExc, Local prevExcVal, Local prevTraceback) = 0;
     // Restores the previous exception for nested exception handling
     virtual void emit_restore_err() = 0;
+    // Restores the previous exception from the top 3 values on the stack
+    virtual void emit_reraise() = 0;
     // Compares to see if an exception is handled, pushing a Python bool onto the stack
     virtual void emit_compare_exceptions() = 0;
     // Compares to see if an exception is handled, pushing an int on the stack indicating true (1), false (0), or error (-1)

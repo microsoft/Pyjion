@@ -230,6 +230,28 @@ void PythonCompiler::emit_rot_three(LocalKind kind) {
     m_il.free_local(third);
 }
 
+void PythonCompiler::emit_rot_four(LocalKind kind) {
+    auto top = m_il.define_local(Parameter(to_clr_type(kind)));
+    auto second = m_il.define_local(Parameter(to_clr_type(kind)));
+    auto third = m_il.define_local(Parameter(to_clr_type(kind)));
+    auto fourth = m_il.define_local(Parameter(to_clr_type(kind)));
+
+    m_il.st_loc(top);
+    m_il.st_loc(second);
+    m_il.st_loc(third);
+    m_il.st_loc(fourth);
+
+    m_il.ld_loc(top);
+    m_il.ld_loc(fourth);
+    m_il.ld_loc(third);
+    m_il.ld_loc(second);
+
+    m_il.free_local(top);
+    m_il.free_local(second);
+    m_il.free_local(third);
+    m_il.free_local(fourth);
+}
+
 void PythonCompiler::emit_pop_top() {
     decref();
 }
@@ -769,6 +791,10 @@ void PythonCompiler::emit_unbox_float() {
     m_il.ld_i(offsetof(PyFloatObject, ob_fval));
     m_il.add();
     m_il.ld_ind_r8();
+}
+
+void PythonCompiler::emit_reraise() {
+    m_il.emit_call(METHOD_UNWIND_EH, 3);
 }
 
 void PythonCompiler::emit_tagged_int(size_t value) {
