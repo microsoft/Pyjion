@@ -94,6 +94,7 @@ if (LINUX)
     set(CLR_CMAKE_HOST_UNIX 1)
     add_definitions(-DFEATURE_SIMD)
     add_definitions(-DFEATURE_HW_INTRINSICS)
+    add_compile_options(-fPIC)
 endif()
 
 if (APPLE)
