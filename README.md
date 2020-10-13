@@ -2,9 +2,9 @@
 Designing a JIT API for CPython
 
 ## A note on development
-This is a side project at work for the project maintainers, and so progress can be
-sporadic. In spite of that we do accept contributions at any time and will attempt
-to respond to them promptly.
+This was a side project at work for the project maintainers, but one of them has
+left the company. In spite of that we do accept contributions at any time and
+will attempt to respond to them promptly.
 
 ## FAQ
 
@@ -30,11 +30,6 @@ Goal #3 is to abstract out all of the common bits required to write a JIT
 implementation for CPython. The idea is to create a framework where JIT
 implementations only have to worry about JIT-specific stuff like _how_ to do
 addition and not _when_ to do addition.
-
-### Is there a Python Enhancement Proposal (PEP) for this?
-We have written a
-[PEP](https://github.com/python/peps/blob/master/pep-0523.txt),
-it was accepted by the Python development team, and will be implemented in Python 3.6.
 
 ### How do you pronounce "Pyjion"?
 Like the word "pigeon". @DinoV wanted a name that had something with "Python"
