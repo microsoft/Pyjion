@@ -414,7 +414,6 @@ public:
     virtual void emit_compare_object(int compareType);
     virtual void emit_compare_float(int compareType);
     virtual void emit_compare_tagged_int(int compareType);
-    virtual bool emit_compare_object_push_int(int compareType);
 
     virtual void emit_store_fast(int local);
 
@@ -472,8 +471,6 @@ private:
 
     void load_local(int oparg);
     void decref();
-
-    void call_optimizing_function(int baseFunction, int size);
 
     CorInfoType to_clr_type(LocalKind kind);
 };

@@ -626,7 +626,7 @@ void PythonCompiler::emit_call_kwargs() {
 
 bool PythonCompiler::emit_call(size_t argCnt) {
     switch (argCnt) {
-        case 0: call_optimizing_function(METHOD_CALL0_TOKEN, 1); return true;
+        case 0: m_il.emit_call(METHOD_CALL0_TOKEN, 1); return true;
         case 1: m_il.emit_call(METHOD_CALL1_TOKEN, 2); return true;
         case 2: m_il.emit_call(METHOD_CALL2_TOKEN, 3); return true;
         case 3: m_il.emit_call(METHOD_CALL3_TOKEN, 4); return true;
@@ -665,14 +665,6 @@ bool PythonCompiler::emit_kwcall(size_t argCnt) {
 
 void PythonCompiler::emit_kwcall_with_tuple() {
 	m_il.emit_call(METHOD_KWCALLN_TOKEN, 3);
-}
-
-void PythonCompiler::call_optimizing_function(int baseFunction, int size) {
-    auto id = new IndirectDispatchMethod(g_module.m_methods[baseFunction]);
-    m_il.ld_i(&id->m_addr);
-    auto token = (int)(FIRST_USER_FUNCTION_TOKEN + m_module->m_methods.size());
-    m_module->m_methods[token] = id;
-    m_il.emit_call(token, size);
 }
 
 void PythonCompiler::emit_store_local(Local local) {
@@ -1138,21 +1130,6 @@ void PythonCompiler::emit_compare_tagged_int(int compareType) {
 void PythonCompiler::emit_compare_object(int compareType) {
     m_il.ld_i4(compareType);
     m_il.emit_call(METHOD_RICHCMP_TOKEN, 3);
-}
-
-bool PythonCompiler::emit_compare_object_push_int(int compareType) {
-    switch (compareType) {
-        case Py_EQ:
-            call_optimizing_function(METHOD_RICHEQUALS_GENERIC_TOKEN, 3);
-            return true;
-        case Py_LT:
-        case Py_LE:
-        case Py_NE:
-        case Py_GT:
-        case Py_GE:
-            break;
-    }
-    return false;
 }
 
 void PythonCompiler::emit_load_method(void* name) {

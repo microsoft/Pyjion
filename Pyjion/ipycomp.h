@@ -382,8 +382,6 @@ public:
 
     // Performs a comparison for values on the stack which are objects, keeping a boxed Python object as the result.
     virtual void emit_compare_object(int compareType) = 0;
-    // Performs a comparison of two Python objects on the stack keeping an unboxed bool on the stack as the result
-    virtual bool emit_compare_object_push_int(int compareType) = 0;
     // Performs a comparison of two unboxed floating point values on the stack
     virtual void emit_compare_float(int compareType) = 0;
     // Performs a comparison of two tagged integers

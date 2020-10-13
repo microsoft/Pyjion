@@ -244,30 +244,8 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
     auto trace = (PyjionJittedCode*)state;
     auto tstate = PyThreadState_Get();
 	SpecializedTreeNode* target = nullptr;
-    for (auto cur = trace->j_optimized.begin(); cur != trace->j_optimized.end() && target == nullptr; cur++) {
-        PyObject** locals = frame->f_localsplus;
-
-		target = *cur;
-        for (auto type = target->types.begin(); type != target->types.end(); type++, locals++) {
-            PyTypeObject *argType = nullptr;
-            if (*locals != nullptr) {
-                argType = (*locals)->ob_type;
-                // We currently only generate optimal code for ints and floats,
-                // so don't bother specializing on other types...
-                if (argType != &PyLong_Type && argType != &PyFloat_Type) {
-                    argType = nullptr;
-                }
-            }
-
-            if (*type != argType) {
-				target = nullptr;
-                break;
-            }
-        }
-    }
 
     // record the new trace...
-    // TODO : This always evaluates to false. Find out what this code was supposed to accomplish
     if (target == nullptr && trace->j_optimized.size() < MAX_TRACE) {
         int argCount = frame->f_code->co_argcount + frame->f_code->co_kwonlyargcount;
         vector<PyTypeObject*> types;
@@ -303,14 +281,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 
 			auto res = interp.compile();
 			bool isSpecialized = false;
-			for (int i = 0; i < argCount; i++) {
-				auto type = GetAbstractType(GetArgType(i, frame->f_localsplus));
-				if (type == AVK_Integer || type == AVK_Float) {
-					if (!interp.get_local_info(0, i).ValueInfo.needs_boxing()) {
-						isSpecialized = true;
-					}
-				}
-			}
+
 #ifdef DEBUG_TRACE
 			printf("Tracing %s from %s line %d %s\r\n",
 				PyUnicode_AsUTF8(frame->f_code->co_name),
@@ -350,6 +321,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 }
 
 bool jit_compile(PyCodeObject* code) {
+    // TODO : support for generator expressions
 	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
         return false;
     }
@@ -411,11 +383,9 @@ PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject) {
 // eventually compile it and invoke it.  If it's not time to compile it yet then we'll
 // invoke the default evaluation function.
 PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
-	//auto err = GetLastError();
 	auto jitted = PyJit_EnsureExtra((PyObject*)f->f_code);
 	if (jitted != nullptr && !throwflag) {
 		if (jitted->j_evalfunc != nullptr) {
-			//SetLastError(err);
 #ifdef DEBUG_CALL_TRACE
 			printf("Calling %s from %s line %d %p\r\n",
 				PyUnicode_AsUTF8(f->f_code->co_name),
@@ -429,7 +399,6 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 		else if (!jitted->j_failed && jitted->j_run_count++ >= jitted->j_specialization_threshold) {
 			if (jit_compile(f->f_code)) {
 				// execute the jitted code...
-				//SetLastError(err);
 #ifdef DEBUG_CALL_TRACE
 				printf("Calling first %s from %s line %d %p\r\n",
 					PyUnicode_AsUTF8(f->f_code->co_name),
@@ -445,7 +414,6 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 			jitted->j_failed = true;
 		}
 	}
-	//SetLastError(err);
 #ifdef DEBUG_CALL_TRACE
 	printf("Falling to EFD %s from %s line %d %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),

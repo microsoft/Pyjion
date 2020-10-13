@@ -611,10 +611,6 @@ bool AbstractInterpreter::interpret() {
                         lastState.pop();
                     }
 
-                    // TODO: If the function was a known quantity we could
-                    // abstract interpret it here with the known args, and
-                    // potentially consider inlining it.
-
                     // pop the function...
                     lastState.pop();
 
