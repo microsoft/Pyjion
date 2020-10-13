@@ -124,6 +124,12 @@ set_target_properties(
         LINKER_LANGUAGE C
 )
 
+if (LINUX)
+    set_target_properties(pyjion PROPERTIES
+            POSITION_INDEPENDENT_CODE ON
+            )
+endif()
+
 target_link_libraries(pyjion ${Python3_LIBRARIES})
 
 # Testing
