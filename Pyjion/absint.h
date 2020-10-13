@@ -38,7 +38,19 @@
 using namespace std;
 
 struct AbstractLocalInfo;
-struct AbsIntBlockInfo;
+
+// Tracks block information for analyzing loops, exception blocks, and break opcodes.
+struct AbsIntBlockInfo {
+    size_t BlockStart, BlockEnd;
+    bool IsLoop;
+
+    AbsIntBlockInfo(size_t blockStart, size_t blockEnd, bool isLoop) {
+        BlockStart = blockStart;
+        BlockEnd = blockEnd;
+        IsLoop = isLoop;
+    }
+};
+
 class InterpreterState;
 
 // The abstract interpreter implementation.  The abstract interpreter performs
@@ -502,16 +514,6 @@ public:
     }
 };
 
-// Tracks block information for analyzing loops, exception blocks, and break opcodes.
-struct AbsIntBlockInfo {
-    size_t BlockStart, BlockEnd;
-    bool IsLoop;
 
-    AbsIntBlockInfo(size_t blockStart, size_t blockEnd, bool isLoop) {
-        BlockStart = blockStart;
-        BlockEnd = blockEnd;
-        IsLoop = isLoop;
-    }
-};
 
 #endif
