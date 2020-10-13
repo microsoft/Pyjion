@@ -266,7 +266,7 @@ TEST_CASE("X Annotation tests") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()"
         );
-        CHECK(t.returns() == "<NULL>");
+        CHECK(t.raises() == PyExc_Exception);
     }
 }
 TEST_CASE("Test math operations") {
