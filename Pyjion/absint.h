@@ -369,6 +369,7 @@ private:
 
     void jump_if_or_pop(bool isTrue, int opcodeIndex, int offset);
     void pop_jump_if(bool isTrue, int opcodeIndex, int offset);
+    void jump_if_not_exact(int opcodeIndex, int jumpTo);
     void test_bool_and_branch(Local value, bool isTrue, Label target);
 
     void debug_log(const char* fmt, ...);

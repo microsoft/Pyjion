@@ -657,7 +657,7 @@ PyObject* PyJit_CompareExceptions(PyObject*v, PyObject* w) {
     return v;
 }
 
-// Returns 2 on an error, 1 if the exceptions match, or 0 if they don't.
+// Returns -1 on an error, 1 if the exceptions match, or 0 if they don't.
 int PyJit_CompareExceptions_Int(PyObject*v, PyObject* w) {
     if (PyTuple_Check(w)) {
         Py_ssize_t i, length;

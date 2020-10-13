@@ -203,13 +203,6 @@ bool AbstractInterpreter::preprocess() {
 
 void AbstractInterpreter::set_local_type(int index, AbstractValueKind kind) {
     auto& lastState = m_startStates[0];
-//    if (kind == AVK_Integer || kind == AVK_Float) {
-//        // Replace our starting state with a local which has a known source
-//        // so that we know it's boxed...
-//        auto localInfo = AbstractLocalInfo(to_abstract(kind));
-//        localInfo.ValueInfo.Sources = new_source(new LocalSource());
-//        lastState.replace_local(index, localInfo);
-//    }
 }
 
 void AbstractInterpreter::init_starting_state() {
@@ -1754,7 +1747,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
     m_allHandlers.push_back(
         ExceptionHandler(
             0,
-            ExceptionVars(),
+            ExceptionVars(m_comp),
             raiseNoHandlerLabel, 
             reraiseNoHandlerLabel, 
             Label(),
@@ -1854,6 +1847,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case JUMP_FORWARD:  jump_absolute(oparg + curByte + sizeof(_Py_CODEUNIT), opcodeIndex); break;
             case JUMP_IF_FALSE_OR_POP:
             case JUMP_IF_TRUE_OR_POP: jump_if_or_pop(byte != JUMP_IF_FALSE_OR_POP, opcodeIndex, oparg); break;
+            case JUMP_IF_NOT_EXC_MATCH: jump_if_not_exact(opcodeIndex, oparg); break;
             case POP_JUMP_IF_TRUE:
             case POP_JUMP_IF_FALSE: pop_jump_if(byte != POP_JUMP_IF_FALSE, opcodeIndex, oparg); break;
             case LOAD_NAME:
@@ -2693,9 +2687,6 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
 }
 
 void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) {
-    auto stackInfo = get_stack_info(opcodeIndex);
-    auto one = stackInfo[stackInfo.size() - 1];
-
     if (jumpTo <= opcodeIndex) {
         periodic_work();
     }
@@ -2735,51 +2726,17 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
 }
 
 void AbstractInterpreter::unary_positive(int opcodeIndex) {
-    auto stackInfo = get_stack_info(opcodeIndex);
-    auto one = stackInfo[stackInfo.size() - 1];
-
-    switch (one.Value->kind()) {
-        case AVK_Float:
-        case AVK_Integer:
-            // nop
-            break;
-        default:
-            dec_stack();
-            m_comp->emit_unary_positive();
-            error_check("unary positive failed");
-            inc_stack();
-            break;
-    }
+    dec_stack();
+    m_comp->emit_unary_positive();
+    error_check("unary positive failed");
+    inc_stack();
 }
 
 void AbstractInterpreter::unary_negative(int opcodeIndex) {
-    auto stackInfo = get_stack_info(opcodeIndex);
-    auto one = stackInfo[stackInfo.size() - 1];
-
-    bool handled = false;
-    if (!one.needs_boxing()) {
-        switch (one.Value->kind()) {
-            case AVK_Float:
-                handled = true;
-                dec_stack();
-                m_comp->emit_unary_negative_float();
-                inc_stack(1, STACK_KIND_VALUE);
-                break;
-            case AVK_Integer:
-                handled = true;
-                dec_stack();
-                m_comp->emit_unary_negative_tagged_int();
-                inc_stack();
-                break;
-        }
-    }
-
-    if (!handled) {
-        dec_stack();
-        m_comp->emit_unary_negative();
-        error_check("unary negative failed");
-        inc_stack();
-    }
+    dec_stack();
+    m_comp->emit_unary_negative();
+    error_check("unary negative failed");
+    inc_stack();
 }
 
 /* Unused for now */
@@ -3044,6 +3001,30 @@ void AbstractInterpreter::jump_absolute(size_t index, size_t from) {
     m_comp->emit_branch(BranchAlways, getOffsetLabel(index));
 }
 
+void AbstractInterpreter::jump_if_not_exact(int opcodeIndex, int jumpTo) {
+    if (jumpTo <= opcodeIndex) {
+        periodic_work();
+    }
+    auto target = getOffsetLabel(jumpTo);
+
+    auto noJump = m_comp->emit_define_label();
+    auto willJump = m_comp->emit_define_label();
+
+    m_comp->emit_compare_exceptions_int();
+    dec_stack(2);
+//    m_comp->emit_dup();
+//    int_error_check("failed to check exact match");
+
+    m_comp->emit_int(0);
+    m_comp->emit_branch(BranchEqual, noJump);
+
+    m_comp->emit_mark_label(willJump);
+    m_comp->emit_branch(BranchAlways, target);
+
+    m_comp->emit_mark_label(noJump);
+
+    m_offsetStack[jumpTo] = m_stack;
+}
 
 // Unwinds exception handling starting at the current handler.  Emits the unwind for all
 // of the current handlers until we reach one which will actually handle the current
@@ -3053,9 +3034,11 @@ void AbstractInterpreter::unwind_eh(size_t fromHandler, size_t toHandler) {
     do {
         auto& exVars = m_allHandlers[cur].ExVars;
 
-        if (exVars.PrevExc.is_valid()) {
-            m_comp->emit_unwind_eh(exVars.PrevExc, exVars.PrevExcVal, exVars.PrevTraceback);
-        }
+        // TODO : This is wiping the exception to NULL values, so I've removed it.
+        // There must be a logic bug in here somewhere.
+//        if (exVars.PrevExc.is_valid()) {
+//            m_comp->emit_unwind_eh(exVars.PrevExc, exVars.PrevExcVal, exVars.PrevTraceback);
+//        }
 
         cur = m_allHandlers[cur].BackHandler;
     } while (cur != -1 && cur != toHandler && !(m_allHandlers[cur].Flags & (EHF_TryExcept | EHF_TryFinally)));
