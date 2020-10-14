@@ -1,4 +1,3 @@
-#include <limits.h>
 /*
 * The MIT License (MIT)
 *
@@ -42,7 +41,7 @@ struct AbstractLocalInfo;
 // Tracks block information for analyzing loops, exception blocks, and break opcodes.
 struct AbsIntBlockInfo {
     size_t BlockStart, BlockEnd;
-    bool IsLoop;
+    __unused bool IsLoop;
 
     AbsIntBlockInfo(size_t blockStart, size_t blockEnd, bool isLoop) {
         BlockStart = blockStart;
@@ -79,11 +78,11 @@ struct AbsIntBlockInfo {
 enum EhFlags {
     EHF_None = 0,
     // The exception handling block includes a continue statement
-    EHF_BlockContinues = 0x01,
+    EHF_BlockContinues __unused = 0x01,
     // The exception handling block includes a return statement
     EHF_BlockReturns = 0x02,
     // The exception handling block includes a break statement
-    EHF_BlockBreaks = 0x04,
+    EHF_BlockBreaks __unused = 0x04,
     // The exception handling block is in the try portion of a try/finally
     EHF_TryFinally = 0x08,
     // The exception handling block is in the try portion of a try/except
@@ -155,7 +154,7 @@ struct BlockInfo {
     int EndOffset, Kind, ContinueOffset;
     EhFlags Flags;
     size_t CurrentHandler;  // the current exception handler, an index into m_allHandlers
-    Local LoopVar; //, LoopOpt1, LoopOpt2;
+    __unused Local LoopVar; //, LoopOpt1, LoopOpt2;
 
     BlockInfo() {
     }
@@ -315,8 +314,6 @@ class AbstractInterpreter {
     Local m_errorCheckLocal;
 
     // ** Data consumed during analysis:
-    // Tracks whether an END_FINALLY is being consumed by a finally block (true) or exception block (false)
-    unordered_map<size_t, bool> m_endFinallyIsFinally;
     // Tracks the entry point for each POP_BLOCK opcode, so we can restore our
     // stack state back after the POP_BLOCK
     unordered_map<size_t, size_t> m_blockStarts;
@@ -392,10 +389,9 @@ public:
 
     AbstractValue* get_return_info();
 
-    bool has_info(size_t byteCodeIndex);
+    __unused bool has_info(size_t byteCodeIndex);
 
 private:
-    const char * op_to_string(int op);
     void compile_pop_block();
     AbstractValue* to_abstract(PyObject* obj);
     AbstractValue* to_abstract(AbstractValueKind kind);
@@ -449,7 +445,8 @@ private:
     void clean_stack_for_reraise();
 
     void unwind_eh(size_t fromHandler, size_t toHandler = -1);
-    void unwind_loop(Local finallyReason, EhFlags branchKind, int branchOffset);
+
+    __unused void unwind_loop(Local finallyReason, EhFlags branchKind, int branchOffset);
 
     ExceptionHandler& get_ehblock();
 
@@ -496,7 +493,8 @@ private:
     void load_fast(int local, int opcodeIndex);
     void load_fast_worker(int local, bool checkUnbound);
     void unpack_sequence(size_t size, int opcode);
-    Local get_optimized_local(int index, AbstractValueKind kind);
+
+    __unused Local get_optimized_local(int index, AbstractValueKind kind);
     void pop_except();
 
     bool can_optimize_pop_jump(int opcodeIndex);

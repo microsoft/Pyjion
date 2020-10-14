@@ -99,15 +99,7 @@ public:
         void **             coldCodeBlock,  /* OUT */
         void **             roDataBlock     /* OUT */
         ) override {
-        // TODO : Honor flag (alignment.)
-//        int offset = 0;
-//        switch (flag){
-//            case CORJIT_ALLOCMEM_DEFAULT_CODE_ALIGN: offset=0 ; break;
-//            case CORJIT_ALLOCMEM_FLG_16BYTE_ALIGN: offset=16; break;
-//            case CORJIT_ALLOCMEM_FLG_32BYTE_ALIGN: offset=32; break;
-//            case CORJIT_ALLOCMEM_FLG_RODATA_16BYTE_ALIGN: offset=16; break;
-//            case CORJIT_ALLOCMEM_FLG_RODATA_32BYTE_ALIGN: offset=32; break;
-//        }
+        // NB: Not honouring flag alignment requested in <flag>, but it is "optional"
 #ifdef WINDOWS
         *hotCodeBlock = m_codeAddr = VirtualAlloc(NULL, hotCodeSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
 #else
@@ -151,7 +143,7 @@ public:
         printf(".NET failed assertion: %s %d\n", szFile, iLine);
         // TODO : Use native warnings when it doesn't cause a recursive error.
         // PyErr_WarnFormat(PyExc_RuntimeWarning, 1, ".NET failed assertion: %s %d", szFile, iLine);
-        return 0;
+        return 1;
     }
 
     void reportFatalError(CorJitResult result) override {

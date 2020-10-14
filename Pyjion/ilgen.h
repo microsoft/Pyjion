@@ -561,13 +561,22 @@ public:
                 res.m_addr = nativeEntry;
                 break;
             case CORJIT_BADCODE:
-            case CORJIT_OUTOFMEM:
-            case CORJIT_INTERNALERROR:
-            case CORJIT_SKIPPED:
-            case CORJIT_RECOVERABLEERROR:
 #ifdef DEBUG
+                printf("JIT failed to compile the submitted method.\n");
                 dump();
 #endif
+                break;
+            case CORJIT_OUTOFMEM:
+                printf("out of memory.\n");
+                break;
+            case CORJIT_INTERNALERROR:
+                printf("internal error code.\n");
+                break;
+            case CORJIT_SKIPPED:
+                printf("skipped code.\n");
+                break;
+            case CORJIT_RECOVERABLEERROR:
+                printf("recoverable error code.\n");
                 break;
         }
         return res;

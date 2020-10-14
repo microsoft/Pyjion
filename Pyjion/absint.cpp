@@ -202,7 +202,7 @@ bool AbstractInterpreter::preprocess() {
 }
 
 void AbstractInterpreter::set_local_type(int index, AbstractValueKind kind) {
-    auto& lastState = m_startStates[0];
+    // unused for now.
 }
 
 void AbstractInterpreter::init_starting_state() {
@@ -475,8 +475,7 @@ bool AbstractInterpreter::interpret() {
                     }
                 }
                     break;
-                case JUMP_IF_NOT_EXC_MATCH: {
-                    auto curState = lastState;
+                case JUMP_IF_NOT_EXC_MATCH:
                     lastState.pop();
                     lastState.pop();
 
@@ -484,8 +483,6 @@ bool AbstractInterpreter::interpret() {
                         queue.push_back(oparg);
                     }
                     goto next;
-                }
-                break;
                 case JUMP_ABSOLUTE:
                     if (update_start_state(lastState, oparg)) {
                         queue.push_back(oparg);
@@ -550,17 +547,7 @@ bool AbstractInterpreter::interpret() {
                     vector<AbstractValueWithSources> sources;
                     for (int i = 0; i < oparg; i++) {
                         lastState.pop();
-                        //sources.push_back(lastState.pop_no_escape());
                     }
-                    // TODO: Currently we don't mark the consuming portions of the tuple
-                    // as escaping until the tuple escapes.  Is that good enough?  That
-                    // means that if we have a non-escaping tuple we need to optimize
-                    // it away too, otherwise our assumptions about what's in the tuple are
-                    // broken.
-                    // This optimization is disabled until the above comment sorted out.
-                    //auto tuple = new TupleSource(sources);
-                    //m_sources.push_back(tuple);
-                    //lastState.push(AbstractValueWithSources(&Tuple, tuple));
                     lastState.push(&Tuple);
                     break;
                 }
@@ -781,22 +768,6 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     lastState.pop();
                     break;
-                case SETUP_FINALLY: {
-                    auto finallyState = lastState;
-                    // Finally is entered with value pushed onto stack indicating reason for 
-                    // the finally running...
-                    finallyState.push(&Any);
-                    finallyState.push(&Any);
-                    finallyState.push(&Any);
-                    finallyState.push(&Any);
-                    finallyState.push(&Any);
-                    finallyState.push(&Any);
-                    if (update_start_state(finallyState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
-                        queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
-                    }
-                    goto next;
-                }
-                break;
                 case FORMAT_VALUE:
                     if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
                         // format spec
@@ -820,6 +791,21 @@ bool AbstractInterpreter::interpret() {
                         queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
                     lastState.push(&Any);
+                    goto next;
+                }
+                case SETUP_FINALLY: {
+                    auto finallyState = lastState;
+
+                    finallyState.push(&Any); // exc_traceback
+                    finallyState.push(&Any); // exc_value
+                    finallyState.push(&Any); // exc_type
+                    finallyState.push(&Any); // prev.. traceback
+                    finallyState.push(&Any); // exc value
+                    finallyState.push(&Any); // exc type
+                    // A block is pushed onto the stack
+                    if (update_start_state(finallyState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                        queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
+                    }
                     goto next;
                 }
                 case BUILD_CONST_KEY_MAP:
@@ -939,10 +925,15 @@ bool AbstractInterpreter::update_start_state(InterpreterState& newState, size_t 
 }
 
 bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterState& mergeTo) {
+#ifdef DUMP_TRACES
+    printf("merging states from %zu to %zu\n", mergeTo.stack_size(), newState.stack_size());
+#endif
     bool changed = false;
     if (mergeTo.m_locals != newState.m_locals) {
-        //    if (mergeTo.m_locals.get() != newState.m_locals.get()) {
-            // need to merge locals...
+        // need to merge locals...
+#ifdef DUMP_TRACES
+        printf("merging locals from %zu to %zu\n", mergeTo.local_count(), newState.local_count());
+#endif
         assert(mergeTo.local_count() == newState.local_count());
         for (size_t i = 0; i < newState.local_count(); i++) {
             auto oldType = mergeTo.get_local(i);
@@ -954,24 +945,34 @@ bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterSt
                 mergeTo.replace_local(i, newType);
                 changed = true;
             }
-
         }
     }
 
     if (mergeTo.stack_size() == 0) {
+#ifdef DUMP_TRACES
+        printf("Initializing empty stack\n");
+#endif
         // first time we assigned, or empty stack...
         mergeTo.m_stack = newState.m_stack;
         changed |= newState.stack_size() != 0;
     }
     else {
+#ifdef DUMP_TRACES
+        printf("merging stack states\n");
+#endif
         // need to merge the stacks...
-        assert(mergeTo.stack_size() >= newState.stack_size());
-        for (size_t i = 0; i < newState.stack_size(); i++) {
+        for (size_t i = 0; i < mergeTo.stack_size(); i++) {
             auto newType = mergeTo[i].merge_with(newState[i]);
             if (mergeTo[i] != newType) {
                 mergeTo[i] = newType;
                 changed = true;
             }
+        }
+#ifdef DUMP_TRACES
+        printf("adding overflow values\n");
+#endif
+        for (size_t i = mergeTo.stack_size() ; i < newState.stack_size(); i++){
+            mergeTo.push(newState[i]);
         }
     }
     return changed;
@@ -1250,7 +1251,7 @@ AbstractValue* AbstractInterpreter::get_return_info() {
     return m_returnValue;
 }
 
-bool AbstractInterpreter::has_info(size_t byteCodeIndex) {
+__unused bool AbstractInterpreter::has_info(size_t byteCodeIndex) {
     return m_startStates.find(byteCodeIndex) != m_startStates.end();
 }
 
@@ -2198,8 +2199,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             case SETUP_FINALLY:
             {
-                auto handlerLabel = getOffsetLabel(oparg + curByte + sizeof(_Py_CODEUNIT));
-                auto blockInfo = BlockInfo(oparg + curByte + sizeof(_Py_CODEUNIT), SETUP_FINALLY, m_allHandlers.size());
+                auto jumpTo = oparg + curByte + sizeof(_Py_CODEUNIT);
+                auto handlerLabel = getOffsetLabel(jumpTo);
+                auto blockInfo = BlockInfo(
+                        jumpTo,
+                        SETUP_FINALLY,
+                        m_allHandlers.size());
 
                 m_blockStack.push_back(blockInfo);
                 m_allHandlers.push_back(
@@ -2218,15 +2223,18 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 newStack.push_back(STACK_KIND_OBJECT);
                 newStack.push_back(STACK_KIND_OBJECT);
                 newStack.push_back(STACK_KIND_OBJECT);
-                newStack.push_back(STACK_KIND_OBJECT);
-                newStack.push_back(STACK_KIND_OBJECT);
-                newStack.push_back(STACK_KIND_OBJECT);
 
-                m_offsetStack[oparg + curByte + sizeof(_Py_CODEUNIT)] = newStack;
-                skipEffect = true; // has jump
+                newStack.push_back(STACK_KIND_OBJECT);
+                newStack.push_back(STACK_KIND_OBJECT);
+                newStack.push_back(STACK_KIND_OBJECT);
+                inc_stack(6);
+                m_offsetStack[jumpTo] = newStack;
             }
             break;
-            case POP_EXCEPT: pop_except(); skipEffect = true; break;
+            case POP_EXCEPT:
+                pop_except();
+                dec_stack(3);
+                break;
             case POP_BLOCK: compile_pop_block(); break;
 
             case YIELD_FROM:
@@ -2616,7 +2624,7 @@ void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
 
 }
 
-void AbstractInterpreter::unwind_loop(Local finallyReason, EhFlags branchKind, int continueOffset) {
+__unused void AbstractInterpreter::unwind_loop(Local finallyReason, EhFlags branchKind, int continueOffset) {
     size_t clearEh = -1;
     for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
         if (m_blockStack[i].Kind == SETUP_FINALLY) {
@@ -3064,7 +3072,7 @@ LocalKind get_optimized_local_kind(AbstractValueKind kind) {
     return LK_Pointer;
 }
 
-Local AbstractInterpreter::get_optimized_local(int index, AbstractValueKind kind) {
+__unused Local AbstractInterpreter::get_optimized_local(int index, AbstractValueKind kind) {
     if (m_optLocals.find(index) == m_optLocals.end()) {
         m_optLocals[index] = unordered_map<AbstractValueKind, Local, AbstractValueKindHash>();
     }
@@ -3081,10 +3089,6 @@ void AbstractInterpreter::pop_except() {
     // clear the exception.
     auto block = m_blockStack.back();
     unwind_eh(block.CurrentHandler, m_allHandlers[block.CurrentHandler].BackHandler);
-#ifdef DEBUG_TRACES
-    m_il.ld_i("Exception cleared");
-    m_il.emit_call(METHOD_DEBUG_TRACE);
-#endif
 }
 
 void AbstractInterpreter::debug_log(const char* fmt, ...) {

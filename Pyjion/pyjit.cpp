@@ -92,7 +92,7 @@ PyjionJittedCode::~PyjionJittedCode() {
 }
 
 PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
-#if DEBUG_CALL_TRACE
+#ifdef DUMP_TRACES
     printf("Invoking trace %s from %s line %d %p %p\r\n",
         PyUnicode_AsUTF8(frame->f_code->co_name),
         PyUnicode_AsUTF8(frame->f_code->co_filename),
@@ -117,7 +117,7 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     // TODO : Catch corrupt memory address before faulting on RIP offset.
     auto res = ((Py_EvalFunc)state)(nullptr, frame);
 
-#if DEBUG_CALL_TRACE
+#ifdef DUMP_TRACES
     printf("Returning from %s\r\n", PyUnicode_AsUTF8(frame->f_code->co_name));
 #endif
 
@@ -142,7 +142,7 @@ unordered_map<PyjionJittedCode*, JittedCode*> g_pyjionJittedCode;
 __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
     auto jittedCode = (PyjionJittedCode *)code->co_extra;
 
-#ifdef DEBUG_TRACES
+#ifdef DUMP_TRACES
     static int compileCount = 0, failCount = 0;
     printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n",
         PyUnicode_AsUTF8(code->co_name),
@@ -157,7 +157,7 @@ __declspec(dllexport) bool jit_compile(PyCodeObject* code) {
     auto res = interp.compile();
 
     if (res == nullptr) {
-#ifdef DEBUG_TRACES
+#ifdef DUMP_TRACES
         printf("Compilation failure #%d\r\n", ++failCount);
 #endif
         jittedCode->j_failed = true;
@@ -282,7 +282,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 			auto res = interp.compile();
 			bool isSpecialized = false;
 
-#ifdef DEBUG_TRACE
+#ifdef DUMP_TRACES
 			printf("Tracing %s from %s line %d %s\r\n",
 				PyUnicode_AsUTF8(frame->f_code->co_name),
 				PyUnicode_AsUTF8(frame->f_code->co_filename),
@@ -293,9 +293,8 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 
 			if (res == nullptr) {
 				static int failCount;
-#ifdef DEBUG_TRACES
+#ifdef DUMP_TRACES
                 printf("Result from compile operation indicates failure, defaulting to EFD.\r\n");
-				interp.dump();
 #endif
 				trace->j_failed = true;
 				return _PyEval_EvalFrameDefault(tstate, frame, 0);
@@ -325,7 +324,7 @@ bool jit_compile(PyCodeObject* code) {
 	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
         return false;
     }
-#ifdef DEBUG_TRACES
+#ifdef DUMP_TRACES
     static int compileCount = 0, failCount = 0;
     printf("Tracing %s from %s line %d #%d (%d failures so far)\r\n",
         PyUnicode_AsUTF8(code->co_name),
@@ -386,7 +385,7 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 	auto jitted = PyJit_EnsureExtra((PyObject*)f->f_code);
 	if (jitted != nullptr && !throwflag) {
 		if (jitted->j_evalfunc != nullptr) {
-#ifdef DEBUG_CALL_TRACE
+#ifdef DUMP_TRACES
 			printf("Calling %s from %s line %d %p\r\n",
 				PyUnicode_AsUTF8(f->f_code->co_name),
 				PyUnicode_AsUTF8(f->f_code->co_filename),
@@ -399,7 +398,7 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 		else if (!jitted->j_failed && jitted->j_run_count++ >= jitted->j_specialization_threshold) {
 			if (jit_compile(f->f_code)) {
 				// execute the jitted code...
-#ifdef DEBUG_CALL_TRACE
+#ifdef DUMP_TRACES
 				printf("Calling first %s from %s line %d %p\r\n",
 					PyUnicode_AsUTF8(f->f_code->co_name),
 					PyUnicode_AsUTF8(f->f_code->co_filename),
@@ -414,7 +413,7 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 			jitted->j_failed = true;
 		}
 	}
-#ifdef DEBUG_CALL_TRACE
+#ifdef DUMP_TRACES
 	printf("Falling to EFD %s from %s line %d %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),
 		PyUnicode_AsUTF8(f->f_code->co_filename),
@@ -424,7 +423,7 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 #endif
 
 	auto res = _PyEval_EvalFrameDefault(ts, f, throwflag);
-#ifdef DEBUG_CALL_TRACE
+#ifdef DUMP_TRACES
 	printf("Returning EFD %s from %s line %d %p\r\n",
 		PyUnicode_AsUTF8(f->f_code->co_name),
 		PyUnicode_AsUTF8(f->f_code->co_filename),

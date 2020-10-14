@@ -202,14 +202,7 @@ class VirtualMethod : public Method {
         pResult->codePointerLookup.lookupKind.runtimeLookupKind = CORINFO_LOOKUP_THISOBJ;
         pResult->codePointerLookup.runtimeLookup.testForNull = false;
         pResult->codePointerLookup.runtimeLookup.testForFixup = false;
-        // TODO : Find out why this code was commented out
-        //pResult->codePointerLookup.runtimeLookup.helper = CORINFO_HELP_UNDEF;
-        //pResult->codePointerLookup.runtimeLookup.indirections = method->m_vtableInfo->indirections;
-        //pResult->codePointerLookup.runtimeLookup.offsets[0] = method->m_vtableInfo->offsets[0];
-        //pResult->codePointerLookup.runtimeLookup.offsets[1] = method->m_vtableInfo->offsets[1];
-        //pResult->codePointerLookup.runtimeLookup.offsets[2] = method->m_vtableInfo->offsets[2];
-        //pResult->codePointerLookup.runtimeLookup.offsets[3] = method->m_vtableInfo->offsets[3];
-
+        //pResult->codePointerLookup.runtimeLookup.helper = CORINFO_HELP_USER_BREAKPOINT;
         pResult->verMethodFlags = pResult->methodFlags = CORINFO_FLG_VIRTUAL;
         pResult->kind = CORINFO_VIRTUALCALL_VTABLE;
         pResult->methodFlags = CORINFO_FLG_VIRTUAL;
