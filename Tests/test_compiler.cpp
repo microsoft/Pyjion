@@ -192,6 +192,12 @@ TEST_CASE("Test general errors") {
     }
     SECTION("test simply try catch") {
         auto t = CompilerTest(
+                "def f():\n  a=0\n  try:\n    a=1\n  except:\n    a=2\n  return a\n"
+        );
+        CHECK(t.returns() == "1");
+    }
+    SECTION("test return within try") {
+        auto t = CompilerTest(
                 "def f():\n  try:\n    return 1\n  except:\n    return 2\n"
         );
         CHECK(t.returns() == "1");
