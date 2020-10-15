@@ -51,7 +51,7 @@ private:
         auto frame = PyFrame_New(PyThreadState_Get(), m_code.get(), globals.get(), PyObject_ptr(PyDict_New()).get());
 
         auto res = m_jittedcode->j_evalfunc(m_jittedcode.get(), frame);
-
+        REQUIRE(!m_jittedcode->j_failed);
         return res;
     }
 

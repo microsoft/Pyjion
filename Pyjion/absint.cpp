@@ -2236,7 +2236,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 m_comp->emit_null();
 
                 inc_stack(6);
-                skipEffect = true;
             }
             break;
             case POP_EXCEPT:
@@ -2245,7 +2244,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             case POP_BLOCK:
                 compile_pop_block();
-                skipEffect = true;
                 break;
             case YIELD_FROM:
             case YIELD_VALUE:
@@ -2532,7 +2530,10 @@ void AbstractInterpreter::compile_pop_block() {
 void AbstractInterpreter::compile_pop_except_block() {
     auto curHandler = m_blockStack.back();
     assert(m_blockStack.size() > 0);
-    //m_blockStack.pop_back();
+    if (curHandler.Kind == SETUP_FINALLY){
+        dec_stack(3);
+        m_blockStack.pop_back();
+    }
 }
 
 void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
