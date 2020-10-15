@@ -117,6 +117,7 @@ bool AbstractInterpreter::preprocess() {
         }
 
         switch (byte) {
+            case POP_EXCEPT:
             case POP_BLOCK:
             {
                 if (!blockStarts.empty()) {
@@ -740,14 +741,8 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case POP_BLOCK:
-                    // Save the state for when break back into this block
-                    merge_states(m_startStates[m_blockStarts[opcodeIndex]], lastState);
-                    goto next;
                 case POP_EXCEPT:
-                    // pop traceback values
-                    lastState.pop();
-                    lastState.pop();
-                    lastState.pop();
+                    lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
                     break;
                 case LOAD_BUILD_CLASS:
                     // TODO: if we know this is __builtins__.__build_class__ we can push a special value
@@ -1748,7 +1743,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
     m_allHandlers.push_back(
         ExceptionHandler(
             0,
-            ExceptionVars(m_comp),
+            ExceptionVars(),
             raiseNoHandlerLabel, 
             reraiseNoHandlerLabel, 
             Label(),
@@ -1767,9 +1762,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
     processOpCode:
         // See FOR_ITER for special handling of the offset label
         if (get_extended_opcode(curByte) != FOR_ITER) {
-#ifdef DUMP_TRACES
-            printf("Building offset for %d OPCODE %s (%d)\n", opcodeIndex, opcode_name(byte), oparg);
-#endif
             mark_offset_label(curByte);
         }
 
@@ -1781,16 +1773,19 @@ JittedCode* AbstractInterpreter::compile_worker() {
             m_stack = curStackDepth->second;
         }
 
-#ifdef DUMP_TRACES
-        printf("Compiling OPCODE %s (%d) stack %d\n", opcode_name(byte), oparg, m_stack.size());
-        int ilLen = m_comp->il_length();
-#endif
-
         if (m_blockStack.size() > 1 && 
             curByte >= m_blockStack.back().EndOffset &&
             m_blockStack.back().EndOffset != -1) {
+#ifdef DUMP_TRACES
+            printf("Compiling new pop block before trying trace");
+#endif
             compile_pop_block();
         }
+
+#ifdef DUMP_TRACES
+        printf("Compiling OPCODE %s (%d) stack %d, depth %d\n", opcode_name(byte), oparg, m_stack.size(), m_blockStack.size());
+        int ilLen = m_comp->il_length();
+#endif
 
         m_comp->emit_lasti_update(curByte);
 
@@ -2218,25 +2213,18 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         EHF_TryFinally
                     )
                 );
-
-                vector<bool> newStack = m_stack;
-                newStack.push_back(STACK_KIND_OBJECT);
-                newStack.push_back(STACK_KIND_OBJECT);
-                newStack.push_back(STACK_KIND_OBJECT);
-
-                newStack.push_back(STACK_KIND_OBJECT);
-                newStack.push_back(STACK_KIND_OBJECT);
-                newStack.push_back(STACK_KIND_OBJECT);
-                inc_stack(6);
-                m_offsetStack[jumpTo] = newStack;
+                inc_stack(3);
+                skipEffect = true;
             }
             break;
             case POP_EXCEPT:
-                pop_except();
-                dec_stack(3);
+                compile_pop_except_block();
+                skipEffect = true;
                 break;
-            case POP_BLOCK: compile_pop_block(); break;
-
+            case POP_BLOCK:
+                compile_pop_block();
+                skipEffect = true;
+                break;
             case YIELD_FROM:
             case YIELD_VALUE:
                 printf("Unsupported opcode: %d (with related)\r\n", byte);
@@ -2462,6 +2450,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
     // handler.  When we take an error we'll branch down to this
     // little stub and then back up to the correct handler.
     if (!m_allHandlers.empty()) {
+#ifdef DUMP_TRACES
+        printf("unifying EH\n");
+#endif
         // TODO: Unify the first handler with this loop
         for (size_t i = 1; i < m_allHandlers.size(); i++) {
             auto& handler = m_allHandlers[i];
@@ -2512,50 +2503,53 @@ JittedCode* AbstractInterpreter::compile_worker() {
 }
 
 void AbstractInterpreter::compile_pop_block() {
-    auto curHandler = m_blockStack.back();
+    assert(m_blockStack.size() > 0);
     m_blockStack.pop_back();
-    if (curHandler.Kind == SETUP_FINALLY) {
-        // convert block into an END_FINALLY/POP_EXCEPT BlockInfo
-        auto back = m_blockStack.back();
+}
 
-        auto& prevHandler = m_allHandlers[curHandler.CurrentHandler];
-        auto& backHandler = m_allHandlers[back.CurrentHandler];
+void AbstractInterpreter::compile_pop_except_block() {
+    auto curHandler = m_blockStack.back();
+    assert(m_blockStack.size() > 1);
+    m_blockStack.pop_back();
+    auto back = m_blockStack.back();
 
-        auto newBlock = BlockInfo(
-            back.EndOffset,
-            curHandler.Kind == SETUP_FINALLY ? 0 : POP_EXCEPT, // TODO : Find equivalent
-            m_allHandlers.size(),
-            curHandler.Flags,
-            curHandler.ContinueOffset
-        );
+    auto& prevHandler = m_allHandlers[curHandler.CurrentHandler];
+    auto& backHandler = back.CurrentHandler != -1 ? m_allHandlers[back.CurrentHandler] : m_allHandlers[curHandler.CurrentHandler];
 
-        // For exceptions in a except/finally block we need to unwind the
-        // current exceptions before raising a new exception.  When we emit
-        // the unwind code we use the exception vars that we created for the
-        // try portion of the block, so we just flow those in here, but when we
-        // hit an error we'll branch to any previous handler that was on the
-        // stack.
-        EhFlags flags = EHF_None;
-        ExceptionVars exVars = prevHandler.ExVars;
-        if (backHandler.Flags & EHF_TryFinally) {
-            flags |= EHF_TryFinally;
-        }
+    auto newBlock = BlockInfo(
+        back.EndOffset,
+        SETUP_FINALLY,
+        m_allHandlers.size(),
+        curHandler.Flags,
+        curHandler.ContinueOffset
+    );
 
-        m_allHandlers.emplace_back(
-            ExceptionHandler(
-                m_allHandlers.size(),
-                exVars,
-                m_comp->emit_define_label(),
-                m_comp->emit_define_label(),
-                backHandler.ErrorTarget,
-                backHandler.EntryStack,
-                flags | EHF_InExceptHandler,
-                back.CurrentHandler
-            )
-        );
-
-        m_blockStack.push_back(newBlock);
+    // For exceptions in a except/finally block we need to unwind the
+    // current exceptions before raising a new exception.  When we emit
+    // the unwind code we use the exception vars that we created for the
+    // try portion of the block, so we just flow those in here, but when we
+    // hit an error we'll branch to any previous handler that was on the
+    // stack.
+    EhFlags flags = EHF_None;
+    ExceptionVars exVars = prevHandler.ExVars;
+    if (backHandler.Flags & EHF_TryFinally) {
+        flags |= EHF_TryFinally;
     }
+
+    m_allHandlers.emplace_back(
+        ExceptionHandler(
+            m_allHandlers.size(),
+            exVars,
+            m_comp->emit_define_label(),
+            m_comp->emit_define_label(),
+            backHandler.ErrorTarget,
+            backHandler.EntryStack,
+            flags | EHF_InExceptHandler,
+            back.CurrentHandler
+        )
+    );
+
+    m_blockStack.push_back(newBlock);
 }
 
 void AbstractInterpreter::emit_raise_and_free(size_t handlerIndex) {
@@ -3031,11 +3025,11 @@ void AbstractInterpreter::unwind_eh(size_t fromHandler, size_t toHandler) {
     do {
         auto& exVars = m_allHandlers[cur].ExVars;
 
-        // TODO : This is wiping the exception to NULL values, so I've removed it.
+        // TODO : This is wiping the exception to NULL values
         // There must be a logic bug in here somewhere.
-//        if (exVars.PrevExc.is_valid()) {
-//            m_comp->emit_unwind_eh(exVars.PrevExc, exVars.PrevExcVal, exVars.PrevTraceback);
-//        }
+        if (exVars.PrevExc.is_valid()) {
+            m_comp->emit_unwind_eh(exVars.PrevExc, exVars.PrevExcVal, exVars.PrevTraceback);
+        }
 
         cur = m_allHandlers[cur].BackHandler;
     } while (cur != -1 && cur != toHandler && !(m_allHandlers[cur].Flags & (EHF_TryExcept | EHF_TryFinally)));
@@ -3052,15 +3046,9 @@ ExceptionHandler& AbstractInterpreter::get_ehblock() {
 void AbstractInterpreter::mark_offset_label(int index) {
     auto existingLabel = m_offsetLabels.find(index);
     if (existingLabel != m_offsetLabels.end()) {
-#ifdef DUMP_TRACES
-        printf("Label for %d exists, marking label %d\n", index, existingLabel->second.m_index);
-#endif
         m_comp->emit_mark_label(existingLabel->second);
     }
     else {
-#ifdef DUMP_TRACES
-        printf("Label for %d doesnt exist, defining new\n", index);
-#endif
         auto label = m_comp->emit_define_label();
         m_offsetLabels[index] = label;
         m_comp->emit_mark_label(label);
@@ -3083,11 +3071,11 @@ __unused Local AbstractInterpreter::get_optimized_local(int index, AbstractValue
     return map.find(kind)->second;
 }
 
-
 void AbstractInterpreter::pop_except() {
     // we made it to the end of an EH block w/o throwing,
     // clear the exception.
     auto block = m_blockStack.back();
+    assert (block.CurrentHandler);
     unwind_eh(block.CurrentHandler, m_allHandlers[block.CurrentHandler].BackHandler);
 }
 

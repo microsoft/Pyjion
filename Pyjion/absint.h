@@ -393,6 +393,7 @@ public:
 
 private:
     void compile_pop_block();
+    void compile_pop_except_block();
     AbstractValue* to_abstract(PyObject* obj);
     AbstractValue* to_abstract(AbstractValueKind kind);
     bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);

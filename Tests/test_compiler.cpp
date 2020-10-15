@@ -190,6 +190,12 @@ TEST_CASE("Test general errors") {
         );
         CHECK(t.raises() == PyExc_UnboundLocalError);
     }
+    SECTION("test simply try catch") {
+        auto t = CompilerTest(
+                "def f():\n  try:\n    return 1\n  except:\n    return 2\n"
+        );
+        CHECK(t.returns() == "1");
+    }
     SECTION("test reraise exception") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise TypeError('hi')\n    except Exception as e:\n         pass\n    finally:\n         pass"
