@@ -305,7 +305,7 @@ private:
     void compile_pop_except_block();
     AbstractValue* to_abstract(PyObject* obj);
     AbstractValue* to_abstract(AbstractValueKind kind);
-    bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
+    static bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
     bool update_start_state(InterpreterState& newState, size_t index);
     void init_starting_state();
     const char* opcode_name(int opcode);

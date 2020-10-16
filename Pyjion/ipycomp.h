@@ -300,6 +300,7 @@ public:
 
     // Emits a call for the specified argument count.
     virtual bool emit_method_call(size_t argCnt) = 0;
+    virtual void emit_method_call_n(size_t argCnt) = 0;
 
     // Emits a call with the arguments to be invoked in a tuple object
     virtual void emit_call_with_tuple() = 0;

@@ -184,7 +184,7 @@
 #define METHOD_METHCALL1_TOKEN        0x00011001
 #define METHOD_METHCALL2_TOKEN        0x00011002
 #define METHOD_METHCALL3_TOKEN        0x00011003
-#define METHOD_METHCALL4_TOKEN        0x00011004
+#define METHOD_METHCALLN_TOKEN        0x00011004
 
 #define METHOD_CALL_ARGS            0x0001000A
 #define METHOD_CALL_KWARGS          0x0001000B
@@ -458,6 +458,7 @@ public:
 
     virtual void emit_load_method(void* name);
     virtual bool emit_method_call(size_t argCnt);
+    virtual void emit_method_call_n(size_t argCnt);
 
     virtual void emit_dict_merge();
 

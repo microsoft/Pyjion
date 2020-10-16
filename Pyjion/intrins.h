@@ -295,7 +295,6 @@ PyObject* MethCall0(PyObject* self, std::vector<PyObject*>* method_info);
 PyObject* MethCall1(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0);
 PyObject* MethCall2(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1);
 PyObject* MethCall3(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2);
-PyObject* MethCall4(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3);
-
+PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObject* args);
 
 #endif

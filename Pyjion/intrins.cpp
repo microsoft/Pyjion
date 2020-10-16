@@ -1985,9 +1985,31 @@ PyObject* MethCall3(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
     return res;
 }
 
-PyObject* MethCall4(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
-    assert(false);
-    return nullptr; // TODO : Implement a better approach.
+PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObject* args) {
+    PyObject* res;
+    if(!PyTuple_Check(args)) {
+        PyErr_Format(PyExc_TypeError,
+                     "invalid arguments for method call");
+        Py_DECREF(args);
+        return nullptr;
+    }
+    if (method_info->back() != nullptr)
+    {
+        auto target = method_info->at(0);
+        auto self_ = method_info->at(1);
+        res = PyObject_Call(target, args, nullptr);
+        Py_DECREF(args);
+        Py_DECREF(target);
+        return res;
+    }
+    else {
+        auto target = method_info->at(0);
+        auto self_ = method_info->at(1);
+        res = PyObject_Call(target, args, nullptr);
+        Py_DECREF(args);
+        Py_DECREF(target);
+        return res;
+    }
 }
 
 PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names) {

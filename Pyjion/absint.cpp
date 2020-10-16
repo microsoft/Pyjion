@@ -951,19 +951,17 @@ bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterSt
 #ifdef DUMP_TRACES
         printf("merging stack states\n");
 #endif
+        int max = mergeTo.stack_size();;
+        if (newState.stack_size() < mergeTo.stack_size())
+            max = newState.stack_size();
+
         // need to merge the stacks...
-        for (size_t i = 0; i < mergeTo.stack_size(); i++) {
+        for (size_t i = 0; i < max; i++) {
             auto newType = mergeTo[i].merge_with(newState[i]);
             if (mergeTo[i] != newType) {
                 mergeTo[i] = newType;
                 changed = true;
             }
-        }
-#ifdef DUMP_TRACES
-        printf("adding overflow values\n");
-#endif
-        for (size_t i = mergeTo.stack_size() ; i < newState.stack_size(); i++){
-            mergeTo.push(newState[i]);
         }
     }
     return changed;
@@ -2409,13 +2407,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case CALL_METHOD:
             {
                 if (!m_comp->emit_method_call(oparg)) {
-                    // TODO : emit method call with >4 args
-                    printf("can't handle large method calls now\n");
-                    assert(false);
+                    build_tuple(oparg);
+                    m_comp->emit_method_call_n(oparg);
                 }
-                else {
-                    dec_stack(oparg + 2); // + method + name + nargs
-                }
+                dec_stack(oparg + 2); // + method + name + nargs
                 error_check("failed to call method");
                 inc_stack(); //result
                 break;
@@ -2601,7 +2596,6 @@ void AbstractInterpreter::test_bool_and_branch(Local value, bool isTrue, Label t
 
 void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpTo) {
     auto stackInfo = get_stack_info(opcodeIndex);
-    auto one = stackInfo[stackInfo.size() - 1];
 
     if (jumpTo <= opcodeIndex) {
         periodic_work();
@@ -2715,8 +2709,14 @@ JittedCode* AbstractInterpreter::compile() {
         printf("Failed to interpret");
         return nullptr;
     }
-    
-    return compile_worker();
+    try {
+        return compile_worker();
+    } catch (const runtime_error& e){
+#ifdef DEBUG
+        printf("Error whilst compiling : %s", e.what());
+#endif
+        return nullptr;
+    }
 }
 
 bool AbstractInterpreter::can_skip_lasti_update(int opcodeIndex) {
