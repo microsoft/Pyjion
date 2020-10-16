@@ -109,7 +109,7 @@ if (APPLE)
     add_definitions(-DFEATURE_HW_INTRINSICS)
 endif()
 
-set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp Pyjion/disasm.cpp)
+set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp Pyjion/disasm.cpp Pyjion/exceptionhandling.cpp Pyjion/exceptionhandling.h Pyjion/stack.cpp Pyjion/stack.h)
 
 add_library(pyjionlib OBJECT ${SOURCES})
 add_library(pyjion MODULE $<TARGET_OBJECTS:pyjionlib>)

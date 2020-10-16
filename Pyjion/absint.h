@@ -33,6 +33,9 @@
 #include "absvalue.h"
 #include "cowvector.h"
 #include "ipycomp.h"
+#include "exceptionhandling.h"
+#include "stack.h"
+
 
 using namespace std;
 
@@ -72,94 +75,20 @@ struct AbsIntBlockInfo {
 // Once we've processed all of the blocks of code in this manner the analysis
 // is complete.
 
-#define STACK_KIND_OBJECT true      // A Python object, or a tagged int which might be an object
-#define STACK_KIND_VALUE  false     // A non-boxed value, currently just floating point
-
-enum EhFlags {
-    EHF_None = 0,
-    // The exception handling block includes a continue statement
-    EHF_BlockContinues __unused = 0x01,
-    // The exception handling block includes a return statement
-    EHF_BlockReturns = 0x02,
-    // The exception handling block includes a break statement
-    EHF_BlockBreaks __unused = 0x04,
-    // The exception handling block is in the try portion of a try/finally
-    EHF_TryFinally = 0x08,
-    // The exception handling block is in the try portion of a try/except
-    EHF_TryExcept = 0x10,
-    // The exception handling block is in the finally or except portion of a try/finally or try/except
-    EHF_InExceptHandler = 0x20,
-};
-
-EhFlags operator | (EhFlags lhs, EhFlags rhs);
-EhFlags operator |= (EhFlags& lhs, EhFlags rhs);
-
 struct AbstractValueKindHash {
     std::size_t operator()(AbstractValueKind e) const {
         return static_cast<std::size_t>(e);
     }
 };
 
-struct ExceptionVars {
-    // The previous exception value before we took the exception we're currently
-    // handling.  These correspond with the values in tstate->exc_* and will be
-    // restored back to their current values if the exception is handled.
-    // When we're generating the try portion of the block these are new locals, when
-    // we're generating the finally/except portion of the block these hold the values
-    // for the handler so we can unwind from the correct variables.
-    Local PrevExc, PrevExcVal, PrevTraceback;
-    // The previous traceback and exception values if we're handling a finally block.
-    // We store these in locals and keep only the exception type on the stack so that
-    // we don't enter the finally handler with multiple stack depths.
-    Local FinallyExc, FinallyTb, FinallyValue;
-
-    ExceptionVars() = default;
-
-    explicit ExceptionVars(IPythonCompiler* comp, bool isFinally = false) {
-        PrevExc = comp->emit_define_local(false);
-        PrevExcVal = comp->emit_define_local(false);
-        PrevTraceback = comp->emit_define_local(false);
-        if (isFinally) {
-            FinallyExc = comp->emit_define_local(false);
-            FinallyTb = comp->emit_define_local(false);
-            FinallyValue = comp->emit_define_local(false);
-        }
-    }
-};
-
-// Exception Handling information
-struct ExceptionHandler {
-    size_t RaiseAndFreeId;
-    EhFlags Flags;
-    Label Raise,        // our raise stub label, prepares the exception
-        ReRaise,        // our re-raise stub label, prepares the exception w/o traceback update
-        ErrorTarget;    // The place to branch to for handling errors
-    ExceptionVars ExVars;
-    vector<bool> EntryStack;
-    size_t BackHandler;
-
-    ExceptionHandler(size_t raiseAndFreeId, ExceptionVars exceptionVars, Label raise, Label reraise, Label errorTarget, vector<bool> entryStack, EhFlags flags = EHF_None, size_t backHandler = -1) {
-        RaiseAndFreeId = raiseAndFreeId;
-        Flags = flags;
-        ExVars = exceptionVars;
-        EntryStack = entryStack;
-        Raise = raise;
-        ReRaise = reraise;
-        ErrorTarget = errorTarget;
-        BackHandler = backHandler;
-    }
-};
 
 struct BlockInfo {
     int EndOffset, Kind, ContinueOffset;
     EhFlags Flags;
-    size_t CurrentHandler;  // the current exception handler, an index into m_allHandlers
+    ExceptionHandler* CurrentHandler;  // the current exception handler
     __unused Local LoopVar; //, LoopOpt1, LoopOpt2;
 
-    BlockInfo() {
-    }
-
-    BlockInfo(int endOffset, int kind, size_t currentHandler = 0, EhFlags flags = EHF_None, int continueOffset = 0) {
+    BlockInfo(int endOffset, int kind, ExceptionHandler* currentHandler, EhFlags flags = EHF_None, int continueOffset = 0) {
         EndOffset = endOffset;
         Kind = kind;
         Flags = flags;
@@ -167,8 +96,6 @@ struct BlockInfo {
         ContinueOffset = continueOffset;
     }
 };
-
-
 
 
 // Tracks the state of a local variable at each location in the function.
@@ -331,9 +258,8 @@ class AbstractInterpreter {
     // or into a finally or exception handler.  Blocks are popped as we leave those protected regions.
     // When we pop a block associated with a try body we transform it into the correct block for the handler
     vector<BlockInfo> m_blockStack;
-    // All of the exception handlers defined in the method.  After generating the method we'll generate helper
-    // targets which dispatch to each of the handlers.
-    vector<ExceptionHandler> m_allHandlers;
+
+    ExceptionHandlerManager m_exceptionHandler;
     // Labels that map from a Python byte code offset to an ilgen label.  This allows us to branch to any
     // byte code offset.
     unordered_map<int, Label> m_offsetLabels;
@@ -341,10 +267,10 @@ class AbstractInterpreter {
     size_t m_blockIds;
     // Tracks the current depth of the stack,  as well as if we have an object reference that needs to be freed.
     // True (STACK_KIND_OBJECT) if we have an object, false (STACK_KIND_VALUE) if we don't
-    vector<bool> m_stack;
+    Stack m_stack;
     // Tracks the state of the stack when we perform a branch.  We copy the existing state to the map and
     // reload it when we begin processing at the stack.
-    unordered_map<int, vector<bool>> m_offsetStack;
+    unordered_map<int, Stack> m_offsetStack;
     // Set of labels used for when we need to raise an error but have values on the stack
     // that need to be freed.  We have one set of labels which fall through to each other
     // before doing the raise:
@@ -434,7 +360,7 @@ private:
     vector<Label>& get_raise_and_free_labels(size_t blockId);
     vector<Label>& get_reraise_and_free_labels(size_t blockId);
     void ensure_raise_and_free_locals(size_t localCount);
-    void emit_raise_and_free(size_t handlerIndex);
+    void emit_raise_and_free(ExceptionHandler* handler);
     void spill_stack_for_raise(size_t localCount);
 
     void ensure_labels(vector<Label>& labels, size_t count);
@@ -445,11 +371,11 @@ private:
 
     void clean_stack_for_reraise();
 
-    void unwind_eh(size_t fromHandler, size_t toHandler = -1);
+    void unwind_eh(ExceptionHandler* fromHandler, ExceptionHandler* toHandler = nullptr);
 
     __unused void unwind_loop(Local finallyReason, EhFlags branchKind, int branchOffset);
 
-    ExceptionHandler& get_ehblock();
+    ExceptionHandler * get_ehblock();
 
     void mark_offset_label(int index);
 
@@ -469,7 +395,7 @@ private:
 
     void dec_stack(size_t size = 1);
 
-    void inc_stack(size_t size = 1, bool kind = STACK_KIND_OBJECT);
+    void inc_stack(size_t size = 1, StackEntryKind kind = STACK_KIND_OBJECT);
 
     // Gets the next opcode skipping for EXTENDED_ARG
     int get_extended_opcode(int curByte);
