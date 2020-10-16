@@ -27,21 +27,82 @@
 #define PYJION_STACK_H
 
 #include <vector>
+#include "block.h"
+
 
 enum StackEntryKind {
     STACK_KIND_VALUE = 0, // A non-boxed value, currently just floating point
     STACK_KIND_OBJECT = 1// A Python object, or a tagged int which might be an object
 };
 
- class Stack : public std::vector<StackEntryKind> {
+class StackUnderflowException: public std::exception {
+};
+
+ class ValueStack : std::vector<StackEntryKind> {
 
  public:
     void inc(size_t by, StackEntryKind kind);
     void dec(size_t by);
+
+    size_t size(){
+        return std::vector<StackEntryKind>::size();
+    }
+
+    void dup_top(){
+        if (empty())
+            throw StackUnderflowException();
+        push_back(back()); // does inc_stack
+    }
+
+    reverse_iterator rbegin(){
+        return std::vector<StackEntryKind>::rbegin();
+    }
+
+    reverse_iterator rend(){
+     return std::vector<StackEntryKind>::rend();
+    }
 };
 
-class StackUnderflowException: std::exception {
+ class BlockStack : std::vector<BlockInfo> {
 
-};
+ public:
+     void pop_back() {
+         if (empty())
+             throw StackUnderflowException();
+         return vector<BlockInfo>::pop_back();
+     }
+     void push_back(BlockInfo block){
+         return vector<BlockInfo>::push_back(block);
+     }
+
+     bool beyond(int curByte){
+         return (size() > 1 &&
+         curByte >= back().EndOffset &&
+         back().EndOffset != -1);
+     }
+
+     size_t size(){
+         return vector<BlockInfo>::size();
+     }
+
+     BlockInfo back(){
+         if (empty())
+             throw StackUnderflowException();
+         return vector<BlockInfo>::back();
+     }
+
+     reverse_iterator rbegin(){
+         return std::vector<BlockInfo>::rbegin();
+     }
+
+     reverse_iterator rend(){
+         return std::vector<BlockInfo>::rend();
+     }
+
+     BlockInfo get(size_t i) {
+        return std::vector<BlockInfo>::at(i);
+     }
+ };
+
 
 #endif //PYJION_STACK_H

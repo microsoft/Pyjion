@@ -56,13 +56,8 @@
 #include "absint.h"
 #include "disasm.h"
 
-#define NUM_ARGS(n) ((n)&0xFF)
-#define NUM_KW_ARGS(n) (((n)>>8) & 0xff)
-
 #define GET_OPARG(index)  _Py_OPARG(m_byteCode[(index)/sizeof(_Py_CODEUNIT)])
 #define GET_OPCODE(index) _Py_OPCODE(m_byteCode[(index)/sizeof(_Py_CODEUNIT)])
-
-const int NO_ERROR_LABEL = 0; // Label for no errors
 
 AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* comp) : m_code(code), m_comp(comp) {
     // TODO  : Initialize m_blockIds
@@ -1771,9 +1766,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
         }
 
         // If this operation goes beyond "EndOffset", pop the stack.
-        if (m_blockStack.size() > 1 && 
-            curByte >= m_blockStack.back().EndOffset &&
-            m_blockStack.back().EndOffset != -1) {
+        if (m_blockStack.beyond(curByte)) {
             // TODO : Check if this is needed anymore. The compiler seems to put a POP_BLOCK at the end of a TRY block
             compile_pop_block();
         }
@@ -1811,7 +1804,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             case DUP_TOP:
                 m_comp->emit_dup_top();
-                m_stack.push_back(m_stack.back()); // does inc_stack
+                m_stack.dup_top();
                 break;
             case DUP_TOP_TWO:
                 inc_stack(2);
@@ -2498,7 +2491,6 @@ JittedCode* AbstractInterpreter::compile_worker() {
 }
 
 void AbstractInterpreter::compile_pop_block() {
-    assert(m_blockStack.size() > 0);
     m_blockStack.pop_back();
 }
 
@@ -2579,20 +2571,21 @@ void AbstractInterpreter::emit_raise_and_free(ExceptionHandler* handler) {
 __unused void AbstractInterpreter::unwind_loop(Local finallyReason, EhFlags branchKind, int continueOffset) {
     size_t clearEh = -1;
     for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
-        if (m_blockStack[i].Kind == SETUP_FINALLY) {
+        auto block = m_blockStack.get(i);
+        if (block.Kind == SETUP_FINALLY) {
             // need to dispatch to outer finally...
             if (clearEh != -1) {
                 unwind_eh(
-                    m_blockStack[clearEh].CurrentHandler, 
-                    m_blockStack[clearEh].CurrentHandler->BackHandler
+                    m_blockStack.get(clearEh).CurrentHandler,
+                    m_blockStack.get(clearEh).CurrentHandler->BackHandler
                 );
             }
 
             m_comp->emit_load_local(finallyReason);
-            m_comp->emit_branch(BranchAlways, m_blockStack[i].CurrentHandler->ErrorTarget);
+            m_comp->emit_branch(BranchAlways, block.CurrentHandler->ErrorTarget);
             break;
         }
-        else if (m_blockStack[i].Kind == POP_EXCEPT) {
+        else if (block.Kind == POP_EXCEPT) {
             if (clearEh == -1) {
                 clearEh = i;
             }
@@ -2768,9 +2761,10 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
     size_t clearEh = -1;
     bool inFinally = false;
     for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != (-1); blockIndex--) {
-        if (m_blockStack[blockIndex].Kind == SETUP_FINALLY) {
+        auto block = m_blockStack.get(blockIndex);
+        if (block.Kind == SETUP_FINALLY) {
             // we need to run the finally before returning...
-            m_blockStack[blockIndex].Flags |= EHF_BlockReturns;
+            block.Flags |= EHF_BlockReturns;
 
             if (!inFinally) {
                 // Only emit the store and branch to the inner most finally, but
@@ -2779,16 +2773,16 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
                 inFinally = true;
                 if (clearEh != -1) {
                     unwind_eh(
-                        m_blockStack[clearEh].CurrentHandler, 
-                        m_blockStack[blockIndex].CurrentHandler->BackHandler
+                        m_blockStack.get(clearEh).CurrentHandler,
+                        block.CurrentHandler->BackHandler
                     );
                 }
                 free_all_iter_locals(blockIndex);
                 m_comp->emit_int(EHF_BlockReturns);
-                m_comp->emit_branch(BranchAlways, m_blockStack[blockIndex].CurrentHandler->ErrorTarget);
+                m_comp->emit_branch(BranchAlways, block.CurrentHandler->ErrorTarget);
             }
         }
-        else if (m_blockStack[blockIndex].Kind == POP_EXCEPT) {
+        else if (block.Kind == POP_EXCEPT) {
             // we need to restore the previous exception before we return
             if (clearEh == -1) {
                 clearEh = blockIndex;
@@ -2798,7 +2792,7 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
 
     if (!inFinally) {
         if (clearEh != -1) {
-            unwind_eh(m_blockStack[clearEh].CurrentHandler);
+            unwind_eh(m_blockStack.get(clearEh).CurrentHandler);
         }
         free_all_iter_locals();
         m_comp->emit_branch(BranchLeave, m_retLabel);

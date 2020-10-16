@@ -1,3 +1,5 @@
+#include <cstdio>
+
 /*
 * The MIT License (MIT)
 *
@@ -23,19 +25,4 @@
 *
 */
 
-#include "stack.h"
-
-
-void ValueStack::inc(size_t by, StackEntryKind kind) {
-    for (size_t i = 0; i < by; i++) {
-        push_back(kind);
-    }
-}
-
-void ValueStack::dec(size_t by) {
-    if (size() < by)
-        throw StackUnderflowException();
-    for (size_t i = 0; i < by; i++) {
-        pop_back();
-    }
-}
+#include "block.h"

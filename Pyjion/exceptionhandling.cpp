@@ -34,7 +34,7 @@ ExceptionHandler* ExceptionHandlerManager::SetRootHandler(Label raiseNoHandlerLa
             raiseNoHandlerLabel,
             reraiseNoHandlerLabel,
             Label(),
-            Stack(),
+            ValueStack(),
             EHF_None,
             nullptr);
     m_exceptionHandlers.push_back(
@@ -46,7 +46,7 @@ ExceptionHandler* ExceptionHandlerManager::SetRootHandler(Label raiseNoHandlerLa
 ExceptionHandler* ExceptionHandlerManager::AddSetupFinallyHandler(Label raiseLabel,
                                                                   Label reraiseLabel,
                                                                   Label handlerLabel,
-                                                                  Stack stack,
+                                                                  ValueStack stack,
                                                                   ExceptionHandler* currentHandler,
                                                                   ExceptionVars vars
                                                                   ) {

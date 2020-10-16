@@ -30,25 +30,11 @@
 #include <vector>
 #include <unordered_map>
 #include "ipycomp.h"
+#include "flags.h"
 #include "stack.h"
 
 using namespace std;
 
-enum EhFlags {
-    EHF_None = 0,
-    // The exception handling block includes a continue statement
-    EHF_BlockContinues __unused = 0x01,
-    // The exception handling block includes a return statement
-    EHF_BlockReturns = 0x02,
-    // The exception handling block includes a break statement
-    EHF_BlockBreaks __unused = 0x04,
-    // The exception handling block is in the try portion of a try/finally
-    EHF_TryFinally = 0x08,
-    // The exception handling block is in the try portion of a try/except
-    EHF_TryExcept = 0x10,
-    // The exception handling block is in the finally or except portion of a try/finally or try/except
-    EHF_InExceptHandler = 0x20,
-};
 
 EhFlags operator | (EhFlags lhs, EhFlags rhs);
 EhFlags operator |= (EhFlags& lhs, EhFlags rhs);
@@ -86,7 +72,7 @@ struct ExceptionHandler {
     ReRaise,        // our re-raise stub label, prepares the exception w/o traceback update
     ErrorTarget;    // The place to branch to for handling errors
     ExceptionVars ExVars;
-    Stack EntryStack;
+    ValueStack EntryStack;
     ExceptionHandler* BackHandler;
 
     ExceptionHandler(size_t raiseAndFreeId,
@@ -94,7 +80,7 @@ struct ExceptionHandler {
                      Label raise,
                      Label reraise,
                      Label errorTarget,
-                     Stack entryStack,
+                     ValueStack entryStack,
                      EhFlags flags = EHF_None,
                      ExceptionHandler *backHandler = nullptr) : ExVars(exceptionVars) {
         RaiseAndFreeId = raiseAndFreeId;
@@ -148,7 +134,7 @@ public:
     ExceptionHandler* AddSetupFinallyHandler(Label raiseLabel,
                                              Label reraiseLabel,
                                              Label handlerLabel,
-                                             Stack stack,
+                                             ValueStack stack,
                                              ExceptionHandler* currentHandler,
                                              ExceptionVars vars
     );

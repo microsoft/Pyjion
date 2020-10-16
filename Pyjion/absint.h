@@ -33,9 +33,9 @@
 #include "absvalue.h"
 #include "cowvector.h"
 #include "ipycomp.h"
-#include "exceptionhandling.h"
+#include "block.h"
 #include "stack.h"
-
+#include "exceptionhandling.h"
 
 using namespace std;
 
@@ -80,23 +80,6 @@ struct AbstractValueKindHash {
         return static_cast<std::size_t>(e);
     }
 };
-
-
-struct BlockInfo {
-    int EndOffset, Kind, ContinueOffset;
-    EhFlags Flags;
-    ExceptionHandler* CurrentHandler;  // the current exception handler
-    __unused Local LoopVar; //, LoopOpt1, LoopOpt2;
-
-    BlockInfo(int endOffset, int kind, ExceptionHandler* currentHandler, EhFlags flags = EHF_None, int continueOffset = 0) {
-        EndOffset = endOffset;
-        Kind = kind;
-        Flags = flags;
-        CurrentHandler = currentHandler;
-        ContinueOffset = continueOffset;
-    }
-};
-
 
 // Tracks the state of a local variable at each location in the function.
 // Each local has a known type associated with it as well as whether or not
@@ -257,7 +240,7 @@ class AbstractInterpreter {
     // it at compile time.  Blocks are pushed onto the stack when we enter a loop, the start of a try block,
     // or into a finally or exception handler.  Blocks are popped as we leave those protected regions.
     // When we pop a block associated with a try body we transform it into the correct block for the handler
-    vector<BlockInfo> m_blockStack;
+    BlockStack m_blockStack;
 
     ExceptionHandlerManager m_exceptionHandler;
     // Labels that map from a Python byte code offset to an ilgen label.  This allows us to branch to any
@@ -267,10 +250,10 @@ class AbstractInterpreter {
     size_t m_blockIds;
     // Tracks the current depth of the stack,  as well as if we have an object reference that needs to be freed.
     // True (STACK_KIND_OBJECT) if we have an object, false (STACK_KIND_VALUE) if we don't
-    Stack m_stack;
+    ValueStack m_stack;
     // Tracks the state of the stack when we perform a branch.  We copy the existing state to the map and
     // reload it when we begin processing at the stack.
-    unordered_map<int, Stack> m_offsetStack;
+    unordered_map<int, ValueStack> m_offsetStack;
     // Set of labels used for when we need to raise an error but have values on the stack
     // that need to be freed.  We have one set of labels which fall through to each other
     // before doing the raise:

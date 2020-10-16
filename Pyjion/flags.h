@@ -23,19 +23,23 @@
 *
 */
 
-#include "stack.h"
+#ifndef PYJION_FLAGS_H
+#define PYJION_FLAGS_H
 
+enum EhFlags {
+    EHF_None = 0,
+    // The exception handling block includes a continue statement
+    EHF_BlockContinues __unused = 0x01,
+    // The exception handling block includes a return statement
+    EHF_BlockReturns = 0x02,
+    // The exception handling block includes a break statement
+    EHF_BlockBreaks __unused = 0x04,
+    // The exception handling block is in the try portion of a try/finally
+    EHF_TryFinally = 0x08,
+    // The exception handling block is in the try portion of a try/except
+    EHF_TryExcept = 0x10,
+    // The exception handling block is in the finally or except portion of a try/finally or try/except
+    EHF_InExceptHandler = 0x20,
+};
 
-void ValueStack::inc(size_t by, StackEntryKind kind) {
-    for (size_t i = 0; i < by; i++) {
-        push_back(kind);
-    }
-}
-
-void ValueStack::dec(size_t by) {
-    if (size() < by)
-        throw StackUnderflowException();
-    for (size_t i = 0; i < by; i++) {
-        pop_back();
-    }
-}
+#endif //PYJION_FLAGS_H

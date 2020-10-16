@@ -23,19 +23,31 @@
 *
 */
 
-#include "stack.h"
 
+#ifndef PYJION_BLOCK_H
+#define PYJION_BLOCK_H
 
-void ValueStack::inc(size_t by, StackEntryKind kind) {
-    for (size_t i = 0; i < by; i++) {
-        push_back(kind);
+#include <cstdio>
+#include <climits>
+#include "ipycomp.h"
+#include "flags.h"
+
+// forward dec exception handlers.
+class ExceptionHandler;
+
+struct BlockInfo {
+    int EndOffset, Kind, ContinueOffset;
+    EhFlags Flags;
+    ExceptionHandler* CurrentHandler;  // the current exception handler
+    __unused Local LoopVar; //, LoopOpt1, LoopOpt2;
+
+    BlockInfo(int endOffset, int kind, ExceptionHandler* currentHandler, EhFlags flags = EHF_None, int continueOffset = 0) {
+        EndOffset = endOffset;
+        Kind = kind;
+        Flags = flags;
+        CurrentHandler = currentHandler;
+        ContinueOffset = continueOffset;
     }
-}
+};
 
-void ValueStack::dec(size_t by) {
-    if (size() < by)
-        throw StackUnderflowException();
-    for (size_t i = 0; i < by; i++) {
-        pop_back();
-    }
-}
+#endif //PYJION_BLOCK_H
