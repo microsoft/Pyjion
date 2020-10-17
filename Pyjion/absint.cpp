@@ -2061,7 +2061,17 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             }
             case SET_ADD:
-                assert(oparg == 1); // TODO : Shift down stack to oparg when != 1
+                switch (oparg){
+                    case 1:
+                        break;
+                    case 2:
+                        m_comp->emit_rot_three();
+                        break;
+                    default:
+                        // TODO
+                        printf("unsupported operation");
+                        assert(false);
+                }
                 // Calls set.update(TOS1[-i], TOS). Used to build sets.
                 m_comp->emit_set_add();
                 dec_stack(2); // set, value
@@ -2069,6 +2079,17 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 inc_stack(1); // set
                 break;
             case MAP_ADD:
+                switch (oparg){
+                    case 1:
+                        break;
+                    case 2:
+                        m_comp->emit_rot_three();
+                        break;
+                    default:
+                        // TODO
+                        printf("unsupported operation");
+                        assert(false);
+                }
                 m_comp->emit_map_add();
                 dec_stack(3);
                 error_check("map add failed");

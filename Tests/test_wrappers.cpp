@@ -39,6 +39,6 @@ TEST_CASE("Test BuildDictFromTuples"){
         PyTuple_SetItem(keys_and_values, 2, keys);
         auto res = PyJit_BuildDictFromTuples(keys_and_values);
         CHECK(PyDict_Check(res));
-        CHECK(PyUnicode_AsUTF8(PyObject_Repr(res)) == "{'key1': 'value1', 'key2': 'value2'}");
+        CHECK_THAT(PyUnicode_AsUTF8(PyObject_Repr(res)), Catch::Equals("{'key1': 'value1', 'key2': 'value2'}"));
     }
 }
