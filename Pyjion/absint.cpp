@@ -737,8 +737,12 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case POP_BLOCK:
-                case POP_EXCEPT:
                     lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
+                    break;
+                case POP_EXCEPT:
+                    lastState.pop();
+                    lastState.pop();
+                    lastState.pop();
                     break;
                 case LOAD_BUILD_CLASS:
                     // TODO: if we know this is __builtins__.__build_class__ we can push a special value
@@ -897,7 +901,9 @@ bool AbstractInterpreter::interpret() {
                     return false;
                     break;
             }
+#ifdef DEBUG
             assert(PyCompile_OpcodeStackEffectWithJump(opcode, oparg, jump) == (lastState.stack_size() - curStackLen));
+#endif
             update_start_state(lastState, curByte + sizeof(_Py_CODEUNIT));
         }
 
