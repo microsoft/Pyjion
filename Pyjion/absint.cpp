@@ -888,6 +888,9 @@ bool AbstractInterpreter::interpret() {
                     lastState.push(&Any);
                     break;
                 }
+                case IMPORT_STAR:
+                    lastState.pop();
+                    break;
                 default:
                     PyErr_Format(PyExc_ValueError,
                                  "Unknown unsupported opcode: %s", opcode_name(opcode));
@@ -1508,8 +1511,8 @@ void AbstractInterpreter::build_set(size_t argCnt) {
         // load all the values into the set...
         auto err = m_comp->emit_define_label();
         for (int i = 0; i < argCnt; i++) {
-            m_comp->emit_load_local(setTmp);
             m_comp->emit_load_local(tmps[i]);
+            m_comp->emit_load_local(setTmp);
             m_comp->emit_set_add();
             frees[i] = m_comp->emit_define_label();
             m_comp->emit_branch(BranchFalse, frees[i]);
@@ -1538,7 +1541,7 @@ void AbstractInterpreter::build_set(size_t argCnt) {
         // And if the last one failed, then all of the values have been
         // decref'd
         m_comp->emit_mark_label(frees[argCnt - 1]);
-        branch_raise("set add failed");
+        branch_raise("build add failed");
 
         m_comp->emit_mark_label(noErr);
         delete[] frees;
@@ -2061,53 +2064,24 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             }
             case SET_ADD:
-                switch (oparg){
-                    case 1:
-                        break;
-                    case 2:
-                        m_comp->emit_rot_three();
-                        break;
-                    default:
-                        // TODO
-                        printf("unsupported operation");
-                        assert(false);
-                }
                 // Calls set.update(TOS1[-i], TOS). Used to build sets.
+                m_comp->lift_n_to_top(oparg);
                 m_comp->emit_set_add();
                 dec_stack(2); // set, value
                 error_check("set update failed");
                 inc_stack(1); // set
                 break;
             case MAP_ADD:
-                switch (oparg){
-                    case 1:
-                        break;
-                    case 2:
-                        m_comp->emit_rot_three();
-                        break;
-                    default:
-                        // TODO
-                        printf("unsupported operation");
-                        assert(false);
-                }
+                // Calls dict.__setitem__(TOS1[-i], TOS1, TOS). Used to implement dict comprehensions.
+                m_comp->lift_n_to_top(oparg);
                 m_comp->emit_map_add();
                 dec_stack(3);
                 error_check("map add failed");
                 inc_stack();
                 break;
             case LIST_APPEND: {
-                switch (oparg){
-                    case 1:
-                        break;
-                    case 2:
-                        m_comp->emit_rot_three();
-                        break;
-                    default:
-                        // TODO
-                        printf("unsupported operation");
-                        assert(false);
-                }
                 // Calls list.append(TOS1[-i], TOS).
+                m_comp->lift_n_to_top(oparg);
                 m_comp->emit_list_append();
                 dec_stack(2); // list, value
                 error_check("list append failed");
@@ -2115,18 +2089,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 break;
             }
             case DICT_MERGE: {
-                switch (oparg){
-                    case 1:
-                        break;
-                    case 2:
-                        m_comp->emit_rot_three();
-                        break;
-                    default:
-                        // TODO
-                        printf("unsupported operation");
-                        assert(false);
-
-                }
+                // Calls dict.update(TOS1[-i], TOS). Used to merge dicts.
+                m_comp->lift_n_to_top(oparg);
                 m_comp->emit_dict_merge();
                 dec_stack(2); // list, value
                 error_check("dict merge failed");
@@ -2363,7 +2327,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case LIST_EXTEND:
             {
-                assert(oparg == 1); // TODO : Shift down stack to oparg when != 1
+                m_comp->lift_n_to_top(oparg);
                 m_comp->emit_list_extend();
                 dec_stack(2);
                 error_check("list extend failed");
@@ -2373,8 +2337,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case DICT_UPDATE:
             {
-                assert(oparg == 1); // TODO : Shift down stack to oparg when != 1
                 // Calls dict.update(TOS1[-i], TOS). Used to build dicts.
+                m_comp->lift_n_to_top(oparg);
                 m_comp->emit_dict_update();
                 dec_stack(2); // dict, item
                 error_check("dict update failed");
@@ -2383,8 +2347,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case SET_UPDATE:
             {
-                assert(oparg == 1); // TODO : Shift down stack to oparg when != 1
                 // Calls set.update(TOS1[-i], TOS). Used to build sets.
+                m_comp->lift_n_to_top(oparg);
                 m_comp->emit_set_extend();
                 dec_stack(2); // set, iterable
                 error_check("set update failed");

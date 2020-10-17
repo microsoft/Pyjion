@@ -469,13 +469,12 @@ public:
     virtual void emit_breakpoint();
 
     virtual JittedCode* emit_compile();
-
+    virtual void lift_n_to_top(int pos);
 private:
     void load_frame();
 
     void load_local(int oparg);
     void decref();
-
     CorInfoType to_clr_type(LocalKind kind);
 };
 

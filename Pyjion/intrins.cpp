@@ -322,7 +322,7 @@ PyObject* PyJit_UnaryInvert(PyObject* value) {
     return res;
 }
 
-PyObject* PyJit_ListAppend(PyObject* list, PyObject* value) {
+PyObject* PyJit_ListAppend(PyObject* value, PyObject* list) {
     assert(list != nullptr);
     assert(PyList_CheckExact(list));
     int err = PyList_Append(list, value);
@@ -333,7 +333,7 @@ PyObject* PyJit_ListAppend(PyObject* list, PyObject* value) {
     return list;
 }
 
-PyObject* PyJit_SetAdd(PyObject* set, PyObject* value) {
+PyObject* PyJit_SetAdd(PyObject* value, PyObject* set) {
     assert(set != nullptr);
     int err ;
     err = PySet_Add(set, value);
@@ -346,7 +346,7 @@ error:
     return nullptr;
 }
 
-PyObject* PyJit_UpdateSet(PyObject* set, PyObject* iterable) {
+PyObject* PyJit_UpdateSet(PyObject* iterable, PyObject* set) {
     assert(set != nullptr);
     int res = _PySet_Update(set, iterable);
     Py_DECREF(iterable);
@@ -357,8 +357,14 @@ error:
     return nullptr;
 }
 
-PyObject* PyJit_MapAdd(PyObject*map, PyObject* value, PyObject*key) {
+PyObject* PyJit_MapAdd(PyObject*key, PyObject*map, PyObject* value) {
     assert(map != nullptr);
+    if (!PyDict_Check(map)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "invalid argument type to MapAdd");
+        Py_DECREF(map);
+        return nullptr;
+    }
     int err = PyDict_SetItem(map, key, value);  /* v[w] = u */
     Py_DECREF(value);
     Py_DECREF(key);
@@ -369,6 +375,13 @@ PyObject* PyJit_MapAdd(PyObject*map, PyObject* value, PyObject*key) {
 }
 
 PyObject* PyJit_Multiply(PyObject *left, PyObject *right) {
+    if (!PyNumber_Check(left) || !PyNumber_Check(right)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "invalid argument type to Multiply");
+        Py_DECREF(left);
+        Py_DECREF(right);
+        return nullptr;
+    }
     auto res = PyNumber_Multiply(left, right);
     Py_DECREF(left);
     Py_DECREF(right);
@@ -1140,7 +1153,7 @@ PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg) {
     return value;
 }
 
-PyObject* PyJit_ExtendList(PyObject *list, PyObject *iterable) {
+PyObject* PyJit_ExtendList(PyObject *iterable, PyObject *list) {
     assert(list != nullptr);
     assert(PyList_CheckExact(list));
     PyObject *none_val = _PyList_Extend((PyListObject *)list, iterable);
@@ -1216,7 +1229,7 @@ PyObject* PyJit_LoadAssertionError() {
     return value;
 }
 
-PyObject* PyJit_DictUpdate(PyObject* dict, PyObject* other) {
+PyObject* PyJit_DictUpdate(PyObject* other, PyObject* dict) {
     assert(dict != nullptr);
     int res ;
     if (!PyDict_CheckExact(dict)) {
@@ -1241,7 +1254,7 @@ error:
     return nullptr;
 }
 
-PyObject* PyJit_DictMerge(PyObject* dict, PyObject* other) {
+PyObject* PyJit_DictMerge(PyObject* other, PyObject* dict) {
     assert(dict != nullptr);
     int res ;
     if (!PyDict_CheckExact(dict)) {

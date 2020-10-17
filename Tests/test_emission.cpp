@@ -183,6 +183,14 @@ TEST_CASE("General dict building") {
         auto t = EmissionTest("def f(): return {1:'a', 2: 'b', 3:'c'}");
         CHECK(t.returns() == "{1: 'a', 2: 'b', 3: 'c'}");
     }
+    SECTION("key add case") {
+        auto t = EmissionTest("def f():\n  a = {1:'a', 2: 'b', 3:'c'}\n  a[4]='d'\n  return a");
+        CHECK(t.returns() == "{1: 'a', 2: 'b', 3: 'c', 4: 'd'}");
+    }
+    SECTION("init") {
+        auto t = EmissionTest("def f():\n  a = dict()\n  a[4]='d'\n  return a");
+        CHECK(t.returns() == "{4: 'd'}");
+    }
 }
 
 TEST_CASE("General dict unpacking") {

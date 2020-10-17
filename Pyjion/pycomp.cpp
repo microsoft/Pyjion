@@ -252,6 +252,32 @@ void PythonCompiler::emit_rot_four(LocalKind kind) {
     m_il.free_local(fourth);
 }
 
+void PythonCompiler::lift_n_to_top(int pos){
+    vector<Local> tmpLocals (pos);
+
+    // dump stack up to n
+    for (int i = 0 ; i < pos ; i ++){
+        auto loc = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+        tmpLocals[i] = loc;
+        m_il.st_loc(loc);
+    }
+
+    // pop n
+    auto n = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+    m_il.st_loc(n);
+
+
+    // recover stack
+    for (auto& loc: tmpLocals){
+        m_il.ld_loc(loc);
+        m_il.free_local(loc);
+    }
+
+    // push n (so its at the top)
+    m_il.ld_loc(n);
+    m_il.free_local(n);
+}
+
 void PythonCompiler::emit_pop_top() {
     decref();
 }

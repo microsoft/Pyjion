@@ -428,7 +428,7 @@ public:
     /* Compiles the generated code */
     virtual JittedCode* emit_compile() = 0;
 
-
+    virtual void lift_n_to_top(int pos) = 0;
 };
 
 #endif

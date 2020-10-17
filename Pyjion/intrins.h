@@ -78,13 +78,12 @@ int PyJit_UnaryNot_Int(PyObject* value);
 
 PyObject* PyJit_UnaryInvert(PyObject* value);
 
-PyObject* PyJit_ListAppend(PyObject* list, PyObject* value);
+PyObject* PyJit_ListAppend(PyObject* value, PyObject* list);
 
-PyObject* PyJit_SetAdd(PyObject* set, PyObject* value);
+PyObject* PyJit_SetAdd(PyObject* value, PyObject* set);
+PyObject* PyJit_UpdateSet(PyObject* iterable, PyObject* set);
 
-PyObject * PyJit_UpdateSet(PyObject* set, PyObject* value);
-
-PyObject* PyJit_MapAdd(PyObject*map, PyObject* value, PyObject*key);
+PyObject* PyJit_MapAdd(PyObject*key, PyObject*map, PyObject* value);
 
 PyObject* PyJit_Multiply(PyObject *left, PyObject *right);
 
@@ -178,7 +177,7 @@ int PyJit_Raise(PyObject *exc, PyObject *cause);
 
 PyObject* PyJit_LoadClassDeref(PyFrameObject* frame, size_t oparg);
 
-PyObject* PyJit_ExtendList(PyObject *list, PyObject *extension);
+PyObject* PyJit_ExtendList(PyObject *iterable, PyObject *list);
 
 PyObject* PyJit_LoadAssertionError();
 
@@ -187,9 +186,9 @@ PyObject* PyJit_ListToTuple(PyObject *list);
 int PyJit_StoreMap(PyObject *key, PyObject *value, PyObject* map);
 int PyJit_StoreMapNoDecRef(PyObject *key, PyObject *value, PyObject* map);
 
-PyObject * PyJit_DictUpdate(PyObject *dict, PyObject* other);
+PyObject* PyJit_DictUpdate(PyObject* other, PyObject* dict);
 PyObject * PyJit_BuildDictFromTuples(PyObject *keys_and_values);
-PyObject* PyJit_DictMerge(PyObject* dict, PyObject* other);
+PyObject* PyJit_DictMerge(PyObject* other, PyObject* dict);
 
 int PyJit_StoreSubscr(PyObject* value, PyObject *container, PyObject *index);
 
