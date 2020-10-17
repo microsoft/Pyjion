@@ -246,3 +246,14 @@ TEST_CASE("Assertions") {
         CHECK(t.raises() == PyExc_AssertionError);
     }
 }
+
+TEST_CASE("Binary subscripts") {
+    SECTION("assert simple case") {
+        auto t = EmissionTest("def f(): x = {'y': 12345.0}; return int(x['y'])");
+        CHECK(t.returns() == "12345");
+    }
+    SECTION("assert scope case") {
+        auto t = EmissionTest("def f():\n  x = {'y': 12345.0, 'z': 1234}\n  return int(x['y'])\n");
+        CHECK(t.returns() == "12345");
+    }
+}

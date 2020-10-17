@@ -106,6 +106,11 @@ PyObject* PyJit_Subscr(PyObject *left, PyObject *right) {
     auto res = PyObject_GetItem(left, right);
     Py_DECREF(left);
     Py_DECREF(right);
+    if (res == nullptr){
+        PyErr_SetString(PyExc_ValueError,
+                        "could not find key in dictionary");
+        return nullptr;
+    }
     return res;
 }
 
@@ -717,41 +722,26 @@ void PyJit_PyErrRestore(PyObject*tb, PyObject*value, PyObject*exception) {
 
 PyObject* PyJit_ImportName(PyObject*level, PyObject*from, PyObject* name, PyFrameObject* f) {
     _Py_IDENTIFIER(__import__);
-    PyObject *func = _PyDict_GetItemId(f->f_builtins, &PyId___import__);
+    PyThreadState *tstate = PyThreadState_GET();
+    PyObject *imp_func = _PyDict_GetItemId(f->f_builtins, &PyId___import__);
     PyObject *args, *res;
-    if (func == NULL) {
+    PyObject* stack[5];
+
+    if (imp_func == nullptr) {
         PyErr_SetString(PyExc_ImportError,
             "__import__ not found");
         return nullptr;
     }
-    Py_INCREF(func);
-    if (PyLong_AsLong(level) != -1 || PyErr_Occurred())
-        args = PyTuple_Pack(5,
-            name,
-            f->f_globals,
-            f->f_locals == NULL ?
-            Py_None : f->f_locals,
-            from,
-            level);
-    else
-        args = PyTuple_Pack(4,
-            name,
-            f->f_globals,
-            f->f_locals == NULL ?
-            Py_None : f->f_locals,
-            from);
-    Py_DECREF(level);
-    Py_DECREF(from);
-    if (args == NULL) {
-        Py_DECREF(func);
-        //STACKADJ(-1);
-        return nullptr;
-    }
-    //READ_TIMESTAMP(intr0);
-    res = PyEval_CallObject(func, args);
-    //READ_TIMESTAMP(intr1);
-    Py_DECREF(args);
-    Py_DECREF(func);
+
+    Py_INCREF(imp_func);
+
+    stack[0] = name;
+    stack[1] = f->f_globals;
+    stack[2] = f->f_locals == nullptr ? Py_None : f->f_locals;
+    stack[3] = from;
+    stack[4] = level;
+    res = _PyObject_FastCall(imp_func, stack, 5);
+    Py_DECREF(imp_func);
     return res;
 }
 
@@ -761,15 +751,15 @@ PyObject* PyJit_ImportFrom(PyObject*v, PyObject* name) {
     PyObject *fullmodname, *pkgname;
 
     x = PyObject_GetAttr(v, name);
-    if (x != NULL || !PyErr_ExceptionMatches(PyExc_AttributeError))
+    if (x != nullptr || !PyErr_ExceptionMatches(PyExc_AttributeError))
         return x;
     /* Issue #17636: in case this failed because of a circular relative
     import, try to fallback on reading the module directly from
     sys.modules. */
     PyErr_Clear();
     pkgname = _PyObject_GetAttrId(v, &PyId___name__);
-    if (pkgname == NULL)
-        return NULL;
+    if (pkgname == nullptr)
+        return nullptr;
     fullmodname = PyUnicode_FromFormat("%U.%U", pkgname, name);
     Py_DECREF(pkgname);
     if (fullmodname == NULL)
@@ -1215,7 +1205,6 @@ PyObject * PyJit_BuildDictFromTuples(PyObject *keys_and_values) {
         Py_DECREF(value);
     }
     Py_DECREF(keys);
-    Py_DECREF(keys_and_values);
     return map;
 error:
     return nullptr;
@@ -1776,69 +1765,6 @@ int PyJit_DeleteName(PyFrameObject* f, PyObject* name) {
             name);
     }
     return err;
-}
-
-static PyObject *
-fast_function(PyObject *func, PyObject **pp_stack, int n) {
-    PyCodeObject *co = (PyCodeObject *)PyFunction_GET_CODE(func);
-    PyObject *globals = PyFunction_GET_GLOBALS(func);
-    PyObject *argdefs = PyFunction_GET_DEFAULTS(func);
-
-    if (argdefs == NULL && co->co_argcount == n &&
-        co->co_kwonlyargcount == 0 &&
-        co->co_flags == (CO_OPTIMIZED | CO_NEWLOCALS | CO_NOFREE)) {
-        PyFrameObject *f;
-        PyObject *retval = NULL;
-        PyThreadState *tstate = PyThreadState_GET();
-        PyObject **fastlocals, **stack;
-        int i;
-
-        assert(globals != NULL);
-        /* XXX Perhaps we should create a specialized
-        PyFrame_New() that doesn't take locals, but does
-        take builtins without sanity checking them.
-        */
-        assert(tstate != NULL);
-        f = PyFrame_New(tstate, co, globals, NULL);
-        if (f == NULL)
-            return NULL;
-
-        fastlocals = f->f_localsplus;
-        stack = pp_stack;
-
-        for (i = 0; i < n; i++) {
-            Py_INCREF(*stack);
-            fastlocals[i] = *stack++;
-        }
-        retval = PyEval_EvalFrameEx(f, 0);
-        ++tstate->recursion_depth;
-        Py_DECREF(f);
-        --tstate->recursion_depth;
-        return retval;
-    }
-
-    auto args = PyTuple_New(n);
-    if (args == nullptr) {
-        return nullptr;
-    }
-    for (int i = 0; i < n; i++) {
-        Py_INCREF(pp_stack[i]);
-        PyTuple_SET_ITEM(args, i, pp_stack[i]);
-    }
-    auto res = PyObject_Call(func, args, nullptr);
-    Py_DECREF(args);
-    return res;
-#if FALSE
-    if (argdefs != NULL) {
-        d = &PyTuple_GET_ITEM(argdefs, 0);
-        nd = Py_SIZE(argdefs);
-    }
-    return _PyEval_EvalCodeWithName((PyObject*)co, globals,
-        (PyObject *)NULL, (pp_stack)-n, na,
-        (pp_stack)-2 * nk, nk, d, nd, kwdefs,
-        PyFunction_GET_CLOSURE(func),
-        name, qualname);
-#endif
 }
 
 PyObject* Call0(PyObject *target) {

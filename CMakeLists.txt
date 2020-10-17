@@ -134,7 +134,7 @@ target_link_libraries(pyjion ${Python3_LIBRARIES})
 
 # Testing
 add_subdirectory(Tests/Catch)
-set(TEST_SOURCES Tests/testing_util.cpp Tests/test_emission.cpp Tests/test_compiler.cpp Tests/test_absint.cpp Tests/Tests.cpp)
+set(TEST_SOURCES Tests/testing_util.cpp Tests/test_emission.cpp Tests/test_compiler.cpp Tests/test_absint.cpp Tests/Tests.cpp Tests/test_wrappers.cpp)
 add_executable(unit_tests ${TEST_SOURCES} $<TARGET_OBJECTS:pyjionlib>)
 target_include_directories(unit_tests PRIVATE Pyjion)
 target_link_libraries(unit_tests Catch2::Catch2)

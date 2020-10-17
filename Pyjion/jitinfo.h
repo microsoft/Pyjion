@@ -147,7 +147,9 @@ public:
     }
 
     void reportFatalError(CorJitResult result) override {
+#ifdef DEBUG
         printf("Fatal error from .NET JIT %X\r\n", result);
+#endif
         // TODO : Enable when successful
         // PyErr_Format(PyExc_ValueError, "Fatal error from .NET JIT %X\r\n", result);
     }
@@ -851,7 +853,9 @@ public:
         CORINFO_CONTEXT_HANDLE      context,    /* IN */
         CORINFO_SIG_INFO           *sig         /* OUT */
         ) override {
+#ifdef DUMP_TRACES
         printf("findCallSiteSig\r\n");
+#endif
     }
 
     CORINFO_CLASS_HANDLE getTokenTypeAsHandle(

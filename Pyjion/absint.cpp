@@ -2706,7 +2706,9 @@ void AbstractInterpreter::unary_not(int& opcodeIndex) {
 JittedCode* AbstractInterpreter::compile() {
     bool interpreted = interpret();
     if (!interpreted) {
+#ifdef DEBUG
         printf("Failed to interpret");
+#endif
         return nullptr;
     }
     try {

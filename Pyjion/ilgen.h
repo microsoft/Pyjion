@@ -144,9 +144,6 @@ public:
         for (int i = 0; i < info->m_branchOffsets.size(); i++) {
             auto from = info->m_branchOffsets[i];
             auto offset = info->m_location - (from + 4);		// relative to the end of the instruction
-#ifdef DUMP_TRACES
-            printf("Marking label[%d] for %x : %x\n", label.m_index, from, offset);
-#endif
             m_il[from] = offset & 0xFF;
             m_il[from + 1] = (offset >> 8) & 0xFF;
             m_il[from + 2] = (offset >> 16) & 0xFF;
@@ -570,13 +567,19 @@ public:
                 printf("out of memory.\n");
                 break;
             case CORJIT_INTERNALERROR:
+#ifdef DEBUG
                 printf("internal error code.\n");
+#endif
                 break;
             case CORJIT_SKIPPED:
+#ifdef DEBUG
                 printf("skipped code.\n");
+#endif
                 break;
             case CORJIT_RECOVERABLEERROR:
+#ifdef DEBUG
                 printf("recoverable error code.\n");
+#endif
                 break;
         }
         return res;
