@@ -140,25 +140,6 @@ PyObject* PyJit_NotContains(PyObject *left, PyObject *right) {
     return ret;
 }
 
-int PyJit_Contains_Int(PyObject *left, PyObject *right) {
-    auto res = PySequence_Contains(right, left);
-    Py_DECREF(left);
-    Py_DECREF(right);
-    return res;
-}
-
-
-int PyJit_NotContains_Int(PyObject *left, PyObject *right) {
-    auto res = PySequence_Contains(right, left);
-    Py_DECREF(left);
-    Py_DECREF(right);
-    if (res < 0) {
-        return -1;
-    }
-    return res ? 0 : 1;
-}
-
-
 PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index) {
     PyObject** cells = frame->f_localsplus + frame->f_code->co_nlocals;
     PyObject *value = PyCell_GET(cells[index]);

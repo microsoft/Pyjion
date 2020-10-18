@@ -75,7 +75,7 @@ TEST_CASE("Test Subscr"){
 
 
 TEST_CASE("Test RichCompare"){
-    SECTION("Test subscr list") {
+    SECTION("Test string does not equal") {
         PyObject* left = PyUnicode_FromString("horse");
         PyObject* right = PyUnicode_FromString("battery");
 
@@ -85,7 +85,27 @@ TEST_CASE("Test RichCompare"){
     }
 }
 
+TEST_CASE("Test Contains"){
+    SECTION("Test word contains letter") {
+        PyObject* left = PyUnicode_FromString("horse");
+        PyObject* right = PyUnicode_FromString("o");
 
+        auto res = PyJit_Contains(left, right);
+        CHECK(PyBool_Check(res));
+        CHECK(res == Py_True);
+    }
+}
+
+TEST_CASE("Test NotContains"){
+    SECTION("Test word does not contain letter") {
+        PyObject* left = PyUnicode_FromString("horse");
+        PyObject* right = PyUnicode_FromString("n");
+
+        auto res = PyJit_Contains(left, right);
+        CHECK(PyBool_Check(res));
+        CHECK(res == Py_True);
+    }
+}
 
 TEST_CASE("Test BuildDictFromTuples"){
     SECTION("Test happy path") {

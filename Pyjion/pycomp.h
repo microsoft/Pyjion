@@ -118,8 +118,7 @@
 #define METHOD_ISNOT_BOOL                        0x0000004C
 #define METHOD_GETITER_OPTIMIZED_TOKEN           0x0000004D
 #define METHOD_COMPARE_EXCEPTIONS_INT            0x0000004E
-#define METHOD_CONTAINS_INT_TOKEN                0x0000004F
-#define METHOD_NOTCONTAINS_INT_TOKEN             0x00000050
+
 #define METHOD_UNARY_NOT_INT                     0x00000051
 #define METHOD_FLOAT_FROM_DOUBLE                 0x00000053
 #define METHOD_BOOL_FROM_LONG                    0x00000054
@@ -373,7 +372,6 @@ public:
     virtual void emit_tagged_int_to_float();
 
     virtual void emit_in();
-    virtual void emit_not_in_push_int();
     virtual void emit_not_in();
 
     virtual void emit_is(bool isNot);

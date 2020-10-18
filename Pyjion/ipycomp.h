@@ -364,9 +364,6 @@ public:
     virtual void emit_in() = 0;
     // Does an not in check and pushes a Python object onto the stack as the result, or NULL if there was an error
     virtual void emit_not_in() = 0;
-    // Does an not in check and pushes an unboxed int onto the stack indicating true (1)/false (0)/error (-1)
-    virtual void emit_not_in_push_int() = 0;
-
     // Does an is check and pushes a boxed Python bool on the stack as the result
     virtual void emit_is(bool isNot) = 0;
 
