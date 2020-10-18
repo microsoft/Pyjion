@@ -305,7 +305,6 @@ public:
     // Emits a call with the arguments to be invoked in a tuple object
     virtual void emit_call_with_tuple() = 0;
 
-	virtual bool emit_kwcall(size_t argCnt) = 0;
 	virtual void emit_kwcall_with_tuple() = 0;
 
     // Emits a call which includes *args 
@@ -348,31 +347,21 @@ public:
     // Perform a unary not, pushing an unboxed int onto the stack indicating true (1), false (0), or error
     virtual void emit_unary_not_push_int() = 0;
 
-    // Does a unary not on an unboxed floating value, pushing an unboxed bool onto the stack
-    virtual void emit_unary_not_float_push_bool() = 0;
-    // Performs a unary negative on a tagged integer
-    virtual void emit_unary_not_tagged_int_push_bool() = 0;
     // Performs a unary invert on the top value on the stack, pushing the result onto the stack or NULL if an error occurred
     virtual void emit_unary_invert() = 0;
 
     // Peforms a unary negative on a unboxed floating value on the stack, pushing the unboxed result back to the stack
     virtual void emit_unary_negative_float() = 0;
-    // Performs a unary negative on a tagged integer
-    virtual void emit_unary_negative_tagged_int() = 0;
 
     // Performans a binary operation for values on the stack which are unboxed floating points
     virtual void emit_binary_float(int opcode) = 0;
     // Performs a binary operation for values on the stack which are boxed objects
     virtual void emit_binary_object(int opcode) = 0;
 
-    virtual void emit_binary_tagged_int(int opcode) = 0;
-
     virtual void emit_tagged_int_to_float() = 0;
 
     // Does an in/contains check and pushes a Python object onto the stack as the result, or NULL if there was an error
     virtual void emit_in() = 0;
-    // Does an in/contains check and pushes an unboxed int onto the stack indicating true (1)/false (0)/error (-1)
-    virtual void emit_in_push_int() = 0;
     // Does an not in check and pushes a Python object onto the stack as the result, or NULL if there was an error
     virtual void emit_not_in() = 0;
     // Does an not in check and pushes an unboxed int onto the stack indicating true (1)/false (0)/error (-1)
@@ -380,8 +369,6 @@ public:
 
     // Does an is check and pushes a boxed Python bool on the stack as the result
     virtual void emit_is(bool isNot) = 0;
-    // Does an is check and pushes an unboxed bool onto the stack
-    virtual void emit_is_push_int(bool isNot) = 0;
 
     // Performs a comparison for values on the stack which are objects, keeping a boxed Python object as the result.
     virtual void emit_compare_object(int compareType) = 0;

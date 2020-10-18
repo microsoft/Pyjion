@@ -121,26 +121,10 @@
 #define METHOD_CONTAINS_INT_TOKEN                0x0000004F
 #define METHOD_NOTCONTAINS_INT_TOKEN             0x00000050
 #define METHOD_UNARY_NOT_INT                     0x00000051
-#define METHOD_RICHEQUALS_GENERIC_TOKEN          0x00000052
 #define METHOD_FLOAT_FROM_DOUBLE                 0x00000053
 #define METHOD_BOOL_FROM_LONG                    0x00000054
 #define METHOD_PYERR_SETSTRING                   0x00000055
 #define METHOD_BOX_TAGGED_PTR                    0x00000056
-
-#define METHOD_ADD_INT_TOKEN                     0x00000057
-#define METHOD_DIVIDE_INT_TOKEN                  0x00000058
-#define METHOD_FLOORDIVIDE_INT_TOKEN             0x00000059
-#define METHOD_POWER_INT_TOKEN                   0x0000005A    
-#define METHOD_MODULO_INT_TOKEN                  0x0000005B
-#define METHOD_BINARY_LSHIFT_INT_TOKEN           0x0000005C
-#define METHOD_BINARY_RSHIFT_INT_TOKEN           0x0000005D
-#define METHOD_BINARY_AND_INT_TOKEN              0x0000005E
-#define METHOD_BINARY_XOR_INT_TOKEN              0x0000005F
-#define METHOD_BINARY_OR_INT_TOKEN               0x00000060
-#define METHOD_MULTIPLY_INT_TOKEN                0x00000061
-#define METHOD_SUBTRACT_INT_TOKEN                0x00000062
-#define METHOD_UNARY_NEGATIVE_INT                0x00000063
-#define METHOD_UNARY_NOT_INT_PUSH_BOOL           0x00000064
 
 #define METHOD_EQUALS_INT_TOKEN                  0x00000065
 #define METHOD_LESS_THAN_INT_TOKEN               0x00000066
@@ -155,7 +139,6 @@
 #define METHOD_SETUPDATE_TOKEN                   0x0000006E
 #define METHOD_DICTUPDATE_TOKEN                  0x0000006F
 #define METHOD_UNBOX_LONG_TAGGED                 0x00000070
-#define METHOD_UNBOX_FLOAT                       0x00000071
 
 #define METHOD_INT_TO_FLOAT                      0x00000072
 
@@ -173,13 +156,6 @@
 #define METHOD_CALL3_TOKEN        0x00010003
 #define METHOD_CALL4_TOKEN        0x00010004
 
-// Not implemented
-#define METHOD_CALL5_TOKEN        0x00010005
-#define METHOD_CALL6_TOKEN        0x00010006
-#define METHOD_CALL7_TOKEN        0x00010007
-#define METHOD_CALL8_TOKEN        0x00010008
-#define METHOD_CALL9_TOKEN        0x00010009
-
 #define METHOD_METHCALL0_TOKEN        0x00011000
 #define METHOD_METHCALL1_TOKEN        0x00011001
 #define METHOD_METHCALL2_TOKEN        0x00011002
@@ -193,8 +169,6 @@
 #define METHOD_CALLN_TOKEN          0x000101FF
 
 #define METHOD_KWCALLN_TOKEN        0x000103FF
-
-#define METHOD_CALL0_OPT_TOKEN      0x00010200
 
 // method helpers
 
@@ -328,13 +302,10 @@ public:
     virtual void emit_unary_positive();
     virtual void emit_unary_negative();
     virtual void emit_unary_negative_float();
-    virtual void emit_unary_negative_tagged_int();
 
     virtual void emit_unary_not();
 
     virtual void emit_unary_not_push_int();
-    virtual void emit_unary_not_float_push_bool();
-    virtual void emit_unary_not_tagged_int_push_bool();
     virtual void emit_unary_invert();
 
     virtual void emit_import_name(void* name);
@@ -357,7 +328,6 @@ public:
     virtual bool emit_call(size_t argCnt);
     virtual void emit_call_with_tuple();
 
-    virtual bool emit_kwcall(size_t argCnt);
     virtual void emit_kwcall_with_tuple();
 
     virtual void emit_call_args();
@@ -396,20 +366,15 @@ public:
     virtual void emit_print_expr();
     virtual void emit_load_classderef(int index);
     virtual void emit_getiter();
-    //void emit_getiter_opt();
     virtual void emit_for_next(Label processValue, Local iterValue);
 
     virtual void emit_binary_float(int opcode);
-    virtual void emit_binary_tagged_int(int opcode);
     virtual void emit_binary_object(int opcode);
     virtual void emit_tagged_int_to_float();
 
-    virtual void emit_in_push_int();
     virtual void emit_in();
     virtual void emit_not_in_push_int();
     virtual void emit_not_in();
-
-    virtual void emit_is_push_int(bool isNot);
 
     virtual void emit_is(bool isNot);
 

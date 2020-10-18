@@ -570,19 +570,6 @@ void PythonCompiler::emit_unary_negative_float() {
     m_il.neg();
 }
 
-void PythonCompiler::emit_unary_negative_tagged_int() {
-    m_il.emit_call(METHOD_UNARY_NEGATIVE_INT, 1);
-}
-
-void PythonCompiler::emit_unary_not_float_push_bool() {
-    m_il.ld_r8(0);
-    m_il.compare_eq();
-}
-
-void PythonCompiler::emit_unary_not_tagged_int_push_bool() {
-    m_il.emit_call(METHOD_UNARY_NOT_INT_PUSH_BOOL, 1);
-}
-
 void PythonCompiler::emit_unary_invert() {
     m_il.emit_call(METHOD_UNARY_INVERT, 1);
 }
@@ -699,19 +686,6 @@ void PythonCompiler::emit_method_call_n(size_t argCnt){
 
 void PythonCompiler::emit_call_with_tuple() {
     m_il.emit_call(METHOD_CALLN_TOKEN, 2);
-}
-
-bool PythonCompiler::emit_kwcall(size_t argCnt) {
-    // TODO: Implement KWARG calls in the same way as function and method calls 0-4
-//	switch (argCnt) {
-//        case 0: m_il.emit_call(METHOD_KWCALL0_TOKEN); return true;
-//		case 1: m_il.emit_call(METHOD_KWCALL1_TOKEN); return true;
-//		case 2: m_il.emit_call(METHOD_KWCALL2_TOKEN); return true;
-//		case 3: m_il.emit_call(METHOD_KWCALL3_TOKEN); return true;
-//		case 4: m_il.emit_call(METHOD_KWCALL4_TOKEN); return true;
-//		default: m_il.emit_call(METHOD_KWCALLN_TOKEN); return true;
-//	}
-	return false;
 }
 
 void PythonCompiler::emit_kwcall_with_tuple() {
@@ -1028,16 +1002,6 @@ void PythonCompiler::emit_for_next(Label processValue, Local iterValue) {
     m_il.free_local(error);
 }
 
-/*
-void PythonCompiler::emit_getiter_opt() {
-    m_il.ld_loca(loopOpt1);
-    m_il.ld_loca(loopOpt2);
-    m_il.emit_call(METHOD_GETITER_OPTIMIZED_TOKEN);
-    dec_stack();
-    emit_error_check();
-    inc_stack();
-}*/
-
 void PythonCompiler::emit_debug_msg(const char* msg) {
     m_il.ld_i((void*)msg);
     m_il.emit_call(METHOD_DEBUG_TRACE, 1);
@@ -1067,35 +1031,6 @@ void PythonCompiler::emit_binary_float(int opcode) {
         case BINARY_FLOOR_DIVIDE:
         case INPLACE_FLOOR_DIVIDE: m_il.div(); m_il.emit_call(METHOD_FLOAT_FLOOR_TOKEN, 1); break;
 
-    }
-}
-
-void PythonCompiler::emit_binary_tagged_int(int opcode) {
-    switch (opcode) {
-        case INPLACE_ADD:
-        case BINARY_ADD: m_il.emit_call(METHOD_ADD_INT_TOKEN, 2); break;
-        case INPLACE_TRUE_DIVIDE:
-        case BINARY_TRUE_DIVIDE: m_il.emit_call(METHOD_DIVIDE_INT_TOKEN, 2); break;
-        case INPLACE_FLOOR_DIVIDE:
-        case BINARY_FLOOR_DIVIDE: m_il.emit_call(METHOD_FLOORDIVIDE_INT_TOKEN, 2); break;
-        case INPLACE_POWER:
-        case BINARY_POWER: m_il.emit_call(METHOD_POWER_INT_TOKEN, 2); break;
-        case INPLACE_MODULO:
-        case BINARY_MODULO: m_il.emit_call(METHOD_MODULO_INT_TOKEN, 2); break;
-        case INPLACE_LSHIFT:
-        case BINARY_LSHIFT: m_il.emit_call(METHOD_BINARY_LSHIFT_INT_TOKEN, 2); break;
-        case INPLACE_RSHIFT:
-        case BINARY_RSHIFT: m_il.emit_call(METHOD_BINARY_RSHIFT_INT_TOKEN, 2); break;
-        case INPLACE_AND:
-        case BINARY_AND: m_il.emit_call(METHOD_BINARY_AND_INT_TOKEN, 2); break;
-        case INPLACE_XOR:
-        case BINARY_XOR: m_il.emit_call(METHOD_BINARY_XOR_INT_TOKEN, 2); break;
-        case INPLACE_OR:
-        case BINARY_OR: m_il.emit_call(METHOD_BINARY_OR_INT_TOKEN, 2); break;
-        case INPLACE_MULTIPLY:
-        case BINARY_MULTIPLY: m_il.emit_call(METHOD_MULTIPLY_INT_TOKEN, 2); break;
-        case INPLACE_SUBTRACT:
-        case BINARY_SUBTRACT: m_il.emit_call(METHOD_SUBTRACT_INT_TOKEN, 2); break;
     }
 }
 
@@ -1134,17 +1069,10 @@ void PythonCompiler::emit_binary_object(int opcode) {
     }
 }
 
-void PythonCompiler::emit_is_push_int(bool isNot) {
-    m_il.emit_call(isNot ? METHOD_ISNOT_BOOL : METHOD_IS_BOOL, 2);
-}
-
 void PythonCompiler::emit_is(bool isNot) {
     m_il.emit_call(isNot ? METHOD_ISNOT : METHOD_IS, 2);
 }
 
-void PythonCompiler::emit_in_push_int() {
-    m_il.emit_call(METHOD_CONTAINS_INT_TOKEN, 2);
-}
 
 void PythonCompiler::emit_in() {
     m_il.emit_call(METHOD_CONTAINS_TOKEN, 2);
@@ -1278,7 +1206,6 @@ GLOBAL_METHOD(METHOD_PYITER_NEXT, &PyIter_Next, CORINFO_TYPE_NATIVEINT, Paramete
 
 GLOBAL_METHOD(METHOD_PYCELL_GET, &PyJit_CellGet, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_RICHCMP_TOKEN, &PyJit_RichCompare, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_INT));
-GLOBAL_METHOD(METHOD_RICHEQUALS_GENERIC_TOKEN, &PyJit_RichEquals_Generic, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_CONTAINS_TOKEN, &PyJit_Contains, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_NOTCONTAINS_TOKEN, &PyJit_NotContains, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
@@ -1403,36 +1330,12 @@ GLOBAL_METHOD(METHOD_FLOAT_FLOOR_TOKEN, static_cast<double(*)(double)>(floor), C
 GLOBAL_METHOD(METHOD_FLOAT_MODULUS_TOKEN, static_cast<double(*)(double, double)>(fmod), CORINFO_TYPE_DOUBLE, Parameter(CORINFO_TYPE_DOUBLE), Parameter(CORINFO_TYPE_DOUBLE));
 GLOBAL_METHOD(METHOD_FLOAT_FROM_DOUBLE, PyFloat_FromDouble, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_DOUBLE));
 GLOBAL_METHOD(METHOD_BOOL_FROM_LONG, PyBool_FromLong, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_INT));
-GLOBAL_METHOD(METHOD_BOX_TAGGED_PTR, PyJit_BoxTaggedPointer, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_UNBOX_LONG_TAGGED, PyJit_UnboxInt_Tagged, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_PYERR_SETSTRING, PyErr_SetString, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
-GLOBAL_METHOD(METHOD_ADD_INT_TOKEN, PyJit_Add_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_DIVIDE_INT_TOKEN, PyJit_TrueDivide_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_FLOORDIVIDE_INT_TOKEN, PyJit_FloorDivide_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_POWER_INT_TOKEN, PyJit_Power_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_MODULO_INT_TOKEN, PyJit_Modulo_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_BINARY_LSHIFT_INT_TOKEN, PyJit_BinaryLShift_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_BINARY_RSHIFT_INT_TOKEN, PyJit_BinaryRShift_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_BINARY_AND_INT_TOKEN, PyJit_BinaryAnd_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_BINARY_XOR_INT_TOKEN, PyJit_BinaryXor_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_BINARY_OR_INT_TOKEN, PyJit_BinaryOr_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_MULTIPLY_INT_TOKEN, PyJit_Multiply_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_SUBTRACT_INT_TOKEN, PyJit_Subtract_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
 
-GLOBAL_METHOD(METHOD_UNARY_NEGATIVE_INT, PyJit_UnaryNegative_Int, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_UNARY_NOT_INT_PUSH_BOOL, PyJit_UnaryNot_Int_PushBool, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT))
-
-GLOBAL_METHOD(METHOD_EQUALS_INT_TOKEN, PyJit_Equals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_LESS_THAN_INT_TOKEN, PyJit_LessThan_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_LESS_THAN_EQUALS_INT_TOKEN, PyJit_LessThanEquals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_NOT_EQUALS_INT_TOKEN, PyJit_NotEquals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_GREATER_THAN_INT_TOKEN, PyJit_GreaterThan_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
-GLOBAL_METHOD(METHOD_GREATER_THAN_EQUALS_INT_TOKEN, PyJit_GreaterThanEquals_Int, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT))
 GLOBAL_METHOD(METHOD_PERIODIC_WORK, _PyJit_PeriodicWork, CORINFO_TYPE_INT)
 
-GLOBAL_METHOD(METHOD_INT_TO_FLOAT, PyJit_Int_ToFloat, CORINFO_TYPE_BOOL, Parameter(CORINFO_TYPE_DOUBLE), Parameter(CORINFO_TYPE_NATIVEINT))
 GLOBAL_METHOD(METHOD_PYUNICODE_JOINARRAY, &PyJit_UnicodeJoinArray, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_FORMAT_VALUE, &PyJit_FormatValue, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_FORMAT_OBJECT, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));

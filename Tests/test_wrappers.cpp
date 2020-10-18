@@ -27,6 +27,66 @@
 #include <Python.h>
 #include "intrins.h"
 
+TEST_CASE("Test Add"){
+    SECTION("Test add two numbers") {
+        PyObject* left = PyLong_FromLong(200);
+        PyObject* right = PyLong_FromLong(304);
+
+        auto res = PyJit_Add(left, right);
+        CHECK(PyNumber_Check(res));
+        CHECK(PyLong_AsDouble(res) == 504);
+    }
+
+     SECTION("Test add two strings") {
+        PyObject* left = PyUnicode_FromString("horse");
+        PyObject* right = PyUnicode_FromString("staple");
+
+        auto res = PyJit_Add(left, right);
+        CHECK(PyUnicode_Check(res));
+        CHECK_THAT(PyUnicode_AsUTF8(res), Catch::Equals("horsestaple"));
+    }
+}
+
+TEST_CASE("Test Subscr"){
+    SECTION("Test subscr list") {
+        PyObject* left = PyList_New(0);
+        PyList_Append(left, PyUnicode_FromString("horse"));
+        PyList_Append(left, PyUnicode_FromString("battery"));
+        PyList_Append(left, PyUnicode_FromString("staple"));
+        PyObject* index = PyLong_FromLong(2);
+
+        auto res = PyJit_Subscr(left, index);
+        CHECK(PyUnicode_Check(res));
+        CHECK_THAT(PyUnicode_AsUTF8(res), Catch::Equals("staple"));
+    }
+
+    SECTION("Test subscr dict") {
+        PyObject* left = PyDict_New();
+        PyDict_SetItem(left, PyLong_FromLong(0), PyUnicode_FromString("horse"));
+        PyDict_SetItem(left, PyLong_FromLong(1), PyUnicode_FromString("battery"));
+        PyDict_SetItem(left, PyLong_FromLong(2), PyUnicode_FromString("staple"));
+        PyObject* right = PyLong_FromLong(2);
+
+        auto res = PyJit_Subscr(left, right);
+        CHECK(PyUnicode_Check(res));
+        CHECK_THAT(PyUnicode_AsUTF8(res), Catch::Equals("staple"));
+    }
+}
+
+
+TEST_CASE("Test RichCompare"){
+    SECTION("Test subscr list") {
+        PyObject* left = PyUnicode_FromString("horse");
+        PyObject* right = PyUnicode_FromString("battery");
+
+        auto res = PyJit_RichCompare(left, right, Py_EQ);
+        CHECK(PyBool_Check(res));
+        CHECK(res == Py_False);
+    }
+}
+
+
+
 TEST_CASE("Test BuildDictFromTuples"){
     SECTION("Test happy path") {
         PyObject* keys_and_values = PyTuple_New(3);

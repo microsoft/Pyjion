@@ -1900,24 +1900,20 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 unpack_sequence(oparg, curByte);
                 break;
             case UNPACK_EX: unpack_ex(oparg, curByte); break;
-            case CALL_FUNCTION_KW:
+            case CALL_FUNCTION_KW: {
                 // names is a tuple on the stack, should have come from a LOAD_CONST
-                if (!m_comp->emit_kwcall(oparg)) {
-                    auto names = m_comp->emit_spill();
-                    dec_stack();    // names
-                    build_tuple(oparg);
-                    m_comp->emit_load_and_free_local(names);
+                auto names = m_comp->emit_spill();
+                dec_stack();    // names
+                build_tuple(oparg);
+                m_comp->emit_load_and_free_local(names);
 
-                    m_comp->emit_kwcall_with_tuple();
-                    dec_stack();// function & names
-                }
-                else {
-                    dec_stack(oparg + 2); // + function & names
-                }
+                m_comp->emit_kwcall_with_tuple();
+                dec_stack();// function & names
 
                 error_check("kwcall failed");
                 inc_stack();
                 break;
+            }
             case CALL_FUNCTION_EX:
                 if (oparg & 0x01) {
                     // kwargs, then args, then function

@@ -45,17 +45,13 @@ format_exc_check_arg(PyObject *exc, const char *format_str, PyObject *obj);
 static void
 format_exc_unbound(PyCodeObject *co, int oparg);
 
-
 PyObject* PyJit_Add(PyObject *left, PyObject *right);
 
 PyObject* PyJit_Subscr(PyObject *left, PyObject *right);
 
 PyObject* PyJit_RichCompare(PyObject *left, PyObject *right, size_t op);
 
-int PyJit_RichEquals_Generic(PyObject *left, PyObject *right, void** addr);
-
 PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index);
-
 
 PyObject* PyJit_Contains(PyObject *left, PyObject *right);
 PyObject* PyJit_NotContains(PyObject *left, PyObject *right);
@@ -151,7 +147,7 @@ const char * ObjInfo(PyObject *obj);
 
 void PyJit_PyErrRestore(PyObject*tb, PyObject*value, PyObject*exception);
 
-PyObject* PyJit_CheckFunctionResult(PyObject* value);
+__unused PyObject* PyJit_CheckFunctionResult(PyObject* value);
 
 PyObject* PyJit_ImportName(PyObject*level, PyObject*from, PyObject* name, PyFrameObject* f);
 
@@ -254,34 +250,10 @@ extern PyObject* g_emptyTuple;
 
 void PyJit_DecRef(PyObject* value);
 
-void PyJit_FloatDivideByZero();
-
-PyObject* PyJit_UnboxInt_Tagged(PyObject* value);
-PyObject* PyJit_Add_Int(PyObject *left, PyObject *right);
-PyObject* PyJit_Subtract_Int(PyObject *left, PyObject *right);
-PyObject* PyJit_BinaryAnd_Int(PyObject *left, PyObject *right);
-PyObject* PyJit_BinaryOr_Int(PyObject *left, PyObject *right);
-PyObject* PyJit_BinaryXor_Int(PyObject *left, PyObject *right);
-PyObject* PyJit_Multiply_Int(PyObject *left, PyObject *right);
-PyObject* PyJit_Modulo_Int(PyObject *left, PyObject *right);
-PyObject* PyJit_TrueDivide_Int(PyObject *left, PyObject *right);
-PyObject* PyJit_FloorDivide_Int(PyObject *left, PyObject *right);
 PyObject* PyJit_BinaryLShift_Int(PyObject *left, PyObject *right);
 PyObject* PyJit_BinaryRShift_Int(PyObject *left, PyObject *right);
 PyObject* PyJit_Power_Int(PyObject *left, PyObject *right);
 
-PyObject* PyJit_BoxTaggedPointer(PyObject* value);
-PyObject* PyJit_UnaryNegative_Int(PyObject*value);
-int PyJit_UnaryNot_Int_PushBool(PyObject*value);
-
-int PyJit_Equals_Int(PyObject *left, PyObject *right);
-int PyJit_LessThan_Int(PyObject *left, PyObject *right);
-int PyJit_LessThanEquals_Int(PyObject *left, PyObject *right);
-int PyJit_NotEquals_Int(PyObject *left, PyObject *right);
-int PyJit_GreaterThan_Int(PyObject *left, PyObject *right);
-int PyJit_GreaterThanEquals_Int(PyObject *left, PyObject *right);
-
-int PyJit_Int_ToFloat(PyObject* in, double*out);
 int _PyJit_PeriodicWork();
 
 PyObject* PyJit_UnicodeJoinArray(PyObject** items, Py_ssize_t count);
