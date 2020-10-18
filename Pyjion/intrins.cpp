@@ -476,9 +476,6 @@ int PyJit_PrintExpr(PyObject *value) {
         Py_DECREF(value);
         return 1;
     }
-    // TODO: Fix a bug where this can be called with a const value if the last
-    // opcode was LOAD_CONST with a small integer
-
     res = PyObject_CallOneArg(hook, value);
     Py_DECREF(value);
     if (res == NULL) {
@@ -621,7 +618,7 @@ void PyJit_DebugTrace(char* msg) {
 const char * ObjInfo(PyObject *obj);
 
 void PyJit_PyErrRestore(PyObject*tb, PyObject*value, PyObject*exception) {
-#ifdef DEBUG_TRACES
+#ifdef DUMP_TRACES
     printf("Restoring exception %p %s\r\n", exception, ObjInfo(exception));
     printf("Restoring value %p %s\r\n", value, ObjInfo(value));
     printf("Restoring tb %p %s\r\n", tb, ObjInfo(tb));
@@ -918,13 +915,6 @@ void PyJit_PopFrame(PyFrameObject* frame) {
 
 void PyJit_EhTrace(PyFrameObject *f) {
     PyTraceBack_Here(f);
-    
-    //auto tstate = PyThreadState_GET();
-
-    //if (tstate->c_tracefunc != NULL) {
-    //	call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj,
-    //		tstate, f);
-    //}
 }
 
 int PyJit_Raise(PyObject *exc, PyObject *cause) {
@@ -1203,7 +1193,7 @@ PyObject* PyJit_CallN(PyObject *target, PyObject* args) {
 
 PyObject* PyJit_CallNKW(PyObject *target, PyObject* args, PyObject* kwargs) {
     // we stole references for the tuple...
-#ifdef DEBUG_TRACES
+#ifdef DUMP_TRACES
     printf("Target: %s\r\n", ObjInfo(target));
 
     printf("Tuple: %s\r\n", ObjInfo(args));
@@ -1213,7 +1203,7 @@ PyObject* PyJit_CallNKW(PyObject *target, PyObject* args, PyObject* kwargs) {
     printf("%d\r\n", kwargs->ob_refcnt);
 #endif
     auto res = PyObject_Call(target, args, kwargs);
-#ifdef DEBUG_TRACES
+#ifdef DUMP_TRACES
     printf("%d\r\n", kwargs->ob_refcnt);
 #endif
     Py_DECREF(target);
@@ -1293,32 +1283,6 @@ typedef struct {
 } rangeobject;
 
 PyObject* PyJit_GetIterOptimized(PyObject* iterable, size_t* iterstate1, size_t* iterstate2) {
-    //if (PyRange_Check(iterable)) {
-    //	rangeobject* range = (rangeobject*)iterable;
-    //	auto step = PyLong_AsSize_t(range->step);
-    //	if (PyErr_ExceptionMatches(PyExc_OverflowError)) {
-    //		PyErr_Clear();		
-    //		goto common;
-    //	}
-    //	else if (step == 1) {
-    //		auto start  = PyLong_AsSize_t(range->start);
-    //		if (PyErr_ExceptionMatches(PyExc_OverflowError)) {
-    //			PyErr_Clear();
-    //			goto common;
-    //		}
-    //		auto end = PyLong_AsSize_t(range->start);
-    //		if (PyErr_ExceptionMatches(PyExc_OverflowError)) {
-    //			PyErr_Clear();
-    //			goto common;
-    //		}
-
-    //		// common iteration case
-    //		*iterstate1 = start;
-    //		*iterstate2 = end;
-    //		return (PyObject*)1;
-    //	}
-    //}
-//common:
     auto res = PyObject_GetIter(iterable);
     Py_DECREF(iterable);
     return res;
@@ -1333,9 +1297,6 @@ PyObject* PyJit_IterNext(PyObject* iter, int*error) {
                 return nullptr;
             }
             *error = 0;
-            // TODO: Tracing...
-            //else if (tstate->c_tracefunc != NULL)
-            //	call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj, tstate, f);
             PyErr_Clear();
         }
     }
@@ -1352,9 +1313,6 @@ PyObject* PyJit_IterNextOptimized(PyObject* iter, int*error, size_t* iterstate1,
                 return nullptr;
             }
             *error = 0;
-            // TODO: Tracing...
-            //else if (tstate->c_tracefunc != NULL)
-            //	call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj, tstate, f);
             PyErr_Clear();
         }
     }
@@ -1560,7 +1518,7 @@ PyObject** PyJit_UnpackSequence(PyObject* seq, size_t size, PyObject** tempStora
 PyObject* PyJit_LoadAttr(PyObject* owner, PyObject* name) {
     PyObject *res = PyObject_GetAttr(owner, name);
     Py_DECREF(owner);
-#ifdef DEBUG_TRACES
+#ifdef DUMP_TRACES
     if (res == nullptr) {
         printf("Load attr failed: %s\r\n", PyUnicode_AsUTF8(name));
     }

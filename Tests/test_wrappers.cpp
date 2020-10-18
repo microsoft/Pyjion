@@ -81,7 +81,7 @@ TEST_CASE("Test RichCompare"){
 
         auto res = PyJit_RichCompare(left, right, Py_EQ);
         CHECK(PyBool_Check(res));
-        CHECK(res == Py_False);
+        CHECK_THAT(PyUnicode_AsUTF8(PyObject_Repr(res)), Catch::Equals("False"));
     }
 }
 
@@ -92,7 +92,7 @@ TEST_CASE("Test Contains"){
 
         auto res = PyJit_Contains(left, right);
         CHECK(PyBool_Check(res));
-        CHECK(res == Py_True);
+        CHECK_THAT(PyUnicode_AsUTF8(PyObject_Repr(res)), Catch::Equals("True"));
     }
 }
 
@@ -101,9 +101,9 @@ TEST_CASE("Test NotContains"){
         PyObject* left = PyUnicode_FromString("horse");
         PyObject* right = PyUnicode_FromString("n");
 
-        auto res = PyJit_Contains(left, right);
+        auto res = PyJit_NotContains(left, right);
         CHECK(PyBool_Check(res));
-        CHECK(res == Py_True);
+        CHECK_THAT(PyUnicode_AsUTF8(PyObject_Repr(res)), Catch::Equals("True"));
     }
 }
 
