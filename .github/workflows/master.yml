@@ -7,9 +7,20 @@ on:
     branches: [ master ]
 
 env:
-  BUILD_TYPE: Release
+  BUILD_TYPE: Debug
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Run clang-tidy
+        uses: HorstBaerbel/action-clang-tidy@1.0
+        with:
+          scandir: 'Pyjion'
+          builddir: 'build'
   build-linux:
     runs-on: ubuntu-latest
     strategy:
