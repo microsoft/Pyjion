@@ -56,9 +56,6 @@ PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index);
 PyObject* PyJit_Contains(PyObject *left, PyObject *right);
 PyObject* PyJit_NotContains(PyObject *left, PyObject *right);
 
-int PyJit_Contains_Int(PyObject *left, PyObject *right);
-int PyJit_NotContains_Int(PyObject *left, PyObject *right);
-
 PyObject* PyJit_NewFunction(PyObject* code, PyObject* qualname, PyFrameObject* frame);
 
 PyObject* PyJit_SetClosure(PyObject* closure, PyObject* func);
@@ -143,7 +140,6 @@ int PyJit_CompareExceptions_Int(PyObject*v, PyObject* w);
 void PyJit_UnboundLocal(PyObject* name);
 
 void PyJit_DebugTrace(char* msg);
-const char * ObjInfo(PyObject *obj);
 
 void PyJit_PyErrRestore(PyObject*tb, PyObject*value, PyObject*exception);
 
@@ -222,8 +218,6 @@ PyObject** PyJit_UnpackSequence(PyObject* seq, size_t size, PyObject** tempStora
 
 PyObject* PyJit_LoadAttr(PyObject* owner, PyObject* name);
 
-const char * ObjInfo(PyObject *obj);
-
 int PyJit_StoreAttr(PyObject* value, PyObject* owner, PyObject* name);
 
 int PyJit_DeleteAttr(PyObject* owner, PyObject* name);
@@ -254,7 +248,7 @@ PyObject* PyJit_BinaryLShift_Int(PyObject *left, PyObject *right);
 PyObject* PyJit_BinaryRShift_Int(PyObject *left, PyObject *right);
 PyObject* PyJit_Power_Int(PyObject *left, PyObject *right);
 
-int _PyJit_PeriodicWork();
+int PyJit_PeriodicWork();
 
 PyObject* PyJit_UnicodeJoinArray(PyObject** items, Py_ssize_t count);
 PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec);

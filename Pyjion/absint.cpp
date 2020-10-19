@@ -60,7 +60,6 @@
 #define GET_OPCODE(index) _Py_OPCODE(m_byteCode[(index)/sizeof(_Py_CODEUNIT)])
 
 AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* comp) : m_code(code), m_comp(comp) {
-    // TODO  : Initialize m_blockIds
     m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
     m_size = PyBytes_Size(code->co_code);
     m_returnValue = &Undefined;

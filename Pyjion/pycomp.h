@@ -31,8 +31,8 @@
 
 #include <share.h>
 #include <intrin.h>
-#include <limits.h>
-#include <float.h>
+#include <climits>
+#include <cfloat>
 
 #include "ipycomp.h"
 #include "jitinfo.h"
@@ -103,7 +103,6 @@
 #define METHOD_COMPARE_EXCEPTIONS                0x00000039
 #define METHOD_UNBOUND_LOCAL                     0x0000003A
 #define METHOD_DEBUG_TRACE                       0x0000003B
-#define METHOD_CALLNKW_TOKEN                     0x0000003D
 #define METHOD_DEBUG_DUMP_FRAME                  0x0000003E
 #define METHOD_UNWIND_EH                         0x0000003F
 #define METHOD_PY_PUSHFRAME                      0x00000041
@@ -220,13 +219,13 @@ class PythonCompiler : public IPythonCompiler {
     Local m_lasti;
 
 public:
-    PythonCompiler(PyCodeObject *code);
+    explicit PythonCompiler(PyCodeObject *code);
 
-    int il_length() {
+    int il_length() override {
         return m_il.m_il.size();
     };
 
-    void dump(int start = 0) {
+    void dump(int start = 0) override {
         for (int i = start; i < m_il.m_il.size(); i++){
             printf("%s\n", opcodename((OPCODE)m_il.m_il[i]));
         }

@@ -246,8 +246,6 @@ class AbstractInterpreter {
     // Labels that map from a Python byte code offset to an ilgen label.  This allows us to branch to any
     // byte code offset.
     unordered_map<int, Label> m_offsetLabels;
-    // Tracks the depth of the Python stack
-    size_t m_blockIds;
     // Tracks the current depth of the stack,  as well as if we have an object reference that needs to be freed.
     // True (STACK_KIND_OBJECT) if we have an object, false (STACK_KIND_VALUE) if we don't
     ValueStack m_stack;
