@@ -1707,33 +1707,6 @@ PyObject* MethCall0(PyObject* self, std::vector<PyObject*>* method_info) {
     return res;
 }
 
-PyObject* MethCall1(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0) {
-    PyObject* res;
-    if (method_info->back() != nullptr)
-        res = Call<PyObject*>(method_info->at(0), method_info->at(1), arg0);
-    else
-        res = Call<PyObject*>(method_info->at(0), arg0);
-    return res;
-}
-
-PyObject* MethCall2(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1) {
-    PyObject* res;
-    if (method_info->back() != nullptr)
-        res = Call<PyObject*>(method_info->at(0), method_info->at(1), arg0, arg1);
-    else
-        res = Call<PyObject*>(method_info->at(0), arg0, arg1);
-    return res;
-}
-
-PyObject* MethCall3(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
-    PyObject* res;
-    if (method_info->back() != nullptr)
-        res = Call<PyObject*>(method_info->at(0), method_info->at(1), arg0, arg1, arg2);
-    else
-        res = Call<PyObject*>(method_info->at(0), arg0, arg1, arg2);
-    return res;
-}
-
 PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObject* args) {
     PyObject* res;
     if(!PyTuple_Check(args)) {
@@ -1742,22 +1715,32 @@ PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
         Py_DECREF(args);
         return nullptr;
     }
+    // TODO : Support vector arg calls.
     if (method_info->back() != nullptr)
     {
         auto target = method_info->at(0);
-        auto self_ = method_info->at(1);
-        res = PyObject_Call(target, args, nullptr);
-        //Py_DECREF(args);
-        assert(res != nullptr);
+        auto args_tuple = PyTuple_New(PyTuple_Size(args) + 1);
+        PyTuple_SetItem(args_tuple, 0, method_info->at(1));
+        for (int i = 0 ; i < PyTuple_Size(args) ; i ++){
+            PyTuple_SetItem(args_tuple, i+1, PyTuple_GetItem(args, i));
+        }
+        res = PyObject_Call(target, args_tuple, nullptr);
+        if (res == nullptr){
+            Py_DECREF(target);
+            Py_DECREF(args);
+            return nullptr;
+        }
         Py_DECREF(target);
         return res;
     }
     else {
         auto target = method_info->at(0);
-        auto self_ = method_info->at(1);
         res = PyObject_Call(target, args, nullptr);
-        //Py_DECREF(args);
-        assert(res != nullptr);
+        if (res == nullptr){
+            Py_DECREF(target);
+            Py_DECREF(args);
+            return nullptr;
+        }
         Py_DECREF(target);
         return res;
     }

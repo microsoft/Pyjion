@@ -701,14 +701,8 @@ bool PythonCompiler::emit_call(size_t argCnt) {
     return false;
 }
 
-bool PythonCompiler::emit_method_call(size_t argCnt) {
-    switch (argCnt) {
-        case 0: m_il.emit_call(METHOD_METHCALL0_TOKEN, 2); return true;
-//        case 1: m_il.emit_call(METHOD_METHCALL1_TOKEN, 3); return true;
-//        case 2: m_il.emit_call(METHOD_METHCALL2_TOKEN, 4); return true;
-//        case 3: m_il.emit_call(METHOD_METHCALL3_TOKEN, 5); return true;
-    }
-    return false;
+void PythonCompiler::emit_method_call_0() {
+    m_il.emit_call(METHOD_METHCALL0_TOKEN, 2);
 }
 
 void PythonCompiler::emit_method_call_n(size_t argCnt){
@@ -1368,9 +1362,6 @@ GLOBAL_METHOD(METHOD_FORMAT_OBJECT, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT,
 GLOBAL_METHOD(METHOD_LOAD_METHOD, &PyJit_LoadMethod, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_METHCALL0_TOKEN, &MethCall0, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_METHCALL1_TOKEN, &MethCall1, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_METHCALL2_TOKEN, &MethCall2, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_METHCALL3_TOKEN, &MethCall3, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_METHCALLN_TOKEN, &MethCallN, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 

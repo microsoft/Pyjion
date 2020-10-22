@@ -56,7 +56,7 @@ private:
     }
 
 public:
-    EmissionTest(const char *code) {
+    explicit EmissionTest(const char *code) {
         m_code.reset(CompileCode(code));
         if (m_code.get() == nullptr) {
             FAIL("failed to compile code");

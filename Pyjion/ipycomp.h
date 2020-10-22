@@ -80,7 +80,6 @@ class IPythonCompiler {
 public:
     // Current CIL queue length
     virtual int il_length() = 0 ;
-    virtual void dump(int start = 0) = 0 ;
 
     /*****************************************************
      * Basic Python stack manipulations */
@@ -301,7 +300,7 @@ public:
     virtual bool emit_call(size_t argCnt) = 0;
 
     // Emits a call for the specified argument count.
-    virtual bool emit_method_call(size_t argCnt) = 0;
+    virtual void emit_method_call_0() = 0;
     virtual void emit_method_call_n(size_t argCnt) = 0;
 
     // Emits a call with the arguments to be invoked in a tuple object

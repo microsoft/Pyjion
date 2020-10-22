@@ -118,7 +118,7 @@ if(NET_SRC_LIB)  # use the libraries compiled from source
 endif()
 
 
-set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp Pyjion/disasm.cpp Pyjion/exceptionhandling.cpp Pyjion/stack.cpp Pyjion/block.cpp)
+set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp Pyjion/exceptionhandling.cpp Pyjion/stack.cpp Pyjion/block.cpp)
 
 add_library(pyjionlib OBJECT ${SOURCES})
 add_library(pyjion MODULE $<TARGET_OBJECTS:pyjionlib>)

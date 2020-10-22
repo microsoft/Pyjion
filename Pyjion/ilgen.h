@@ -676,27 +676,6 @@ public:
         return res;
     }
 
-    void dump () {
-        printf("Stack Size %d\n", m_stackSize);
-        printf("Labels         \n");
-        printf("---------------\n");
-        for (auto & m_label : m_labels) {
-            printf("%d : \n", m_label.m_location);
-        }
-
-        printf("Locals         \n");
-        printf("---------------\n");
-        for (auto & m_local : m_locals) {
-            printf("%d : \n", m_local.m_type);
-        }
-
-        printf("IL          \n");
-        printf("---------------\n");
-        for (int i =0 ; i < m_il.size(); i ++) {
-           printf("%s\n", opcodename((OPCODE)m_il[i]));
-        }
-    }
-
 private:
     void emit_int(int value) {
         m_il.push_back(value & 0xff);

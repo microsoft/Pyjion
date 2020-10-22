@@ -1780,8 +1780,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
 #ifdef DUMP_TRACES
         printf("Compiling OPCODE %d - %s (%d) stack %d, depth %d\n", curByte, opcode_name(byte), oparg, m_stack.size(), m_blockStack.size());
         int ilLen = m_comp->il_length();
-#endif
         m_comp->emit_breakpoint();
+#endif
         m_comp->emit_lasti_update(curByte);
 
         int curStackSize = m_stack.size();
@@ -2392,11 +2392,13 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case CALL_METHOD:
             {
-                if (!m_comp->emit_method_call(oparg)) {
+                if (oparg == 0) {
+                    m_comp->emit_method_call_0();
+                } else {
                     build_tuple(oparg);
                     m_comp->emit_method_call_n(oparg);
                 }
-                dec_stack(oparg + 2); // + method + name + nargs
+                dec_stack(2); // + method + name + nargs
                 error_check("failed to call method");
                 inc_stack(); //result
                 break;
