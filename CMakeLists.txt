@@ -23,6 +23,10 @@ if(DUMP_TRACES)
     add_definitions(-DDUMP_TRACES)
 endif()
 
+if(DUMP_JIT_TRACES)
+    add_definitions(-DDUMP_JIT_TRACES)
+endif()
+
 if(NOT WIN32)
     set(CMAKE_CXX_STANDARD 14)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)

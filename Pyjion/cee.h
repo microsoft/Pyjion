@@ -64,8 +64,7 @@ protected:
 #endif
 
 public: CCorJitHost(){
-#ifndef WINDOWS
-#ifdef DUMP_TRACES
+#ifdef DUMP_JIT_TRACES
         intSettings[u"JitLsraStats"] = 0;
         intSettings[u"DumpJittedMethods"] = 1;
         intSettings[u"JitDumpToDebugger"] = 0;
@@ -73,7 +72,6 @@ public: CCorJitHost(){
         intSettings[u"JitDumpASCII"] = 0;
         strSettings[u"JitDump"] = u"*";
         intSettings[u"JitDumpVerboseTrees"] = 1;
-#endif
 #endif
     }
 

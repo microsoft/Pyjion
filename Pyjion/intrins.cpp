@@ -1735,6 +1735,11 @@ PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
     }
     else {
         auto target = method_info->at(0);
+#ifdef DUMP_TRACES
+        printf("Calling method %s with args %s\n",
+               PyUnicode_AsUTF8(PyObject_Repr(target)),
+               PyUnicode_AsUTF8(PyObject_Repr(args)));
+#endif
         res = PyObject_Call(target, args, nullptr);
         if (res == nullptr){
             Py_DECREF(target);
