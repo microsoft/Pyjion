@@ -143,7 +143,7 @@ void PyJit_DebugTrace(char* msg);
 
 void PyJit_PyErrRestore(PyObject*tb, PyObject*value, PyObject*exception);
 
-__unused PyObject* PyJit_CheckFunctionResult(PyObject* value);
+PyObject* PyJit_CheckFunctionResult(PyObject* value);
 
 PyObject* PyJit_ImportName(PyObject*level, PyObject*from, PyObject* name, PyFrameObject* f);
 

@@ -39,7 +39,7 @@ struct BlockInfo {
     int EndOffset, Kind, ContinueOffset;
     EhFlags Flags;
     ExceptionHandler* CurrentHandler;  // the current exception handler
-    __unused Local LoopVar; //, LoopOpt1, LoopOpt2;
+    Local LoopVar; //, LoopOpt1, LoopOpt2;
 
     BlockInfo(int endOffset, int kind, ExceptionHandler* currentHandler, EhFlags flags = EHF_None, int continueOffset = 0) {
         EndOffset = endOffset;

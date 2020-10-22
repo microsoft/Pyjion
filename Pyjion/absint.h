@@ -44,7 +44,7 @@ struct AbstractLocalInfo;
 // Tracks block information for analyzing loops, exception blocks, and break opcodes.
 struct AbsIntBlockInfo {
     size_t BlockStart, BlockEnd;
-    __unused bool IsLoop;
+    bool IsLoop;
 
     AbsIntBlockInfo(size_t blockStart, size_t blockEnd, bool isLoop) {
         BlockStart = blockStart;
@@ -296,7 +296,7 @@ public:
 
     AbstractValue* get_return_info();
 
-    __unused bool has_info(size_t byteCodeIndex);
+    bool has_info(size_t byteCodeIndex);
 
 private:
     void compile_pop_block();
@@ -354,7 +354,7 @@ private:
 
     void unwind_eh(ExceptionHandler* fromHandler, ExceptionHandler* toHandler = nullptr);
 
-    __unused void unwind_loop(Local finallyReason, EhFlags branchKind, int branchOffset);
+    void unwind_loop(Local finallyReason, EhFlags branchKind, int branchOffset);
 
     ExceptionHandler * get_ehblock();
 
@@ -402,7 +402,7 @@ private:
     void load_fast_worker(int local, bool checkUnbound);
     void unpack_sequence(size_t size, int opcode);
 
-    __unused Local get_optimized_local(int index, AbstractValueKind kind);
+    Local get_optimized_local(int index, AbstractValueKind kind);
     void pop_except();
 
     bool can_optimize_pop_jump(int opcodeIndex);

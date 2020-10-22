@@ -29,11 +29,11 @@
 enum EhFlags {
     EHF_None = 0,
     // The exception handling block includes a continue statement
-    EHF_BlockContinues __unused = 0x01,
+    EHF_BlockContinues = 0x01,
     // The exception handling block includes a return statement
     EHF_BlockReturns = 0x02,
     // The exception handling block includes a break statement
-    EHF_BlockBreaks __unused = 0x04,
+    EHF_BlockBreaks = 0x04,
     // The exception handling block is in the try portion of a try/finally
     EHF_TryFinally = 0x08,
     // The exception handling block is in the try portion of a try/except
