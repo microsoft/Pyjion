@@ -38,7 +38,6 @@
 
 #include <vector>
 #include <unordered_map>
-
 #include <corjit.h>
 
 #include <openum.h>
@@ -54,7 +53,12 @@
 using namespace std;
 
 void helperFtn(); // Does nothing, replacement function of the entry-point helper in the CLR.
+void breakpointFtn();
 
+vector<PyObject *> newArrayHelperFtn(INT_PTR size, CORINFO_CLASS_HANDLE arrayMT);
+void* stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref);
+
+const CORINFO_CLASS_HANDLE PYOBJECT_PTR_TYPE = (CORINFO_CLASS_HANDLE)0x11;
 
 class CorJitInfo : public ICorJitInfo, public JittedCode {
     void* m_codeAddr;
@@ -361,7 +365,12 @@ public:
         CORINFO_RESOLVED_TOKEN *        pResolvedToken,
         BOOL                            fEmbedParent, // TRUE - embeds parent type handle of the field/method handle
         CORINFO_GENERICHANDLE_RESULT *  pResult) override {
-        printf("embedGenericHandle  not implemented\r\n");
+        if (pResolvedToken->tokenType == CORINFO_TOKENKIND_Newarr) {
+            // Emitted from ILGenerator::new_array()
+            pResult->lookup.lookupKind.needsRuntimeLookup = false;
+            pResult->lookup.constLookup.handle = pResult->compileTimeHandle;
+            pResult->lookup.constLookup.accessType = IAT_VALUE;
+        }
     }
 
     // Generate a cookie based on the signature that would needs to be passed
@@ -826,7 +835,7 @@ public:
         auto* mod = (Module*)pResolvedToken->tokenScope;
         BaseMethod* method = mod->ResolveMethod(pResolvedToken->token);
         pResolvedToken->hMethod = (CORINFO_METHOD_HANDLE)method;
-        pResolvedToken->hClass = (CORINFO_CLASS_HANDLE)1; // this just suppresses a JIT assert
+        pResolvedToken->hClass = PYOBJECT_PTR_TYPE; // Internal reference for Pyobject ptr
         //printf("resolveToken %d\r\n", pResolvedToken->token);
     }
 
@@ -901,7 +910,10 @@ public:
     CorInfoType asCorInfoType(
         CORINFO_CLASS_HANDLE    cls
         ) override {
-        printf("asCorInfoType\r\n");
+        if (cls == PYOBJECT_PTR_TYPE){
+            return CORINFO_TYPE_PTR;
+        }
+        printf("unimplemented asCorInfoType\r\n");
         return CORINFO_TYPE_UNDEF;
     }
 
@@ -909,6 +921,8 @@ public:
     const char* getClassName(
         CORINFO_CLASS_HANDLE    cls
         ) override {
+        if (cls == PYOBJECT_PTR_TYPE)
+            return "PyObject";
         return "classname";
     }
 
@@ -929,13 +943,19 @@ public:
     }
 
     // Quick check whether the type is a value class. Returns the same value as getClassAttribs(cls) & CORINFO_FLG_VALUECLASS, except faster.
-    BOOL isValueClass(CORINFO_CLASS_HANDLE cls) override { printf("isValueClass\r\n"); return FALSE; }
+    BOOL isValueClass(CORINFO_CLASS_HANDLE cls) override {
+        if (cls == PYOBJECT_PTR_TYPE)
+            return FALSE;
+        return FALSE;
+    }
 
     // return flags (defined above, CORINFO_FLG_PUBLIC ...)
     DWORD getClassAttribs(
         CORINFO_CLASS_HANDLE    cls
         ) override {
         // TODO : Load from a base class and establish correct attribs.
+        if (cls == PYOBJECT_PTR_TYPE)
+            return CORINFO_FLG_NATIVE;
         return CORINFO_FLG_VALUECLASS;
     }
 
@@ -1057,6 +1077,9 @@ public:
     CorInfoHelpFunc getNewArrHelper(
         CORINFO_CLASS_HANDLE        arrayCls
         ) override {
+        if (arrayCls == PYOBJECT_PTR_TYPE){
+            return CORINFO_HELP_NEWARR_1_VC;
+        }
         printf("getNewArrHelper\r\n");
         return CORINFO_HELP_UNDEF;
     }
@@ -1096,7 +1119,7 @@ public:
         CORINFO_CLASS_HANDLE        cls
         ) override {
         printf("getBoxHelper\r\n");
-        return CORINFO_HELP_UNDEF;
+        return CORINFO_HELP_BOX;
     }
 
     // returns the unbox helper.  If 'helperCopies' points to a true 
@@ -1115,7 +1138,7 @@ public:
         CORINFO_CLASS_HANDLE        cls
         ) override {
         printf("getUnBoxHelper\r\n");
-        return CORINFO_HELP_UNDEF;
+        return CORINFO_HELP_UNBOX;
     }
 
     const char* getHelperName(
@@ -1152,6 +1175,8 @@ public:
     CorInfoType getTypeForPrimitiveValueClass(
         CORINFO_CLASS_HANDLE        cls
         ) override {
+        if (cls == PYOBJECT_PTR_TYPE)
+            return CORINFO_TYPE_NATIVEINT;
         printf("getTypeForPrimitiveValueClass\r\n");
         return CORINFO_TYPE_UNDEF;
     }
@@ -1246,7 +1271,6 @@ public:
         CORINFO_HELPER_DESC    *pAccessHelper /* If canAccessMethod returns something other
                                               than ALLOWED, then this is filled in. */
         ) override {
-        printf("canAccessClass\r\n");
         return CORINFO_ACCESS_ALLOWED;
     }
 
@@ -1421,7 +1445,8 @@ public:
         CORINFO_ARG_LIST_HANDLE     args            /* IN */
         ) override {
         // TODO: Work out correct return type
-        //printf("getArgClass not implemented\r\n");
+        printf("getArgClass not implemented\r\n");
+        return PYOBJECT_PTR_TYPE;
         return nullptr;
     }
 
@@ -1701,6 +1726,14 @@ public:
         if (ppIndirection != nullptr)
             *ppIndirection = nullptr;
         assert(ftnNum < CORINFO_HELP_COUNT);
+        switch (ftnNum){
+            case CORINFO_HELP_USER_BREAKPOINT:
+                return (void*)breakpointFtn;
+            case CORINFO_HELP_NEWARR_1_VC:
+                return (void*)newArrayHelperFtn;
+            case CORINFO_HELP_ARRADDR_ST:
+                return (void*)stArrayHelperFtn;
+        }
         return (void*)helperFtn;
     }
 

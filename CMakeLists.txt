@@ -16,8 +16,12 @@ add_definitions(-DUSE_STL)
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
     message(STATUS "Enabling very verbose messages")
     add_definitions(-DDEBUG)
-    add_definitions(-DDUMP_TRACES)
+
 ENDIF(CMAKE_BUILD_TYPE MATCHES Debug)
+
+if(DUMP_TRACES)
+    add_definitions(-DDUMP_TRACES)
+endif()
 
 if(NOT WIN32)
     set(CMAKE_CXX_STANDARD 14)
@@ -108,6 +112,11 @@ if (APPLE)
     add_definitions(-DFEATURE_SIMD)
     add_definitions(-DFEATURE_HW_INTRINSICS)
 endif()
+
+if(NET_SRC_LIB)  # use the libraries compiled from source
+    set(DOTNETPATH ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD})
+endif()
+
 
 set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp Pyjion/disasm.cpp Pyjion/exceptionhandling.cpp Pyjion/stack.cpp Pyjion/block.cpp)
 

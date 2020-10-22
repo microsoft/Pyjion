@@ -1781,7 +1781,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
         printf("Compiling OPCODE %d - %s (%d) stack %d, depth %d\n", curByte, opcode_name(byte), oparg, m_stack.size(), m_blockStack.size());
         int ilLen = m_comp->il_length();
 #endif
-
+        m_comp->emit_breakpoint();
         m_comp->emit_lasti_update(curByte);
 
         int curStackSize = m_stack.size();

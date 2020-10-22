@@ -198,6 +198,97 @@ public:
         }
     }
 
+    void new_array(size_t len){
+        /*Stack Transition:
+
+        …, numElems → …, array
+
+        Description:
+
+        The newarr instruction pushes a reference to a new zero-based, one-dimensional array whose elements are of type etype, a metadata token (a typeref, typedef or typespec; see Partition II). numElems (of type native int or int32) specifies the number of elements in the array. Valid array indexes are 0 ≤ index < numElems. The elements of an array can be any type, including value types.
+
+                Zero-based, one-dimensional arrays of numbers are created using a metadata token referencing the appropriate value type (System.Int32, etc.). Elements of the array are initialized to 0 of the appropriate type.
+
+                One-dimensional arrays that aren't zero-based and multidimensional arrays are created using newobj rather than newarr. More commonly, they are created using the methods of System.Array class in the Base Framework.
+
+        Correctness:
+
+        Correct CIL ensures that etype is a valid typeref, typedef or typespec token.
+
+                Verifiability:
+
+        numElems shall be of type native int or int32.
+         */
+        ld_i4(len);
+        m_il.push_back(CEE_NEWARR);
+        INC_CEE_STACK(1);
+    }
+
+    void st_elem(Local array, int index, Local value){
+        /* Stack Transition:
+
+        …, array, index, value, → …
+
+        Description:
+
+        The stelem instruction replaces the value of the element with zero-based index index (of type native int or int32) in the one-dimensional array array, with value.
+         Arrays are objects and hence are represented by a value of type O. The type of value must be array-element-compatible-with typeTok in the instruction.
+
+                Storing into arrays that hold values smaller than 4 bytes whose intermediate type is int32 truncates the value as it moves from the stack to the array.
+                Floating-point values are rounded from their native size (type F) to the size associated with the array. (See §III.1.1.1, Numeric data types.)
+
+        [Note: For one-dimensional arrays that aren't zero-based and for multidimensional arrays, the array class provides a StoreElement method. end note]
+
+        Correctness:
+
+        typeTok shall be a valid typedef, typeref, or typespec metadata token.
+
+                array shall be null or a single dimensional array.
+
+                Verifiability:
+
+        Verification requires that:
+
+        the tracked type of array is T[], for some T;
+
+        the tracked type of value is array-element-compatible-with (§I.8.7.1) typeTok;
+
+        typeTok is array-element-compatible-with T; and
+
+        the type of index is int32 or native int.*/
+        ld_loc(array);
+        ld_i4(index);
+        ld_loc(value);
+        m_il.push_back(CEE_STELEM); DEC_CEE_STACK(1);
+        //ld_i(0x11); // PYOBJECT_PTR type token.
+    }
+
+    void st_elem_i(int index){
+        emit_int(index);
+        m_il.push_back(CEE_STELEM); DEC_CEE_STACK(1);
+
+    }
+
+    void st_elem_i4(int index){
+        emit_int(index);
+        m_il.push_back(CEE_STELEM_I4); DEC_CEE_STACK(1);
+    }
+
+    void ld_elem(int index){
+        emit_int(index);
+        m_il.push_back(CEE_LDELEM); INC_CEE_STACK(1);
+    }
+
+    void ld_elem_i4(int index){
+        emit_int(index);
+        m_il.push_back(CEE_LDELEM_I4); INC_CEE_STACK(1);
+    }
+
+    void ld_elem_r8(int index){
+        emit_int(index);
+        m_il.push_back(CEE_LDELEM_R8); INC_CEE_STACK(1);
+    }
+
     void load_null() {
         ld_i4(0);
         m_il.push_back(CEE_CONV_I); DEC_CEE_STACK(1); // Pop1 + PushI
@@ -560,7 +651,6 @@ public:
             case CORJIT_BADCODE:
 #ifdef DEBUG
                 printf("JIT failed to compile the submitted method.\n");
-                dump();
 #endif
                 break;
             case CORJIT_OUTOFMEM:
@@ -582,6 +672,7 @@ public:
 #endif
                 break;
         }
+        // TODO: use dumpILRange(nativeEntry, nativeSizeOfCode); to dump IL
         return res;
     }
 

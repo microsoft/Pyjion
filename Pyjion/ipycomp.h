@@ -292,6 +292,8 @@ public:
     virtual void emit_load_array(int index) = 0;
 	virtual void emit_store_to_array(Local array, int index) = 0;
 
+    virtual void emit_build_vector(size_t argCnt) = 0;
+
     // Emits a call for the specified argument count.  If the compiler
     // can't emit a call with this number of args then it returns false,
     // and emit_call_with_tuple is used to call with a variable sized

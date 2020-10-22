@@ -48,6 +48,16 @@ PyObject* g_emptyTuple;
     "free variable '%.200s' referenced before assignment" \
     " in enclosing scope"
 
+template<typename T>
+void decref(T v) {
+    Py_DECREF(v);
+}
+
+template<typename T, typename... Args>
+void decref(T v, Args... args) {
+    Py_DECREF(v) ; decref(args...);
+}
+
 static void
 format_exc_check_arg(PyObject *exc, const char *format_str, PyObject *obj) {
     const char *obj_str;
@@ -1627,6 +1637,39 @@ int PyJit_DeleteName(PyFrameObject* f, PyObject* name) {
     return err;
 }
 
+
+template<typename T>
+T tuple_build(PyObject* v, PyObject* arg) {
+    int l = PyTuple_Size(v);
+}
+
+template<typename T, typename ... Args>
+PyObject* Call(PyObject *target, Args...args) {
+    PyObject* res = nullptr;
+    if (PyCFunction_Check(target)) {
+        PyObject* _args[sizeof...(args)] = {args...};
+        res = PyObject_Vectorcall(target, _args, sizeof...(args) | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
+    }
+    else {
+        auto t_args = PyTuple_New(sizeof...(args));
+        if (t_args == nullptr) {
+            std::vector<PyObject*> args_v = {args...};
+            for (int i = 0; i < args_v.size() ; i ++)
+                Py_DECREF(args_v[i]);
+            goto error;
+        }
+        std::vector<PyObject*> args_v = {args...};
+        for (int i = 0; i < args_v.size() ; i ++)
+            PyTuple_SET_ITEM(t_args, i, args_v[i]);
+
+        res = PyObject_Call(target, t_args, nullptr);
+        //Py_DECREF(args);
+    }
+    error:
+    Py_DECREF(target);
+    return res;
+}
+
 PyObject* Call0(PyObject *target) {
     PyObject* res = nullptr;
     if (PyCFunction_Check(target)) {
@@ -1640,134 +1683,54 @@ PyObject* Call0(PyObject *target) {
 }
 
 PyObject* Call1(PyObject *target, PyObject* arg0) {
-    PyObject* res = nullptr;
-    if (PyCFunction_Check(target)) {
-        PyObject* args[1] = {arg0};
-        res = PyObject_Vectorcall(target, args, 1 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
-    }
-    else {
-        auto args = PyTuple_New(1);
-        if (args == nullptr) {
-            Py_DECREF(arg0);
-            goto error;
-        }
-        PyTuple_SET_ITEM(args, 0, arg0);
-        res = PyObject_Call(target, args, nullptr);
-        Py_DECREF(args);
-    }
-error:
-    Py_DECREF(target);
-    return res;
+    return Call<PyObject *>(target, arg0);
 }
 
 PyObject* Call2(PyObject *target, PyObject* arg0, PyObject* arg1) {
-    PyObject* res = nullptr;
-    if (PyCFunction_Check(target)) {
-        PyObject* args[2] = {arg0, arg1};
-        res = PyObject_Vectorcall(target, args, 2 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
-    }
-    else {
-        auto args = PyTuple_New(2);
-        if (args == nullptr) {
-            Py_DECREF(arg0);
-            Py_DECREF(arg1);
-            goto error;
-        }
-        PyTuple_SET_ITEM(args, 0, arg0);
-        PyTuple_SET_ITEM(args, 1, arg1);
-        res = PyObject_Call(target, args, nullptr);
-        Py_DECREF(args);
-    }
-    error:
-    Py_DECREF(target);
-    return res;
+    return Call<PyObject*>(target, arg0, arg1);
 }
 
 PyObject* Call3(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
-    PyObject* res = nullptr;
-    if (PyCFunction_Check(target)) {
-        PyObject* args[3] = {arg0, arg1, arg2};
-        res = PyObject_Vectorcall(target, args, 3 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
-    }
-    else {
-        auto args = PyTuple_New(3);
-        if (args == nullptr) {
-            Py_DECREF(arg0);
-            Py_DECREF(arg1);
-            Py_DECREF(arg2);
-            goto error;
-        }
-        PyTuple_SET_ITEM(args, 0, arg0);
-        PyTuple_SET_ITEM(args, 1, arg1);
-        PyTuple_SET_ITEM(args, 2, arg2);
-        res = PyObject_Call(target, args, nullptr);
-        Py_DECREF(args);
-    }
-    error:
-    Py_DECREF(target);
-    return res;
+    return Call<PyObject*>(target, arg0, arg1, arg2);
 }
 
 PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
-    PyObject* res = nullptr;
-    if (PyCFunction_Check(target)) {
-        PyObject* args[4] = {arg0, arg1, arg2, arg3};
-        res = PyObject_Vectorcall(target, args, 4 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
-    }
-    else {
-        auto args = PyTuple_New(3);
-        if (args == nullptr) {
-            Py_DECREF(arg0);
-            Py_DECREF(arg1);
-            Py_DECREF(arg2);
-            Py_DECREF(arg3);
-            goto error;
-        }
-        PyTuple_SET_ITEM(args, 0, arg0);
-        PyTuple_SET_ITEM(args, 1, arg1);
-        PyTuple_SET_ITEM(args, 2, arg2);
-        PyTuple_SET_ITEM(args, 3, arg3);
-        res = PyObject_Call(target, args, nullptr);
-        Py_DECREF(args);
-    }
-    error:
-    Py_DECREF(target);
-    return res;
+    return Call<PyObject*>(target, arg0, arg1, arg2, arg3);
 }
 
 PyObject* MethCall0(PyObject* self, std::vector<PyObject*>* method_info) {
     PyObject* res;
     if (method_info->back() != nullptr)
-        res = Call1(method_info->at(0), method_info->at(1));
+        res = Call<PyObject*>(method_info->at(0), method_info->at(1));
     else
-        res = Call0(method_info->at(0));
+        res = Call<PyObject*>(method_info->at(0));
     return res;
 }
 
 PyObject* MethCall1(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0) {
     PyObject* res;
     if (method_info->back() != nullptr)
-        res = Call2(method_info->at(0), method_info->at(1), arg0);
+        res = Call<PyObject*>(method_info->at(0), method_info->at(1), arg0);
     else
-        res = Call1(method_info->at(0), arg0);
+        res = Call<PyObject*>(method_info->at(0), arg0);
     return res;
 }
 
 PyObject* MethCall2(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1) {
     PyObject* res;
     if (method_info->back() != nullptr)
-        res = Call3(method_info->at(0), method_info->at(1), arg0, arg1);
+        res = Call<PyObject*>(method_info->at(0), method_info->at(1), arg0, arg1);
     else
-        res = Call2(method_info->at(0), arg0, arg1);
+        res = Call<PyObject*>(method_info->at(0), arg0, arg1);
     return res;
 }
 
 PyObject* MethCall3(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
     PyObject* res;
     if (method_info->back() != nullptr)
-        res = Call4(method_info->at(0), method_info->at(1), arg0, arg1, arg2);
+        res = Call<PyObject*>(method_info->at(0), method_info->at(1), arg0, arg1, arg2);
     else
-        res = Call3(method_info->at(0), arg0, arg1, arg2);
+        res = Call<PyObject*>(method_info->at(0), arg0, arg1, arg2);
     return res;
 }
 
@@ -1784,7 +1747,8 @@ PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
         auto target = method_info->at(0);
         auto self_ = method_info->at(1);
         res = PyObject_Call(target, args, nullptr);
-        Py_DECREF(args);
+        //Py_DECREF(args);
+        assert(res != nullptr);
         Py_DECREF(target);
         return res;
     }
@@ -1792,7 +1756,8 @@ PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
         auto target = method_info->at(0);
         auto self_ = method_info->at(1);
         res = PyObject_Call(target, args, nullptr);
-        Py_DECREF(args);
+        //Py_DECREF(args);
+        assert(res != nullptr);
         Py_DECREF(target);
         return res;
     }
@@ -1830,7 +1795,7 @@ error:
 	Py_XDECREF(kwArgs);
 	Py_XDECREF(posArgs);
 	Py_DECREF(target);
-	Py_DECREF(args);
+	//Py_DECREF(args);
 	Py_DECREF(names);
 	return result;
 }

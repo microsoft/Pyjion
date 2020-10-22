@@ -97,7 +97,18 @@ public:
     }
 };
 
-TEST_CASE("General list unpacking", "[list][BUILD_LIST_UNPACK][emission]") {
+TEST_CASE("General import test") {
+    SECTION("import from case") {
+        auto t = EmissionTest("def f():\n  from pprint import pprint\n  pprint('hello')");
+        CHECK(t.returns() == "None");
+    }
+    SECTION("import case") {
+        auto t = EmissionTest("def f():\n  import pprint\n  pprint.pprint('hello')");
+        CHECK(t.returns() == "None");
+    }
+}
+
+TEST_CASE("General list unpacking") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): return [1, *[2], 3, 4]");
         CHECK(t.returns() == "[1, 2, 3, 4]");
@@ -109,7 +120,7 @@ TEST_CASE("General list unpacking", "[list][BUILD_LIST_UNPACK][emission]") {
     }
 }
 
-TEST_CASE("General tuple unpacking", "[tuple][BUILD_TUPLE_UNPACK][emission]") {
+TEST_CASE("General tuple unpacking") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): return (1, *(2,), 3)");
         CHECK(t.returns() == "(1, 2, 3)");

@@ -50,6 +50,7 @@ using namespace std;
 
 class Method;
 class BaseMethod;
+class CorClass;
 
 class Module {
 public:

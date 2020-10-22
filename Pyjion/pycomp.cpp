@@ -31,7 +31,19 @@
 
 using namespace std;
 
-void helperFtn(){}
+void helperFtn(){};
+void breakpointFtn(){
+
+}
+
+vector<PyObject *> newArrayHelperFtn(INT_PTR size, CORINFO_CLASS_HANDLE arrayMT){
+    return std::vector<PyObject*> (size);
+}
+
+void* stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref){
+    int i = 0;
+}
+
 
 CCorJitHost g_jitHost;
 
@@ -136,8 +148,6 @@ void PythonCompiler::emit_breakpoint(){
 void PythonCompiler::decref() {
     m_il.emit_call(METHOD_DECREF_TOKEN, 1);
 }
-
-
 
 Local PythonCompiler::emit_allocate_stack_array(size_t bytes) {
     auto sequenceTmp = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
@@ -365,6 +375,27 @@ void PythonCompiler::emit_list_store(size_t argCnt) {
     m_il.free_local(valueTmp);
     m_il.free_local(listTmp);
     m_il.free_local(listItems);
+}
+
+void PythonCompiler::emit_build_vector(size_t argCnt){
+    vector<Local> values;
+    // dump all the values into local tmp variables.
+    for (int i = 0 ; i < argCnt; i++){
+        auto tmpVar = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+        m_il.st_loc(tmpVar);
+        values.push_back(tmpVar);
+    }
+    m_il.new_array(argCnt);
+    auto array = m_il.define_local(Parameter(CORINFO_TYPE_NATIVEINT));
+    m_il.st_loc(array);
+    for (int i = argCnt ; i > 0; i -- ){
+        m_il.st_elem(array, i, values[i]);
+    }
+    ///  TODO : free local vars
+    for (int i = 0 ; i < argCnt; i++){
+        emit_free_local(values[i]);
+    }
+    emit_load_and_free_local(array);
 }
 
 void PythonCompiler::emit_list_extend() {
@@ -673,9 +704,9 @@ bool PythonCompiler::emit_call(size_t argCnt) {
 bool PythonCompiler::emit_method_call(size_t argCnt) {
     switch (argCnt) {
         case 0: m_il.emit_call(METHOD_METHCALL0_TOKEN, 2); return true;
-        case 1: m_il.emit_call(METHOD_METHCALL1_TOKEN, 3); return true;
-        case 2: m_il.emit_call(METHOD_METHCALL2_TOKEN, 4); return true;
-        case 3: m_il.emit_call(METHOD_METHCALL3_TOKEN, 5); return true;
+//        case 1: m_il.emit_call(METHOD_METHCALL1_TOKEN, 3); return true;
+//        case 2: m_il.emit_call(METHOD_METHCALL2_TOKEN, 4); return true;
+//        case 3: m_il.emit_call(METHOD_METHCALL3_TOKEN, 5); return true;
     }
     return false;
 }

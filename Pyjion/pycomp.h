@@ -318,6 +318,7 @@ public:
 
     virtual void emit_unpack_ex(Local sequence, size_t leftSize, size_t rightSize, Local sequenceStorage, Local list, Local remainder);
 
+    virtual void emit_build_vector(size_t argCnt);
 
     // Emits a call for the specified argument count.  If the compiler
     // can't emit a call with this number of args then it returns false,

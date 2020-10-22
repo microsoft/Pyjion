@@ -65,7 +65,7 @@ protected:
 
 public: CCorJitHost(){
 #ifndef WINDOWS
-#ifdef DEBUG
+#ifdef DUMP_TRACES
         intSettings[u"JitLsraStats"] = 0;
         intSettings[u"DumpJittedMethods"] = 1;
         intSettings[u"JitDumpToDebugger"] = 0;
