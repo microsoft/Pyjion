@@ -18,9 +18,6 @@ jobs:
           submodules: 'recursive'
       - name: Run clang-tidy
         uses: HorstBaerbel/action-clang-tidy@1.0
-        with:
-          scandir: 'Pyjion'
-          builddir: 'build'
   build-linux:
     runs-on: ubuntu-latest
     strategy:
