@@ -87,23 +87,41 @@ TEST_CASE("Test RichCompare"){
 
 TEST_CASE("Test Contains"){
     SECTION("Test word contains letter") {
-        PyObject* left = PyUnicode_FromString("horse");
-        PyObject* right = PyUnicode_FromString("o");
+        PyObject* left = PyUnicode_FromString("o");
+        PyObject* right = PyUnicode_FromString("horse");
 
         auto res = PyJit_Contains(left, right);
         CHECK(PyBool_Check(res));
         CHECK_THAT(PyUnicode_AsUTF8(PyObject_Repr(res)), Catch::Equals("True"));
     }
+
+    SECTION("Test word does not contain other word") {
+        PyObject* left = PyUnicode_FromString("pig");
+        PyObject* right = PyUnicode_FromString("horse");
+
+        auto res = PyJit_Contains(left, right);
+        CHECK(PyBool_Check(res));
+        CHECK_THAT(PyUnicode_AsUTF8(PyObject_Repr(res)), Catch::Equals("False"));
+    }
 }
 
 TEST_CASE("Test NotContains"){
     SECTION("Test word does not contain letter") {
-        PyObject* left = PyUnicode_FromString("horse");
-        PyObject* right = PyUnicode_FromString("n");
+        PyObject* left = PyUnicode_FromString("pig");
+        PyObject* right = PyUnicode_FromString("horse");
 
         auto res = PyJit_NotContains(left, right);
         CHECK(PyBool_Check(res));
         CHECK_THAT(PyUnicode_AsUTF8(PyObject_Repr(res)), Catch::Equals("True"));
+    }
+
+    SECTION("Test word does not contain letter") {
+        PyObject* left = PyUnicode_FromString("horse");
+        PyObject* right = PyUnicode_FromString("horseback");
+
+        auto res = PyJit_NotContains(left, right);
+        CHECK(PyBool_Check(res));
+        CHECK_THAT(PyUnicode_AsUTF8(PyObject_Repr(res)), Catch::Equals("False"));
     }
 }
 
