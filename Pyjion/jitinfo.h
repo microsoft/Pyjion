@@ -524,7 +524,7 @@ public:
         CORINFO_METHOD_HANDLE       ftn,        /* IN */
         CorInfoMethodRuntimeFlags   attribs     /* IN */
         ) override {
-        printf("setMethodAttribs  not implemented\r\n");
+        //printf("setMethodAttribs  not implemented\r\n");
     }
 
     // Given a method descriptor ftnHnd, extract signature information into sigInfo
