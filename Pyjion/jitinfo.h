@@ -56,7 +56,7 @@ void helperFtn(); // Does nothing, replacement function of the entry-point helpe
 void breakpointFtn();
 
 vector<PyObject *> newArrayHelperFtn(INT_PTR size, CORINFO_CLASS_HANDLE arrayMT);
-void* stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref);
+void stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref);
 
 const CORINFO_CLASS_HANDLE PYOBJECT_PTR_TYPE = (CORINFO_CLASS_HANDLE)0x11;
 
