@@ -65,6 +65,29 @@ ExceptionHandler* ExceptionHandlerManager::AddSetupFinallyHandler(Label raiseLab
     return newHandler;
 }
 
+ExceptionHandler* ExceptionHandlerManager::AddInTryHandler(Label raiseLabel,
+                                                              Label reraiseLabel,
+                                                              Label handlerLabel,
+                                                              ValueStack stack,
+                                                              ExceptionHandler* currentHandler,
+                                                              ExceptionVars vars,
+                                                              bool inTryFinally
+) {
+    auto newHandler = new ExceptionHandler(
+            m_exceptionHandlers.size(),
+            vars,
+            raiseLabel,
+            reraiseLabel,
+            handlerLabel,
+            stack,
+            inTryFinally ? EHF_TryFinally | EHF_InExceptHandler : EHF_InExceptHandler,
+            currentHandler);
+    m_exceptionHandlers.push_back(
+            newHandler
+    );
+    return newHandler;
+}
+
 ExceptionHandler* ExceptionHandlerManager::GetRootHandler() {
     return m_exceptionHandlers[0];
 }

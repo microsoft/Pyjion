@@ -56,11 +56,9 @@ struct ExceptionVars {
         PrevExc = comp->emit_define_local(false);
         PrevExcVal = comp->emit_define_local(false);
         PrevTraceback = comp->emit_define_local(false);
-        if (isFinally) {
-            FinallyExc = comp->emit_define_local(false);
-            FinallyTb = comp->emit_define_local(false);
-            FinallyValue = comp->emit_define_local(false);
-        }
+        FinallyExc = comp->emit_define_local(false);
+        FinallyTb = comp->emit_define_local(false);
+        FinallyValue = comp->emit_define_local(false);
     }
 };
 
@@ -137,6 +135,14 @@ public:
                                              ValueStack stack,
                                              ExceptionHandler* currentHandler,
                                              ExceptionVars vars
+    );
+    ExceptionHandler* AddInTryHandler(Label raiseLabel,
+                                                               Label reraiseLabel,
+                                                               Label handlerLabel,
+                                                               ValueStack stack,
+                                                               ExceptionHandler* currentHandler,
+                                                               ExceptionVars vars,
+                                                               bool inTryFinally
     );
     vector<ExceptionHandler*> GetHandlers();
 };

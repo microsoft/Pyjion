@@ -102,16 +102,6 @@ void ReturnVerifier::verify(AbstractInterpreter& interpreter) {
     CHECK(m_kind == interpreter.get_return_info()->kind());
 };
 
-BoxVerifier::BoxVerifier(size_t byteCodeIndex, bool shouldBox) {
-    m_byteCodeIndex = byteCodeIndex;
-    m_shouldBox = shouldBox;
-};
-
-void BoxVerifier::verify(AbstractInterpreter& interpreter) {
-//    CHECK(m_shouldBox == interpreter.should_box(m_byteCodeIndex));
-};
-
-
 PyObject* Incremented(PyObject*o) {
     Py_INCREF(o);
     return o;

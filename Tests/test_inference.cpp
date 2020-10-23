@@ -35,9 +35,7 @@
 #include "testing_util.h"
 #include <Python.h>
 #include <absint.h>
-#include <util.h>
 #include <memory>
-#include <vector>
 
 class InferenceTest {
 private:

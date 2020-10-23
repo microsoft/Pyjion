@@ -59,7 +59,7 @@ public:
     explicit EmissionTest(const char *code) {
         m_code.reset(CompileCode(code));
         if (m_code.get() == nullptr) {
-            FAIL("failed to compile code");
+            FAIL("failed to compile in JIT code");
         }
 		auto jitted = PyJit_EnsureExtra((PyObject*)*m_code);
         if (!jit_compile(m_code.get())) {
@@ -253,7 +253,7 @@ TEST_CASE("General contains comparison") {
 
 TEST_CASE("Assertions") {
     SECTION("assert simple case") {
-        auto t = EmissionTest("def f(): assert '1' == '2'");
+        auto t = EmissionTest("def f():\n  assert '1' == '2'");
         CHECK(t.raises() == PyExc_AssertionError);
     }
     SECTION("assert simple case short int") {

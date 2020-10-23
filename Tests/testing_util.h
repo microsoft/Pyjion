@@ -14,7 +14,7 @@ public:
     const char* m_expected;
     vector<PyObject*> m_args;
 
-    TestInput(const char* expected) {
+    explicit TestInput(const char* expected) {
         m_expected = expected;
     }
 
@@ -57,7 +57,7 @@ class StackVerifier : public AIVerifier {
 public:
     StackVerifier(size_t byteCodeIndex, size_t stackIndex, AbstractValueKind kind);
 
-    virtual void verify(AbstractInterpreter& interpreter);
+    void verify(AbstractInterpreter& interpreter) override;
 };
 
 /* Verify the inferred type stored in the locals array before a specified bytecode executes. */
@@ -74,25 +74,22 @@ private:
 public:
     VariableVerifier(size_t byteCodeIndex, size_t localIndex, AbstractValueKind kind, bool undefined = false) ;
 
-    virtual void verify(AbstractInterpreter& interpreter);
+    void verify(AbstractInterpreter& interpreter) override;
 };
 
 class ReturnVerifier : public AIVerifier {
     AbstractValueKind m_kind;
 public:
-    ReturnVerifier(AbstractValueKind kind);
+    explicit ReturnVerifier(AbstractValueKind kind);
 
-    virtual void verify(AbstractInterpreter& interpreter);
+    void verify(AbstractInterpreter& interpreter) override;
 };
 
 class BoxVerifier : public AIVerifier {
-    size_t m_byteCodeIndex;
-    bool m_shouldBox;
-
 public:
     BoxVerifier(size_t byteCodeIndex, bool shouldBox);
 
-    virtual void verify(AbstractInterpreter& interpreter);
+    void verify(AbstractInterpreter& interpreter) override {};
 };
 
 class AITestCase {
@@ -108,7 +105,7 @@ public:
 
     AITestCase(const char *code, vector<AIVerifier*> verifiers) {
         m_code = code;
-        m_verifiers = verifiers;
+        m_verifiers = std::move(verifiers);
     }
 
     AITestCase(const char *code, std::initializer_list<AIVerifier*> list) {

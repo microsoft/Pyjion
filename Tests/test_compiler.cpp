@@ -51,7 +51,7 @@ private:
     }
 
 public:
-    CompilerTest(const char *code) {
+    explicit CompilerTest(const char *code) {
         PyErr_Clear();
         m_code.reset(CompileCode(code));
         if (m_code.get() == nullptr) {
@@ -220,20 +220,13 @@ TEST_CASE("Test general errors") {
         CHECK(t.returns() == "42");
     }
 }
-TEST_CASE("X Annotation tests") {
+TEST_CASE("Annotation tests") {
     SECTION("test annotations") {
         auto t = CompilerTest(
                 "def f():\n    def f(self) -> 42 : pass\n    return 42"
         );
         CHECK(t.returns() == "42");
     }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, q, r):\n    if not (a == q and r == 0):\n        return 42\n    return 23"
-//                        );
-//CHECK(t.returns() == "42",
-//                                  vector<PyObject *>({PyLong_FromLong(2), PyLong_FromLong(4), PyLong_FromLong(7)}))
-//                }
-
     SECTION("Break from nested try/finally needs to use BranchLeave to clear the stack") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                break\n            finally:\n                pass\n    return 42"
@@ -323,12 +316,12 @@ TEST_CASE("Test math operations") {
         );
         CHECK(t.returns() == "'abcabcabc'");
     }
-//    SECTION("test boundary ranging") {
-//        auto t = CompilerTest(
-//                "def f():\n    if 0.0 < 1.0 <= 1.0 == 1.0 >= 1.0 > 0.0 != 1.0:  return 42"
-//        );
-//        CHECK(t.returns() == "42");
-//    }
+    SECTION("test boundary ranging") {
+        auto t = CompilerTest(
+                "def f():\n    if 0.0 < 1.0 <= 1.0 == 1.0 >= 1.0 > 0.0 != 1.0:  return 42"
+        );
+        CHECK(t.returns() == "42");
+    }
 }
 TEST_CASE("Test try") {
     SECTION("test1") {
