@@ -79,6 +79,7 @@ if (IS_64)
     endif()
 else()
     add_definitions(-DTARGET_X86)
+    add_definitions(-D_TARGET_X86_)
     message(STATUS "Enabling x86")
 endif()
 

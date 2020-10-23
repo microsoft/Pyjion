@@ -1643,6 +1643,11 @@ T tuple_build(PyObject* v, PyObject* arg) {
     int l = PyTuple_Size(v);
 }
 
+template<typename T>
+PyObject* Call(PyObject* target) {
+    return Call0(target);
+}
+
 template<typename T, typename ... Args>
 PyObject* Call(PyObject *target, Args...args) {
     PyObject* res = nullptr;

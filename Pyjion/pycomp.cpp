@@ -40,7 +40,7 @@ vector<PyObject *> newArrayHelperFtn(INT_PTR size, CORINFO_CLASS_HANDLE arrayMT)
     return std::vector<PyObject*> (size);
 }
 
-void* stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref){
+void stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref){
     int i = 0;
 }
 

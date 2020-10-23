@@ -2653,7 +2653,7 @@ JittedCode* AbstractInterpreter::compile() {
     }
     try {
         return compile_worker();
-    } catch (const runtime_error& e){
+    } catch (const exception& e){
 #ifdef DEBUG
         printf("Error whilst compiling : %s", e.what());
 #endif
