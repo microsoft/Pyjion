@@ -32,12 +32,12 @@
 
 enum StackEntryKind {
     STACK_KIND_VALUE = 0, // A non-boxed value, currently just floating point
-    STACK_KIND_OBJECT = 1// A Python object, or a tagged int which might be an object
+    STACK_KIND_OBJECT = 1 // A Python object, or a tagged int which might be an object
 };
 
-class StackUnderflowException: public std::exception {
+class StackUnderflowException: public std::underflow_error {
 public:
-    StackUnderflowException() : exception("Stack underflow error") {}
+    StackUnderflowException() : std::underflow_error("Stack underflow error") {};
 };
 
  class ValueStack : std::vector<StackEntryKind> {

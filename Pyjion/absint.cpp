@@ -1786,67 +1786,84 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 auto ehInfo = curBlock.CurrentHandler;
                 m_blockStack.pop_back();
 
-                int flags = curBlock.Flags;
+                if (!ehInfo->IsRootHandler()) {
+                    int flags = curBlock.Flags;
 
-                auto noException = m_comp->emit_define_label();
-                dec_stack();
-                m_comp->emit_store_local(ehInfo->ExVars.FinallyExc);
-                m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
-                m_comp->emit_ptr(Py_None);
-                m_comp->emit_dup();
-                m_comp->emit_incref();
-                m_comp->emit_branch(BranchEqual, noException);
-
-                if (flags & EHF_BlockReturns) {
-                    auto exceptional = m_comp->emit_define_label();
+                    auto noException = m_comp->emit_define_label();
+                    dec_stack();
+                    m_comp->emit_store_local(ehInfo->ExVars.FinallyExc);
                     m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
-                    m_comp->emit_int(EHF_BlockReturns);
-                    m_comp->emit_compare_equal();
-                    m_comp->emit_branch(BranchFalse, exceptional);
+                    m_comp->emit_ptr(Py_None);
+                    m_comp->emit_dup();
+                    m_comp->emit_incref();
+                    m_comp->emit_branch(BranchEqual, noException);
 
-                    bool hasOuterFinally = false;
-                    size_t clearEh = -1;
-                    for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
-                        auto stack = m_blockStack.get(i);
-                        if (stack.Kind == SETUP_FINALLY) {
-                            // need to dispatch to outer finally...
-                            m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
-                            m_comp->emit_branch(BranchAlways, stack.CurrentHandler->ErrorTarget);
-                            hasOuterFinally = true;
-                            break;
-                        }
-                        else if (stack.Kind == POP_EXCEPT || stack.Kind == RERAISE) {
-                            if (clearEh == -1) {
-                                clearEh = i;
+                    if (flags & EHF_BlockReturns) {
+                        auto exceptional = m_comp->emit_define_label();
+                        m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
+                        m_comp->emit_int(EHF_BlockReturns);
+                        m_comp->emit_compare_equal();
+                        m_comp->emit_branch(BranchFalse, exceptional);
+
+                        bool hasOuterFinally = false;
+                        size_t clearEh = -1;
+                        for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
+                            auto stack = m_blockStack.get(i);
+                            if (stack.Kind == SETUP_FINALLY) {
+                                // need to dispatch to outer finally...
+                                m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
+                                m_comp->emit_branch(BranchAlways, stack.CurrentHandler->ErrorTarget);
+                                hasOuterFinally = true;
+                                break;
+                            } else if (stack.Kind == POP_EXCEPT || stack.Kind == RERAISE) {
+                                if (clearEh == -1) {
+                                    clearEh = i;
+                                }
                             }
+
                         }
 
+                        if (clearEh != -1) {
+                            unwind_eh(m_blockStack.get(clearEh).CurrentHandler);
+                        }
+
+                        if (!hasOuterFinally) {
+                            m_comp->emit_branch(BranchLeave, m_retLabel);
+                        }
+
+                        m_comp->emit_mark_label(exceptional);
                     }
 
-                    if (clearEh != -1) {
-                        unwind_eh(m_blockStack.get(clearEh).CurrentHandler);
-                    }
+                    m_comp->emit_load_local(ehInfo->ExVars.FinallyTb);
+                    m_comp->emit_load_local(ehInfo->ExVars.FinallyValue);
+                    m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
+                    m_comp->emit_restore_err();
+                    unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
 
-                    if (!hasOuterFinally) {
-                        m_comp->emit_branch(BranchLeave, m_retLabel);
-                    }
+                    auto ehBlock = get_ehblock();
 
-                    m_comp->emit_mark_label(exceptional);
+                    clean_stack_for_reraise();
+                    m_comp->emit_branch(BranchAlways, ehBlock->ReRaise);
+
+                    m_comp->emit_mark_label(noException);
+                } else {
+                    // END_FINALLY is marking the EH rethrow.  The byte code branches
+                    // around this in the non-exceptional case.
+
+                    // If we haven't sent a branch to this END_FINALLY then we have
+                    // a bare try/except: which handles all exceptions.  In that case
+                    // we have no values to pop off, and this code will never be invoked
+                    // anyway.
+                    if (m_offsetStack.find(curByte) != m_offsetStack.end()) {
+                        dec_stack(3);
+                        m_comp->emit_restore_err();
+
+                        unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
+                        clean_stack_for_reraise();
+
+                        m_comp->emit_branch(BranchAlways, get_ehblock()->ReRaise);
+                    }
                 }
-
-                m_comp->emit_load_local(ehInfo->ExVars.FinallyTb);
-                m_comp->emit_load_local(ehInfo->ExVars.FinallyValue);
-                m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
-                m_comp->emit_restore_err();
-                unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
-
-                auto ehBlock = get_ehblock();
-
-                clean_stack_for_reraise();
-                m_comp->emit_branch(BranchAlways, ehBlock->ReRaise);
-
-                m_comp->emit_mark_label(noException);
-
                 skipEffect = true;
                 break;
             }
