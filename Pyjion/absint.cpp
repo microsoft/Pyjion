@@ -1248,11 +1248,6 @@ AbstractValue* AbstractInterpreter::get_return_info() {
     return m_returnValue;
 }
 
-__unused bool AbstractInterpreter::has_info(size_t byteCodeIndex) {
-    return m_startStates.find(byteCodeIndex) != m_startStates.end();
-}
-
-
 AbstractSource* AbstractInterpreter::add_local_source(size_t opcodeIndex, size_t localIndex) {
     auto store = m_opcodeSources.find(opcodeIndex);
     if (store == m_opcodeSources.end()) {
@@ -1628,24 +1623,6 @@ void AbstractInterpreter::dec_stack(size_t size) {
 
 void AbstractInterpreter::inc_stack(size_t size, StackEntryKind kind) {
     m_stack.inc(size, kind);
-}
-
-// Frees our iteration temporary variable which gets allocated when we hit
-// a FOR_ITER.  Used when we're breaking from the current loop.
-void AbstractInterpreter::free_iter_local() {
-
-}
-
-// Frees all of the iteration variables in a range. Used when we're
-// going to branch to a finally through multiple loops.
-void AbstractInterpreter::free_all_iter_locals(size_t to) {
-
-}
-
-// Frees all of our iteration variables.  Used when we're unwinding the function
-// on an exception.
-void AbstractInterpreter::free_iter_locals_on_exception() {
-
 }
 
 void AbstractInterpreter::periodic_work() {
@@ -2196,7 +2173,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             break;
             case POP_EXCEPT:
-                compile_pop_except_block();
+                pop_except();
                 skipEffect = true;
                 break;
             case POP_BLOCK:
@@ -2551,31 +2528,6 @@ void AbstractInterpreter::emit_raise_and_free(ExceptionHandler* handler) {
 
 }
 
-__unused void AbstractInterpreter::unwind_loop(Local finallyReason, EhFlags branchKind, int continueOffset) {
-    size_t clearEh = -1;
-    for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
-        auto block = m_blockStack.get(i);
-        if (block.Kind == SETUP_FINALLY) {
-            // need to dispatch to outer finally...
-            if (clearEh != -1) {
-                unwind_eh(
-                    m_blockStack.get(clearEh).CurrentHandler,
-                    m_blockStack.get(clearEh).CurrentHandler->BackHandler
-                );
-            }
-
-            m_comp->emit_load_local(finallyReason);
-            m_comp->emit_branch(BranchAlways, block.CurrentHandler->ErrorTarget);
-            break;
-        }
-        else if (block.Kind == POP_EXCEPT) {
-            if (clearEh == -1) {
-                clearEh = i;
-            }
-        }
-    }
-}
-
 void AbstractInterpreter::test_bool_and_branch(Local value, bool isTrue, Label target) {
     m_comp->emit_load_local(value);
     m_comp->emit_ptr(isTrue ? Py_False : Py_True);
@@ -2767,7 +2719,6 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
                         block.CurrentHandler->BackHandler
                     );
                 }
-                free_all_iter_locals(blockIndex);
                 m_comp->emit_int(EHF_BlockReturns);
                 m_comp->emit_branch(BranchAlways, block.CurrentHandler->ErrorTarget);
             }
@@ -2784,7 +2735,6 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
         if (clearEh != -1) {
             unwind_eh(m_blockStack.get(clearEh).CurrentHandler);
         }
-        free_all_iter_locals();
         m_comp->emit_branch(BranchLeave, m_retLabel);
     }
 }
@@ -2972,9 +2922,10 @@ void AbstractInterpreter::unwind_eh(ExceptionHandler* fromHandler, ExceptionHand
         if (exVars.PrevExc.is_valid()) {
             m_comp->emit_unwind_eh(exVars.PrevExc, exVars.PrevExcVal, exVars.PrevTraceback);
         }
-
+        if (cur->IsRootHandler())
+            break;
         cur = cur->BackHandler;
-    } while (!cur->IsRootHandler() && cur != toHandler && !cur->IsTryExceptOrFinally());
+    } while (cur != nullptr && !cur->IsRootHandler() && cur != toHandler && !cur->IsTryExceptOrFinally());
 }
 
 ExceptionHandler* AbstractInterpreter::get_ehblock() {
@@ -3002,32 +2953,10 @@ LocalKind get_optimized_local_kind(AbstractValueKind kind) {
     return LK_Pointer;
 }
 
-__unused Local AbstractInterpreter::get_optimized_local(int index, AbstractValueKind kind) {
-    if (m_optLocals.find(index) == m_optLocals.end()) {
-        m_optLocals[index] = unordered_map<AbstractValueKind, Local, AbstractValueKindHash>();
-    }
-    auto& map = m_optLocals.find(index)->second;
-    if (map.find(kind) == map.end()) {
-        return map[kind] = m_comp->emit_define_local(get_optimized_local_kind(kind));
-    }
-    return map.find(kind)->second;
-}
-
 void AbstractInterpreter::pop_except() {
     // we made it to the end of an EH block w/o throwing,
     // clear the exception.
     auto block = m_blockStack.back();
     assert (block.CurrentHandler);
     unwind_eh(block.CurrentHandler, block.CurrentHandler->BackHandler);
-}
-
-void AbstractInterpreter::debug_log(const char* fmt, ...) {
-    va_list args;
-
-    va_start(args, fmt);
-    const int bufferSize = 181;
-    char* buffer = new char[bufferSize];
-    vsnprintf(buffer, bufferSize, fmt, args);
-    va_end(args);
-    m_comp->emit_debug_msg(buffer);
 }

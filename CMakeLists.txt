@@ -14,16 +14,17 @@ set (CLR_DIR CoreCLR/src/coreclr)
 add_definitions(-DUSE_STL)
 
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
-    message(STATUS "Enabling very verbose messages")
+    message(STATUS "Enabling verbose messages")
     add_definitions(-DDEBUG)
-
 ENDIF(CMAKE_BUILD_TYPE MATCHES Debug)
 
 if(DUMP_TRACES)
+    message(STATUS "Enabling very-verbose messages")
     add_definitions(-DDUMP_TRACES)
 endif()
 
 if(DUMP_JIT_TRACES)
+    message(STATUS "Enabling very-very-verbose messages")
     add_definitions(-DDUMP_JIT_TRACES)
 endif()
 

@@ -1445,8 +1445,7 @@ public:
         CORINFO_ARG_LIST_HANDLE     args            /* IN */
         ) override {
         // TODO: Work out correct return type
-        printf("getArgClass not implemented\r\n");
-        return PYOBJECT_PTR_TYPE;
+        //return PYOBJECT_PTR_TYPE;
         return nullptr;
     }
 

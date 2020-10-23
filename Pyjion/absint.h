@@ -278,7 +278,6 @@ public:
 
     JittedCode* compile();
     bool interpret();
-    void dump();
 
     void set_local_type(int index, AbstractValueKind kind);
     // Returns information about the specified local variable at a specific
@@ -295,8 +294,6 @@ public:
     bool can_skip_lasti_update(size_t opcodeIndex);
 
     AbstractValue* get_return_info();
-
-    bool has_info(size_t byteCodeIndex);
 
 private:
     void compile_pop_block();
@@ -354,25 +351,11 @@ private:
 
     void unwind_eh(ExceptionHandler* fromHandler, ExceptionHandler* toHandler = nullptr);
 
-    void unwind_loop(Local finallyReason, EhFlags branchKind, int branchOffset);
-
     ExceptionHandler * get_ehblock();
 
     void mark_offset_label(int index);
 
-    // Frees our iteration temporary variable which gets allocated when we hit
-    // a FOR_ITER.  Used when we're breaking from the current loop.
-    void free_iter_local();
-
     void jump_absolute(size_t index, size_t from);
-
-    // Frees all of the iteration variables in a range. Used when we're
-    // going to branch to a finally through multiple loops.
-    void free_all_iter_locals(size_t to = 0);
-
-    // Frees all of our iteration variables.  Used when we're unwinding the function
-    // on an exception.
-    void free_iter_locals_on_exception();
 
     void dec_stack(size_t size = 1);
 
@@ -402,7 +385,6 @@ private:
     void load_fast_worker(int local, bool checkUnbound);
     void unpack_sequence(size_t size, int opcode);
 
-    Local get_optimized_local(int index, AbstractValueKind kind);
     void pop_except();
 
     bool can_optimize_pop_jump(int opcodeIndex);
@@ -415,7 +397,6 @@ private:
     void jump_if_not_exact(int opcodeIndex, int jumpTo);
     void test_bool_and_branch(Local value, bool isTrue, Label target);
 
-    void debug_log(const char* fmt, ...);
 };
 
 
