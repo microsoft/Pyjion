@@ -120,6 +120,13 @@ TEST_CASE("General list unpacking") {
     }
 }
 
+TEST_CASE("General dict comprehensions") {
+    SECTION("common case") {
+        auto t = EmissionTest("def f():\n  dict1 = {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5}\n  return {k : v * 2 for k,v in dict1.items()}\n");
+        CHECK(t.returns() == "{'a': 2, 'b': 4, 'c': 6, 'd': 8, 'e': 10}");
+    }
+}
+
 TEST_CASE("General tuple unpacking") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): return (1, *(2,), 3)");

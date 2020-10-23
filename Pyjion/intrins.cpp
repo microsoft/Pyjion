@@ -267,7 +267,7 @@ error:
     return nullptr;
 }
 
-PyObject* PyJit_MapAdd(PyObject*key, PyObject*map, PyObject* value) {
+PyObject* PyJit_MapAdd(PyObject*value, PyObject*key, PyObject* map) {
     assert(map != nullptr);
     if (!PyDict_Check(map)) {
         PyErr_SetString(PyExc_TypeError,
@@ -285,13 +285,6 @@ PyObject* PyJit_MapAdd(PyObject*key, PyObject*map, PyObject* value) {
 }
 
 PyObject* PyJit_Multiply(PyObject *left, PyObject *right) {
-    if (!PyNumber_Check(left) || !PyNumber_Check(right)) {
-        PyErr_SetString(PyExc_TypeError,
-                        "invalid argument type to Multiply");
-        Py_DECREF(left);
-        Py_DECREF(right);
-        return nullptr;
-    }
     auto res = PyNumber_Multiply(left, right);
     Py_DECREF(left);
     Py_DECREF(right);
