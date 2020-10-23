@@ -74,7 +74,7 @@ StackVerifier::StackVerifier(size_t byteCodeIndex, size_t stackIndex, AbstractVa
 };
 
 void StackVerifier::verify(AbstractInterpreter& interpreter) {
-    auto info = interpreter.get_stack_info(m_byteCodeIndex);
+    auto info = interpreter.getStackInfo(m_byteCodeIndex);
     CHECK(m_kind == info[info.size() - m_stackIndex - 1].Value->kind());
 };
 
@@ -88,7 +88,7 @@ VariableVerifier::VariableVerifier(size_t byteCodeIndex, size_t localIndex, Abst
 };
 
 void VariableVerifier::verify(AbstractInterpreter& interpreter) {
-    auto local = interpreter.get_local_info(m_byteCodeIndex, m_localIndex);
+    auto local = interpreter.getLocalInfo(m_byteCodeIndex, m_localIndex);
     CHECK(local.IsMaybeUndefined == m_undefined);
     CHECK(local.ValueInfo.Value->kind() == m_kind);
 };
@@ -99,7 +99,7 @@ ReturnVerifier::ReturnVerifier(AbstractValueKind kind) {
 };
 
 void ReturnVerifier::verify(AbstractInterpreter& interpreter) {
-    CHECK(m_kind == interpreter.get_return_info()->kind());
+    CHECK(m_kind == interpreter.getReturnInfo()->kind());
 };
 
 PyObject* Incremented(PyObject*o) {

@@ -35,7 +35,7 @@ ExceptionHandler* ExceptionHandlerManager::SetRootHandler(Label raiseNoHandlerLa
             reraiseNoHandlerLabel,
             Label(),
             ValueStack(),
-            EHF_None,
+            EhfNone,
             nullptr);
     m_exceptionHandlers.push_back(
         rootHandler
@@ -57,7 +57,7 @@ ExceptionHandler* ExceptionHandlerManager::AddSetupFinallyHandler(Label raiseLab
             reraiseLabel,
             handlerLabel,
             stack,
-            EHF_TryFinally,
+            EhfTryFinally,
             currentHandler);
     m_exceptionHandlers.push_back(
         newHandler
@@ -80,7 +80,7 @@ ExceptionHandler* ExceptionHandlerManager::AddInTryHandler(Label raiseLabel,
             reraiseLabel,
             handlerLabel,
             stack,
-            inTryFinally ? EHF_TryFinally | EHF_InExceptHandler : EHF_InExceptHandler,
+            inTryFinally ? EhfTryFinally | EhfInExceptHandler : EhfInExceptHandler,
             currentHandler);
     m_exceptionHandlers.push_back(
             newHandler
@@ -100,11 +100,11 @@ vector<ExceptionHandler*> ExceptionHandlerManager::GetHandlers() {
     return m_exceptionHandlers;
 }
 
-EhFlags operator | (EhFlags lhs, EhFlags rhs) {
-    return (EhFlags)(static_cast<int>(lhs) | static_cast<int>(rhs));
+ehFlags operator | (ehFlags lhs, ehFlags rhs) {
+    return (ehFlags)(static_cast<int>(lhs) | static_cast<int>(rhs));
 }
 
-EhFlags operator |= (EhFlags& lhs, EhFlags rhs) {
-    lhs = (EhFlags)(static_cast<int>(lhs) | static_cast<int>(rhs));
+ehFlags operator |= (ehFlags& lhs, ehFlags rhs) {
+    lhs = (ehFlags)(static_cast<int>(lhs) | static_cast<int>(rhs));
     return lhs;
 }

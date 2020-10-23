@@ -30,11 +30,11 @@ class Local {
 public:
     int m_index;
 
-    Local(int index = -1) {
+    explicit Local(int index = -1) {
         m_index = index;
     }
 
-    bool is_valid() {
+    bool is_valid() const {
         return m_index != -1;
     }
 };
@@ -43,7 +43,7 @@ class Label {
 public:
     int m_index;
 
-    Label(int index = -1) {
+    explicit Label(int index = -1) {
         m_index = index;
     }
 };

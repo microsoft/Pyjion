@@ -15,7 +15,7 @@ private:
 
 public:
     py_ptr() : m_ptr(nullptr) {}
-    py_ptr(T* ptr) : m_ptr(ptr) {}
+    explicit py_ptr(T* ptr) : m_ptr(ptr) {}
     py_ptr(const py_ptr& copy) {
         m_ptr = copy.get();
         Py_INCREF(m_ptr);
@@ -48,7 +48,7 @@ A concrete PyObject instance of py_ptr.
 */
 class PyObject_ptr : public py_ptr<PyObject> {
 public:
-    PyObject_ptr(PyObject *ptr) : py_ptr(ptr) {}
+    explicit PyObject_ptr(PyObject *ptr) : py_ptr(ptr) {}
 };
 
 #endif // !UTIL_H

@@ -276,7 +276,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 			// provide the interpreter information about the specialized types
 			for (int i = 0; i < argCount; i++) {
 				auto type = GetAbstractType(GetArgType(i, frame->f_localsplus));
-				interp.set_local_type(i, type);
+                interp.setLocalType(i, type);
 			}
 
 			auto res = interp.compile();

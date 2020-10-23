@@ -1,18 +1,18 @@
-#ifndef JITINIT_H
-#define JITINIT_H
+#ifndef PYJION_JITINIT_H
+#define PYJION_JITINIT_H
 
 
 #define FEATURE_NO_HOST
 
-#include <stdint.h>
+#include <cstdint>
 #include <windows.h>
-#include <wchar.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <limits.h>
-#include <string.h>
-#include <float.h>
+#include <cwchar>
+#include <cstdio>
+#include <cstddef>
+#include <cstdlib>
+#include <climits>
+#include <cstring>
+#include <cfloat>
 #include <share.h>
 #include <intrin.h>
 

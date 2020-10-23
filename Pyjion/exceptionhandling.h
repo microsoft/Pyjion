@@ -36,8 +36,8 @@
 using namespace std;
 
 
-EhFlags operator | (EhFlags lhs, EhFlags rhs);
-EhFlags operator |= (EhFlags& lhs, EhFlags rhs);
+ehFlags operator | (ehFlags lhs, ehFlags rhs);
+ehFlags operator |= (ehFlags& lhs, ehFlags rhs);
 
 struct ExceptionVars {
     // The previous exception value before we took the exception we're currently
@@ -65,7 +65,7 @@ struct ExceptionVars {
 // Exception Handling information
 struct ExceptionHandler {
     size_t RaiseAndFreeId;
-    EhFlags Flags;
+    ehFlags Flags;
     Label Raise,        // our raise stub label, prepares the exception
     ReRaise,        // our re-raise stub label, prepares the exception w/o traceback update
     ErrorTarget;    // The place to branch to for handling errors
@@ -79,7 +79,7 @@ struct ExceptionHandler {
                      Label reraise,
                      Label errorTarget,
                      ValueStack entryStack,
-                     EhFlags flags = EHF_None,
+                     ehFlags flags = EhfNone,
                      ExceptionHandler *backHandler = nullptr) : ExVars(exceptionVars) {
         RaiseAndFreeId = raiseAndFreeId;
         Flags = flags;
@@ -95,7 +95,7 @@ struct ExceptionHandler {
     }
 
     bool IsTryFinally() {
-        return Flags & EHF_TryFinally && ExVars.FinallyValue.is_valid();
+        return Flags & EhfTryFinally && ExVars.FinallyValue.is_valid();
     }
 
     ExceptionHandler* GetRootOf(){
@@ -111,7 +111,7 @@ struct ExceptionHandler {
     }
 
     bool IsTryExceptOrFinally() const {
-        return Flags & (EHF_TryExcept | EHF_TryFinally);
+        return Flags & (EhfTryExcept | EhfTryFinally);
     }
 };
 

@@ -55,19 +55,19 @@
 
 #include "absint.h"
 
-#define GET_OPARG(index)  _Py_OPARG(m_byteCode[(index)/sizeof(_Py_CODEUNIT)])
-#define GET_OPCODE(index) _Py_OPCODE(m_byteCode[(index)/sizeof(_Py_CODEUNIT)])
+#define GET_OPARG(index)  _Py_OPARG(mByteCode[(index)/sizeof(_Py_CODEUNIT)])
+#define GET_OPCODE(index) _Py_OPCODE(mByteCode[(index)/sizeof(_Py_CODEUNIT)])
 
-AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* comp) : m_code(code), m_comp(comp) {
-    m_byteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
-    m_size = PyBytes_Size(code->co_code);
-    m_returnValue = &Undefined;
+AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* comp) : mCode(code), m_comp(comp) {
+    mByteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
+    mSize = PyBytes_Size(code->co_code);
+    mReturnValue = &Undefined;
     if (comp != nullptr) {
         m_retLabel = comp->emit_define_label();
         m_retValue = comp->emit_define_local();
-        m_errorCheckLocal = comp->emit_define_local();
+        mErrorCheckLocal = comp->emit_define_local();
     }
-    init_starting_state();
+    initStartingState();
 }
 
 AbstractInterpreter::~AbstractInterpreter() {
@@ -81,7 +81,7 @@ AbstractInterpreter::~AbstractInterpreter() {
 }
 
 bool AbstractInterpreter::preprocess() {
-    if (m_code->co_flags & (CO_COROUTINE | CO_GENERATOR)) {
+    if (mCode->co_flags & (CO_COROUTINE | CO_GENERATOR)) {
         // Don't compile co-routines or generators.  We can't rely on
         // detecting yields because they could be optimized out.
 #ifdef DEBUG
@@ -89,7 +89,7 @@ bool AbstractInterpreter::preprocess() {
 #endif
         return false;
     }
-    for (int i = 0; i < m_code->co_argcount; i++) {
+    for (int i = 0; i < mCode->co_argcount; i++) {
         // all parameters are initially definitely assigned
         m_assignmentState[i] = true;
     }
@@ -97,7 +97,7 @@ bool AbstractInterpreter::preprocess() {
     int oparg;
     vector<bool> ehKind;
     vector<AbsIntBlockInfo> blockStarts;
-    for (size_t curByte = 0; curByte < m_size; curByte += sizeof(_Py_CODEUNIT)) {
+    for (size_t curByte = 0; curByte < mSize; curByte += sizeof(_Py_CODEUNIT)) {
         auto opcodeIndex = curByte;
         auto byte = GET_OPCODE(curByte);
         oparg = GET_OPARG(curByte);
@@ -148,7 +148,7 @@ bool AbstractInterpreter::preprocess() {
                 }
                 break;
             case DELETE_FAST:
-                if (oparg < m_code->co_argcount) {
+                if (oparg < mCode->co_argcount) {
                     // this local is deleted, so we need to check for assignment
                     m_assignmentState[oparg] = false;
                 }
@@ -162,7 +162,7 @@ bool AbstractInterpreter::preprocess() {
                 break;
             case LOAD_GLOBAL:
             {
-                auto name = PyUnicode_AsUTF8(PyTuple_GetItem(m_code->co_names, oparg));
+                auto name = PyUnicode_AsUTF8(PyTuple_GetItem(mCode->co_names, oparg));
                 if (!strcmp(name, "vars") || 
                     !strcmp(name, "dir") || 
                     !strcmp(name, "locals") || 
@@ -195,33 +195,33 @@ bool AbstractInterpreter::preprocess() {
     return true;
 }
 
-void AbstractInterpreter::set_local_type(int index, AbstractValueKind kind) {
+void AbstractInterpreter::setLocalType(int index, AbstractValueKind kind) {
     // unused for now.
 }
 
-void AbstractInterpreter::init_starting_state() {
-    InterpreterState lastState = InterpreterState(m_code->co_nlocals);
+void AbstractInterpreter::initStartingState() {
+    InterpreterState lastState = InterpreterState(mCode->co_nlocals);
 
     int localIndex = 0;
-    for (int i = 0; i < m_code->co_argcount + m_code->co_kwonlyargcount; i++) {
+    for (int i = 0; i < mCode->co_argcount + mCode->co_kwonlyargcount; i++) {
         // all parameters are initially definitely assigned
         // TODO: Populate this with type information from profiling...
-        lastState.replace_local(localIndex++, AbstractLocalInfo(&Any));
+        lastState.replaceLocal(localIndex++, AbstractLocalInfo(&Any));
     }
 
-    if (m_code->co_flags & CO_VARARGS) {
-        lastState.replace_local(localIndex++, AbstractLocalInfo(&Tuple));
+    if (mCode->co_flags & CO_VARARGS) {
+        lastState.replaceLocal(localIndex++, AbstractLocalInfo(&Tuple));
     }
-    if (m_code->co_flags & CO_VARKEYWORDS) {
-        lastState.replace_local(localIndex++, AbstractLocalInfo(&Dict));
+    if (mCode->co_flags & CO_VARKEYWORDS) {
+        lastState.replaceLocal(localIndex++, AbstractLocalInfo(&Dict));
     }
 
-    for (; localIndex < m_code->co_nlocals; localIndex++) {
+    for (; localIndex < mCode->co_nlocals; localIndex++) {
         // All locals are initially undefined
-        lastState.replace_local(localIndex, AbstractLocalInfo(&Undefined, true));
+        lastState.replaceLocal(localIndex, AbstractLocalInfo(&Undefined, true));
     }
 
-    update_start_state(lastState, 0);
+    updateStartState(lastState, 0);
 }
 
 bool AbstractInterpreter::interpret() {
@@ -238,20 +238,21 @@ bool AbstractInterpreter::interpret() {
         int oparg;
         auto cur = queue.front();
         queue.pop_front();
-        for (size_t curByte = cur; curByte < m_size; curByte += sizeof(_Py_CODEUNIT)) {
+        for (size_t curByte = cur; curByte < mSize; curByte += sizeof(_Py_CODEUNIT)) {
             // get our starting state when we entered this opcode
-            InterpreterState lastState = m_startStates.find(curByte)->second;
+            InterpreterState lastState = mStartStates.find(curByte)->second;
 
             auto opcodeIndex = curByte;
 
             auto opcode = GET_OPCODE(curByte);
             oparg = GET_OPARG(curByte);
 #ifdef DUMP_TRACES
-            printf("Interpreting %lu - OPCODE %s (%d) stack %zu\n", opcodeIndex, opcode_name(opcode), oparg, lastState.stack_size());
+            printf("Interpreting %lu - OPCODE %s (%d) stack %zu\n", opcodeIndex, opcodeName(opcode), oparg,
+                   lastState.stackSize());
 #endif
         processOpCode:
 
-            int curStackLen = lastState.stack_size();
+            int curStackLen = lastState.stackSize();
             int jump = 0;
             bool skipEffect = false;
             switch (opcode) {
@@ -259,14 +260,14 @@ bool AbstractInterpreter::interpret() {
                     curByte += sizeof(_Py_CODEUNIT);
                     oparg = (oparg << 8) | GET_OPARG(curByte);
                     opcode = GET_OPCODE(curByte);
-                    update_start_state(lastState, curByte);
+                    updateStartState(lastState, curByte);
                     goto processOpCode;
                 }
                 case NOP:
                     break;
                 case ROT_TWO: {
-                    auto top = lastState.pop_no_escape();
-                    auto second = lastState.pop_no_escape();
+                    auto top = lastState.popNoEscape();
+                    auto second = lastState.popNoEscape();
 
                     auto sources = AbstractSource::combine(top.Sources, second.Sources);
                     m_opcodeSources[opcodeIndex] = sources;
@@ -281,9 +282,9 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case ROT_THREE: {
-                    auto top = lastState.pop_no_escape();
-                    auto second = lastState.pop_no_escape();
-                    auto third = lastState.pop_no_escape();
+                    auto top = lastState.popNoEscape();
+                    auto second = lastState.popNoEscape();
+                    auto third = lastState.popNoEscape();
 
                     auto sources = AbstractSource::combine(
                             top.Sources,
@@ -303,10 +304,10 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case ROT_FOUR: {
-                    auto top = lastState.pop_no_escape();
-                    auto second = lastState.pop_no_escape();
-                    auto third = lastState.pop_no_escape();
-                    auto fourth = lastState.pop_no_escape();
+                    auto top = lastState.popNoEscape();
+                    auto second = lastState.popNoEscape();
+                    auto third = lastState.popNoEscape();
+                    auto fourth = lastState.popNoEscape();
 
                     auto sources = AbstractSource::combine(
                             top.Sources,
@@ -333,11 +334,11 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     break;
                 case DUP_TOP:
-                    lastState.push(lastState[lastState.stack_size() - 1]);
+                    lastState.push(lastState[lastState.stackSize() - 1]);
                     break;
                 case DUP_TOP_TWO: {
-                    auto top = lastState[lastState.stack_size() - 1];
-                    auto second = lastState[lastState.stack_size() - 2];
+                    auto top = lastState[lastState.stackSize() - 1];
+                    auto second = lastState[lastState.stackSize() - 2];
                     lastState.push(second);
                     lastState.push(top);
                     break;
@@ -350,17 +351,17 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case LOAD_CONST: {
-                    auto constSource = add_const_source(opcodeIndex, oparg);
+                    auto constSource = addConstSource(opcodeIndex, oparg);
                     auto value = AbstractValueWithSources(
-                            to_abstract(PyTuple_GetItem(m_code->co_consts, oparg)),
+                            toAbstract(PyTuple_GetItem(mCode->co_consts, oparg)),
                             constSource
                     );
                     lastState.push(value);
                     break;
                 }
                 case LOAD_FAST: {
-                    auto localSource = add_local_source(opcodeIndex, oparg);
-                    auto local = lastState.get_local(oparg);
+                    auto localSource = addLocalSource(opcodeIndex, oparg);
+                    auto local = lastState.getLocal(oparg);
 
                     local.ValueInfo.Sources = AbstractSource::combine(localSource, local.ValueInfo.Sources);
 
@@ -368,16 +369,16 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case STORE_FAST: {
-                    auto valueInfo = lastState.pop_no_escape();
+                    auto valueInfo = lastState.popNoEscape();
                     m_opcodeSources[opcodeIndex] = valueInfo.Sources;
-                    lastState.replace_local(oparg, AbstractLocalInfo(valueInfo, valueInfo.Value == &Undefined));
+                    lastState.replaceLocal(oparg, AbstractLocalInfo(valueInfo, valueInfo.Value == &Undefined));
                 }
                     break;
                 case DELETE_FAST:
                     // We need to box any previous stores so we can delete them...  Otherwise
                     // we won't know if we should raise an unbound local error
-                    lastState.get_local(oparg).ValueInfo.escapes();
-                    lastState.replace_local(oparg, AbstractLocalInfo(&Undefined, true));
+                    lastState.getLocal(oparg).ValueInfo.escapes();
+                    lastState.replaceLocal(oparg, AbstractLocalInfo(&Undefined, true));
                     break;
                 case BINARY_SUBSCR:
                 case BINARY_TRUE_DIVIDE:
@@ -412,10 +413,10 @@ bool AbstractInterpreter::interpret() {
                 }
                     break;
                 case POP_JUMP_IF_FALSE: {
-                    auto value = lastState.pop_no_escape();
+                    auto value = lastState.popNoEscape();
 
                     // merge our current state into the branched to location...
-                    if (update_start_state(lastState, oparg)) {
+                    if (updateStartState(lastState, oparg)) {
                         queue.push_back(oparg);
                     }
 
@@ -429,10 +430,10 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case POP_JUMP_IF_TRUE: {
-                    auto value = lastState.pop_no_escape();
+                    auto value = lastState.popNoEscape();
 
                     // merge our current state into the branched to location...
-                    if (update_start_state(lastState, oparg)) {
+                    if (updateStartState(lastState, oparg)) {
                         queue.push_back(oparg);
                     }
 
@@ -447,10 +448,10 @@ bool AbstractInterpreter::interpret() {
                 }
                 case JUMP_IF_TRUE_OR_POP: {
                     auto curState = lastState;
-                    if (update_start_state(lastState, oparg)) {
+                    if (updateStartState(lastState, oparg)) {
                         queue.push_back(oparg);
                     }
-                    auto value = lastState.pop_no_escape();
+                    auto value = lastState.popNoEscape();
                     value.Value->truth(value.Sources);
                     if (value.Value->is_always_true()) {
                         // we always jump, no need to analyze the following instructions...
@@ -460,10 +461,10 @@ bool AbstractInterpreter::interpret() {
                     break;
                 case JUMP_IF_FALSE_OR_POP: {
                     auto curState = lastState;
-                    if (update_start_state(lastState, oparg)) {
+                    if (updateStartState(lastState, oparg)) {
                         queue.push_back(oparg);
                     }
-                    auto value = lastState.pop_no_escape();
+                    auto value = lastState.popNoEscape();
                     value.Value->truth(value.Sources);
                     if (value.Value->is_always_false()) {
                         // we always jump, no need to analyze the following instructions...
@@ -475,19 +476,19 @@ bool AbstractInterpreter::interpret() {
                     lastState.pop();
                     lastState.pop();
 
-                    if (update_start_state(lastState, oparg)) {
+                    if (updateStartState(lastState, oparg)) {
                         queue.push_back(oparg);
                     }
                     goto next;
                 case JUMP_ABSOLUTE:
-                    if (update_start_state(lastState, oparg)) {
+                    if (updateStartState(lastState, oparg)) {
                         queue.push_back(oparg);
                     }
                     // Done processing this basic block, we'll need to see a branch
                     // to the following opcodes before we'll process them.
                     goto next;
                 case JUMP_FORWARD:
-                    if (update_start_state(lastState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                    if (updateStartState(lastState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
                         queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
                     // Done processing this basic block, we'll need to see a branch
@@ -496,8 +497,8 @@ bool AbstractInterpreter::interpret() {
                 case RETURN_VALUE: {
                     // We don't treat returning as escaping as it would just result in a single
                     // boxing over the lifetime of the function.
-                    auto retValue = lastState.pop_no_escape();
-                    m_returnValue = m_returnValue->merge_with(retValue.Value);
+                    auto retValue = lastState.popNoEscape();
+                    mReturnValue = mReturnValue->merge_with(retValue.Value);
                     }
                     goto next;
                 case LOAD_NAME:
@@ -588,7 +589,7 @@ bool AbstractInterpreter::interpret() {
                     int na = oparg;
 
                     // Pop the names tuple
-                    auto names = lastState.pop_no_escape();
+                    auto names = lastState.popNoEscape();
                     assert(names.Value->kind() == AVK_Tuple);
 
                     for (int i = 0; i < na; i++) {
@@ -711,7 +712,7 @@ bool AbstractInterpreter::interpret() {
                     // For branches out with the value consumed
                     auto leaveState = lastState;
                     leaveState.pop();
-                    if (update_start_state(leaveState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                    if (updateStartState(leaveState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
                         queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
 
@@ -722,8 +723,10 @@ bool AbstractInterpreter::interpret() {
                     break;
                 }
                 case POP_BLOCK:
-                    lastState.m_stack = m_startStates[m_blockStarts[opcodeIndex]].m_stack;
-                    break;
+                    lastState.mStack = mStartStates[m_blockStarts[opcodeIndex]].mStack;
+                    lastState.push(&Any);
+                    lastState.push(&Any);
+                    lastState.push(&Any);
                 case POP_EXCEPT:
                     skipEffect = true;
                     break;
@@ -764,7 +767,7 @@ bool AbstractInterpreter::interpret() {
                 case SETUP_WITH: {
                     auto finallyState = lastState;
                     finallyState.push(&Any);
-                    if (update_start_state(finallyState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                    if (updateStartState(finallyState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
                         jump = 1;
                         queue.push_back((size_t) oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
@@ -778,7 +781,10 @@ bool AbstractInterpreter::interpret() {
                     ehState.push(&Any);
                     ehState.push(&Any);
                     ehState.push(&Any);
-                    if (update_start_state(ehState, (size_t)oparg + curByte + sizeof(_Py_CODEUNIT))) {
+                    ehState.push(&Any);
+                    ehState.push(&Any);
+                    ehState.push(&Any);
+                    if (updateStartState(ehState, (size_t) oparg + curByte + sizeof(_Py_CODEUNIT))) {
                         queue.push_back((size_t)oparg + curByte + sizeof(_Py_CODEUNIT));
                     }
                     break;
@@ -836,7 +842,7 @@ bool AbstractInterpreter::interpret() {
                     auto top = lastState.pop(); // exc
                     auto second = lastState.pop(); // val
                     auto third = lastState.pop(); // tb
-                    auto seventh = lastState[lastState.stack_size() - 7]; // exit_func
+                    auto seventh = lastState[lastState.stackSize() - 7]; // exit_func
                     // TODO : Vectorcall (exit_func, stack+1, 3, ..)
                     assert(false);
                     lastState.push(&Any); // res
@@ -873,14 +879,14 @@ bool AbstractInterpreter::interpret() {
                     break;
                 default:
                     PyErr_Format(PyExc_ValueError,
-                                 "Unknown unsupported opcode: %s", opcode_name(opcode));
+                                 "Unknown unsupported opcode: %s", opcodeName(opcode));
                     return false;
                     break;
             }
 #ifdef DEBUG
-            assert(skipEffect || PyCompile_OpcodeStackEffectWithJump(opcode, oparg, jump) == (lastState.stack_size() - curStackLen));
+            assert(skipEffect || PyCompile_OpcodeStackEffectWithJump(opcode, oparg, jump) == (lastState.stackSize() - curStackLen));
 #endif
-            update_start_state(lastState, curByte + sizeof(_Py_CODEUNIT));
+            updateStartState(lastState, curByte + sizeof(_Py_CODEUNIT));
         }
 
     next:;
@@ -889,56 +895,56 @@ bool AbstractInterpreter::interpret() {
     return true;
 }
 
-bool AbstractInterpreter::update_start_state(InterpreterState& newState, size_t index) {
-    auto initialState = m_startStates.find(index);
-    if (initialState != m_startStates.end()) {
-        return merge_states(newState, initialState->second);
+bool AbstractInterpreter::updateStartState(InterpreterState& newState, size_t index) {
+    auto initialState = mStartStates.find(index);
+    if (initialState != mStartStates.end()) {
+        return mergeStates(newState, initialState->second);
     }
     else {
-        m_startStates[index] = newState;
+        mStartStates[index] = newState;
         return true;
     }
 }
 
-bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterState& mergeTo) {
+bool AbstractInterpreter::mergeStates(InterpreterState& newState, InterpreterState& mergeTo) {
 #ifdef DUMP_TRACES
-    printf("merging states from %zu to %zu\n", mergeTo.stack_size(), newState.stack_size());
+    printf("merging states from %zu to %zu\n", mergeTo.stackSize(), newState.stackSize());
 #endif
     bool changed = false;
-    if (mergeTo.m_locals != newState.m_locals) {
+    if (mergeTo.mLocals != newState.mLocals) {
         // need to merge locals...
 #ifdef DUMP_TRACES
-        printf("merging locals from %zu to %zu\n", mergeTo.local_count(), newState.local_count());
+        printf("merging locals from %zu to %zu\n", mergeTo.localCount(), newState.localCount());
 #endif
-        assert(mergeTo.local_count() == newState.local_count());
-        for (size_t i = 0; i < newState.local_count(); i++) {
-            auto oldType = mergeTo.get_local(i);
-            auto newType = oldType.merge_with(newState.get_local(i));
+        assert(mergeTo.localCount() == newState.localCount());
+        for (size_t i = 0; i < newState.localCount(); i++) {
+            auto oldType = mergeTo.getLocal(i);
+            auto newType = oldType.merge_with(newState.getLocal(i));
             if (newType != oldType) {
                 if (oldType.ValueInfo.needs_boxing()) {
                     newType.ValueInfo.escapes();
                 }
-                mergeTo.replace_local(i, newType);
+                mergeTo.replaceLocal(i, newType);
                 changed = true;
             }
         }
     }
 
-    if (mergeTo.stack_size() == 0) {
+    if (mergeTo.stackSize() == 0) {
 #ifdef DUMP_TRACES
         printf("Initializing empty stack\n");
 #endif
         // first time we assigned, or empty stack...
-        mergeTo.m_stack = newState.m_stack;
-        changed |= newState.stack_size() != 0;
+        mergeTo.mStack = newState.mStack;
+        changed |= newState.stackSize() != 0;
     }
     else {
 #ifdef DUMP_TRACES
         printf("merging stack states\n");
 #endif
-        int max = mergeTo.stack_size();;
-        if (newState.stack_size() < mergeTo.stack_size())
-            max = newState.stack_size();
+        int max = mergeTo.stackSize();;
+        if (newState.stackSize() < mergeTo.stackSize())
+            max = newState.stackSize();
 
         // need to merge the stacks...
         for (size_t i = 0; i < max; i++) {
@@ -952,41 +958,41 @@ bool AbstractInterpreter::merge_states(InterpreterState& newState, InterpreterSt
     return changed;
 }
 
-AbstractValue* AbstractInterpreter::to_abstract(PyObject*value) {
-    if (value == Py_None) {
+AbstractValue* AbstractInterpreter::toAbstract(PyObject*obj) {
+    if (obj == Py_None) {
         return &None;
     }
-    else if (PyLong_CheckExact(value)) {
+    else if (PyLong_CheckExact(obj)) {
         return &Integer;
     }
-    else if (PyUnicode_Check(value)) {
+    else if (PyUnicode_Check(obj)) {
         return &String;
     }
-    else if (PyList_CheckExact(value)) {
+    else if (PyList_CheckExact(obj)) {
         return &List;
     }
-    else if (PyDict_CheckExact(value)) {
+    else if (PyDict_CheckExact(obj)) {
         return &Dict;
     }
-    else if (PyTuple_CheckExact(value)) {
+    else if (PyTuple_CheckExact(obj)) {
         return &Tuple;
     }
-    else if (PyBool_Check(value)) {
+    else if (PyBool_Check(obj)) {
         return &Bool;
     }
-    else if (PyFloat_CheckExact(value)) {
+    else if (PyFloat_CheckExact(obj)) {
         return &Float;
     }
-    else if (PyBytes_CheckExact(value)) {
+    else if (PyBytes_CheckExact(obj)) {
         return &Bytes;
     }
-    else if (PySet_Check(value)) {
+    else if (PySet_Check(obj)) {
         return &Set;
     }
-    else if (PyComplex_CheckExact(value)) {
+    else if (PyComplex_CheckExact(obj)) {
         return &Complex;
     }
-    else if (PyFunction_Check(value)) {
+    else if (PyFunction_Check(obj)) {
         return &Function;
     }
 
@@ -994,7 +1000,7 @@ AbstractValue* AbstractInterpreter::to_abstract(PyObject*value) {
     return &Any;
 }
 
-AbstractValue* AbstractInterpreter::to_abstract(AbstractValueKind kind) {
+AbstractValue* AbstractInterpreter::toAbstract(AbstractValueKind kind) {
     switch (kind) {
         case AVK_None:
             return &None;
@@ -1027,7 +1033,7 @@ AbstractValue* AbstractInterpreter::to_abstract(AbstractValueKind kind) {
     return &Any;
 }
 
-bool AbstractInterpreter::should_box(size_t opcodeIndex) {
+bool AbstractInterpreter::shouldBox(size_t opcodeIndex) {
     auto boxInfo = m_opcodeSources.find(opcodeIndex);
     if (boxInfo != m_opcodeSources.end()) {
         if (boxInfo->second == nullptr) {
@@ -1038,7 +1044,7 @@ bool AbstractInterpreter::should_box(size_t opcodeIndex) {
     return true;
 }
 
-bool AbstractInterpreter::can_skip_lasti_update(size_t opcodeIndex) {
+bool AbstractInterpreter::canSkipLastiUpdate(size_t opcodeIndex) {
     switch (GET_OPCODE(opcodeIndex)) {
         case BINARY_TRUE_DIVIDE:
         case BINARY_FLOOR_DIVIDE:
@@ -1068,14 +1074,14 @@ bool AbstractInterpreter::can_skip_lasti_update(size_t opcodeIndex) {
         case INPLACE_OR:
         case COMPARE_OP:
         case LOAD_FAST:
-            return !should_box(opcodeIndex);
+            return !shouldBox(opcodeIndex);
     }
 
     return false;
 
 }
 
-void AbstractInterpreter::dump_sources(AbstractSource* sources) {
+void AbstractInterpreter::dumpSources(AbstractSource* sources) {
     if (sources != nullptr) {
         for (auto value : sources->Sources->Sources) {
             printf("              %s (%p)\r\n", value->describe(), value);
@@ -1083,7 +1089,7 @@ void AbstractInterpreter::dump_sources(AbstractSource* sources) {
     }
 }
 
-const char* AbstractInterpreter::opcode_name(int opcode) {
+const char* AbstractInterpreter::opcodeName(int opcode) {
 #define OP_TO_STR(x)   case x: return #x;
     switch (opcode) { // NOLINT(hicpp-multiway-paths-covered)
         OP_TO_STR(POP_TOP)
@@ -1212,41 +1218,41 @@ const char* AbstractInterpreter::opcode_name(int opcode) {
 
 // Returns information about the specified local variable at a specific 
 // byte code index.
-AbstractLocalInfo AbstractInterpreter::get_local_info(size_t byteCodeIndex, size_t localIndex) {
-    return m_startStates[byteCodeIndex].get_local(localIndex);
+AbstractLocalInfo AbstractInterpreter::getLocalInfo(size_t byteCodeIndex, size_t localIndex) {
+    return mStartStates[byteCodeIndex].getLocal(localIndex);
 }
 
 // Returns information about the stack at the specific byte code index.
-vector<AbstractValueWithSources>& AbstractInterpreter::get_stack_info(size_t byteCodeIndex) {
-    return m_startStates[byteCodeIndex].m_stack;
+vector<AbstractValueWithSources>& AbstractInterpreter::getStackInfo(size_t byteCodeIndex) {
+    return mStartStates[byteCodeIndex].mStack;
 }
 
-AbstractValue* AbstractInterpreter::get_return_info() {
-    return m_returnValue;
+AbstractValue* AbstractInterpreter::getReturnInfo() {
+    return mReturnValue;
 }
 
-AbstractSource* AbstractInterpreter::add_local_source(size_t opcodeIndex, size_t localIndex) {
+AbstractSource* AbstractInterpreter::addLocalSource(size_t opcodeIndex, size_t localIndex) {
     auto store = m_opcodeSources.find(opcodeIndex);
     if (store == m_opcodeSources.end()) {
-        return m_opcodeSources[opcodeIndex] = new_source(new LocalSource());
+        return m_opcodeSources[opcodeIndex] = newSource(new LocalSource());
     }
 
     return store->second;
 }
 
-AbstractSource* AbstractInterpreter::add_const_source(size_t opcodeIndex, size_t constIndex) {
+AbstractSource* AbstractInterpreter::addConstSource(size_t opcodeIndex, size_t constIndex) {
     auto store = m_opcodeSources.find(opcodeIndex);
     if (store == m_opcodeSources.end()) {
-        return m_opcodeSources[opcodeIndex] = new_source(new ConstSource());
+        return m_opcodeSources[opcodeIndex] = newSource(new ConstSource());
     }
 
     return store->second;
 }
 
-AbstractSource* AbstractInterpreter::add_intermediate_source(size_t opcodeIndex) {
+AbstractSource* AbstractInterpreter::addIntermediateSource(size_t opcodeIndex) {
     auto store = m_opcodeSources.find(opcodeIndex);
     if (store == m_opcodeSources.end()) {
-        return m_opcodeSources[opcodeIndex] = new_source(new IntermediateSource());
+        return m_opcodeSources[opcodeIndex] = newSource(new IntermediateSource());
     }
 
     return store->second;
@@ -1266,27 +1272,27 @@ AbstractSource* AbstractInterpreter::add_intermediate_source(size_t opcodeIndex)
 
  // Checks to see if we have a non-zero error code on the stack, and if so,
  // branches to the current error handler.  Consumes the error code in the process
-void AbstractInterpreter::int_error_check(const char* reason) {
+void AbstractInterpreter::intErrorCheck(const char* reason) {
     auto noErr = m_comp->emit_define_label();
     m_comp->emit_int(0);
     m_comp->emit_branch(BranchEqual, noErr);
 
-    branch_raise(reason);
+     branchRaise(reason);
     m_comp->emit_mark_label(noErr);
 }
 
 // Checks to see if we have a null value as the last value on our stack
 // indicating an error, and if so, branches to our current error handler.
-void AbstractInterpreter::error_check(const char *reason) {
+void AbstractInterpreter::errorCheck(const char *reason) {
     auto noErr = m_comp->emit_define_label();
     m_comp->emit_dup();
-    m_comp->emit_store_local(m_errorCheckLocal);
+    m_comp->emit_store_local(mErrorCheckLocal);
     m_comp->emit_null();
     m_comp->emit_branch(BranchNotEqual, noErr);
 
-    branch_raise(reason);
+    branchRaise(reason);
     m_comp->emit_mark_label(noErr);
-    m_comp->emit_load_local(m_errorCheckLocal);
+    m_comp->emit_load_local(mErrorCheckLocal);
 }
 
 Label AbstractInterpreter::getOffsetLabel(int jumpTo) {
@@ -1301,20 +1307,20 @@ Label AbstractInterpreter::getOffsetLabel(int jumpTo) {
     return jumpToLabel;
 }
 
-void AbstractInterpreter::ensure_raise_and_free_locals(size_t localCount) {
+void AbstractInterpreter::ensureRaiseAndFreeLocals(size_t localCount) {
     while (m_raiseAndFreeLocals.size() <= localCount) {
         m_raiseAndFreeLocals.push_back(m_comp->emit_define_local());
     }
 }
 
-void AbstractInterpreter::spill_stack_for_raise(size_t localCount) {
-    ensure_raise_and_free_locals(localCount);
+void AbstractInterpreter::spillStackForRaise(size_t localCount) {
+    ensureRaiseAndFreeLocals(localCount);
     for (size_t i = 0; i < localCount; i++) {
         m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
     }
 }
 
-vector<Label>& AbstractInterpreter::get_raise_and_free_labels(size_t blockId) {
+vector<Label>& AbstractInterpreter::getRaiseAndFreeLabels(size_t blockId) {
     while (m_raiseAndFree.size() <= blockId) {
         m_raiseAndFree.emplace_back();
     }
@@ -1322,7 +1328,7 @@ vector<Label>& AbstractInterpreter::get_raise_and_free_labels(size_t blockId) {
     return m_raiseAndFree[blockId];
 }
 
-vector<Label>& AbstractInterpreter::get_reraise_and_free_labels(size_t blockId) {
+vector<Label>& AbstractInterpreter::getReraiseAndFreeLabels(size_t blockId) {
     while (m_reraiseAndFree.size() <= blockId) {
         m_reraiseAndFree.emplace_back();
     }
@@ -1330,8 +1336,8 @@ vector<Label>& AbstractInterpreter::get_reraise_and_free_labels(size_t blockId) 
     return m_reraiseAndFree[blockId];
 }
 
-size_t AbstractInterpreter::clear_value_stack() {
-    auto ehBlock = get_ehblock();
+size_t AbstractInterpreter::clearValueStack() {
+    auto ehBlock = getEhblock();
     auto& entry_stack = ehBlock->EntryStack;
 
     // clear any non-object values from the stack up
@@ -1350,14 +1356,14 @@ size_t AbstractInterpreter::clear_value_stack() {
     return count;
 }
 
-void AbstractInterpreter::ensure_labels(vector<Label>& labels, size_t count) {
+void AbstractInterpreter::ensureLabels(vector<Label>& labels, size_t count) {
     for (auto i = labels.size(); i < count; i++) {
         labels.push_back(m_comp->emit_define_label());
     }
 }
 
-void AbstractInterpreter::branch_raise(const char *reason) {
-    auto ehBlock = get_ehblock();
+void AbstractInterpreter::branchRaise(const char *reason) {
+    auto ehBlock = getEhblock();
     auto& entry_stack = ehBlock->EntryStack;
 
 #ifdef DEBUG
@@ -1386,9 +1392,9 @@ void AbstractInterpreter::branch_raise(const char *reason) {
         return;
     }
 
-    vector<Label>& labels = get_raise_and_free_labels(ehBlock->RaiseAndFreeId);
-    ensure_labels(labels, count);
-    ensure_raise_and_free_locals(count);
+    vector<Label>& labels = getRaiseAndFreeLabels(ehBlock->RaiseAndFreeId);
+    ensureLabels(labels, count);
+    ensureRaiseAndFreeLocals(count);
 
     // continue walking our stack iterator
     for (auto i = 0; i < count; cur++, i++) {
@@ -1407,8 +1413,8 @@ void AbstractInterpreter::branch_raise(const char *reason) {
     m_comp->emit_branch(BranchAlways, labels[count - 1]);
 }
 
-void AbstractInterpreter::clean_stack_for_reraise() {
-    auto ehBlock = get_ehblock();
+void AbstractInterpreter::cleanStackForReraise() {
+    auto ehBlock = getEhblock();
 
     auto& entry_stack = ehBlock->EntryStack;
     size_t count = m_stack.size() - entry_stack.size();
@@ -1418,62 +1424,62 @@ void AbstractInterpreter::clean_stack_for_reraise() {
     }
 }
 
-void AbstractInterpreter::build_tuple(size_t argCnt) {
+void AbstractInterpreter::buildTuple(size_t argCnt) {
     m_comp->emit_new_tuple(argCnt);
     if (argCnt != 0) {
-        error_check("tuple build failed");
+        errorCheck("tuple build failed");
         m_comp->emit_tuple_store(argCnt);
-        dec_stack(argCnt);
+        decStack(argCnt);
     }
 }
 
-void AbstractInterpreter::extend_tuple(size_t argCnt) {
-    extend_list(argCnt);
+void AbstractInterpreter::extendTuple(size_t argCnt) {
+    extendList(argCnt);
     m_comp->emit_list_to_tuple();
-    error_check("extend tuple failed");
+    errorCheck("extend tuple failed");
 }
 
-void AbstractInterpreter::build_list(size_t argCnt) {
+void AbstractInterpreter::buildList(size_t argCnt) {
     m_comp->emit_new_list(argCnt);
-    error_check("build list failed");
+    errorCheck("build list failed");
     if (argCnt != 0) {
         m_comp->emit_list_store(argCnt);
     }
-    dec_stack(argCnt);
+    decStack(argCnt);
 }
 
-void AbstractInterpreter::extend_list_recursively(Local listTmp, size_t argCnt) {
+void AbstractInterpreter::extendListRecursively(Local list, size_t argCnt) {
     if (argCnt == 0) {
         return;
     }
 
     auto valueTmp = m_comp->emit_define_local();
     m_comp->emit_store_local(valueTmp);
-    dec_stack();
+    decStack();
 
-    extend_list_recursively(listTmp, --argCnt);
+    extendListRecursively(list, --argCnt);
 
     m_comp->emit_load_local(valueTmp); // arg 2
-    m_comp->emit_load_local(listTmp);  // arg 1
+    m_comp->emit_load_local(list);  // arg 1
 
     m_comp->emit_list_extend();
-    int_error_check("list extend failed");
+    intErrorCheck("list extend failed");
 
     m_comp->emit_free_local(valueTmp);
 }
 
-void AbstractInterpreter::extend_list(size_t argCnt) {
+void AbstractInterpreter::extendList(size_t argCnt) {
     assert(argCnt > 0);
     auto listTmp = m_comp->emit_spill();
-    dec_stack();
-    extend_list_recursively(listTmp, argCnt);
+    decStack();
+    extendListRecursively(listTmp, argCnt);
     m_comp->emit_load_and_free_local(listTmp);
-    inc_stack(1, STACK_KIND_OBJECT);
+    incStack(1, STACK_KIND_OBJECT);
 }
 
-void AbstractInterpreter::build_set(size_t argCnt) {
+void AbstractInterpreter::buildSet(size_t argCnt) {
     m_comp->emit_new_set();
-    error_check("build set failed");
+    errorCheck("build set failed");
 
     if (argCnt != 0) {
         auto setTmp = m_comp->emit_define_local();
@@ -1482,7 +1488,7 @@ void AbstractInterpreter::build_set(size_t argCnt) {
         auto* frees = new Label[argCnt];
         for (auto i = 0; i < argCnt; i++) {
             tmps[argCnt - (i + 1)] = m_comp->emit_spill();
-            dec_stack();
+            decStack();
         }
 
         // load all the values into the set...
@@ -1518,7 +1524,7 @@ void AbstractInterpreter::build_set(size_t argCnt) {
         // And if the last one failed, then all of the values have been
         // decref'd
         m_comp->emit_mark_label(frees[argCnt - 1]);
-        branch_raise("build add failed");
+        branchRaise("build add failed");
 
         m_comp->emit_mark_label(noErr);
         delete[] frees;
@@ -1527,12 +1533,12 @@ void AbstractInterpreter::build_set(size_t argCnt) {
         m_comp->emit_load_local(setTmp);
         m_comp->emit_free_local(setTmp);
     }
-    inc_stack();
+    incStack();
 }
 
-void AbstractInterpreter::build_map(size_t  argCnt) {
+void AbstractInterpreter::buildMap(size_t  argCnt) {
     m_comp->emit_new_dict(argCnt);
-    error_check("build map failed");
+    errorCheck("build map failed");
 
     if (argCnt > 0) {
         auto map = m_comp->emit_spill();
@@ -1541,16 +1547,16 @@ void AbstractInterpreter::build_map(size_t  argCnt) {
 
             m_comp->emit_dict_store();
 
-            dec_stack(2);
-            int_error_check("dict store failed");
+            decStack(2);
+            intErrorCheck("dict store failed");
         }
         m_comp->emit_load_and_free_local(map);
     }
 }
 
-void AbstractInterpreter::make_function(int oparg) {
+void AbstractInterpreter::makeFunction(int oparg) {
     m_comp->emit_new_function();
-    dec_stack(2);
+    decStack(2);
 
     if (oparg & 0x0f) {
         auto func = m_comp->emit_spill();
@@ -1560,7 +1566,7 @@ void AbstractInterpreter::make_function(int oparg) {
             m_comp->emit_load_local(func);
             m_comp->emit_load_and_free_local(tmp);
             m_comp->emit_set_closure();
-            dec_stack();
+            decStack();
         }
         if (oparg & 0x04) {
             // annoations
@@ -1569,7 +1575,7 @@ void AbstractInterpreter::make_function(int oparg) {
             m_comp->emit_load_and_free_local(tmp);
 
             m_comp->emit_set_annotations();
-            dec_stack();
+            decStack();
         }
         if (oparg & 0x02) {
             // kw defaults
@@ -1578,7 +1584,7 @@ void AbstractInterpreter::make_function(int oparg) {
             m_comp->emit_load_and_free_local(tmp);
 
             m_comp->emit_set_kw_defaults();
-            dec_stack();
+            decStack();
         }
         if (oparg & 0x01) {
             // defaults
@@ -1586,28 +1592,28 @@ void AbstractInterpreter::make_function(int oparg) {
             m_comp->emit_load_local(func);
             m_comp->emit_load_and_free_local(tmp);
             m_comp->emit_set_defaults();
-            dec_stack();
+            decStack();
         }
         m_comp->emit_load_and_free_local(func);
     }
 
-    inc_stack();
+    incStack();
 }
 
-void AbstractInterpreter::dec_stack(size_t size) {
+void AbstractInterpreter::decStack(size_t size) {
     m_stack.dec(size);
 }
 
-void AbstractInterpreter::inc_stack(size_t size, StackEntryKind kind) {
+void AbstractInterpreter::incStack(size_t size, StackEntryKind kind) {
     m_stack.inc(size, kind);
 }
 
-void AbstractInterpreter::periodic_work() {
+void AbstractInterpreter::periodicWork() {
     m_comp->emit_periodic_work();
-    int_error_check("periodic work");
+    intErrorCheck("periodic work");
 }
 
-int AbstractInterpreter::get_extended_opcode(int curByte) {
+int AbstractInterpreter::getExtendedOpcode(int curByte) {
     auto opcode = GET_OPCODE(curByte);
     while (opcode == EXTENDED_ARG) {
         curByte += 2;
@@ -1619,7 +1625,7 @@ int AbstractInterpreter::get_extended_opcode(int curByte) {
 // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
 // If the value on the stack is -1, we branch to the current error handler.
 // Otherwise branches based if the current value is true/false based upon the current opcode 
-void AbstractInterpreter::branch_or_error(int& curByte) {
+void AbstractInterpreter::branchOrError(int& curByte) {
     curByte += sizeof(_Py_CODEUNIT);
     auto jmpType = GET_OPCODE(curByte);
     auto oparg = GET_OPARG(curByte);
@@ -1628,13 +1634,13 @@ void AbstractInterpreter::branch_or_error(int& curByte) {
         oparg = (oparg << 8) | GET_OPARG(curByte);
         jmpType = GET_OPCODE(curByte);
     }
-    mark_offset_label(curByte);
+    markOffsetLabel(curByte);
 
-    raise_on_negative_one();
+    raiseOnNegativeOne();
 
     if (oparg <= curByte) {
         auto tmp = m_comp->emit_spill();
-        periodic_work();
+        periodicWork();
         m_comp->emit_load_and_free_local(tmp);
     }
 
@@ -1645,7 +1651,7 @@ void AbstractInterpreter::branch_or_error(int& curByte) {
 // Checks to see if -1 is the current value on the stack, and if so, falls into
 // the logic for raising an exception.  If not execution continues forward progress.
 // Used for checking if an API reports an error (typically true/false/-1)
-void AbstractInterpreter::raise_on_negative_one() {
+void AbstractInterpreter::raiseOnNegativeOne() {
     m_comp->emit_dup();
     m_comp->emit_int(-1);
 
@@ -1655,7 +1661,7 @@ void AbstractInterpreter::raise_on_negative_one() {
     // values on the stack...
 
     m_comp->emit_pop();
-    branch_raise();
+    branchRaise();
     m_comp->emit_mark_label(noErr);
 }
 
@@ -1671,17 +1677,17 @@ void AbstractInterpreter::branch(int& curByte) {
         jmpType = GET_OPCODE(curByte);
     }
 
-    mark_offset_label(curByte);
+    markOffsetLabel(curByte);
 
     if (oparg <= curByte) {
-        periodic_work();
+        periodicWork();
     }
     m_comp->emit_branch(jmpType == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, getOffsetLabel(oparg));
-    dec_stack();
+    decStack();
     m_offsetStack[oparg] = m_stack;
 }
 
-JittedCode* AbstractInterpreter::compile_worker() {
+JittedCode* AbstractInterpreter::compileWorker() {
     Label ok;
 
     auto raiseNoHandlerLabel = m_comp->emit_define_label();
@@ -1697,7 +1703,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
     m_blockStack.push_back(BlockInfo(-1, NOP, rootHandler));
 
     // Loop through all opcodes in this frame
-    for (int curByte = 0; curByte < m_size; curByte += sizeof(_Py_CODEUNIT)) {
+    for (int curByte = 0; curByte < mSize; curByte += sizeof(_Py_CODEUNIT)) {
         assert(curByte % sizeof(_Py_CODEUNIT) == 0);
 
         // opcodeIndex is the opcode position (matches the dis.dis() output)
@@ -1711,8 +1717,8 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
     processOpCode:
         // See FOR_ITER for special handling of the offset label
-        if (get_extended_opcode(curByte) != FOR_ITER) {
-            mark_offset_label(curByte);
+        if (getExtendedOpcode(curByte) != FOR_ITER) {
+            markOffsetLabel(curByte);
         }
 
         // See if current index is part of offset stack, used for jump operations
@@ -1728,11 +1734,11 @@ JittedCode* AbstractInterpreter::compile_worker() {
         // If this operation goes beyond "EndOffset", pop the stack.
         if (m_blockStack.beyond(curByte)) {
             // TODO : Check if this is needed anymore. The compiler seems to put a POP_BLOCK at the end of a TRY block
-            compile_pop_block();
+            compilePopBlock();
         }
 
 #ifdef DUMP_TRACES
-        printf("Compiling OPCODE %d - %s (%d) stack %zu, depth %zu\n", curByte, opcode_name(byte), oparg, m_stack.size(), m_blockStack.size());
+        printf("Compiling OPCODE %d - %s (%d) stack %zu, depth %zu\n", curByte, opcodeName(byte), oparg, m_stack.size(), m_blockStack.size());
         int ilLen = m_comp->il_length();
         m_comp->emit_breakpoint();
 #endif
@@ -1760,26 +1766,26 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             case POP_TOP:
                 m_comp->emit_pop_top();
-                dec_stack();
+                decStack();
                 break;
             case DUP_TOP:
                 m_comp->emit_dup_top();
                 m_stack.dup_top();
                 break;
             case DUP_TOP_TWO:
-                inc_stack(2);
+                incStack(2);
                 m_comp->emit_dup_top_two();
                 break;
             case COMPARE_OP:
                 m_comp->emit_compare_object(oparg);
-                dec_stack(2);
-                error_check("failed to compare");
-                inc_stack(1);
+                decStack(2);
+                errorCheck("failed to compare");
+                incStack(1);
                 break;
             case LOAD_BUILD_CLASS:
                 m_comp->emit_load_build_class();
-                error_check("load build class failed");
-                inc_stack();
+                errorCheck("load build class failed");
+                incStack();
                 break;
             case RERAISE:{
                 auto curBlock = m_blockStack.back();
@@ -1790,7 +1796,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     int flags = curBlock.Flags;
 
                     auto noException = m_comp->emit_define_label();
-                    dec_stack();
+                    decStack();
                     m_comp->emit_store_local(ehInfo->ExVars.FinallyExc);
                     m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
                     m_comp->emit_ptr(Py_None);
@@ -1798,10 +1804,10 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_incref();
                     m_comp->emit_branch(BranchEqual, noException);
 
-                    if (flags & EHF_BlockReturns) {
+                    if (flags & EhfBlockReturns) {
                         auto exceptional = m_comp->emit_define_label();
                         m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
-                        m_comp->emit_int(EHF_BlockReturns);
+                        m_comp->emit_int(EhfBlockReturns);
                         m_comp->emit_compare_equal();
                         m_comp->emit_branch(BranchFalse, exceptional);
 
@@ -1824,7 +1830,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         }
 
                         if (clearEh != -1) {
-                            unwind_eh(m_blockStack.get(clearEh).CurrentHandler);
+                            unwindEh(m_blockStack.get(clearEh).CurrentHandler);
                         }
 
                         if (!hasOuterFinally) {
@@ -1838,11 +1844,11 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_load_local(ehInfo->ExVars.FinallyValue);
                     m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
                     m_comp->emit_restore_err();
-                    unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
+                    unwindEh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
 
-                    auto ehBlock = get_ehblock();
+                    auto ehBlock = getEhblock();
 
-                    clean_stack_for_reraise();
+                    cleanStackForReraise();
                     m_comp->emit_branch(BranchAlways, ehBlock->ReRaise);
 
                     m_comp->emit_mark_label(noException);
@@ -1855,171 +1861,181 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     // we have no values to pop off, and this code will never be invoked
                     // anyway.
                     if (m_offsetStack.find(curByte) != m_offsetStack.end()) {
-                        dec_stack(3);
+                        decStack(3);
                         m_comp->emit_restore_err();
 
-                        unwind_eh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
-                        clean_stack_for_reraise();
+                        unwindEh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
+                        cleanStackForReraise();
 
-                        m_comp->emit_branch(BranchAlways, get_ehblock()->ReRaise);
+                        m_comp->emit_branch(BranchAlways, getEhblock()->ReRaise);
                     }
                 }
                 skipEffect = true;
                 break;
             }
-            case JUMP_ABSOLUTE: jump_absolute(oparg, opcodeIndex); break;
-            case JUMP_FORWARD:  jump_absolute(oparg + curByte + sizeof(_Py_CODEUNIT), opcodeIndex); break;
+            case JUMP_ABSOLUTE:
+                jumpAbsolute(oparg, opcodeIndex); break;
+            case JUMP_FORWARD:
+                jumpAbsolute(oparg + curByte + sizeof(_Py_CODEUNIT), opcodeIndex); break;
             case JUMP_IF_FALSE_OR_POP:
-            case JUMP_IF_TRUE_OR_POP: jump_if_or_pop(byte != JUMP_IF_FALSE_OR_POP, opcodeIndex, oparg); break;
+            case JUMP_IF_TRUE_OR_POP:
+                jumpIfOrPop(byte != JUMP_IF_FALSE_OR_POP, opcodeIndex, oparg); break;
             case JUMP_IF_NOT_EXC_MATCH:
-                jump_if_not_exact(opcodeIndex, oparg);
+                jumpIfNotExact(opcodeIndex, oparg);
                 break;
             case POP_JUMP_IF_TRUE:
-            case POP_JUMP_IF_FALSE: pop_jump_if(byte != POP_JUMP_IF_FALSE, opcodeIndex, oparg); break;
+            case POP_JUMP_IF_FALSE:
+                popJumpIf(byte != POP_JUMP_IF_FALSE, opcodeIndex, oparg); break;
             case LOAD_NAME:
-                m_comp->emit_load_name(PyTuple_GetItem(m_code->co_names, oparg));
-                error_check("load name failed");
-                inc_stack();
+                m_comp->emit_load_name(PyTuple_GetItem(mCode->co_names, oparg));
+                errorCheck("load name failed");
+                incStack();
                 break;
             case STORE_ATTR:
-                m_comp->emit_store_attr(PyTuple_GetItem(m_code->co_names, oparg));
-                dec_stack(2);
-                int_error_check("store attr failed");
+                m_comp->emit_store_attr(PyTuple_GetItem(mCode->co_names, oparg));
+                decStack(2);
+                intErrorCheck("store attr failed");
                 break;
             case DELETE_ATTR:
-                m_comp->emit_delete_attr(PyTuple_GetItem(m_code->co_names, oparg));
-                dec_stack();
-                int_error_check("delete attr failed");
+                m_comp->emit_delete_attr(PyTuple_GetItem(mCode->co_names, oparg));
+                decStack();
+                intErrorCheck("delete attr failed");
                 break;
             case LOAD_ATTR:
-                m_comp->emit_load_attr(PyTuple_GetItem(m_code->co_names, oparg));
-                dec_stack();
-                error_check("load attr failed");
-                inc_stack();
+                m_comp->emit_load_attr(PyTuple_GetItem(mCode->co_names, oparg));
+                decStack();
+                errorCheck("load attr failed");
+                incStack();
                 break;
             case STORE_GLOBAL:
-                m_comp->emit_store_global(PyTuple_GetItem(m_code->co_names, oparg));
-                dec_stack();
-                int_error_check("store global failed");
+                m_comp->emit_store_global(PyTuple_GetItem(mCode->co_names, oparg));
+                decStack();
+                intErrorCheck("store global failed");
                 break;
             case DELETE_GLOBAL:
-                m_comp->emit_delete_global(PyTuple_GetItem(m_code->co_names, oparg));
-                int_error_check("delete global failed");
+                m_comp->emit_delete_global(PyTuple_GetItem(mCode->co_names, oparg));
+                intErrorCheck("delete global failed");
                 break;
             case LOAD_GLOBAL:
-                m_comp->emit_load_global(PyTuple_GetItem(m_code->co_names, oparg));
-                error_check("load global failed");
-                inc_stack();
+                m_comp->emit_load_global(PyTuple_GetItem(mCode->co_names, oparg));
+                errorCheck("load global failed");
+                incStack();
                 break;
-            case LOAD_CONST: load_const(oparg, opcodeIndex); break;
+            case LOAD_CONST:
+                loadConst(oparg, opcodeIndex); break;
             case STORE_NAME:
-                m_comp->emit_store_name(PyTuple_GetItem(m_code->co_names, oparg));
-                dec_stack();
-                int_error_check("store name failed");
+                m_comp->emit_store_name(PyTuple_GetItem(mCode->co_names, oparg));
+                decStack();
+                intErrorCheck("store name failed");
                 break;
             case DELETE_NAME:
-                m_comp->emit_delete_name(PyTuple_GetItem(m_code->co_names, oparg));
-                int_error_check("delete name failed");
+                m_comp->emit_delete_name(PyTuple_GetItem(mCode->co_names, oparg));
+                intErrorCheck("delete name failed");
                 break;
             case DELETE_FAST:
-                load_fast_worker(oparg, true);
+                loadFastWorker(oparg, true);
                 m_comp->emit_pop_top();
                 m_comp->emit_delete_fast(oparg);
                 break;
-            case STORE_FAST: store_fast(oparg, opcodeIndex); break;
-            case LOAD_FAST: load_fast(oparg, opcodeIndex); break;
+            case STORE_FAST:
+                storeFast(oparg, opcodeIndex); break;
+            case LOAD_FAST:
+                loadFast(oparg, opcodeIndex); break;
             case UNPACK_SEQUENCE:
-                unpack_sequence(oparg, curByte);
+                unpackSequence(oparg, curByte);
                 break;
-            case UNPACK_EX: unpack_ex(oparg, curByte); break;
+            case UNPACK_EX:
+                unpackEx(oparg, curByte); break;
             case CALL_FUNCTION_KW: {
                 // names is a tuple on the stack, should have come from a LOAD_CONST
                 auto names = m_comp->emit_spill();
-                dec_stack();    // names
-                build_tuple(oparg);
+                decStack();    // names
+                buildTuple(oparg);
                 m_comp->emit_load_and_free_local(names);
 
                 m_comp->emit_kwcall_with_tuple();
-                dec_stack();// function & names
+                decStack();// function & names
 
-                error_check("kwcall failed");
-                inc_stack();
+                errorCheck("kwcall failed");
+                incStack();
                 break;
             }
             case CALL_FUNCTION_EX:
                 if (oparg & 0x01) {
                     // kwargs, then args, then function
                     m_comp->emit_call_kwargs();
-                    dec_stack(3);
+                    decStack(3);
                 }else{
                     m_comp->emit_call_args();
-                    dec_stack(2);
+                    decStack(2);
                 }
 
-                error_check("call failed");
-                inc_stack();
+                errorCheck("call failed");
+                incStack();
                 break;
             case CALL_FUNCTION:
             {
                 if (!m_comp->emit_call(oparg)) {
-                    build_tuple(oparg);
+                    buildTuple(oparg);
                     m_comp->emit_call_with_tuple();
-                    dec_stack();// function
+                    decStack();// function
                 }
                 else {
-                    dec_stack(oparg + 1); // + function
+                    decStack(oparg + 1); // + function
                 }
-                
-                error_check("call function failed");
-                inc_stack();
+
+                errorCheck("call function failed");
+                incStack();
                 break;
             }
             case BUILD_TUPLE:
-                build_tuple(oparg);
-                inc_stack();
+                buildTuple(oparg);
+                incStack();
                 break;
             case BUILD_LIST:
-                build_list(oparg);
-                inc_stack();
+                buildList(oparg);
+                incStack();
                 break;
             case BUILD_MAP:
-                build_map(oparg);
-                inc_stack();
+                buildMap(oparg);
+                incStack();
                 break;
             case STORE_SUBSCR:
-                dec_stack(3);
+                decStack(3);
                 m_comp->emit_store_subscr();
-                int_error_check("store subscr failed");
+                intErrorCheck("store subscr failed");
                 break;
             case DELETE_SUBSCR:
-                dec_stack(2);
+                decStack(2);
                 m_comp->emit_delete_subscr();
-                int_error_check("delete subscr failed");
+                intErrorCheck("delete subscr failed");
                 break;
             case BUILD_SLICE:
-                dec_stack(oparg);
+                decStack(oparg);
                 if (oparg != 3) {
                     m_comp->emit_null();
                 }
                 m_comp->emit_build_slice();
-                inc_stack();
+                incStack();
                 break;
             case BUILD_SET:
-                build_set(oparg);
+                buildSet(oparg);
                 break;
-            case UNARY_POSITIVE: unary_positive(opcodeIndex); break;
-            case UNARY_NEGATIVE: unary_negative(opcodeIndex); break;
+            case UNARY_POSITIVE:
+                unaryPositive(opcodeIndex); break;
+            case UNARY_NEGATIVE:
+                unaryNegative(opcodeIndex); break;
             case UNARY_NOT:
                 m_comp->emit_unary_not();
-                dec_stack(1);
-                error_check("unary not failed");
-                inc_stack();
+                decStack(1);
+                errorCheck("unary not failed");
+                incStack();
                 break;
             case UNARY_INVERT:
                 m_comp->emit_unary_invert();
-                dec_stack(1);
-                error_check("unary invert failed");
-                inc_stack();
+                decStack(1);
+                errorCheck("unary invert failed");
+                incStack();
                 break;
             case BINARY_SUBSCR:
             case BINARY_ADD:
@@ -2049,11 +2065,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
             case INPLACE_XOR:
             case INPLACE_OR:
                 m_comp->emit_binary_object(byte);
-                dec_stack(2);
-                error_check("binary op failed");
-                inc_stack();
+                decStack(2);
+                errorCheck("binary op failed");
+                incStack();
                 break;
-            case RETURN_VALUE: return_value(opcodeIndex); break;
+            case RETURN_VALUE:
+                returnValue(opcodeIndex); break;
             case EXTENDED_ARG:
             {
                 curByte += sizeof(_Py_CODEUNIT);
@@ -2063,36 +2080,36 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 goto processOpCode;
             }
             case MAKE_FUNCTION:
-                make_function(oparg);
+                makeFunction(oparg);
                 break;
             case LOAD_DEREF:
                 m_comp->emit_load_deref(oparg);
-                error_check("load deref failed");
-                inc_stack();
+                errorCheck("load deref failed");
+                incStack();
                 break;
             case STORE_DEREF:
-                dec_stack();
+                decStack();
                 m_comp->emit_store_deref(oparg);
                 break;
             case DELETE_DEREF: m_comp->emit_delete_deref(oparg); break;
             case LOAD_CLOSURE:
                 m_comp->emit_load_closure(oparg);
-                inc_stack();
+                incStack();
                 break;
             case GET_ITER: {
                 m_comp->emit_getiter();
-                dec_stack();
-                error_check("get iter failed");
-                inc_stack();
+                decStack();
+                errorCheck("get iter failed");
+                incStack();
                 break;
             }
             case FOR_ITER:
             {
                 BlockInfo *loopBlock = nullptr;
-                for_iter(
-                    curByte + oparg + sizeof(_Py_CODEUNIT), 
-                    opcodeIndex, 
-                    loopBlock
+                forIter(
+                        curByte + oparg + sizeof(_Py_CODEUNIT),
+                        opcodeIndex,
+                        loopBlock
                 );
                 skipEffect = true; // has jump effect
                 break;
@@ -2101,45 +2118,45 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 // Calls set.update(TOS1[-i], TOS). Used to build sets.
                 m_comp->lift_n_to_top(oparg);
                 m_comp->emit_set_add();
-                dec_stack(2); // set, value
-                error_check("set update failed");
-                inc_stack(1); // set
+                decStack(2); // set, value
+                errorCheck("set update failed");
+                incStack(1); // set
                 break;
             case MAP_ADD:
                 // Calls dict.__setitem__(TOS1[-i], TOS1, TOS). Used to implement dict comprehensions.
                 m_comp->lift_n_to_top(oparg);
                 m_comp->emit_map_add();
-                dec_stack(3);
-                error_check("map add failed");
-                inc_stack();
+                decStack(3);
+                errorCheck("map add failed");
+                incStack();
                 break;
             case LIST_APPEND: {
                 // Calls list.append(TOS1[-i], TOS).
                 m_comp->lift_n_to_top(oparg);
                 m_comp->emit_list_append();
-                dec_stack(2); // list, value
-                error_check("list append failed");
-                inc_stack(1);
+                decStack(2); // list, value
+                errorCheck("list append failed");
+                incStack(1);
                 break;
             }
             case DICT_MERGE: {
                 // Calls dict.update(TOS1[-i], TOS). Used to merge dicts.
                 m_comp->lift_n_to_top(oparg);
                 m_comp->emit_dict_merge();
-                dec_stack(2); // list, value
-                error_check("dict merge failed");
-                inc_stack(1);
+                decStack(2); // list, value
+                errorCheck("dict merge failed");
+                incStack(1);
                 break;
             }
             case PRINT_EXPR:
                 m_comp->emit_print_expr();
-                dec_stack();
-                int_error_check("print expr failed");
+                decStack();
+                intErrorCheck("print expr failed");
                 break;
             case LOAD_CLASSDEREF:
                 m_comp->emit_load_classderef(oparg);
-                error_check("load classderef failed");
-                inc_stack();
+                errorCheck("load classderef failed");
+                incStack();
                 break;
             case RAISE_VARARGS:
                 // do raise (exception, cause)
@@ -2148,12 +2165,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     case 0: m_comp->emit_null();
                     case 1: m_comp->emit_null();
                     case 2:
-                        dec_stack(oparg);
+                        decStack(oparg);
                         // raise exc
                         m_comp->emit_raise_varargs();
                         // returns 1 if we're doing a re-raise in which case we don't need
                         // to update the traceback.  Otherwise returns 0.
-                        auto curHandler = get_ehblock();
+                        auto curHandler = getEhblock();
                         auto stackDepth = m_stack.size() - curHandler->EntryStack.size();
                         if (oparg == 0) {
                             bool noStack = true;
@@ -2165,17 +2182,17 @@ JittedCode* AbstractInterpreter::compile_worker() {
                                 // a set of labels for freeing objects on the stack for the re-raise.
                                 auto raiseTmp = m_comp->emit_define_local(LK_Bool);
                                 m_comp->emit_store_local(raiseTmp);
-                                auto count = clear_value_stack();
+                                auto count = clearValueStack();
 
-                                auto& raiseLabels = get_raise_and_free_labels(curHandler->RaiseAndFreeId);
-                                auto& reraiseLabels = get_reraise_and_free_labels(curHandler->RaiseAndFreeId);
+                                auto& raiseLabels = getRaiseAndFreeLabels(curHandler->RaiseAndFreeId);
+                                auto& reraiseLabels = getReraiseAndFreeLabels(curHandler->RaiseAndFreeId);
 
                                 m_comp->emit_load_and_free_local(raiseTmp);
                                 if (count != 0) {
-                                    ensure_labels(raiseLabels, count);
-                                    ensure_labels(reraiseLabels, count);
+                                    ensureLabels(raiseLabels, count);
+                                    ensureLabels(reraiseLabels, count);
 
-                                    spill_stack_for_raise(count);
+                                    spillStackForRaise(count);
                                     m_comp->emit_branch(BranchFalse, raiseLabels[count - 1]);
                                     m_comp->emit_branch(BranchAlways, reraiseLabels[count - 1]);
                                     noStack = false;
@@ -2193,7 +2210,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         else {
                             // if we have args we'll always return 0...
                             m_comp->emit_pop();
-                            branch_raise();
+                            branchRaise();
                         }
                         break;
                 }
@@ -2229,11 +2246,11 @@ JittedCode* AbstractInterpreter::compile_worker() {
             }
             break;
             case POP_EXCEPT:
-                pop_except();
+                popExcept();
                 skipEffect = true;
                 break;
             case POP_BLOCK:
-                compile_pop_block();
+                compilePopBlock();
                 break;
             case YIELD_FROM:
             case YIELD_VALUE:
@@ -2241,20 +2258,20 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 return nullptr;
 
             case IMPORT_NAME:
-                m_comp->emit_import_name(PyTuple_GetItem(m_code->co_names, oparg));
-                dec_stack(2);
-                error_check("import name failed");
-                inc_stack();
+                m_comp->emit_import_name(PyTuple_GetItem(mCode->co_names, oparg));
+                decStack(2);
+                errorCheck("import name failed");
+                incStack();
                 break;
             case IMPORT_FROM:
-                m_comp->emit_import_from(PyTuple_GetItem(m_code->co_names, oparg));
-                error_check("import from failed");
-                inc_stack();
+                m_comp->emit_import_from(PyTuple_GetItem(mCode->co_names, oparg));
+                errorCheck("import from failed");
+                incStack();
                 break;
             case IMPORT_STAR:
                 m_comp->emit_import_star();
-                dec_stack(1);
-                int_error_check("import star failed");
+                decStack(1);
+                intErrorCheck("import star failed");
                 break;
             case SETUP_WITH:
                 printf("Unsupported opcode: %d (with related)\r\n", byte);
@@ -2265,12 +2282,12 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
                     // format spec
                     fmtSpec = m_comp->emit_spill();
-                    dec_stack();
+                    decStack();
                 }
 
                 int which_conversion = oparg & FVC_MASK;
 
-                dec_stack();
+                decStack();
                 if (which_conversion) {
                     // Save the original value so we can decref it...
                     m_comp->emit_dup();
@@ -2291,7 +2308,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     // we need to free as well.
                     auto noErr = m_comp->emit_define_label();
                     m_comp->emit_dup();
-                    m_comp->emit_store_local(m_errorCheckLocal);
+                    m_comp->emit_store_local(mErrorCheckLocal);
                     m_comp->emit_null();
                     m_comp->emit_branch(BranchNotEqual, noErr);
 
@@ -2300,9 +2317,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
                         m_comp->emit_pop_top();
                     }
 
-                    branch_raise("conversion failed");
+                    branchRaise("conversion failed");
                     m_comp->emit_mark_label(noErr);
-                    m_comp->emit_load_local(m_errorCheckLocal);
+                    m_comp->emit_load_local(mErrorCheckLocal);
                 }
 
                 if ((oparg & FVS_MASK) == FVS_HAVE_SPEC) {
@@ -2310,7 +2327,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_load_and_free_local(fmtSpec);
                     m_comp->emit_pyobject_format();
 
-                    error_check("format object");
+                    errorCheck("format object");
                 }
                 else if (!which_conversion) {
                     // TODO: This could also be avoided if we knew we had a string on the stack
@@ -2320,7 +2337,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_format_value();
                 }
 
-                inc_stack();
+                incStack();
                 break;
             }
             case BUILD_STRING:
@@ -2329,7 +2346,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 Local tmp;
                 for (auto i = 0; i < oparg; i++) {
                     m_comp->emit_store_to_array(stackArray, oparg - i - 1);
-                    dec_stack();
+                    decStack();
                 }
 
                 // Array
@@ -2339,7 +2356,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
 
                 m_comp->emit_unicode_joinarray();
 
-                inc_stack();
+                incStack();
                 break;
             }
             case BUILD_CONST_KEY_MAP:
@@ -2351,21 +2368,21 @@ JittedCode* AbstractInterpreter::compile_worker() {
                  * in the built dictionary.
                  */
                 // spill TOP into keys and then build a tuple for stack
-                build_tuple(oparg + 1);
-                inc_stack();
+                buildTuple(oparg + 1);
+                incStack();
                 m_comp->emit_dict_build_from_map();
-                dec_stack(1);
-                error_check("dict map failed");
-                inc_stack(1);
+                decStack(1);
+                errorCheck("dict map failed");
+                incStack(1);
                 break;
             }
             case LIST_EXTEND:
             {
                 m_comp->lift_n_to_top(oparg);
                 m_comp->emit_list_extend();
-                dec_stack(2);
-                error_check("list extend failed");
-                inc_stack(1);
+                decStack(2);
+                errorCheck("list extend failed");
+                incStack(1);
                 // Takes list, value from stack and pushes list back onto stack
                 break;
             }
@@ -2374,9 +2391,9 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 // Calls dict.update(TOS1[-i], TOS). Used to build dicts.
                 m_comp->lift_n_to_top(oparg);
                 m_comp->emit_dict_update();
-                dec_stack(2); // dict, item
-                error_check("dict update failed");
-                inc_stack(1);
+                decStack(2); // dict, item
+                errorCheck("dict update failed");
+                incStack(1);
                 break;
             }
             case SET_UPDATE:
@@ -2384,25 +2401,25 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 // Calls set.update(TOS1[-i], TOS). Used to build sets.
                 m_comp->lift_n_to_top(oparg);
                 m_comp->emit_set_extend();
-                dec_stack(2); // set, iterable
-                error_check("set update failed");
-                inc_stack(1); // set
+                decStack(2); // set, iterable
+                errorCheck("set update failed");
+                incStack(1); // set
                 break;
             }
             case LIST_TO_TUPLE:
             {
                 m_comp->emit_list_to_tuple();
-                dec_stack(1); // list
-                error_check("list to tuple failed");
-                inc_stack(1); // tuple
+                decStack(1); // list
+                errorCheck("list to tuple failed");
+                incStack(1); // tuple
                 break;
             }
             case IS_OP:
             {
                 m_comp->emit_is(oparg);
-                dec_stack(2);
-                error_check("is check failed");
-                inc_stack(1);
+                decStack(2);
+                errorCheck("is check failed");
+                incStack(1);
                 break;
             }
             case CONTAINS_OP:
@@ -2412,15 +2429,15 @@ JittedCode* AbstractInterpreter::compile_worker() {
                     m_comp->emit_in();
                 else
                     m_comp->emit_not_in();
-                dec_stack(2); // in/not in takes two
-                inc_stack(); // pushes result
+                decStack(2); // in/not in takes two
+                incStack(); // pushes result
                 break;
             }
             case LOAD_METHOD:
             {
                 m_comp->emit_dup_top(); // dup self as needs to remain on stack
-                m_comp->emit_load_method(PyTuple_GetItem(m_code->co_names, oparg));
-                inc_stack(1);
+                m_comp->emit_load_method(PyTuple_GetItem(mCode->co_names, oparg));
+                incStack(1);
                 break;
             }
             case CALL_METHOD:
@@ -2428,18 +2445,18 @@ JittedCode* AbstractInterpreter::compile_worker() {
                 if (oparg == 0) {
                     m_comp->emit_method_call_0();
                 } else {
-                    build_tuple(oparg);
+                    buildTuple(oparg);
                     m_comp->emit_method_call_n(oparg);
                 }
-                dec_stack(2); // + method + name + nargs
-                error_check("failed to call method");
-                inc_stack(); //result
+                decStack(2); // + method + name + nargs
+                errorCheck("failed to call method");
+                incStack(); //result
                 break;
             }
             case LOAD_ASSERTION_ERROR :
             {
                 m_comp->emit_load_assertion_error();
-                inc_stack();
+                incStack();
                 break;
             }
             default:
@@ -2459,7 +2476,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
     if (!m_exceptionHandler.Empty()) {
         // TODO: Unify the first handler with this loop
         for (auto handler: m_exceptionHandler.GetHandlers()) {
-            emit_raise_and_free(handler);
+            emitRaiseAndFree(handler);
 
             if (handler->HasErrorTarget()) {
                 m_comp->emit_prepare_exception(
@@ -2484,7 +2501,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
     }
 
     // label we branch to for error handling when we have no EH handlers, return NULL.
-    emit_raise_and_free(rootHandler);
+    emitRaiseAndFree(rootHandler);
 
     m_comp->emit_null();
     auto finalRet = m_comp->emit_define_label();
@@ -2501,7 +2518,7 @@ JittedCode* AbstractInterpreter::compile_worker() {
     return m_comp->emit_compile();
 }
 
-void AbstractInterpreter::compile_pop_block() {
+void AbstractInterpreter::compilePopBlock() {
     auto handler = m_blockStack.back().CurrentHandler;
 
     auto curHandler = m_blockStack.back();
@@ -2520,7 +2537,7 @@ void AbstractInterpreter::compile_pop_block() {
                 backHandler->EntryStack,
                 back.CurrentHandler,
                 prevHandler->ExVars,
-                backHandler->Flags & EHF_TryFinally
+                backHandler->Flags & EhfTryFinally
         );
 
         auto newBlock = BlockInfo(
@@ -2536,17 +2553,17 @@ void AbstractInterpreter::compile_pop_block() {
     m_blockStack.pop_back();
 }
 
-void AbstractInterpreter::compile_pop_except_block() {
+void AbstractInterpreter::compilePopExceptBlock() {
     auto curHandler = m_blockStack.back();
     assert(m_blockStack.size() > 0);
     if (curHandler.Kind == SETUP_FINALLY){
-        dec_stack(3);
+        decStack(3);
         m_blockStack.pop_back();
     }
 }
 
-void AbstractInterpreter::emit_raise_and_free(ExceptionHandler* handler) {
-    auto reraiseAndFreeLabels = get_reraise_and_free_labels(handler->RaiseAndFreeId);
+void AbstractInterpreter::emitRaiseAndFree(ExceptionHandler* handler) {
+    auto reraiseAndFreeLabels = getReraiseAndFreeLabels(handler->RaiseAndFreeId);
     for (auto cur = reraiseAndFreeLabels.size() - 1; cur != -1; cur--) {
         m_comp->emit_mark_label(reraiseAndFreeLabels[cur]);
         m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
@@ -2555,14 +2572,14 @@ void AbstractInterpreter::emit_raise_and_free(ExceptionHandler* handler) {
     if (!reraiseAndFreeLabels.empty()) {
         m_comp->emit_branch(BranchAlways, handler->ReRaise);
     }
-    auto raiseAndFreeLabels = get_raise_and_free_labels(handler->RaiseAndFreeId);
+    auto raiseAndFreeLabels = getRaiseAndFreeLabels(handler->RaiseAndFreeId);
     for (auto cur = raiseAndFreeLabels.size() - 1; cur != -1; cur--) {
         m_comp->emit_mark_label(raiseAndFreeLabels[cur]);
         m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
         m_comp->emit_pop_top();
     }
 
-    if (handler->Flags & EHF_InExceptHandler) {
+    if (handler->Flags & EhfInExceptHandler) {
         // We're in an except handler and we're raising a new exception.  First we need
         // to unwind the current exception.  If we're doing a raise we need to update the
         // traceback with our line/frame information.  If we're doing a re-raise we need
@@ -2570,7 +2587,7 @@ void AbstractInterpreter::emit_raise_and_free(ExceptionHandler* handler) {
         auto prepare = m_comp->emit_define_label();
 
         m_comp->emit_mark_label(handler->Raise);
-        unwind_eh(handler);
+        unwindEh(handler);
 
         m_comp->emit_eh_trace();     // update the traceback
 
@@ -2586,7 +2603,7 @@ void AbstractInterpreter::emit_raise_and_free(ExceptionHandler* handler) {
 
         m_comp->emit_mark_label(handler->ReRaise);
 
-        unwind_eh(handler);
+        unwindEh(handler);
 
         m_comp->emit_mark_label(prepare);
         if (!handler->HasErrorTarget()) {
@@ -2610,36 +2627,36 @@ void AbstractInterpreter::emit_raise_and_free(ExceptionHandler* handler) {
 
 }
 
-void AbstractInterpreter::test_bool_and_branch(Local value, bool isTrue, Label target) {
+void AbstractInterpreter::testBoolAndBranch(Local value, bool isTrue, Label target) {
     m_comp->emit_load_local(value);
     m_comp->emit_ptr(isTrue ? Py_False : Py_True);
     m_comp->emit_branch(BranchEqual, target);
 }
 
-void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpTo) {
-    auto stackInfo = get_stack_info(opcodeIndex);
+void AbstractInterpreter::jumpIfOrPop(bool isTrue, int opcodeIndex, int jumpTo) {
+    auto stackInfo = getStackInfo(opcodeIndex);
 
     if (jumpTo <= opcodeIndex) {
-        periodic_work();
+        periodicWork();
     }
 
     auto target = getOffsetLabel(jumpTo);
     m_offsetStack[jumpTo] = m_stack;
-    dec_stack();
+    decStack();
 
     auto tmp = m_comp->emit_spill();
     auto noJump = m_comp->emit_define_label();
     auto willJump = m_comp->emit_define_label();
 
     // fast checks for true/false.
-    test_bool_and_branch(tmp, isTrue, noJump);
-    test_bool_and_branch(tmp, !isTrue, willJump);
+    testBoolAndBranch(tmp, isTrue, noJump);
+    testBoolAndBranch(tmp, !isTrue, willJump);
 
     // Use PyObject_IsTrue
     m_comp->emit_load_local(tmp);
     m_comp->emit_is_true();
 
-    raise_on_negative_one();
+    raiseOnNegativeOne();
 
     m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
 
@@ -2654,12 +2671,12 @@ void AbstractInterpreter::jump_if_or_pop(bool isTrue, int opcodeIndex, int jumpT
     m_comp->emit_pop_top();
 
     m_comp->emit_free_local(tmp);
-    inc_stack();
+    incStack();
 }
 
-void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) {
+void AbstractInterpreter::popJumpIf(bool isTrue, int opcodeIndex, int jumpTo) {
     if (jumpTo <= opcodeIndex) {
-        periodic_work();
+        periodicWork();
     }
     auto target = getOffsetLabel(jumpTo);
 
@@ -2679,7 +2696,7 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
     m_comp->emit_dup();
     m_comp->emit_is_true();
 
-    raise_on_negative_one();
+    raiseOnNegativeOne();
 
     m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
 
@@ -2692,37 +2709,37 @@ void AbstractInterpreter::pop_jump_if(bool isTrue, int opcodeIndex, int jumpTo) 
     m_comp->emit_mark_label(noJump);
     m_comp->emit_pop_top();
 
-    dec_stack();
+    decStack();
     m_offsetStack[jumpTo] = m_stack;
 }
 
-void AbstractInterpreter::unary_positive(int opcodeIndex) {
-    dec_stack();
+void AbstractInterpreter::unaryPositive(int opcodeIndex) {
+    decStack();
     m_comp->emit_unary_positive();
-    error_check("unary positive failed");
-    inc_stack();
+    errorCheck("unary positive failed");
+    incStack();
 }
 
-void AbstractInterpreter::unary_negative(int opcodeIndex) {
-    dec_stack();
+void AbstractInterpreter::unaryNegative(int opcodeIndex) {
+    decStack();
     m_comp->emit_unary_negative();
-    error_check("unary negative failed");
-    inc_stack();
+    errorCheck("unary negative failed");
+    incStack();
 }
 
 /* Unused for now */
-bool AbstractInterpreter::can_optimize_pop_jump(int opcodeIndex) {
-    auto opcode = get_extended_opcode(opcodeIndex + sizeof(_Py_CODEUNIT));
+bool AbstractInterpreter::canOptimizePopJump(int opcodeIndex) {
+    auto opcode = getExtendedOpcode(opcodeIndex + sizeof(_Py_CODEUNIT));
     if (opcode == POP_JUMP_IF_TRUE || opcode == POP_JUMP_IF_FALSE) {
         return m_jumpsTo.find(opcodeIndex + sizeof(_Py_CODEUNIT)) == m_jumpsTo.end();
     }
     return false;
 }
 
-void AbstractInterpreter::unary_not(int& opcodeIndex) {
+void AbstractInterpreter::unaryNot(int& opcodeIndex) {
     m_comp->emit_unary_not();
-    error_check("unary not failed");
-    inc_stack();
+    errorCheck("unary not failed");
+    incStack();
 }
 
 JittedCode* AbstractInterpreter::compile() {
@@ -2734,7 +2751,7 @@ JittedCode* AbstractInterpreter::compile() {
         return nullptr;
     }
     try {
-        return compile_worker();
+        return compileWorker();
     } catch (const exception& e){
 #ifdef DEBUG
         printf("Error whilst compiling : %s", e.what());
@@ -2743,7 +2760,7 @@ JittedCode* AbstractInterpreter::compile() {
     }
 }
 
-bool AbstractInterpreter::can_skip_lasti_update(int opcodeIndex) {
+bool AbstractInterpreter::canSkipLastiUpdate(int opcodeIndex) {
     switch (GET_OPCODE(opcodeIndex)) {
         case DUP_TOP:
         case NOP:
@@ -2764,21 +2781,21 @@ bool AbstractInterpreter::can_skip_lasti_update(int opcodeIndex) {
     return false;
 }
 
-void AbstractInterpreter::store_fast(int local, int opcodeIndex) {
+void AbstractInterpreter::storeFast(int local, int opcodeIndex) {
     m_comp->emit_store_fast(local);
-    dec_stack();
+    decStack();
 }
 
-void AbstractInterpreter::load_const(int constIndex, int opcodeIndex) {
-    auto constValue = PyTuple_GetItem(m_code->co_consts, constIndex);
+void AbstractInterpreter::loadConst(int constIndex, int opcodeIndex) {
+    auto constValue = PyTuple_GetItem(mCode->co_consts, constIndex);
     m_comp->emit_ptr(constValue);
     m_comp->emit_dup();
     m_comp->emit_incref();
-    inc_stack();
+    incStack();
 }
 
-void AbstractInterpreter::return_value(int opcodeIndex) {
-    dec_stack();
+void AbstractInterpreter::returnValue(int opcodeIndex) {
+    decStack();
 
     m_comp->emit_store_local(m_retValue);
 
@@ -2788,7 +2805,7 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
         auto block = m_blockStack.get(blockIndex);
         if (block.Kind == SETUP_FINALLY) {
             // we need to run the finally before returning...
-            block.Flags |= EHF_BlockReturns;
+            block.Flags |= EhfBlockReturns;
 
             if (!inFinally) {
                 // Only emit the store and branch to the inner most finally, but
@@ -2796,12 +2813,12 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
                 // through.
                 inFinally = true;
                 if (clearEh != -1) {
-                    unwind_eh(
-                        m_blockStack.get(clearEh).CurrentHandler,
-                        block.CurrentHandler->BackHandler
+                    unwindEh(
+                            m_blockStack.get(clearEh).CurrentHandler,
+                            block.CurrentHandler->BackHandler
                     );
                 }
-                m_comp->emit_int(EHF_BlockReturns);
+                m_comp->emit_int(EhfBlockReturns);
                 m_comp->emit_branch(BranchAlways, block.CurrentHandler->ErrorTarget);
             }
         }
@@ -2828,21 +2845,21 @@ void AbstractInterpreter::return_value(int opcodeIndex) {
 
     if (!inFinally) {
         if (clearEh != -1) {
-            unwind_eh(m_blockStack.get(clearEh).CurrentHandler);
+            unwindEh(m_blockStack.get(clearEh).CurrentHandler);
         }
         m_comp->emit_branch(BranchLeave, m_retLabel);
     }
 }
 
 
-void AbstractInterpreter::unpack_sequence(size_t size, int opcode) {
+void AbstractInterpreter::unpackSequence(size_t size, int opcode) {
     auto valueTmp = m_comp->emit_spill();
-    dec_stack();
+    decStack();
 
     auto success = m_comp->emit_define_label();
     m_comp->emit_unpack_sequence(valueTmp, m_sequenceLocals[opcode], success, size);
 
-    branch_raise();
+    branchRaise();
 
     m_comp->emit_mark_label(success);
     auto fastTmp = m_comp->emit_spill();
@@ -2858,7 +2875,7 @@ void AbstractInterpreter::unpack_sequence(size_t size, int opcode) {
     while (tmpOpArg--) {
         m_comp->emit_load_local(fastTmp);
         m_comp->emit_load_array(tmpOpArg);
-        inc_stack();
+        incStack();
     }
 
     m_comp->emit_load_and_free_local(valueTmp);
@@ -2867,7 +2884,7 @@ void AbstractInterpreter::unpack_sequence(size_t size, int opcode) {
     m_comp->emit_free_local(fastTmp);
 }
 
-void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo) {
+void AbstractInterpreter::forIter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo) {
     // CPython always generates LOAD_FAST or a GET_ITER before a FOR_ITER.
     // Therefore we know that we always fall into a FOR_ITER when it is
     // initialized, and we branch back to it for the loop condition.  We
@@ -2877,7 +2894,7 @@ void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *lo
 
     // oparg is where to jump on break
     auto iterValue = m_comp->emit_spill();
-    dec_stack();
+    decStack();
     //bool inLoop = false;
     //Local loopOpt1, loopOpt2;
     if (loopInfo != nullptr) {
@@ -2886,7 +2903,7 @@ void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *lo
 
     // now that we've saved the value into a temp we can mark the offset
     // label.
-    mark_offset_label(opcodeIndex);
+    markOffsetLabel(opcodeIndex);
 
     m_comp->emit_load_local(iterValue);
 
@@ -2895,51 +2912,51 @@ void AbstractInterpreter::for_iter(int loopIndex, int opcodeIndex, BlockInfo *lo
 
     m_comp->emit_for_next(processValue, iterValue);
 
-    int_error_check("for_iter failed");
+    intErrorCheck("for_iter failed");
 
-    jump_absolute(loopIndex, opcodeIndex);
+    jumpAbsolute(loopIndex, opcodeIndex);
 
     m_comp->emit_mark_label(processValue);
-    inc_stack();
+    incStack();
 }
 
-void AbstractInterpreter::load_fast(int local, int opcodeIndex) {
+void AbstractInterpreter::loadFast(int local, int opcodeIndex) {
     bool checkUnbound = m_assignmentState.find(local) == m_assignmentState.end() || !m_assignmentState.find(local)->second;
-    load_fast_worker(local, checkUnbound);
-    inc_stack();
+    loadFastWorker(local, checkUnbound);
+    incStack();
 }
 
-void AbstractInterpreter::load_fast_worker(int local, bool checkUnbound) {
+void AbstractInterpreter::loadFastWorker(int local, bool checkUnbound) {
     m_comp->emit_load_fast(local);
 
     if (checkUnbound) {
         Label success = m_comp->emit_define_label();
 
         m_comp->emit_dup();
-        m_comp->emit_store_local(m_errorCheckLocal);
+        m_comp->emit_store_local(mErrorCheckLocal);
         m_comp->emit_null();
         m_comp->emit_branch(BranchNotEqual, success);
 
-        m_comp->emit_ptr(PyTuple_GetItem(m_code->co_varnames, local));
+        m_comp->emit_ptr(PyTuple_GetItem(mCode->co_varnames, local));
 
         m_comp->emit_unbound_local_check();
-        
-        branch_raise();
+
+        branchRaise();
 
         m_comp->emit_mark_label(success);
-        m_comp->emit_load_local(m_errorCheckLocal);
+        m_comp->emit_load_local(mErrorCheckLocal);
     }
 
     m_comp->emit_dup();
     m_comp->emit_incref(false);
 }
 
-void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
+void AbstractInterpreter::unpackEx(size_t size, int opcode) {
     auto valueTmp = m_comp->emit_spill();
     auto listTmp = m_comp->emit_define_local();
     auto remainderTmp = m_comp->emit_define_local();
 
-    dec_stack();
+    decStack();
 
     m_comp->emit_unpack_ex(valueTmp, size & 0xff, size >> 8, m_sequenceLocals[opcode], listTmp, remainderTmp);
     // load the iterable, the sizes, and our temporary 
@@ -2947,7 +2964,7 @@ void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
     // the list local address, and the remainder address
     // PyObject* seq, size_t leftSize, size_t rightSize, PyObject** tempStorage, PyObject** list, PyObject*** remainder
 
-    error_check("unpack ex failed"); // TODO: We leak the sequence on failure
+    errorCheck("unpack ex failed"); // TODO: We leak the sequence on failure
 
     auto fastTmp = m_comp->emit_spill();
 
@@ -2956,12 +2973,12 @@ void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
     while (tmpOpArg--) {
         m_comp->emit_load_local(remainderTmp);
         m_comp->emit_load_array(tmpOpArg);
-        inc_stack();
+        incStack();
     }
 
     // load the list
     m_comp->emit_load_and_free_local(listTmp);
-    inc_stack();
+    incStack();
     // load the left hand side, Equivalent to CPython's:
     //while (oparg--) {
     //    item = items[oparg];
@@ -2973,7 +2990,7 @@ void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
     while (tmpOpArg--) {
         m_comp->emit_load_local(fastTmp);
         m_comp->emit_load_array(tmpOpArg);
-        inc_stack();
+        incStack();
     }
 
     m_comp->emit_load_and_free_local(valueTmp);
@@ -2983,23 +3000,23 @@ void AbstractInterpreter::unpack_ex(size_t size, int opcode) {
     m_comp->emit_free_local(remainderTmp);
 }
 
-void AbstractInterpreter::jump_absolute(size_t index, size_t from) { 
+void AbstractInterpreter::jumpAbsolute(size_t index, size_t from) {
     if (index <= from) {
-        periodic_work();
+        periodicWork();
     }
 
     m_offsetStack[index] = m_stack;
     m_comp->emit_branch(BranchAlways, getOffsetLabel(index));
 }
 
-void AbstractInterpreter::jump_if_not_exact(int opcodeIndex, int jumpTo) {
+void AbstractInterpreter::jumpIfNotExact(int opcodeIndex, int jumpTo) {
     if (jumpTo <= opcodeIndex) { // if going backward, spin the CPU a bit
-        periodic_work();
+        periodicWork();
     }
     auto target = getOffsetLabel(jumpTo);
     m_comp->emit_compare_exceptions_int();
-    dec_stack(2);
-    raise_on_negative_one();
+    decStack(2);
+    raiseOnNegativeOne();
     m_comp->emit_branch(BranchFalse, target);
     m_offsetStack[jumpTo] = m_stack;
 }
@@ -3007,7 +3024,7 @@ void AbstractInterpreter::jump_if_not_exact(int opcodeIndex, int jumpTo) {
 // Unwinds exception handling starting at the current handler.  Emits the unwind for all
 // of the current handlers until we reach one which will actually handle the current
 // exception.
-void AbstractInterpreter::unwind_eh(ExceptionHandler* fromHandler, ExceptionHandler* toHandler) {
+void AbstractInterpreter::unwindEh(ExceptionHandler* fromHandler, ExceptionHandler* toHandler) {
     auto cur = fromHandler;
     do {
         auto& exVars = cur->ExVars;
@@ -3023,7 +3040,7 @@ void AbstractInterpreter::unwind_eh(ExceptionHandler* fromHandler, ExceptionHand
     } while (cur != nullptr && !cur->IsRootHandler() && cur != toHandler && !cur->IsTryExceptOrFinally());
 }
 
-ExceptionHandler* AbstractInterpreter::get_ehblock() {
+ExceptionHandler* AbstractInterpreter::getEhblock() {
     return m_blockStack.back().CurrentHandler;
 }
 
@@ -3031,7 +3048,7 @@ ExceptionHandler* AbstractInterpreter::get_ehblock() {
 // and generated locations in the code.  So for each Python byte code index
 // we define a label in the generated code.  If we ever branch to a specific
 // opcode then we'll branch to the generated label.
-void AbstractInterpreter::mark_offset_label(int index) {
+void AbstractInterpreter::markOffsetLabel(int index) {
     auto existingLabel = m_offsetLabels.find(index);
     if (existingLabel != m_offsetLabels.end()) {
         m_comp->emit_mark_label(existingLabel->second);
@@ -3048,10 +3065,10 @@ LocalKind get_optimized_local_kind(AbstractValueKind kind) {
     return LK_Pointer;
 }
 
-void AbstractInterpreter::pop_except() {
+void AbstractInterpreter::popExcept() {
     // we made it to the end of an EH block w/o throwing,
     // clear the exception.
     auto block = m_blockStack.back();
     assert (block.CurrentHandler);
-    unwind_eh(block.CurrentHandler, block.CurrentHandler->BackHandler);
+    unwindEh(block.CurrentHandler, block.CurrentHandler->BackHandler);
 }

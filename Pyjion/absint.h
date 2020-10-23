@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef ABSINT_H
-#define ABSINT_H
+#ifndef PYJION_ABSINT_H
+#define PYJION_ABSINT_H
 
 #include <Python.h>
 #include <vector>
@@ -151,57 +151,56 @@ struct AbstractLocalInfo {
 // them in place.  If they are shared then we will issue a copy.
 class InterpreterState {
 public:
-    vector<AbstractValueWithSources> m_stack;
-    CowVector<AbstractLocalInfo> m_locals;
+    vector<AbstractValueWithSources> mStack;
+    CowVector<AbstractLocalInfo> mLocals;
 
     InterpreterState() = default;
 
     explicit InterpreterState(int numLocals) {
-        m_locals = CowVector<AbstractLocalInfo>(numLocals);
+        mLocals = CowVector<AbstractLocalInfo>(numLocals);
     }
 
-    AbstractLocalInfo get_local(size_t index) {
-        return m_locals[index];
+    AbstractLocalInfo getLocal(size_t index) {
+        return mLocals[index];
     }
 
-    size_t local_count() {
-        return m_locals.size();
+    size_t localCount() {
+        return mLocals.size();
     }
 
-    void replace_local(size_t index, AbstractLocalInfo value) {
-        m_locals.replace(index, value);
+    void replaceLocal(size_t index, AbstractLocalInfo value) {
+        mLocals.replace(index, value);
     }
 
     AbstractValue* pop() {
-        assert(!m_stack.empty());
-        auto res = m_stack.back();
+        assert(!mStack.empty());
+        auto res = mStack.back();
         res.escapes();
-        m_stack.pop_back();
+        mStack.pop_back();
         return res.Value;
     }
 
-    AbstractValueWithSources pop_no_escape() {
-        assert(!m_stack.empty());
-        auto res = m_stack.back();
-        m_stack.pop_back();
+    AbstractValueWithSources popNoEscape() {
+        assert(!mStack.empty());
+        auto res = mStack.back();
+        mStack.pop_back();
         return res;
     }
 
     void push(AbstractValueWithSources& value) {
-        m_stack.push_back(value);
+        mStack.push_back(value);
     }
 
     void push(AbstractValue* value) {
-        // TODO : Use emplace_back instead?
-        m_stack.push_back(value);
+        mStack.emplace_back(value);
     }
 
-    size_t stack_size() const {
-        return m_stack.size();
+    size_t stackSize() const {
+        return mStack.size();
     }
 
     AbstractValueWithSources& operator[](const size_t index) {
-        return m_stack[index];
+        return mStack[index];
     }
 };
 
@@ -214,14 +213,14 @@ class AbstractInterpreter {
 #endif
     // ** Results produced:
     // Tracks the interpreter state before each opcode
-    unordered_map<size_t, InterpreterState> m_startStates;
-    AbstractValue* m_returnValue;
+    unordered_map<size_t, InterpreterState> mStartStates;
+    AbstractValue* mReturnValue;
 
     // ** Inputs:
-    PyCodeObject* m_code;
-    _Py_CODEUNIT *m_byteCode;
-    size_t m_size;
-    Local m_errorCheckLocal;
+    PyCodeObject* mCode;
+    _Py_CODEUNIT *mByteCode;
+    size_t mSize;
+    Local mErrorCheckLocal;
 
     // ** Data consumed during analysis:
     // Tracks the entry point for each POP_BLOCK opcode, so we can restore our
@@ -279,123 +278,123 @@ public:
     JittedCode* compile();
     bool interpret();
 
-    void set_local_type(int index, AbstractValueKind kind);
+    void setLocalType(int index, AbstractValueKind kind);
     // Returns information about the specified local variable at a specific
     // byte code index.
-    AbstractLocalInfo get_local_info(size_t byteCodeIndex, size_t localIndex);
+    AbstractLocalInfo getLocalInfo(size_t byteCodeIndex, size_t localIndex);
 
     // Returns information about the stack at the specific byte code index.
-    vector<AbstractValueWithSources>& get_stack_info(size_t byteCodeIndex);
+    vector<AbstractValueWithSources>& getStackInfo(size_t byteCodeIndex);
 
     // Returns true if the result of the opcode should be boxed, false if it
     // can be maintained on the stack.
-    bool should_box(size_t opcodeIndex);
+    bool shouldBox(size_t opcodeIndex);
 
-    bool can_skip_lasti_update(size_t opcodeIndex);
+    bool canSkipLastiUpdate(size_t opcodeIndex);
 
-    AbstractValue* get_return_info();
+    AbstractValue* getReturnInfo();
 
 private:
-    void compile_pop_block();
-    void compile_pop_except_block();
-    AbstractValue* to_abstract(PyObject* obj);
-    AbstractValue* to_abstract(AbstractValueKind kind);
-    static bool merge_states(InterpreterState& newState, InterpreterState& mergeTo);
-    bool update_start_state(InterpreterState& newState, size_t index);
-    void init_starting_state();
-    const char* opcode_name(int opcode);
+    void compilePopBlock();
+    void compilePopExceptBlock();
+    AbstractValue* toAbstract(PyObject* obj);
+    AbstractValue* toAbstract(AbstractValueKind kind);
+    static bool mergeStates(InterpreterState& newState, InterpreterState& mergeTo);
+    bool updateStartState(InterpreterState& newState, size_t index);
+    void initStartingState();
+    const char* opcodeName(int opcode);
     bool preprocess();
-    void dump_sources(AbstractSource* sources);
-    AbstractSource* new_source(AbstractSource* source) {
+    void dumpSources(AbstractSource* sources);
+    AbstractSource* newSource(AbstractSource* source) {
         m_sources.push_back(source);
         return source;
     }
 
-    AbstractSource* add_local_source(size_t opcodeIndex, size_t localIndex);
-    AbstractSource* add_const_source(size_t opcodeIndex, size_t constIndex);
-    AbstractSource* add_intermediate_source(size_t opcodeIndex);
+    AbstractSource* addLocalSource(size_t opcodeIndex, size_t localIndex);
+    AbstractSource* addConstSource(size_t opcodeIndex, size_t constIndex);
+    AbstractSource* addIntermediateSource(size_t opcodeIndex);
 
-    void make_function(int oparg);
-    bool can_skip_lasti_update(int opcodeIndex);
-    void build_tuple(size_t argCnt);
-    void extend_tuple(size_t argCnt);
-    void build_list(size_t argCnt);
-    void extend_list_recursively(Local list, size_t argCnt);
-    void extend_list(size_t argCnt);
-    void build_set(size_t argCnt);
-    void unpack_ex(size_t size, int opcode);
+    void makeFunction(int oparg);
+    bool canSkipLastiUpdate(int opcodeIndex);
+    void buildTuple(size_t argCnt);
+    void extendTuple(size_t argCnt);
+    void buildList(size_t argCnt);
+    void extendListRecursively(Local list, size_t argCnt);
+    void extendList(size_t argCnt);
+    void buildSet(size_t argCnt);
+    void unpackEx(size_t size, int opcode);
 
-    void build_map(size_t argCnt);
+    void buildMap(size_t argCnt);
 
     Label getOffsetLabel(int jumpTo);
-    void for_iter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo);
+    void forIter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo);
 
     // Checks to see if we have a null value as the last value on our stack
     // indicating an error, and if so, branches to our current error handler.
-    void error_check(const char* reason = nullptr);
-    void int_error_check(const char* reason = nullptr);
+    void errorCheck(const char* reason = nullptr);
+    void intErrorCheck(const char* reason = nullptr);
 
-    vector<Label>& get_raise_and_free_labels(size_t blockId);
-    vector<Label>& get_reraise_and_free_labels(size_t blockId);
-    void ensure_raise_and_free_locals(size_t localCount);
-    void emit_raise_and_free(ExceptionHandler* handler);
-    void spill_stack_for_raise(size_t localCount);
+    vector<Label>& getRaiseAndFreeLabels(size_t blockId);
+    vector<Label>& getReraiseAndFreeLabels(size_t blockId);
+    void ensureRaiseAndFreeLocals(size_t localCount);
+    void emitRaiseAndFree(ExceptionHandler* handler);
+    void spillStackForRaise(size_t localCount);
 
-    void ensure_labels(vector<Label>& labels, size_t count);
+    void ensureLabels(vector<Label>& labels, size_t count);
 
-    void branch_raise(const char* reason = nullptr);
-    size_t clear_value_stack();
-    void raise_on_negative_one();
+    void branchRaise(const char* reason = nullptr);
+    size_t clearValueStack();
+    void raiseOnNegativeOne();
 
-    void clean_stack_for_reraise();
+    void cleanStackForReraise();
 
-    void unwind_eh(ExceptionHandler* fromHandler, ExceptionHandler* toHandler = nullptr);
+    void unwindEh(ExceptionHandler* fromHandler, ExceptionHandler* toHandler = nullptr);
 
-    ExceptionHandler * get_ehblock();
+    ExceptionHandler * getEhblock();
 
-    void mark_offset_label(int index);
+    void markOffsetLabel(int index);
 
-    void jump_absolute(size_t index, size_t from);
+    void jumpAbsolute(size_t index, size_t from);
 
-    void dec_stack(size_t size = 1);
+    void decStack(size_t size = 1);
 
-    void inc_stack(size_t size = 1, StackEntryKind kind = STACK_KIND_OBJECT);
+    void incStack(size_t size = 1, StackEntryKind kind = STACK_KIND_OBJECT);
 
     // Gets the next opcode skipping for EXTENDED_ARG
-    int get_extended_opcode(int curByte);
+    int getExtendedOpcode(int curByte);
 
     // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
     // If the value on the stack is -1, we branch to the current error handler.
     // Otherwise branches based if the current value is true/false based upon the current opcode
-    void branch_or_error(int& i);
+    void branchOrError(int& i);
 
     // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
     // Branches based if the current value is true/false based upon the current opcode
     void branch(int& i);
-    JittedCode* compile_worker();
+    JittedCode* compileWorker();
 
-    void periodic_work();
-    void store_fast(int local, int opcodeIndex);
+    void periodicWork();
+    void storeFast(int local, int opcodeIndex);
 
-    void load_const(int constIndex, int opcodeIndex);
+    void loadConst(int constIndex, int opcodeIndex);
 
-    void return_value(int opcodeIndex);
+    void returnValue(int opcodeIndex);
 
-    void load_fast(int local, int opcodeIndex);
-    void load_fast_worker(int local, bool checkUnbound);
-    void unpack_sequence(size_t size, int opcode);
+    void loadFast(int local, int opcodeIndex);
+    void loadFastWorker(int local, bool checkUnbound);
+    void unpackSequence(size_t size, int opcode);
 
-    void pop_except();
+    void popExcept();
 
-    bool can_optimize_pop_jump(int opcodeIndex);
-    void unary_positive(int opcodeIndex);
-    void unary_negative(int opcodeIndex);
-    void unary_not(int& opcodeIndex);
+    bool canOptimizePopJump(int opcodeIndex);
+    void unaryPositive(int opcodeIndex);
+    void unaryNegative(int opcodeIndex);
+    void unaryNot(int& opcodeIndex);
 
-    void jump_if_or_pop(bool isTrue, int opcodeIndex, int offset);
-    void pop_jump_if(bool isTrue, int opcodeIndex, int offset);
-    void jump_if_not_exact(int opcodeIndex, int jumpTo);
-    void test_bool_and_branch(Local value, bool isTrue, Label target);
+    void jumpIfOrPop(bool isTrue, int opcodeIndex, int offset);
+    void popJumpIf(bool isTrue, int opcodeIndex, int offset);
+    void jumpIfNotExact(int opcodeIndex, int jumpTo);
+    void testBoolAndBranch(Local value, bool isTrue, Label target);
 
 };
 

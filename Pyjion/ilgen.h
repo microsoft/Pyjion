@@ -28,15 +28,15 @@
 
 #define FEATURE_NO_HOST
 
-#include <stdint.h>
+#include <cstdint>
 #include <windows.h>
-#include <wchar.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <limits.h>
-#include <string.h>
-#include <float.h>
+#include <cwchar>
+#include <cstdio>
+#include <cstddef>
+#include <cstdlib>
+#include <climits>
+#include <cstring>
+#include <cfloat>
 #include <share.h>
 #include <cstdlib>
 #include <intrin.h>
@@ -54,9 +54,9 @@
 using namespace std;
 
 #define INC_CEE_STACK(c) \
-    m_stackSize += c;
+    m_stackSize += (c);
 #define DEC_CEE_STACK(c) \
-    m_stackSize -= c; \
+    m_stackSize -= (c); \
 
 class LabelInfo {
 public:
@@ -98,7 +98,7 @@ public:
 
     Local define_local(Parameter param) {
         auto existing = m_freedLocals.find(param.m_type);
-        if (existing != m_freedLocals.end() && existing->second.size() != 0) {
+        if (existing != m_freedLocals.end() && !existing->second.empty()) {
             auto res = existing->second[existing->second.size() - 1];
             existing->second.pop_back();
             return res;
@@ -123,8 +123,8 @@ public:
             localList = &(existing->second);
         }
 #if DEBUG
-        for (int i = 0; i < localList->size(); i++) {
-            if ((*localList)[i].m_index == local.m_index) {
+        for (auto & i : *localList) {
+            if (i.m_index == local.m_index) {
                 // locals shouldn't be double freed...
                 assert(FALSE);
             }
@@ -134,7 +134,7 @@ public:
     }
 
     Label define_label() {
-        m_labels.push_back(LabelInfo());
+        m_labels.emplace_back();
         return Label((int)m_labels.size() - 1);
     }
 
@@ -167,7 +167,7 @@ public:
 
     void ld_r8(double i) {
         push_back(CEE_LDC_R8); // Pop0 + PushR8
-        unsigned char* value = (unsigned char*)(&i);
+        auto* value = (unsigned char*)(&i);
         for (int i = 0; i < 8; i++) {
             push_back(value[i]);
         }
@@ -450,7 +450,7 @@ public:
     }
 
     void ld_i(void* ptr) {
-        size_t value = (size_t)ptr;
+        auto value = (size_t)ptr;
 #ifdef _TARGET_AMD64_
         if ((value & 0xFFFFFFFF) == value) {
             ld_i((int)value);
@@ -610,7 +610,7 @@ public:
     }
 
     CORINFO_METHOD_INFO to_method(Method* addr, int stackSize) {
-        CORINFO_METHOD_INFO methodInfo;
+        CORINFO_METHOD_INFO methodInfo{};
         methodInfo.ftn = (CORINFO_METHOD_HANDLE)addr;
         methodInfo.scope = (CORINFO_MODULE_HANDLE)m_module;
         methodInfo.ILCode = &m_il[0];
@@ -620,12 +620,12 @@ public:
         methodInfo.options = CORINFO_OPT_INIT_LOCALS;
         methodInfo.regionKind = CORINFO_REGION_JIT;
         methodInfo.args = CORINFO_SIG_INFO{ CORINFO_CALLCONV_DEFAULT };
-        methodInfo.args.args = (CORINFO_ARG_LIST_HANDLE)(m_params.size() == 0 ? nullptr : &m_params[0]);
+        methodInfo.args.args = (CORINFO_ARG_LIST_HANDLE)(m_params.empty() ? nullptr : &m_params[0]);
         methodInfo.args.numArgs = m_params.size();
         methodInfo.args.retType = m_retType;
         methodInfo.args.retTypeClass = nullptr;
         methodInfo.locals = CORINFO_SIG_INFO{ CORINFO_CALLCONV_DEFAULT };
-        methodInfo.locals.args = (CORINFO_ARG_LIST_HANDLE)(m_locals.size() == 0 ? nullptr : &m_locals[0]);
+        methodInfo.locals.args = (CORINFO_ARG_LIST_HANDLE)(m_locals.empty() ? nullptr : &m_locals[0]);
         methodInfo.locals.numArgs = m_locals.size();
         return methodInfo;
     }

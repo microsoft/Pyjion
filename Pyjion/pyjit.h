@@ -28,15 +28,15 @@
 
 #define FEATURE_NO_HOST
 
-#include <stdint.h>
+#include <cstdint>
 #include <windows.h>
-#include <wchar.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <limits.h>
-#include <string.h>
-#include <float.h>
+#include <cwchar>
+#include <cstdio>
+#include <cstddef>
+#include <cstdlib>
+#include <climits>
+#include <cstring>
+#include <cfloat>
 #include <share.h>
 #include <intrin.h>
 
@@ -80,7 +80,7 @@ public:
 #endif
 	Py_EvalFunc j_generic;
 
-	PyjionJittedCode(PyObject* code) {
+	explicit PyjionJittedCode(PyObject* code) {
 		j_code = code;
 		j_run_count = 0;
 		j_failed = false;
