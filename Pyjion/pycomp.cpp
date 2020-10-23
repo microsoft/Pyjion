@@ -146,7 +146,8 @@ void PythonCompiler::emit_breakpoint(){
 }
 
 void PythonCompiler::decref() {
-    m_il.emit_call(METHOD_DECREF_TOKEN, 1);
+    // TODO : This causes segmentation faults at runtime. Find the root cause.
+    //m_il.emit_call(METHOD_DECREF_TOKEN, 1);
 }
 
 Local PythonCompiler::emit_allocate_stack_array(size_t bytes) {
@@ -692,17 +693,17 @@ void PythonCompiler::emit_call_kwargs() {
 
 bool PythonCompiler::emit_call(size_t argCnt) {
     switch (argCnt) {
-        case 0: m_il.emit_call(METHOD_CALL0_TOKEN, 1); return true;
-        case 1: m_il.emit_call(METHOD_CALL1_TOKEN, 2); return true;
-        case 2: m_il.emit_call(METHOD_CALL2_TOKEN, 3); return true;
-        case 3: m_il.emit_call(METHOD_CALL3_TOKEN, 4); return true;
-        case 4: m_il.emit_call(METHOD_CALL4_TOKEN, 5); return true;
+        case 0: m_il.emit_call(METHOD_CALL_0_TOKEN, 1); return true;
+        case 1: m_il.emit_call(METHOD_CALL_1_TOKEN, 2); return true;
+        case 2: m_il.emit_call(METHOD_CALL_2_TOKEN, 3); return true;
+        case 3: m_il.emit_call(METHOD_CALL_3_TOKEN, 4); return true;
+        case 4: m_il.emit_call(METHOD_CALL_4_TOKEN, 5); return true;
     }
     return false;
 }
 
 void PythonCompiler::emit_method_call_0() {
-    m_il.emit_call(METHOD_METHCALL0_TOKEN, 2);
+    m_il.emit_call(METHOD_METHCALL_0_TOKEN, 2);
 }
 
 void PythonCompiler::emit_method_call_n(size_t argCnt){
@@ -857,6 +858,11 @@ void PythonCompiler::emit_set_closure() {
 	emit_load_and_free_local(tmp);
 
 	m_il.st_ind_i();
+}
+
+void PythonCompiler::emit_setup_annotations() {
+    load_frame();
+    m_il.emit_call(METHOD_SETUP_ANNOTATIONS, 1);
 }
 
 void PythonCompiler::emit_set_annotations() {
@@ -1243,11 +1249,11 @@ GLOBAL_METHOD(METHOD_UNPACK_SEQUENCEEX_TOKEN, &PyJit_UnpackSequenceEx, CORINFO_T
 
 GLOBAL_METHOD(METHOD_PYSET_ADD, &PySet_Add, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
-GLOBAL_METHOD(METHOD_CALL0_TOKEN, &Call0, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_CALL1_TOKEN, &Call1, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_CALL2_TOKEN, &Call2, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_CALL3_TOKEN, &Call3, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_CALL4_TOKEN, &Call4, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALL_0_TOKEN, &Call0, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALL_1_TOKEN, &Call1, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALL_2_TOKEN, &Call2, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALL_3_TOKEN, &Call3, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_CALL_4_TOKEN, &Call4, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_CALLN_TOKEN, &PyJit_CallN, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_KWCALLN_TOKEN, &PyJit_KwCallN, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
@@ -1361,8 +1367,9 @@ GLOBAL_METHOD(METHOD_FORMAT_OBJECT, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT,
 
 GLOBAL_METHOD(METHOD_LOAD_METHOD, &PyJit_LoadMethod, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
-GLOBAL_METHOD(METHOD_METHCALL0_TOKEN, &MethCall0, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL_0_TOKEN, &MethCall0, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_METHCALLN_TOKEN, &MethCallN, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
+GLOBAL_METHOD(METHOD_SETUP_ANNOTATIONS, &PyJit_SetupAnnotations, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT),);
 
 GLOBAL_METHOD(METHOD_LOAD_ASSERTION_ERROR, &PyJit_LoadAssertionError, CORINFO_TYPE_NATIVEINT);

@@ -226,7 +226,9 @@ void AbstractInterpreter::initStartingState() {
 
 bool AbstractInterpreter::interpret() {
     if (!preprocess()) {
+#ifdef DEBUG
         printf("Failed to preprocess");
+#endif
         return false;
     }
 
@@ -876,6 +878,8 @@ bool AbstractInterpreter::interpret() {
                 }
                 case IMPORT_STAR:
                     lastState.pop();
+                    break;
+                case SETUP_ANNOTATIONS:
                     break;
                 default:
                     PyErr_Format(PyExc_ValueError,
@@ -1786,6 +1790,10 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 m_comp->emit_load_build_class();
                 errorCheck("load build class failed");
                 incStack();
+                break;
+            case SETUP_ANNOTATIONS:
+                m_comp->emit_set_annotations();
+                intErrorCheck("failed to setup annotations");
                 break;
             case RERAISE:{
                 auto curBlock = m_blockStack.back();

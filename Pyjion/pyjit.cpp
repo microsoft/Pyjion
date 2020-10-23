@@ -118,7 +118,8 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     auto res = ((Py_EvalFunc)state)(nullptr, frame);
 
 #ifdef DUMP_TRACES
-    printf("Returning from %s, value %s\r\n", PyUnicode_AsUTF8(frame->f_code->co_name), PyUnicode_AsUTF8(PyObject_Repr(res)));
+    if (res != nullptr)
+        printf("Returning from %s, value %s\r\n", PyUnicode_AsUTF8(frame->f_code->co_name), PyUnicode_AsUTF8(PyObject_Repr(res)));
 #endif
 
     Py_LeaveRecursiveCall();

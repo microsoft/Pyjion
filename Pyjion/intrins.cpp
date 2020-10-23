@@ -112,11 +112,6 @@ PyObject* PyJit_Subscr(PyObject *left, PyObject *right) {
     auto res = PyObject_GetItem(left, right);
     Py_DECREF(left);
     Py_DECREF(right);
-    if (res == nullptr){
-        PyErr_SetString(PyExc_ValueError,
-                        "could not find key in dictionary");
-        return nullptr;
-    }
     return res;
 }
 
@@ -1545,6 +1540,66 @@ int PyJit_DeleteAttr(PyObject* owner, PyObject* name) {
     int res = PyObject_DelAttr(owner, name);
     Py_DECREF(owner);
     return res;
+}
+
+int PyJit_SetupAnnotations(PyFrameObject* frame) {
+    auto tstate = PyThreadState_Get();
+    _Py_IDENTIFIER(__annotations__);
+    int err;
+    PyObject *ann_dict;
+    if (frame->f_locals == nullptr) {
+        PyErr_Format(PyExc_SystemError,
+                      "no locals found when setting up annotations");
+        return -1;
+    }
+    /* check if __annotations__ in locals()... */
+    if (PyDict_CheckExact(frame->f_locals)) {
+        ann_dict = _PyDict_GetItemIdWithError(frame->f_locals,
+                                              &PyId___annotations__);
+        if (ann_dict == nullptr) {
+            if (PyErr_Occurred()) {
+                return -1;
+            }
+            /* ...if not, create a new one */
+            ann_dict = PyDict_New();
+            if (ann_dict == nullptr) {
+                return -1;
+            }
+            err = _PyDict_SetItemId(frame->f_locals,
+                                    &PyId___annotations__, ann_dict);
+            Py_DECREF(ann_dict);
+            if (err != 0) {
+                return -1;
+            }
+        }
+    }
+    else {
+        /* do the same if locals() is not a dict */
+        PyObject *ann_str = _PyUnicode_FromId(&PyId___annotations__);
+        if (ann_str == nullptr) {
+            return -1;
+        }
+        ann_dict = PyObject_GetItem(frame->f_locals, ann_str);
+        if (ann_dict == nullptr) {
+            if (!PyErr_ExceptionMatches(PyExc_KeyError)) {
+                return -1;
+            }
+            PyErr_Clear();
+            ann_dict = PyDict_New();
+            if (ann_dict == nullptr) {
+                return -1;
+            }
+            err = PyObject_SetItem(frame->f_locals, ann_str, ann_dict);
+            Py_DECREF(ann_dict);
+            if (err != 0) {
+                return -1;
+            }
+        }
+        else {
+            Py_DECREF(ann_dict);
+        }
+    }
+    return 0;
 }
 
 PyObject* PyJit_LoadName(PyFrameObject* f, PyObject* name) {

@@ -145,16 +145,17 @@
 #define METHOD_FORMAT_OBJECT                     0x00000075
 #define METHOD_BUILD_DICT_FROM_TUPLES            0x00000076
 #define METHOD_DICT_MERGE                        0x00000077
+#define METHOD_SETUP_ANNOTATIONS                 0x00000078
 
 
 // call helpers
-#define METHOD_CALL0_TOKEN        0x00010000
-#define METHOD_CALL1_TOKEN        0x00010001
-#define METHOD_CALL2_TOKEN        0x00010002
-#define METHOD_CALL3_TOKEN        0x00010003
-#define METHOD_CALL4_TOKEN        0x00010004
+#define METHOD_CALL_0_TOKEN        0x00010000
+#define METHOD_CALL_1_TOKEN        0x00010001
+#define METHOD_CALL_2_TOKEN        0x00010002
+#define METHOD_CALL_3_TOKEN        0x00010003
+#define METHOD_CALL_4_TOKEN        0x00010004
 
-#define METHOD_METHCALL0_TOKEN        0x00011000
+#define METHOD_METHCALL_0_TOKEN        0x00011000
 #define METHOD_METHCALLN_TOKEN        0x00011004
 
 #define METHOD_CALL_ARGS            0x0001000A
@@ -419,6 +420,8 @@ public:
     virtual void emit_load_assertion_error();
 
     virtual void emit_periodic_work();
+
+    virtual void emit_setup_annotations();
 
     virtual void emit_breakpoint();
 

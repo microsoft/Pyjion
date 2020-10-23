@@ -257,9 +257,7 @@ PyObject* PyJit_FormatValue(PyObject* item);
 std::vector<PyObject *> * PyJit_LoadMethod(PyObject* object, PyObject* name);
 
 PyObject* MethCall0(PyObject* self, std::vector<PyObject*>* method_info);
-PyObject* MethCall1(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0);
-PyObject* MethCall2(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1);
-PyObject* MethCall3(PyObject* self, std::vector<PyObject*>* method_info, PyObject* arg0, PyObject* arg1, PyObject* arg2);
 PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObject* args);
 
+int PyJit_SetupAnnotations(PyFrameObject* frame);
 #endif
