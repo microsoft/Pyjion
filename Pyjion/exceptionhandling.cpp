@@ -27,7 +27,6 @@
 #include "stack.h"
 
 ExceptionHandler* ExceptionHandlerManager::SetRootHandler(Label raiseNoHandlerLabel, Label reraiseNoHandlerLabel, ExceptionVars vars) {
-    assert(m_exceptionHandlers.empty());
     auto rootHandler = new ExceptionHandler(
             0,
             vars,

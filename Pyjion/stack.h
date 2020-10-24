@@ -27,6 +27,8 @@
 #define PYJION_STACK_H
 
 #include <vector>
+#include <exception>
+
 #include "block.h"
 
 
@@ -38,6 +40,10 @@ enum StackEntryKind {
 class StackUnderflowException: public std::exception {
 public:
     StackUnderflowException() : std::exception() {};
+    const char * what () const noexcept override
+    {
+        return "Stack underflow";
+    }
 };
 
  class ValueStack : std::vector<StackEntryKind> {

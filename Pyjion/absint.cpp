@@ -1755,7 +1755,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             case RERAISE:{
                 m_comp->emit_restore_err();
                 decStack(3);
-                returnFromReraise(opcodeIndex);
+                unwindHandlers();
                 skipEffect = true;
                 break;
             }
@@ -2357,38 +2357,10 @@ JittedCode* AbstractInterpreter::compileWorker() {
 #endif
     }
 
-    // for each exception handler we need to load the exception
-    // information onto the stack, and then branch to the correct
-    // handler.  When we take an error we'll branch down to this
-    // little stub and then back up to the correct handler.
-    if (!m_exceptionHandler.Empty()) {
-        // TODO: Unify the first handler with this loop
-        for (auto handler: m_exceptionHandler.GetHandlers()) {
-            emitRaiseAndFree(handler);
+exception_unwind:
+    unwindHandlers();
 
-            if (handler->HasErrorTarget()) {
-                m_comp->emit_prepare_exception(
-                    handler->ExVars.PrevExc,
-                    handler->ExVars.PrevExcVal,
-                    handler->ExVars.PrevTraceback
-                );
-                if (handler->IsTryFinally()) {
-                    auto tmpEx = m_comp->emit_spill();
-
-                    auto root = handler->GetRootOf();
-                    auto& vars = handler->ExVars;
-
-                    m_comp->emit_store_local(vars.FinallyValue);
-                    m_comp->emit_store_local(vars.FinallyTb);
-
-                    m_comp->emit_load_and_free_local(tmpEx);
-                }
-                m_comp->emit_branch(BranchAlways, handler->ErrorTarget);
-            }
-        }
-    }
-
-    // label we branch to for error handling when we have no EH handlers, return NULL.
+    // label branch for error handling when we have no EH handlers, (return NULL).
     emitRaiseAndFree(rootHandler);
 
     m_comp->emit_null();
@@ -2454,7 +2426,6 @@ void AbstractInterpreter::emitRaiseAndFree(ExceptionHandler* handler) {
     for (auto cur = raiseAndFreeLabels.size() - 1; cur != -1; cur--) {
         m_comp->emit_mark_label(raiseAndFreeLabels[cur]);
         m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
-        // TODO : The decref for this operation causes a crash at runtime.
         m_comp->emit_pop_top();
     }
 
@@ -2673,37 +2644,37 @@ void AbstractInterpreter::loadConst(int constIndex, int opcodeIndex) {
     incStack();
 }
 
-void AbstractInterpreter::returnFromReraise(int opcodeIndex){
-    size_t clearEh = -1;
-    bool inFinally = false;
-    while (!m_blockStack.empty()) {
-        auto block = m_blockStack.back();
-        m_blockStack.pop_back();
-        if (block.Kind == EXCEPT_HANDLER){
-            unwindEh(block.CurrentHandler);
-            continue;
-        }
-        // unwind value stack
-        auto& entryStack = block.CurrentHandler->EntryStack;
-        size_t count = m_stack.size() - entryStack.size();
-        for (auto cur = m_stack.rbegin(); cur != m_stack.rend(); cur++) {
-            if (*cur == STACK_KIND_VALUE) {
-                count--;
-                m_comp->emit_pop();
+void AbstractInterpreter::unwindHandlers(){
+    // for each exception handler we need to load the exception
+    // information onto the stack, and then branch to the correct
+    // handler.  When we take an error we'll branch down to this
+    // little stub and then back up to the correct handler.
+    if (!m_exceptionHandler.Empty()) {
+        // TODO: Unify the first handler with this loop
+        for (auto handler: m_exceptionHandler.GetHandlers()) {
+            emitRaiseAndFree(handler);
+
+            if (handler->HasErrorTarget()) {
+                m_comp->emit_prepare_exception(
+                        handler->ExVars.PrevExc,
+                        handler->ExVars.PrevExcVal,
+                        handler->ExVars.PrevTraceback
+                );
+                if (handler->IsTryFinally()) {
+                    auto tmpEx = m_comp->emit_spill();
+
+                    auto root = handler->GetRootOf();
+                    auto& vars = handler->ExVars;
+
+                    m_comp->emit_store_local(vars.FinallyValue);
+                    m_comp->emit_store_local(vars.FinallyTb);
+
+                    m_comp->emit_load_and_free_local(tmpEx);
+                }
+                m_comp->emit_branch(BranchAlways, handler->ErrorTarget);
             }
-            else {
-                break;
-            }
         }
-
-        if (block.Kind == SETUP_FINALLY) {
-
-            return;
-        }
-
     }
-    m_comp->emit_null();
-    returnValue(opcodeIndex);
 }
 
 void AbstractInterpreter::returnValue(int opcodeIndex) {
