@@ -1254,15 +1254,6 @@ AbstractSource* AbstractInterpreter::addConstSource(size_t opcodeIndex, size_t c
     return store->second;
 }
 
-AbstractSource* AbstractInterpreter::addIntermediateSource(size_t opcodeIndex) {
-    auto store = m_opcodeSources.find(opcodeIndex);
-    if (store == m_opcodeSources.end()) {
-        return m_opcodeSources[opcodeIndex] = newSource(new IntermediateSource());
-    }
-
-    return store->second;
-}
-
 /*****************
  * Code generation
 
@@ -1343,11 +1334,11 @@ vector<Label>& AbstractInterpreter::getReraiseAndFreeLabels(size_t blockId) {
 
 size_t AbstractInterpreter::clearValueStack() {
     auto ehBlock = getEhblock();
-    auto& entry_stack = ehBlock->EntryStack;
+    auto& entryStack = ehBlock->EntryStack;
 
     // clear any non-object values from the stack up
     // to the stack that owned the block when we entered.
-    size_t count = m_stack.size() - entry_stack.size();
+    size_t count = m_stack.size() - entryStack.size();
 
     for (auto cur = m_stack.rbegin(); cur != m_stack.rend(); cur++) {
         if (*cur == STACK_KIND_VALUE) {
@@ -1369,7 +1360,7 @@ void AbstractInterpreter::ensureLabels(vector<Label>& labels, size_t count) {
 
 void AbstractInterpreter::branchRaise(const char *reason) {
     auto ehBlock = getEhblock();
-    auto& entry_stack = ehBlock->EntryStack;
+    auto& entryStack = ehBlock->EntryStack;
 
 #ifdef DEBUG
     if (reason != nullptr) {
@@ -1378,7 +1369,7 @@ void AbstractInterpreter::branchRaise(const char *reason) {
 #endif
 
     // number of stack entries we need to clear...
-    size_t count = m_stack.size() - entry_stack.size();    
+    size_t count = m_stack.size() - entryStack.size();
     
     auto cur = m_stack.rbegin();
     for (; cur != m_stack.rend() && count >= 0; cur++) {
@@ -1421,11 +1412,11 @@ void AbstractInterpreter::branchRaise(const char *reason) {
 void AbstractInterpreter::cleanStackForReraise() {
     auto ehBlock = getEhblock();
 
-    auto& entry_stack = ehBlock->EntryStack;
-    size_t count = m_stack.size() - entry_stack.size();
+    auto& entryStack = ehBlock->EntryStack;
+    size_t count = m_stack.size() - entryStack.size();
 
-    for (size_t i = m_stack.size(); i-- > entry_stack.size();) {
-        m_comp->emit_pop_top();
+    for (size_t i = m_stack.size(); i-- > entryStack.size();) {
+        m_comp->pop_top();
     }
 }
 
@@ -2171,7 +2162,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 // do raise (exception, cause)
                 // We can be invoked with no args (bare raise), raise exception, or raise w/ exception and cause
                 switch (oparg) { // NOLINT(hicpp-multiway-paths-covered)
-                    case 0: m_comp->emit_null();
+                    case 0: m_comp->emit_null(); // NOLINT(bugprone-branch-clone)
                     case 1: m_comp->emit_null();
                     case 2:
                         decStack(oparg);
@@ -2294,16 +2285,16 @@ JittedCode* AbstractInterpreter::compileWorker() {
                     decStack();
                 }
 
-                int which_conversion = oparg & FVC_MASK;
+                int whichConversion = oparg & FVC_MASK;
 
                 decStack();
-                if (which_conversion) {
+                if (whichConversion) {
                     // Save the original value so we can decref it...
                     m_comp->emit_dup();
                     auto tmp = m_comp->emit_spill();
 
                     // Convert it
-                    switch (which_conversion) { // NOLINT(hicpp-multiway-paths-covered)
+                    switch (whichConversion) { // NOLINT(hicpp-multiway-paths-covered)
                         case FVC_STR:   m_comp->emit_pyobject_str();   break;
                         case FVC_REPR:  m_comp->emit_pyobject_repr();  break;
                         case FVC_ASCII: m_comp->emit_pyobject_ascii(); break;
@@ -2338,7 +2329,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
 
                     errorCheck("format object");
                 }
-                else if (!which_conversion) {
+                else if (!whichConversion) {
                     // TODO: This could also be avoided if we knew we had a string on the stack
 
                     // If we did a conversion we know we have a string...
@@ -2361,7 +2352,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 // Array
                 m_comp->emit_load_local(stackArray);
                 // Count
-                m_comp->emit_ptr((void*)oparg);
+                m_comp->emit_int(oparg);
 
                 m_comp->emit_unicode_joinarray();
 
@@ -2564,15 +2555,6 @@ void AbstractInterpreter::compilePopBlock() {
     m_blockStack.pop_back();
 }
 
-void AbstractInterpreter::compilePopExceptBlock() {
-    auto curHandler = m_blockStack.back();
-    assert(m_blockStack.size() > 0);
-    if (curHandler.Kind == SETUP_FINALLY){
-        decStack(3);
-        m_blockStack.pop_back();
-    }
-}
-
 void AbstractInterpreter::emitRaiseAndFree(ExceptionHandler* handler) {
     auto reraiseAndFreeLabels = getReraiseAndFreeLabels(handler->RaiseAndFreeId);
     for (auto cur = reraiseAndFreeLabels.size() - 1; cur != -1; cur--) {
@@ -2739,7 +2721,7 @@ void AbstractInterpreter::unaryNegative(int opcodeIndex) {
     incStack();
 }
 
-/* Unused for now */
+/* Unused for now? */
 bool AbstractInterpreter::canOptimizePopJump(int opcodeIndex) {
     auto opcode = getExtendedOpcode(opcodeIndex + sizeof(_Py_CODEUNIT));
     if (opcode == POP_JUMP_IF_TRUE || opcode == POP_JUMP_IF_FALSE) {
@@ -3072,7 +3054,7 @@ void AbstractInterpreter::markOffsetLabel(int index) {
     }
 }
 
-LocalKind get_optimized_local_kind(AbstractValueKind kind) {
+LocalKind getOptimizedLocalKind(AbstractValueKind kind) {
     // Remove optimizations for now, always use PyObject* /Lk_ptr/ NATIVEINT
     return LK_Pointer;
 }

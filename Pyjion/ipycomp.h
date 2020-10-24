@@ -416,6 +416,7 @@ public:
     virtual JittedCode* emit_compile() = 0;
 
     virtual void lift_n_to_top(int pos) = 0;
+    virtual void pop_top() = 0;
 };
 
 #endif

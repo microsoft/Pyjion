@@ -292,6 +292,10 @@ void PythonCompiler::lift_n_to_top(int pos){
 void PythonCompiler::emit_pop_top() {
     decref();
 }
+// emit_pop_top is for the POP_TOP opcode, which should pop the stack AND decref. pop_top is just for pop'ing the value.
+void PythonCompiler::pop_top() {
+    m_il.pop();
+}
 
 void PythonCompiler::emit_dup_top() {
     // TODO : Figure out why it does DUP twice?

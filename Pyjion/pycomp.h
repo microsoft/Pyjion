@@ -433,6 +433,7 @@ private:
     void load_local(int oparg);
     void decref();
     CorInfoType to_clr_type(LocalKind kind);
+    void pop_top();
 };
 
 #endif
