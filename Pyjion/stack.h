@@ -35,9 +35,9 @@ enum StackEntryKind {
     STACK_KIND_OBJECT = 1 // A Python object, or a tagged int which might be an object
 };
 
-class StackUnderflowException: public std::underflow_error {
+class StackUnderflowException: public std::exception {
 public:
-    StackUnderflowException() : std::underflow_error("Stack underflow error") {};
+    StackUnderflowException() : std::exception() {};
 };
 
  class ValueStack : std::vector<StackEntryKind> {

@@ -5,6 +5,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+if (LINUX)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpic")
+endif()
+
 find_package (Python3 3.9 COMPONENTS Interpreter Development)
 
 include_directories(${Python3_INCLUDE_DIRS})
@@ -138,12 +143,6 @@ set_target_properties(
         OUTPUT_NAME "pyjion"
         LINKER_LANGUAGE C
 )
-
-if (LINUX)
-    set_target_properties(pyjion PROPERTIES
-            POSITION_INDEPENDENT_CODE ON
-            )
-endif()
 
 target_link_libraries(pyjion ${Python3_LIBRARIES})
 
