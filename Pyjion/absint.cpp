@@ -2570,7 +2570,7 @@ void AbstractInterpreter::emitRaiseAndFree(ExceptionHandler* handler) {
         m_comp->emit_mark_label(raiseAndFreeLabels[cur]);
         m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
         // TODO : The decref for this operation causes a crash at runtime.
-        //m_comp->emit_pop_top();
+        m_comp->emit_pop_top();
     }
 
     if (handler->Flags & EhfInExceptHandler) {

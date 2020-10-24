@@ -1111,7 +1111,8 @@ PyObject * PyJit_BuildDictFromTuples(PyObject *keys_and_values) {
             Py_DECREF(map);
             goto error;
         }
-        Py_DECREF(value);
+        // TODO : Causes double clear and crash.
+        // Py_DECREF(value);
     }
     Py_DECREF(keys);
     return map;
@@ -1778,7 +1779,8 @@ PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
             return nullptr;
         }
         Py_DECREF(target);
-        Py_DECREF(args);
+        // TODO : Causes double dec and segmentation fault.
+        //Py_DECREF(args);
         return res;
     }
     else {
