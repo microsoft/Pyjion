@@ -24,8 +24,6 @@
 *
 * Portions lifted from CPython under the PSF license.
 */
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "hicpp-signed-bitwise"
 #include "intrins.h"
 
 #ifdef _MSC_VER
@@ -1262,14 +1260,6 @@ PyObject* PyJit_GetIter(PyObject* iterable) {
     return res;
 }
 
-typedef struct {
-    PyObject_HEAD
-        PyObject *start;
-    PyObject *stop;
-    PyObject *step;
-    PyObject *length;
-} rangeobject;
-
 PyObject* PyJit_GetIterOptimized(PyObject* iterable, size_t* iterstate1, size_t* iterstate2) {
     auto res = PyObject_GetIter(iterable);
     Py_DECREF(iterable);
@@ -1699,6 +1689,8 @@ PyObject* Call(PyObject* target) {
 template<typename T, typename ... Args>
 PyObject* Call(PyObject *target, Args...args) {
     PyObject* res = nullptr;
+    if (target == nullptr)
+        return nullptr;
     if (PyCFunction_Check(target)) {
         PyObject* _args[sizeof...(args)] = {args...};
         res = PyObject_Vectorcall(target, _args, sizeof...(args) | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
@@ -1706,9 +1698,9 @@ PyObject* Call(PyObject *target, Args...args) {
     else {
         auto t_args = PyTuple_New(sizeof...(args));
         if (t_args == nullptr) {
-            std::vector<PyObject*> args_v = {args...};
-            for (int i = 0; i < args_v.size() ; i ++)
-                Py_DECREF(args_v[i]);
+            std::vector<PyObject*> argsVector = {args...};
+            for (auto &i: argsVector)
+                Py_DECREF(i);
             goto error;
         }
         std::vector<PyObject*> args_v = {args...};
@@ -1716,7 +1708,7 @@ PyObject* Call(PyObject *target, Args...args) {
             PyTuple_SET_ITEM(t_args, i, args_v[i]);
 
         res = PyObject_Call(target, t_args, nullptr);
-        //Py_DECREF(args);
+        Py_DECREF(t_args);
     }
     error:
     Py_DECREF(target);
@@ -1725,6 +1717,8 @@ PyObject* Call(PyObject *target, Args...args) {
 
 PyObject* Call0(PyObject *target) {
     PyObject* res = nullptr;
+    if (target == nullptr)
+        return nullptr;
     if (PyCFunction_Check(target)) {
         res = PyObject_Vectorcall(target, nullptr, 0 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr);
     }
@@ -1756,7 +1750,7 @@ PyObject* MethCall0(PyObject* self, std::vector<PyObject*>* method_info) {
     if (method_info->back() != nullptr)
         res = Call<PyObject*>(method_info->at(0), method_info->at(1));
     else
-        res = Call<PyObject*>(method_info->at(0));
+        res = Call0(method_info->at(0));
     return res;
 }
 
@@ -1784,6 +1778,7 @@ PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
             return nullptr;
         }
         Py_DECREF(target);
+        Py_DECREF(args);
         return res;
     }
     else {
@@ -1800,6 +1795,7 @@ PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
             return nullptr;
         }
         Py_DECREF(target);
+        Py_DECREF(args);
         return res;
     }
 }
@@ -1836,7 +1832,7 @@ error:
 	Py_XDECREF(kwArgs);
 	Py_XDECREF(posArgs);
 	Py_DECREF(target);
-	//Py_DECREF(args);
+	Py_DECREF(args);
 	Py_DECREF(names);
 	return result;
 }
@@ -1937,4 +1933,3 @@ PyObject* PyJit_FormatValue(PyObject* item) {
 	Py_DECREF(item);
 	return res;
 }
-#pragma clang diagnostic pop

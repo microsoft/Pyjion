@@ -147,7 +147,7 @@ void PythonCompiler::emit_breakpoint(){
 
 void PythonCompiler::decref() {
     // TODO : This causes segmentation faults at runtime. Find the root cause.
-    //m_il.emit_call(METHOD_DECREF_TOKEN, 1);
+    m_il.emit_call(METHOD_DECREF_TOKEN, 1);
 }
 
 Local PythonCompiler::emit_allocate_stack_array(size_t bytes) {
@@ -1009,17 +1009,8 @@ void PythonCompiler::emit_box_tagged_ptr() {
 void PythonCompiler::emit_for_next(Label processValue, Local iterValue) {
     auto error = m_il.define_local(Parameter(CORINFO_TYPE_INT));
     m_il.ld_loca(error);
+    m_il.emit_call(SIG_ITERNEXT_TOKEN, 2);
 
-    /*
-    if (inLoop) {
-    m_il.ld_loca(loopOpt1);
-    m_il.ld_loca(loopOpt2);
-    m_il.emit_call(SIG_ITERNEXT_OPTIMIZED_TOKEN);
-    }
-    else*/
-    {
-        m_il.emit_call(SIG_ITERNEXT_TOKEN, 2);
-    }
     m_il.dup();
     m_il.ld_i(nullptr);
     m_il.branch(BranchNotEqual, processValue);
@@ -1029,9 +1020,7 @@ void PythonCompiler::emit_for_next(Label processValue, Local iterValue) {
     m_il.pop();
     m_il.ld_loc(iterValue);
     decref();
-    m_il.ld_loc(error);
-
-    m_il.free_local(error);
+    emit_load_and_free_local(error);
 }
 
 void PythonCompiler::emit_debug_msg(const char* msg) {

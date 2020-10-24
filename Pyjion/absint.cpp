@@ -2260,9 +2260,12 @@ JittedCode* AbstractInterpreter::compileWorker() {
             case POP_BLOCK:
                 compilePopBlock();
                 break;
+            case SETUP_WITH:
             case YIELD_FROM:
             case YIELD_VALUE:
-                printf("Unsupported opcode: %d (with related)\r\n", byte);
+#ifdef DUMP_TRACES
+                printf("Unsupported opcode: %s (with related)\r\n", opcodeName(byte));
+#endif
                 return nullptr;
 
             case IMPORT_NAME:
@@ -2281,9 +2284,6 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 decStack(1);
                 intErrorCheck("import star failed");
                 break;
-            case SETUP_WITH:
-                printf("Unsupported opcode: %d (with related)\r\n", byte);
-                return nullptr;
             case FORMAT_VALUE:
             {
                 Local fmtSpec;
@@ -2468,7 +2468,9 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 break;
             }
             default:
-                printf("Unsupported opcode: %d (with related)\r\n", byte);
+#ifdef DEBUG
+                printf("Unsupported opcode: %s (with related)\r\n", opcodeName(byte));
+#endif
 
                 return nullptr;
         }
@@ -2584,7 +2586,8 @@ void AbstractInterpreter::emitRaiseAndFree(ExceptionHandler* handler) {
     for (auto cur = raiseAndFreeLabels.size() - 1; cur != -1; cur--) {
         m_comp->emit_mark_label(raiseAndFreeLabels[cur]);
         m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
-        m_comp->emit_pop_top();
+        // TODO : The decref for this operation causes a crash at runtime.
+        //m_comp->emit_pop_top();
     }
 
     if (handler->Flags & EhfInExceptHandler) {
