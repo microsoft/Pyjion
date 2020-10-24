@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef PYCOMP_H
-#define PYCOMP_H
+#ifndef PYJION_PYCOMP_H
+#define PYJION_PYCOMP_H
 
 
 #include <windows.h>

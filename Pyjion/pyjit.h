@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef PYJIT_H
-#define PYJIT_H
+#ifndef PYJION_PYJIT_H
+#define PYJION_PYJIT_H
 
 #define FEATURE_NO_HOST
 

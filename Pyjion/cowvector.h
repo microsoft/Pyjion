@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef COWVECTOR_H
-#define COWVECTOR_H
+#ifndef PYJION_COWVECTOR_H
+#define PYJION_COWVECTOR_H
 
 #include <memory>
 #include <vector>

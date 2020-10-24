@@ -127,15 +127,15 @@ TEST_CASE("Test NotContains"){
 
 TEST_CASE("Test BuildDictFromTuples"){
     SECTION("Test happy path") {
-        PyObject* keys_and_values = PyTuple_New(3);
+        PyObject* keysAndValues = PyTuple_New(3);
         PyObject* keys = PyTuple_New(2);
         PyTuple_SetItem(keys, 0, PyUnicode_FromString("key1"));
         PyTuple_SetItem(keys, 1, PyUnicode_FromString("key2"));
 
-        PyTuple_SetItem(keys_and_values, 0, PyUnicode_FromString("value1"));
-        PyTuple_SetItem(keys_and_values, 1, PyUnicode_FromString("value2"));
-        PyTuple_SetItem(keys_and_values, 2, keys);
-        auto res = PyJit_BuildDictFromTuples(keys_and_values);
+        PyTuple_SetItem(keysAndValues, 0, PyUnicode_FromString("value1"));
+        PyTuple_SetItem(keysAndValues, 1, PyUnicode_FromString("value2"));
+        PyTuple_SetItem(keysAndValues, 2, keys);
+        auto res = PyJit_BuildDictFromTuples(keysAndValues);
         CHECK(PyDict_Check(res));
         CHECK_THAT(PyUnicode_AsUTF8(PyObject_Repr(res)), Catch::Equals("{'key1': 'value1', 'key2': 'value2'}"));
     }

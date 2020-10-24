@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef ILGEN_H
-#define ILGEN_H
+#ifndef PYJION_ILGEN_H
+#define PYJION_ILGEN_H
 
 #define FEATURE_NO_HOST
 

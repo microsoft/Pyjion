@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef TESTING_UTIL_H
-#define TESTING_UTIL_H 1
+#ifndef PYJION_TESTING_UTIL_H
+#define PYJION_TESTING_UTIL_H 1
 
 #include <Python.h>
 #include <absint.h>
@@ -129,4 +129,5 @@ public:
 void VerifyOldTest(AITestCase testCase);
 
 PyObject* Incremented(PyObject*o);
-#endif // !TESTING_UTIL_H
+
+#endif // !PYJION_TESTING_UTIL_H

@@ -23,7 +23,6 @@
 *
 */
 
-#include "stdafx.h"
 #include <catch2/catch.hpp>
 #include "testing_util.h"
 

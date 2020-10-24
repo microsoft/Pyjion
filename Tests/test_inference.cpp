@@ -30,7 +30,6 @@
  set of tests should write their own testing code that would be easier to work
  with.
 */
-#include "stdafx.h"
 #include <catch2/catch.hpp>
 #include "testing_util.h"
 #include <Python.h>

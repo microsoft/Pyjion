@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef JITINFO_H
-#define JITINFO_H
+#ifndef PYJION_JITINFO_H
+#define PYJION_JITINFO_H
 
 
 #define FEATURE_NO_HOST

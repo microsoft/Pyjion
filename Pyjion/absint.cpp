@@ -23,29 +23,6 @@
 *
 */
 
-
-/*
- * TODO : New opcodes since 3.6:
- * Need implementation:
- *  - Implement JUMP_IF_NOT_EXC_MATCH
- *  - Implement WITH_EXCEPT_START
- *  - Test RERAISE
- *  - Implement END_ASYNC_FOR
- *  - Implement GET_AITER
- *  Implemented (need unit tests)
- *  - Test LOAD_ASSERTION_ERROR
- *  - Implement SETUP_ANNOTATIONS
- *  - Test DICT_MERGE
- *  - Test LOAD_METHOD (Done)
- *  - Test CALL_METHOD (done)
- *  - Test IS_OP (DONE)
- *  - Test DICT_UPDATE (DONE)
- *  - Test CONTAINS_OP (DONE)
- *  - Test SET_UPDATE (DONE)
- *  - Test LIST_EXTEND (DONE)
- *  - Test LIST_TO_TUPLE
- *  - Test ROT_FOUR
- */
 #include <Python.h>
 #include <opcode.h>
 #include <object.h>

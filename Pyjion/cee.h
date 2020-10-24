@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef CEE_H
-#define CEE_H
+#ifndef PYJION_CEE_H
+#define PYJION_CEE_H
 
 #define FEATURE_NO_HOST
 

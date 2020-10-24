@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef INTRINS_H
-#define INTRINS_H
+#ifndef PYJION_INTRINS_H
+#define PYJION_INTRINS_H
 
 #include <Python.h>
 #include <frameobject.h>

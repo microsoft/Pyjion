@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef ABSVALUE_H
-#define ABSVALUE_H
+#ifndef PYJION_ABSVALUE_H
+#define PYJION_ABSVALUE_H
 
 #include <Python.h>
 #include <opcode.h>

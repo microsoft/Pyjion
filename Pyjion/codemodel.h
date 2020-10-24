@@ -23,8 +23,8 @@
 *
 */
 
-#ifndef CODEMODEL_H
-#define CODEMODEL_H
+#ifndef PYJION_CODEMODEL_H
+#define PYJION_CODEMODEL_H
 
 #define FEATURE_NO_HOST
 
