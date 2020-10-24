@@ -120,9 +120,9 @@ struct AbstractLocalInfo {
         IsMaybeUndefined = isUndefined;
     }
 
-    AbstractLocalInfo merge_with(AbstractLocalInfo other) const {
+    AbstractLocalInfo mergeWith(AbstractLocalInfo other) const {
         return {
-            ValueInfo.merge_with(other.ValueInfo),
+            ValueInfo.mergeWith(other.ValueInfo),
             IsMaybeUndefined || other.IsMaybeUndefined
             };
     }

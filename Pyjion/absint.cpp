@@ -400,7 +400,7 @@ bool AbstractInterpreter::interpret() {
                     }
 
                     value.Value->truth(value.Sources);
-                    if (value.Value->is_always_false()) {
+                    if (value.Value->isAlwaysFalse()) {
                         // We're always jumping, we don't need to process the following opcodes...
                         goto next;
                     }
@@ -417,7 +417,7 @@ bool AbstractInterpreter::interpret() {
                     }
 
                     value.Value->truth(value.Sources);
-                    if (value.Value->is_always_true()) {
+                    if (value.Value->isAlwaysTrue()) {
                         // We're always jumping, we don't need to process the following opcodes...
                         goto next;
                     }
@@ -432,7 +432,7 @@ bool AbstractInterpreter::interpret() {
                     }
                     auto value = lastState.popNoEscape();
                     value.Value->truth(value.Sources);
-                    if (value.Value->is_always_true()) {
+                    if (value.Value->isAlwaysTrue()) {
                         // we always jump, no need to analyze the following instructions...
                         goto next;
                     }
@@ -445,7 +445,7 @@ bool AbstractInterpreter::interpret() {
                     }
                     auto value = lastState.popNoEscape();
                     value.Value->truth(value.Sources);
-                    if (value.Value->is_always_false()) {
+                    if (value.Value->isAlwaysFalse()) {
                         // we always jump, no need to analyze the following instructions...
                         goto next;
                     }
@@ -477,7 +477,7 @@ bool AbstractInterpreter::interpret() {
                     // We don't treat returning as escaping as it would just result in a single
                     // boxing over the lifetime of the function.
                     auto retValue = lastState.popNoEscape();
-                    mReturnValue = mReturnValue->merge_with(retValue.Value);
+                    mReturnValue = mReturnValue->mergeWith(retValue.Value);
                     }
                     goto next;
                 case LOAD_NAME:
@@ -901,9 +901,9 @@ bool AbstractInterpreter::mergeStates(InterpreterState& newState, InterpreterSta
         assert(mergeTo.localCount() == newState.localCount());
         for (size_t i = 0; i < newState.localCount(); i++) {
             auto oldType = mergeTo.getLocal(i);
-            auto newType = oldType.merge_with(newState.getLocal(i));
+            auto newType = oldType.mergeWith(newState.getLocal(i));
             if (newType != oldType) {
-                if (oldType.ValueInfo.needs_boxing()) {
+                if (oldType.ValueInfo.needsBoxing()) {
                     newType.ValueInfo.escapes();
                 }
                 mergeTo.replaceLocal(i, newType);
@@ -930,7 +930,7 @@ bool AbstractInterpreter::mergeStates(InterpreterState& newState, InterpreterSta
 
         // need to merge the stacks...
         for (size_t i = 0; i < max; i++) {
-            auto newType = mergeTo[i].merge_with(newState[i]);
+            auto newType = mergeTo[i].mergeWith(newState[i]);
             if (mergeTo[i] != newType) {
                 mergeTo[i] = newType;
                 changed = true;
@@ -1021,7 +1021,7 @@ bool AbstractInterpreter::shouldBox(size_t opcodeIndex) {
         if (boxInfo->second == nullptr) {
             return true;
         }
-        return boxInfo->second->needs_boxing();
+        return boxInfo->second->needsBoxing();
     }
     return true;
 }
@@ -1766,86 +1766,13 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 break;
             case RERAISE:{
                 auto curBlock = m_blockStack.back();
-                auto ehInfo = curBlock.CurrentHandler;
-                m_blockStack.pop_back();
-
-                if (!ehInfo->IsRootHandler()) {
-                    int flags = curBlock.Flags;
-
-                    auto noException = m_comp->emit_define_label();
-                    decStack();
-                    m_comp->emit_store_local(ehInfo->ExVars.FinallyExc);
-                    m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
-                    m_comp->emit_ptr(Py_None);
-                    m_comp->emit_dup();
-                    m_comp->emit_incref();
-                    m_comp->emit_branch(BranchEqual, noException);
-
-                    if (flags & EhfBlockReturns) {
-                        auto exceptional = m_comp->emit_define_label();
-                        m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
-                        m_comp->emit_int(EhfBlockReturns);
-                        m_comp->emit_compare_equal();
-                        m_comp->emit_branch(BranchFalse, exceptional);
-
-                        bool hasOuterFinally = false;
-                        size_t clearEh = -1;
-                        for (size_t i = m_blockStack.size() - 1; i != -1; i--) {
-                            auto stack = m_blockStack.get(i);
-                            if (stack.Kind == SETUP_FINALLY) {
-                                // need to dispatch to outer finally...
-                                m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
-                                m_comp->emit_branch(BranchAlways, stack.CurrentHandler->ErrorTarget);
-                                hasOuterFinally = true;
-                                break;
-                            } else if (stack.Kind == POP_EXCEPT || stack.Kind == RERAISE) {
-                                if (clearEh == -1) {
-                                    clearEh = i;
-                                }
-                            }
-
-                        }
-
-                        if (clearEh != -1) {
-                            unwindEh(m_blockStack.get(clearEh).CurrentHandler);
-                        }
-
-                        if (!hasOuterFinally) {
-                            m_comp->emit_branch(BranchLeave, m_retLabel);
-                        }
-
-                        m_comp->emit_mark_label(exceptional);
-                    }
-
-                    m_comp->emit_load_local(ehInfo->ExVars.FinallyTb);
-                    m_comp->emit_load_local(ehInfo->ExVars.FinallyValue);
-                    m_comp->emit_load_local(ehInfo->ExVars.FinallyExc);
+                if (m_offsetStack.find(curByte) != m_offsetStack.end()) {
                     m_comp->emit_restore_err();
-                    unwindEh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
-
-                    auto ehBlock = getEhblock();
-
+                    decStack(3);
+                    // TODO : Emulate the correct behaviour in ceval.
+                    unwindEh(curBlock.CurrentHandler);
                     cleanStackForReraise();
-                    m_comp->emit_branch(BranchAlways, ehBlock->ReRaise);
-
-                    m_comp->emit_mark_label(noException);
-                } else {
-                    // END_FINALLY is marking the EH rethrow.  The byte code branches
-                    // around this in the non-exceptional case.
-
-                    // If we haven't sent a branch to this END_FINALLY then we have
-                    // a bare try/except: which handles all exceptions.  In that case
-                    // we have no values to pop off, and this code will never be invoked
-                    // anyway.
-                    if (m_offsetStack.find(curByte) != m_offsetStack.end()) {
-                        decStack(3);
-                        m_comp->emit_restore_err();
-
-                        unwindEh(curBlock.CurrentHandler, m_blockStack.back().CurrentHandler);
-                        cleanStackForReraise();
-
-                        m_comp->emit_branch(BranchAlways, getEhblock()->ReRaise);
-                    }
+                    m_comp->emit_branch(BranchAlways, getEhblock()->ReRaise);
                 }
                 skipEffect = true;
                 break;
@@ -2526,7 +2453,6 @@ void AbstractInterpreter::compilePopBlock() {
                 curHandler.Flags,
                 curHandler.ContinueOffset
         );
-
         m_blockStack.push_back(newBlock);
     }
     m_blockStack.pop_back();

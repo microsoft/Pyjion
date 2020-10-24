@@ -55,7 +55,7 @@ enum AbstractValueKind {
     AVK_Complex
 };
 
-static bool is_known_type(AbstractValueKind kind) {
+static bool isKnownType(AbstractValueKind kind) {
     // TODO : AVK_Any and AVK_Undefined are missing from here, dont know if this was intentional?
     switch (kind) {
         case AVK_Integer:
@@ -83,9 +83,9 @@ public:
 
     AbstractSource();
 
-    void escapes();
+    void escapes() const;
 
-    bool needs_boxing();
+    bool needsBoxing() const;
 
     virtual const char* describe() {
         return "unknown source";
@@ -106,7 +106,7 @@ struct AbstractSources {
         m_escapes = true;
     }
 
-    bool needs_boxing() const {
+    bool needsBoxing() const {
         return m_escapes;
     }
 
@@ -115,7 +115,7 @@ struct AbstractSources {
 class ConstSource : public AbstractSource {
 public:
     const char* describe() override {
-        if (needs_boxing()) {
+        if (needsBoxing()) {
             return "Source: Const (escapes)";
         }
         else {
@@ -127,7 +127,7 @@ public:
 class LocalSource : public AbstractSource {
 public:
     const char* describe() override {
-        if (needs_boxing()) {
+        if (needsBoxing()) {
             return "Source: Local (escapes)";
         }
         else {
@@ -139,7 +139,7 @@ public:
 class IntermediateSource : public AbstractSource {
 public:
     const char* describe() override {
-        if (needs_boxing()) {
+        if (needsBoxing()) {
             return "Source: Intermediate (escapes)";
         }
         else {
@@ -156,13 +156,13 @@ public:
     virtual AbstractValue* compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other);
     virtual void truth(AbstractSource* selfSources);
 
-    virtual bool is_always_true() {
+    virtual bool isAlwaysTrue() {
         return false;
     }
-    virtual bool is_always_false() {
+    virtual bool isAlwaysFalse() {
         return false;
     }
-    virtual AbstractValue* merge_with(AbstractValue*other);
+    virtual AbstractValue* mergeWith(AbstractValue*other);
     virtual AbstractValueKind kind() = 0;
     virtual const char* describe() {
         return "";
@@ -174,7 +174,7 @@ struct AbstractValueWithSources {
     AbstractValue* Value;
     AbstractSource* Sources;
 
-    AbstractValueWithSources(AbstractValue *type = nullptr) {
+    AbstractValueWithSources(AbstractValue *type = nullptr) { // NOLINT(google-explicit-constructor)
         Value = type;
         Sources = nullptr;
     }
@@ -190,17 +190,17 @@ struct AbstractValueWithSources {
         }
     }
 
-    bool needs_boxing() const {
+    bool needsBoxing() const {
         if (Sources != nullptr) {
-            return Sources->needs_boxing();
+            return Sources->needsBoxing();
         }
         return true;
     }
 
-    AbstractValueWithSources merge_with(AbstractValueWithSources other) const {
+    AbstractValueWithSources mergeWith(AbstractValueWithSources other) const {
         // TODO: Is defining a new source at the merge point better?
 
-        auto newValue = Value->merge_with(other.Value);
+        auto newValue = Value->mergeWith(other.Value);
         if ((newValue->kind() != Value->kind() && Value->kind() != AVK_Undefined) ||
             (newValue->kind() != other.Value->kind() && other.Value->kind() != AVK_Undefined)) {
             if (Sources != nullptr) {
@@ -211,7 +211,7 @@ struct AbstractValueWithSources {
             }
         }
         return {
-            Value->merge_with(other.Value),
+                Value->mergeWith(other.Value),
             AbstractSource::combine(Sources, other.Sources)
             };
     }
@@ -246,7 +246,7 @@ class AnyValue : public AbstractValue {
 };
 
 class UndefinedValue : public AbstractValue {
-    AbstractValue* merge_with(AbstractValue*other) override {
+    AbstractValue* mergeWith(AbstractValue*other) override {
         return other;
     }
     AbstractValueKind kind() override {

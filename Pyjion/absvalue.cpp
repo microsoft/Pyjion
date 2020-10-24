@@ -63,7 +63,7 @@ AbstractValue* AbstractValue::unary(AbstractSource* selfSources, int op) {
 }
 
 AbstractValue* AbstractValue::compare(AbstractSource* selfSources, int op, AbstractValueWithSources& other) {
-    if (is_known_type(kind()) && is_known_type(other.Value->kind()) && kind() == other.Value->kind()) {
+    if (isKnownType(kind()) && isKnownType(other.Value->kind()) && kind() == other.Value->kind()) {
         // We know all of the known types don't have fancy rich comparison
         // operations and will return true/false.  This is in contrast to
         // user defined types which can override the rich comparison methods
@@ -84,20 +84,20 @@ void AbstractValue::truth(AbstractSource* selfSources) {
     }
 }
 
-AbstractValue* AbstractValue::merge_with(AbstractValue*other) {
+AbstractValue* AbstractValue::mergeWith(AbstractValue*other) {
     if (this == other) {
         return this;
     }
     return &Any;
 }
 
-void AbstractSource::escapes() {
+void AbstractSource::escapes() const {
     if (Sources) {
         Sources->m_escapes = true;
     }
 }
 
-bool AbstractSource::needs_boxing() {
+bool AbstractSource::needsBoxing() const {
     if (Sources) {
         return Sources->m_escapes;
     }
@@ -122,7 +122,7 @@ AbstractSource* AbstractSource::combine(AbstractSource* one, AbstractSource* two
                         source->Sources = one->Sources;
                     }
                 }
-                if (two->needs_boxing() && !one->needs_boxing()) {
+                if (two->needsBoxing() && !one->needsBoxing()) {
                     one->escapes();
                 }
                 two->Sources = one->Sources;
@@ -135,7 +135,7 @@ AbstractSource* AbstractSource::combine(AbstractSource* one, AbstractSource* two
                         source->Sources = two->Sources;
                     }
                 }
-                if (one->needs_boxing() && !two->needs_boxing()) {
+                if (one->needsBoxing() && !two->needsBoxing()) {
                     two->escapes();
                 }
                 one->Sources = two->Sources;

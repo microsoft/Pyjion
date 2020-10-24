@@ -1,5 +1,3 @@
-#include <cstdio>
-
 /*
 * The MIT License (MIT)
 *
