@@ -2861,8 +2861,6 @@ void AbstractInterpreter::unwindEh(ExceptionHandler* fromHandler, ExceptionHandl
     do {
         auto& exVars = cur->ExVars;
 
-        // TODO : This is wiping the exception to NULL values
-        // There must be a logic bug in here somewhere.
         if (exVars.PrevExc.is_valid()) {
             m_comp->emit_unwind_eh(exVars.PrevExc, exVars.PrevExcVal, exVars.PrevTraceback);
         }
