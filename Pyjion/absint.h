@@ -396,6 +396,7 @@ private:
     void jumpIfNotExact(int opcodeIndex, int jumpTo);
     void testBoolAndBranch(Local value, bool isTrue, Label target);
 
+    void returnFromReraise(int opcodeIndex);
 };
 
 

@@ -68,6 +68,10 @@ public:
  class BlockStack : std::vector<BlockInfo> {
 
  public:
+     bool empty(){
+         return vector<BlockInfo>::empty();
+     }
+
      void pop_back() {
          if (empty())
              throw StackUnderflowException();

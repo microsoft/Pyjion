@@ -1231,18 +1231,6 @@ AbstractSource* AbstractInterpreter::addConstSource(size_t opcodeIndex, size_t c
     return store->second;
 }
 
-/*****************
- * Code generation
-
- */
-
-
- /************************************************************************
- * Compiler driver code...
- */
-
-
-
  // Checks to see if we have a non-zero error code on the stack, and if so,
  // branches to the current error handler.  Consumes the error code in the process
 void AbstractInterpreter::intErrorCheck(const char* reason) {
@@ -1765,15 +1753,9 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 intErrorCheck("failed to setup annotations");
                 break;
             case RERAISE:{
-                auto curBlock = m_blockStack.back();
-                if (m_offsetStack.find(curByte) != m_offsetStack.end()) {
-                    m_comp->emit_restore_err();
-                    decStack(3);
-                    // TODO : Emulate the correct behaviour in ceval.
-                    unwindEh(curBlock.CurrentHandler);
-                    cleanStackForReraise();
-                    m_comp->emit_branch(BranchAlways, getEhblock()->ReRaise);
-                }
+                m_comp->emit_restore_err();
+                decStack(3);
+                returnFromReraise(opcodeIndex);
                 skipEffect = true;
                 break;
             }
@@ -2691,61 +2673,43 @@ void AbstractInterpreter::loadConst(int constIndex, int opcodeIndex) {
     incStack();
 }
 
-void AbstractInterpreter::returnValue(int opcodeIndex) {
-    decStack();
-
-    m_comp->emit_store_local(m_retValue);
-
+void AbstractInterpreter::returnFromReraise(int opcodeIndex){
     size_t clearEh = -1;
     bool inFinally = false;
-    for (size_t blockIndex = m_blockStack.size() - 1; blockIndex != (-1); blockIndex--) {
-        auto block = m_blockStack.get(blockIndex);
+    while (!m_blockStack.empty()) {
+        auto block = m_blockStack.back();
+        m_blockStack.pop_back();
+        if (block.Kind == EXCEPT_HANDLER){
+            unwindEh(block.CurrentHandler);
+            continue;
+        }
+        // unwind value stack
+        auto& entryStack = block.CurrentHandler->EntryStack;
+        size_t count = m_stack.size() - entryStack.size();
+        for (auto cur = m_stack.rbegin(); cur != m_stack.rend(); cur++) {
+            if (*cur == STACK_KIND_VALUE) {
+                count--;
+                m_comp->emit_pop();
+            }
+            else {
+                break;
+            }
+        }
+
         if (block.Kind == SETUP_FINALLY) {
-            // we need to run the finally before returning...
-            block.Flags |= EhfBlockReturns;
 
-            if (!inFinally) {
-                // Only emit the store and branch to the inner most finally, but
-                // we need to mark all finallys as being capable of being returned
-                // through.
-                inFinally = true;
-                if (clearEh != -1) {
-                    unwindEh(
-                            m_blockStack.get(clearEh).CurrentHandler,
-                            block.CurrentHandler->BackHandler
-                    );
-                }
-                m_comp->emit_int(EhfBlockReturns);
-                m_comp->emit_branch(BranchAlways, block.CurrentHandler->ErrorTarget);
-            }
+            return;
         }
-        else if (block.Kind == POP_EXCEPT || block.Kind == RERAISE) {
-            // we need to restore the previous exception before we return
-            if (clearEh == -1) {
-                clearEh = blockIndex;
-                if (m_blockStack.get(blockIndex).Kind == RERAISE) {
-                    m_comp->emit_load_local(m_blockStack.get(blockIndex).CurrentHandler->ExVars.FinallyTb);
-                    m_comp->emit_pop_top();
-                    m_comp->emit_load_local(m_blockStack.get(blockIndex).CurrentHandler->ExVars.FinallyValue);
-                    m_comp->emit_pop_top();
-                    m_comp->emit_load_local(m_blockStack.get(blockIndex).CurrentHandler->ExVars.FinallyExc);
-                    m_comp->emit_pop_top();
 
-                    m_comp->emit_null();
-                    m_comp->emit_null();
-                    m_comp->emit_null();
-                    m_comp->emit_restore_err();
-                }
-            }
-        }
     }
+    m_comp->emit_null();
+    returnValue(opcodeIndex);
+}
 
-    if (!inFinally) {
-        if (clearEh != -1) {
-            unwindEh(m_blockStack.get(clearEh).CurrentHandler);
-        }
-        m_comp->emit_branch(BranchLeave, m_retLabel);
-    }
+void AbstractInterpreter::returnValue(int opcodeIndex) {
+    decStack();
+    m_comp->emit_store_local(m_retValue);
+    m_comp->emit_branch(BranchLeave, m_retLabel);
 }
 
 
