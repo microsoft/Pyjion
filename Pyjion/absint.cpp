@@ -879,8 +879,9 @@ bool AbstractInterpreter::interpret() {
                 case IMPORT_STAR:
                     lastState.pop();
                     break;
+                case DELETE_GLOBAL:
                 case SETUP_ANNOTATIONS:
-                    break;
+                    break;  // No stack effect
                 default:
                     PyErr_Format(PyExc_ValueError,
                                  "Unknown unsupported opcode: %s", opcodeName(opcode));
