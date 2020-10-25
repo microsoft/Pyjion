@@ -570,14 +570,14 @@ static PyMethodDef PyjionMethods[] = {
 
 static struct PyModuleDef pyjionmodule = {
 	PyModuleDef_HEAD_INIT,
-	"pyjion",   /* name of module */
+	"_pyjion",   /* name of module */
 	"Pyjion - A Just-in-Time Compiler for CPython", /* module documentation, may be NULL */
 	-1,       /* size of per-interpreter state of the module,
 			  or -1 if the module keeps state in global variables. */
 	PyjionMethods
 }; 
 
-PyMODINIT_FUNC PyInit_pyjion(void)
+PyMODINIT_FUNC PyInit__pyjion(void)
 {
 	// Install our frame evaluation function
 	JitInit();

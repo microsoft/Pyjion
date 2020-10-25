@@ -13,6 +13,9 @@ if (UNIX AND NOT APPLE)
 endif()
 
 find_package (Python3 3.9 COMPONENTS Interpreter Development)
+if (SKBUILD)
+    find_package(PythonExtensions REQUIRED)
+endif (SKBUILD)
 
 include_directories(${Python3_INCLUDE_DIRS})
 
@@ -133,19 +136,18 @@ endif()
 set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp Pyjion/exceptionhandling.cpp Pyjion/stack.cpp Pyjion/block.cpp)
 
 add_library(pyjionlib OBJECT ${SOURCES})
-add_library(pyjion MODULE $<TARGET_OBJECTS:pyjionlib>)
-install(TARGETS pyjion
-        LIBRARY DESTINATION ${CMAKE_BINARY_DIR})
+add_library(_pyjion MODULE $<TARGET_OBJECTS:pyjionlib>)
+
 
 set_target_properties(
-        pyjion
+        _pyjion
         PROPERTIES
         PREFIX ""
-        OUTPUT_NAME "pyjion"
+        OUTPUT_NAME "_pyjion"
         LINKER_LANGUAGE C
 )
 
-target_link_libraries(pyjion ${Python3_LIBRARIES})
+target_link_libraries(_pyjion ${Python3_LIBRARIES})
 
 # Testing
 add_subdirectory(Tests/Catch)
@@ -160,9 +162,15 @@ target_link_libraries(unit_tests Catch2::Catch2)
 target_link_libraries(unit_tests ${Python3_LIBRARIES})
 
 if (NOT WIN32)
-    target_link_libraries(pyjion ${DOTNETPATH}/${CLR_JIT_LIB})
+    target_link_libraries(_pyjion ${DOTNETPATH}/${CLR_JIT_LIB})
     target_link_libraries(unit_tests ${DOTNETPATH}/${CLR_JIT_LIB})
 else ()
-    target_link_libraries(pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
+    target_link_libraries(_pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
     target_link_libraries(unit_tests ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
 endif()
+
+if (SKBUILD)
+    python_extension_module(_pyjion)
+endif (SKBUILD)
+
+install(TARGETS _pyjion LIBRARY DESTINATION pyjion)
