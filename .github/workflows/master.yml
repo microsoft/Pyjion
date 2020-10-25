@@ -41,11 +41,17 @@ jobs:
         shell: bash
         working-directory: ${{runner.workspace}}/build
         run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        env:
+          CXX: clang++
+          CC: clang
 
       - name: Build
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: cmake --build . --config $BUILD_TYPE
+        env:
+          CXX: clang++
+          CC: clang
 
       - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
