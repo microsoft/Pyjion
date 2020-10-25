@@ -37,6 +37,7 @@ endif()
 
 if(NOT WIN32)
     set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
     include_directories(CoreCLR/src/coreclr/src/pal/inc/rt CoreCLR/src/coreclr/src/pal/inc CoreCLR/src/coreclr/src/pal/prebuilt/inc)
     add_compile_options(-DPAL_STDCPP_COMPAT)
     add_compile_options(-fexceptions)
