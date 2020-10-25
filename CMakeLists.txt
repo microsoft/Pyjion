@@ -26,6 +26,7 @@ add_definitions(-DUSE_STL)
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
     message(STATUS "Enabling verbose messages")
     add_definitions(-DDEBUG)
+    set(DO_TESTS 1)
 ENDIF(CMAKE_BUILD_TYPE MATCHES Debug)
 
 if(DUMP_TRACES)
@@ -132,12 +133,10 @@ if(NET_SRC_LIB)  # use the libraries compiled from source
     set(DOTNETPATH ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/bin/coreclr/${CLR_OS_BUILD})
 endif()
 
-
 set(SOURCES pyjion/absint.cpp pyjion/absvalue.cpp pyjion/intrins.cpp pyjion/jitinit.cpp pyjion/pycomp.cpp pyjion/pyjit.cpp pyjion/exceptionhandling.cpp pyjion/stack.cpp pyjion/block.cpp)
 
 add_library(pyjionlib OBJECT ${SOURCES})
 add_library(_pyjion MODULE $<TARGET_OBJECTS:pyjionlib>)
-
 
 set_target_properties(
         _pyjion
@@ -149,24 +148,30 @@ set_target_properties(
 
 target_link_libraries(_pyjion ${Python3_LIBRARIES})
 
-# Testing
-add_subdirectory(Tests/Catch)
-set(TEST_SOURCES Tests/testing_util.cpp Tests/test_emission.cpp Tests/test_compiler.cpp Tests/test_absint.cpp Tests/Tests.cpp Tests/test_wrappers.cpp)
-add_executable(unit_tests ${TEST_SOURCES} $<TARGET_OBJECTS:pyjionlib>)
-if (NOT WIN32)
-    set_property(TARGET unit_tests PROPERTY CXX_STANDARD 17)
-    set_property(TARGET unit_tests PROPERTY CXX_EXTENSIONS OFF)
-endif(NOT WIN32)
-target_include_directories(unit_tests PRIVATE pyjion)
-target_link_libraries(unit_tests Catch2::Catch2)
-target_link_libraries(unit_tests ${Python3_LIBRARIES})
+if (DO_TESTS)
+    # Testing
+    add_subdirectory(Tests/Catch)
+    set(TEST_SOURCES Tests/testing_util.cpp Tests/test_emission.cpp Tests/test_compiler.cpp Tests/test_absint.cpp Tests/Tests.cpp Tests/test_wrappers.cpp)
+    add_executable(unit_tests ${TEST_SOURCES} $<TARGET_OBJECTS:pyjionlib>)
+    if (NOT WIN32)
+        set_property(TARGET unit_tests PROPERTY CXX_STANDARD 17)
+        set_property(TARGET unit_tests PROPERTY CXX_EXTENSIONS OFF)
+    endif(NOT WIN32)
+    target_include_directories(unit_tests PRIVATE pyjion)
+    target_link_libraries(unit_tests Catch2::Catch2)
+    target_link_libraries(unit_tests ${Python3_LIBRARIES})
+
+    if (NOT WIN32)
+        target_link_libraries(unit_tests ${DOTNETPATH}/${CLR_JIT_LIB})
+    else ()
+        target_link_libraries(unit_tests ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
+    endif()
+endif(DO_TESTS)
 
 if (NOT WIN32)
     target_link_libraries(_pyjion ${DOTNETPATH}/${CLR_JIT_LIB})
-    target_link_libraries(unit_tests ${DOTNETPATH}/${CLR_JIT_LIB})
 else ()
     target_link_libraries(_pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
-    target_link_libraries(unit_tests ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
 endif()
 
 if (SKBUILD)

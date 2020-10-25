@@ -49,10 +49,17 @@ public:
  class ValueStack : std::vector<StackEntryKind> {
 
  public:
+     ValueStack() = default;
+
+    ValueStack(ValueStack const &old)  {
+        for (int i=0; i< old.size(); i++)
+            push_back(old[i]);
+    }
+
     void inc(size_t by, StackEntryKind kind);
     void dec(size_t by);
 
-    size_t size(){
+    size_t size() const {
         return std::vector<StackEntryKind>::size();
     }
 
@@ -74,6 +81,13 @@ public:
  class BlockStack : std::vector<BlockInfo> {
 
  public:
+     BlockStack() = default;
+
+     BlockStack(BlockStack const &old)  {
+         for (int i=0; i< old.size(); i++)
+             push_back(old[i]);
+     }
+
      bool empty(){
          return vector<BlockInfo>::empty();
      }
@@ -83,6 +97,7 @@ public:
              throw StackUnderflowException();
          return vector<BlockInfo>::pop_back();
      }
+
      void push_back(BlockInfo block){
          return vector<BlockInfo>::push_back(block);
      }
@@ -93,7 +108,7 @@ public:
          back().EndOffset != -1);
      }
 
-     size_t size(){
+     size_t size() const{
          return vector<BlockInfo>::size();
      }
 

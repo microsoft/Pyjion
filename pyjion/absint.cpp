@@ -1694,6 +1694,9 @@ JittedCode* AbstractInterpreter::compileWorker() {
 
         // If this operation goes beyond "EndOffset", pop the stack.
         if (m_blockStack.beyond(curByte)) {
+#ifdef DUMP_TRACES
+            printf("Compiling new block beyond EndOffset %d\n", curByte);
+#endif
             // TODO : Check if this is needed anymore. The compiler seems to put a POP_BLOCK at the end of a TRY block
             compilePopBlock();
         }
@@ -1754,7 +1757,6 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 break;
             case RERAISE:{
                 m_comp->emit_restore_err();
-                decStack(3);
                 unwindHandlers();
                 skipEffect = true;
                 break;
@@ -2123,10 +2125,8 @@ JittedCode* AbstractInterpreter::compileWorker() {
 
                 m_blockStack.push_back(newBlock);
 
-                ValueStack newStack = m_stack;
-                for (int j = 0; j < 3; j++) {
-                    newStack.inc(3, STACK_KIND_OBJECT);
-                }
+                ValueStack newStack = ValueStack(m_stack);
+                newStack.inc(3, STACK_KIND_OBJECT);
                 m_offsetStack[oparg + curByte + sizeof(_Py_CODEUNIT)] = newStack;
                 skipEffect=true;
             }
@@ -2491,7 +2491,7 @@ void AbstractInterpreter::jumpIfOrPop(bool isTrue, int opcodeIndex, int jumpTo) 
     }
 
     auto target = getOffsetLabel(jumpTo);
-    m_offsetStack[jumpTo] = m_stack;
+    m_offsetStack[jumpTo] = ValueStack(m_stack);
     decStack();
 
     auto tmp = m_comp->emit_spill();
@@ -2560,7 +2560,7 @@ void AbstractInterpreter::popJumpIf(bool isTrue, int opcodeIndex, int jumpTo) {
     m_comp->emit_pop_top();
 
     decStack();
-    m_offsetStack[jumpTo] = m_stack;
+    m_offsetStack[jumpTo] = ValueStack(m_stack);
 }
 
 void AbstractInterpreter::unaryPositive(int opcodeIndex) {
@@ -2760,7 +2760,6 @@ void AbstractInterpreter::loadFast(int local, int opcodeIndex) {
 
 void AbstractInterpreter::loadFastWorker(int local, bool checkUnbound) {
     m_comp->emit_load_fast(local);
-
     if (checkUnbound) {
         Label success = m_comp->emit_define_label();
 
@@ -2837,7 +2836,7 @@ void AbstractInterpreter::jumpAbsolute(size_t index, size_t from) {
         periodicWork();
     }
 
-    m_offsetStack[index] = m_stack;
+    m_offsetStack[index] = ValueStack(m_stack);
     m_comp->emit_branch(BranchAlways, getOffsetLabel(index));
 }
 
@@ -2850,7 +2849,7 @@ void AbstractInterpreter::jumpIfNotExact(int opcodeIndex, int jumpTo) {
     decStack(2);
     raiseOnNegativeOne();
     m_comp->emit_branch(BranchFalse, target);
-    m_offsetStack[jumpTo] = m_stack;
+    m_offsetStack[jumpTo] = ValueStack(m_stack);
 }
 
 // Unwinds exception handling starting at the current handler.  Emits the unwind for all

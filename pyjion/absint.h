@@ -296,7 +296,6 @@ public:
 
 private:
     void compilePopBlock();
-    void compilePopExceptBlock();
     AbstractValue* toAbstract(PyObject* obj);
     AbstractValue* toAbstract(AbstractValueKind kind);
     static bool mergeStates(InterpreterState& newState, InterpreterState& mergeTo);

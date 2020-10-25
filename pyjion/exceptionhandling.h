@@ -83,7 +83,7 @@ struct ExceptionHandler {
                      ExceptionHandler *backHandler = nullptr) : ExVars(exceptionVars) {
         RaiseAndFreeId = raiseAndFreeId;
         Flags = flags;
-        EntryStack = std::move(entryStack);
+        EntryStack = entryStack;
         Raise = raise;
         ReRaise = reraise;
         ErrorTarget = errorTarget;
