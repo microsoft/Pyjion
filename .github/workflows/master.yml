@@ -120,4 +120,4 @@ jobs:
       - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: ./unit_tests
+        run: ./unit_tests.exe
