@@ -24,16 +24,16 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
-      - uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: '5.0.100-rc.2.20479.15'
-
       - name: Install CLR requirements
         run: |
           sudo apt-get install -y cmake llvm-9 clang-9 autoconf automake \
           libtool build-essential python curl git lldb-6.0 liblldb-6.0-dev \
           libunwind8 libunwind8-dev gettext libicu-dev liblttng-ust-dev \
           libssl-dev libnuma-dev libkrb5-dev zlib1g-dev
+      - uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '5.0.100-rc.2.20479.15'
+
       - name: Create Build Environment
         run: cmake -E make_directory ${{runner.workspace}}/build
 
@@ -41,22 +41,12 @@ jobs:
         shell: bash
         working-directory: ${{runner.workspace}}/build
         run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-        env:
-          CXX: clang++
-          CC: clang
 
       - name: Build
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: cmake --build . --config $BUILD_TYPE
-        env:
-          CXX: clang++
-          CC: clang
+        run: cmake --build . --config $BUILD_TYPE --target pyjion
 
-      - name: Run unit tests
-        working-directory: ${{runner.workspace}}/build
-        shell: bash
-        run: ./unit_tests
   build-mac:
     runs-on: macos-latest
     strategy:
@@ -91,6 +81,7 @@ jobs:
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: ./unit_tests
+
   build-windows:
     runs-on: windows-latest
     strategy:
