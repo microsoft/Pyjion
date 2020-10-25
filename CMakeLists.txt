@@ -118,7 +118,7 @@ endif()
 
 if (APPLE)
     set(CLR_OS_BUILD OSX.x64.Debug)
-    include_directories(Pyjion/compat)
+    include_directories(pyjion/compat)
     set(CLR_CMAKE_HOST_UNIX 1)
     set(CLR_JIT_LIB "libclrjit.dylib")
     add_definitions(-D_XOPEN_SOURCE)
@@ -133,7 +133,7 @@ if(NET_SRC_LIB)  # use the libraries compiled from source
 endif()
 
 
-set(SOURCES Pyjion/absint.cpp Pyjion/absvalue.cpp Pyjion/intrins.cpp Pyjion/jitinit.cpp Pyjion/pycomp.cpp Pyjion/pyjit.cpp Pyjion/exceptionhandling.cpp Pyjion/stack.cpp Pyjion/block.cpp)
+set(SOURCES pyjion/absint.cpp pyjion/absvalue.cpp pyjion/intrins.cpp pyjion/jitinit.cpp pyjion/pycomp.cpp pyjion/pyjit.cpp pyjion/exceptionhandling.cpp pyjion/stack.cpp pyjion/block.cpp)
 
 add_library(pyjionlib OBJECT ${SOURCES})
 add_library(_pyjion MODULE $<TARGET_OBJECTS:pyjionlib>)
@@ -157,7 +157,7 @@ if (NOT WIN32)
     set_property(TARGET unit_tests PROPERTY CXX_STANDARD 17)
     set_property(TARGET unit_tests PROPERTY CXX_EXTENSIONS OFF)
 endif(NOT WIN32)
-target_include_directories(unit_tests PRIVATE Pyjion)
+target_include_directories(unit_tests PRIVATE pyjion)
 target_link_libraries(unit_tests Catch2::Catch2)
 target_link_libraries(unit_tests ${Python3_LIBRARIES})
 
