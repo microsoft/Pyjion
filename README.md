@@ -1,5 +1,35 @@
 # Pyjion
+
 Designing a JIT API for CPython
+
+## Installing
+
+Prerequisites: 
+
+- CPython 3.9.0
+- CMake 3.2 + 
+- .NET 5
+
+```console
+ $ git clone git@github.com:Microsoft/pyjion --recurse-submodules
+ $ cd pyjion
+ $ python -m pip install .
+```
+
+## Using
+
+Once you have installed the Python package, at the REPL you can enable the JIT by using `pyjion.enable()`:
+
+```console
+ $ python
+ >>> import pyjion
+ >>> pyjion.enable()
+ >>> a = 1
+ ```
+
+All code executed after `pyjion.enable()` will go through the JIT.
+
+In a script, call `pyjion.enable()` before any code you want to JIT and disable using `pyjion.disable()` to stop JITting.
 
 ## A note on development
 This is a side project at work for the project maintainers, and so progress can be
@@ -87,14 +117,6 @@ Both [Nuitka](http://nuitka.net/) and
 which means they translate Python code into equivalent C++ code. Being a JIT,
 Pyjion is not a transpiler.
 
-
-### Are you going to support OS X and/or Linux?
-Yes! Goals #1 and #3 are entirely platform-agnostic while goal #2 of using
-CoreCLR as a JIT compiler is not an impedence to supporting OS X or Linux as
-it already supports the major OSs. The only reason Pyjion doesn't directly
-support Linux or OS X is entirely momentum/laziness: since the work is being
-driven by Microsoft employees, it simply meant it was easier to get going on
-Windows.
 
 ### Will this ever ship with CPython?
 Goal #1 is explicitly to add a C API to CPython to support JIT compilers. There

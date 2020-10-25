@@ -29,10 +29,4 @@ Building
 Follow the :doc:`building guide <building>` to build the binaries to be installed into your Python distribution.
 
 
-Trying it out
--------------
-
-Once you have build the Python distribution with the JIT module loaded using the instructions in the :doc:`building guide <building>` you can simply
-enter the Python CLI by running ``Python\python.bat`` and start using the Python 3.5.1 distribution as you would normally.
-
 .. _`CMake`: https://cmake.org/download/

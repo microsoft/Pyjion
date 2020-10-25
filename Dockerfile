@@ -14,7 +14,7 @@ RUN apt-get -y update && apt-get install -y software-properties-common && apt-ge
      libtool build-essential curl ninja-build git lldb-6.0 liblldb-6.0-dev \
      libunwind8 libunwind8-dev gettext libicu-dev liblttng-ust-dev \
      libssl-dev libnuma-dev libkrb5-dev zlib1g-dev \
-     && apt-get install -y python3.9 \
+     && apt-get install -y python3.9 python3.9-dev \
      && apt-get clean -y
 RUN wget https://dotnetcli.azureedge.net/dotnet/Sdk/${DOTNET_VERSION}/dotnet-sdk-${DOTNET_VERSION}-linux-x64.tar.gz
 RUN mkdir -p dotnet && tar zxf dotnet-sdk-${DOTNET_VERSION}-linux-x64.tar.gz -C dotnet
