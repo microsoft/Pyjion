@@ -45,7 +45,7 @@ jobs:
       - name: Build
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: cmake --build . --config $BUILD_TYPE --target pyjion
+        run: cmake --build . --config $BUILD_TYPE --target _pyjion
 
   build-mac:
     runs-on: macos-latest

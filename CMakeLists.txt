@@ -164,6 +164,11 @@ target_link_libraries(unit_tests ${Python3_LIBRARIES})
 if (NOT WIN32)
     target_link_libraries(_pyjion ${DOTNETPATH}/${CLR_JIT_LIB})
     target_link_libraries(unit_tests ${DOTNETPATH}/${CLR_JIT_LIB})
+    add_custom_command(
+            TARGET _pyjion POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+            ${DOTNETPATH}/${CLR_JIT_LIB}
+            $<TARGET_FILE_DIR:_pyjion>)
 else ()
     target_link_libraries(_pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
     target_link_libraries(unit_tests ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)

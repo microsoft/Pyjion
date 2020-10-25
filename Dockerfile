@@ -18,6 +18,7 @@ RUN apt-get -y update && apt-get install -y software-properties-common && apt-ge
      && apt-get clean -y
 RUN wget https://dotnetcli.azureedge.net/dotnet/Sdk/${DOTNET_VERSION}/dotnet-sdk-${DOTNET_VERSION}-linux-x64.tar.gz
 RUN mkdir -p dotnet && tar zxf dotnet-sdk-${DOTNET_VERSION}-linux-x64.tar.gz -C dotnet
-ENV DOTNETPATH=/src/dotnet
-RUN cmake -E make_directory build && cmake -DCMAKE_BUILD_TYPE=Release && cmake --build . --config Release --target pyjion
+ENV DOTNET_ROOT=/src/dotnet
+RUN cmake -E make_directory build && cmake -DCMAKE_BUILD_TYPE=Release && cmake --build . --config Release --target _pyjion
+RUN pip3.9 install .
 
