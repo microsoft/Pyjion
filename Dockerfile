@@ -19,5 +19,5 @@ RUN apt-get -y update && apt-get install -y software-properties-common && apt-ge
 RUN wget https://dotnetcli.azureedge.net/dotnet/Sdk/${DOTNET_VERSION}/dotnet-sdk-${DOTNET_VERSION}-linux-x64.tar.gz
 RUN mkdir -p dotnet && tar zxf dotnet-sdk-${DOTNET_VERSION}-linux-x64.tar.gz -C dotnet
 ENV DOTNETPATH=/src/dotnet
-RUN cmake -E make_directory build && cmake -DCMAKE_BUILD_TYPE=Debug && cmake --build . --config Debug
-RUN ./unit_tests
+RUN cmake -E make_directory build && cmake -DCMAKE_BUILD_TYPE=Release && cmake --build . --config Release --target pyjion
+
