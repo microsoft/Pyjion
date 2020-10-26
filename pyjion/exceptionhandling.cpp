@@ -106,6 +106,10 @@ vector<ExceptionHandler*> ExceptionHandlerManager::GetHandlers() {
     return m_exceptionHandlers;
 }
 
+void ExceptionHandlerManager::PopBack() {
+    m_exceptionHandlers.pop_back();
+}
+
 ehFlags operator | (ehFlags lhs, ehFlags rhs) {
     return (ehFlags)(static_cast<int>(lhs) | static_cast<int>(rhs));
 }

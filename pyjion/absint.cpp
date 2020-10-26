@@ -2149,6 +2149,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             case POP_EXCEPT:
                 popExcept();
                 decStack(3);
+                m_exceptionHandler.PopBack();
                 skipEffect = true;
                 break;
             case POP_BLOCK:

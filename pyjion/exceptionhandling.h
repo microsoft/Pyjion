@@ -144,6 +144,8 @@ public:
 
     bool IsHandlerAtOffset(int offset);
     ExceptionHandler* HandlerAtOffset(int offset);
+
+    void PopBack();
 };
 
 #endif //PYJION_EXCEPTIONHANDLING_H
