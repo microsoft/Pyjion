@@ -42,13 +42,10 @@ ExceptionHandler* ExceptionHandlerManager::SetRootHandler(Label raiseNoHandlerLa
     return m_exceptionHandlers[0];
 }
 
-ExceptionHandler* ExceptionHandlerManager::AddSetupFinallyHandler(Label raiseLabel,
-                                                                  Label reraiseLabel,
-                                                                  Label handlerLabel,
-                                                                  ValueStack stack,
-                                                                  ExceptionHandler* currentHandler,
-                                                                  ExceptionVars vars
-                                                                  ) {
+ExceptionHandler * ExceptionHandlerManager::AddSetupFinallyHandler(Label raiseLabel, Label reraiseLabel,
+                                                                   Label handlerLabel, ValueStack stack,
+                                                                   ExceptionHandler *currentHandler, ExceptionVars vars,
+                                                                   unsigned long handlerIndex) {
     auto newHandler = new ExceptionHandler(
             m_exceptionHandlers.size(),
             vars,
@@ -58,6 +55,8 @@ ExceptionHandler* ExceptionHandlerManager::AddSetupFinallyHandler(Label raiseLab
             stack,
             EhfTryFinally,
             currentHandler);
+    m_handlerIndexes[handlerIndex] = newHandler;
+
     m_exceptionHandlers.push_back(
         newHandler
     );
@@ -93,6 +92,14 @@ ExceptionHandler* ExceptionHandlerManager::GetRootHandler() {
 
 bool ExceptionHandlerManager::Empty() {
     return m_exceptionHandlers.empty();
+}
+
+bool ExceptionHandlerManager::IsHandlerAtOffset(int offset){
+    return m_handlerIndexes.find(offset) != m_handlerIndexes.end();
+}
+
+ExceptionHandler* ExceptionHandlerManager::HandlerAtOffset(int offset){
+    return m_handlerIndexes.find(offset)->second;
 }
 
 vector<ExceptionHandler*> ExceptionHandlerManager::GetHandlers() {

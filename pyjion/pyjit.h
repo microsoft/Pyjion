@@ -73,12 +73,9 @@ public:
 	Py_EvalFunc j_evalfunc;
 	PY_UINT64_T j_specialization_threshold;
 	PyObject* j_code;
-#ifdef TRACE_TREE
-	SpecializedTreeNode* funcs;
-#else
 	std::vector<SpecializedTreeNode*> j_optimized;
-#endif
 	Py_EvalFunc j_generic;
+    void *j_evalstate;
 
 	explicit PyjionJittedCode(PyObject* code) {
 		j_code = code;
@@ -86,10 +83,8 @@ public:
 		j_failed = false;
 		j_evalfunc = nullptr;
 		j_specialization_threshold = HOT_CODE;
-#ifdef TRACE_TREE
-		funcs = new SpecializedTreeNode();
-#endif
 		j_generic = nullptr;
+		j_evalstate = nullptr;
 	}
 
 	~PyjionJittedCode();

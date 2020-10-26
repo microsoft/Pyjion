@@ -104,8 +104,8 @@ public:
 
      bool beyond(int curByte){
          return (size() > 1 &&
-         curByte >= back().EndOffset &&
-         back().EndOffset != -1);
+             curByte >= back().EndOffset &&
+             back().EndOffset != -1);
      }
 
      size_t size() const{

@@ -1691,6 +1691,19 @@ JittedCode* AbstractInterpreter::compileWorker() {
             // Recover stack from jump
             m_stack = curStackDepth->second;
         }
+        if (m_exceptionHandler.IsHandlerAtOffset(curByte)){
+#ifdef DUMP_TRACES
+            printf("Recovering EH stack\n");
+#endif
+            ExceptionHandler* handler = m_exceptionHandler.HandlerAtOffset(curByte);
+            m_comp->emit_load_local(handler->ExVars.PrevTraceback);
+            m_comp->emit_load_local(handler->ExVars.PrevExcVal);
+            m_comp->emit_load_local(handler->ExVars.PrevExc);
+            m_comp->emit_load_local(handler->ExVars.FinallyTb);
+            m_comp->emit_load_local(handler->ExVars.FinallyValue);
+            m_comp->emit_load_local(handler->ExVars.FinallyExc);
+            incStack(6);
+        }
 
         // If this operation goes beyond "EndOffset", pop the stack.
         if (m_blockStack.beyond(curByte)) {
@@ -1757,6 +1770,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 break;
             case RERAISE:{
                 m_comp->emit_restore_err();
+                //decStack(3);
                 unwindHandlers();
                 skipEffect = true;
                 break;
@@ -2116,7 +2130,8 @@ JittedCode* AbstractInterpreter::compileWorker() {
                         handlerLabel,
                         m_stack,
                         current.CurrentHandler,
-                        ExceptionVars(m_comp, true));
+                        ExceptionVars(m_comp, true),
+                        jumpTo);
 
                 auto newBlock = BlockInfo(
                         jumpTo,
@@ -2126,17 +2141,18 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 m_blockStack.push_back(newBlock);
 
                 ValueStack newStack = ValueStack(m_stack);
-                newStack.inc(3, STACK_KIND_OBJECT);
-                m_offsetStack[oparg + curByte + sizeof(_Py_CODEUNIT)] = newStack;
-                skipEffect=true;
+                // This stack only gets used if an error occurs within the try:
+                m_offsetStack[jumpTo] = newStack;
+                skipEffect = true;
             }
             break;
             case POP_EXCEPT:
                 popExcept();
+                decStack(3);
                 skipEffect = true;
                 break;
             case POP_BLOCK:
-                compilePopBlock();
+                m_blockStack.pop_back();
                 break;
             case SETUP_WITH:
             case YIELD_FROM:
@@ -2379,36 +2395,7 @@ exception_unwind:
 }
 
 void AbstractInterpreter::compilePopBlock() {
-    auto handler = m_blockStack.back().CurrentHandler;
-
-    auto curHandler = m_blockStack.back();
-    m_blockStack.pop_back();
-    if (curHandler.Kind == SETUP_FINALLY) {
-        // convert block into an END_FINALLY/POP_EXCEPT BlockInfo
-        auto back = m_blockStack.back();
-
-        auto &prevHandler = handler;
-        auto &backHandler = handler->BackHandler;
-
-        auto newHandler = m_exceptionHandler.AddInTryHandler(
-                m_comp->emit_define_label(),
-                m_comp->emit_define_label(),
-                backHandler->ErrorTarget,
-                backHandler->EntryStack,
-                back.CurrentHandler,
-                prevHandler->ExVars,
-                backHandler->Flags & EhfTryFinally
-        );
-
-        auto newBlock = BlockInfo(
-                back.EndOffset,
-                curHandler.Kind == SETUP_FINALLY ? RERAISE : POP_EXCEPT,
-                newHandler,
-                curHandler.Flags,
-                curHandler.ContinueOffset
-        );
-        m_blockStack.push_back(newBlock);
-    }
+    auto curBlock = m_blockStack.back();
     m_blockStack.pop_back();
 }
 
@@ -2678,9 +2665,9 @@ void AbstractInterpreter::unwindHandlers(){
 }
 
 void AbstractInterpreter::returnValue(int opcodeIndex) {
-    decStack();
     m_comp->emit_store_local(m_retValue);
     m_comp->emit_branch(BranchLeave, m_retLabel);
+    decStack();
 }
 
 
@@ -2727,8 +2714,6 @@ void AbstractInterpreter::forIter(int loopIndex, int opcodeIndex, BlockInfo *loo
     // oparg is where to jump on break
     auto iterValue = m_comp->emit_spill();
     decStack();
-    //bool inLoop = false;
-    //Local loopOpt1, loopOpt2;
     if (loopInfo != nullptr) {
         loopInfo->LoopVar = iterValue;
     }
@@ -2760,6 +2745,8 @@ void AbstractInterpreter::loadFast(int local, int opcodeIndex) {
 
 void AbstractInterpreter::loadFastWorker(int local, bool checkUnbound) {
     m_comp->emit_load_fast(local);
+
+    // Check if arg is unbound, raises UnboundLocalError
     if (checkUnbound) {
         Label success = m_comp->emit_define_label();
 

@@ -21,8 +21,6 @@
 * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 * OTHER DEALINGS IN THE SOFTWARE.
 *
-
-
 */
 
 #include <Python.h>
@@ -37,60 +35,29 @@ HINSTANCE            g_pMSCorEE;
 // we'll have a jitted code object & optimized evalutation function optimized
 // for those arguments.  
 struct SpecializedTreeNode {
-#ifdef TRACE_TREE
-	vector<pair<PyTypeObject*, SpecializedTreeNode*>> children;
-#else
 	vector<PyTypeObject*> types;
-#endif
 	Py_EvalFunc addr;
 	JittedCode* jittedCode;
 	int hitCount;
 
-#ifdef TRACE_TREE
-	SpecializedTreeNode() {
-#else
-	SpecializedTreeNode(vector<PyTypeObject*>& types) : types(types) {
-#endif
+	explicit SpecializedTreeNode(vector<PyTypeObject*>& types) : types(types) {
 		addr = nullptr;
 		jittedCode = nullptr;
 		hitCount = 0;
 	}
 
-#ifdef TRACE_TREE
-	SpecializedTreeNode* getNextNode(PyTypeObject* type) {
-		for (auto cur = children.begin(); cur != children.end(); cur++) {
-			if (cur->first == type) {
-				return cur->second;
-			}
-		}
-
-		auto res = new SpecializedTreeNode();
-		children.push_back(pair<PyTypeObject*, SpecializedTreeNode*>(type, res));
-		return res;
-	}
-#endif
-
 	~SpecializedTreeNode() {
 		delete jittedCode;
-#ifdef TRACE_TREE
-		for (auto cur = children.begin(); cur != children.end(); cur++) {
-			delete cur->second;
-		}
-#endif
 	}
 };
 
 
 PyjionJittedCode::~PyjionJittedCode() {
-#ifdef TRACE_TREE
-	delete funcs;
-#else
 	for (auto cur = j_optimized.begin(); cur != j_optimized.end(); cur++) {
 		delete *cur;
 	}
-#endif
 }
-
+PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame);
 PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
 #ifdef DUMP_TRACES
     printf("Invoking trace %s from %s line %d %p %p\r\n",
@@ -136,42 +103,26 @@ void JitInit() {
     g_emptyTuple = PyTuple_New(0);
 }
 
-#ifdef NO_TRACE
-
-unordered_map<PyjionJittedCode*, JittedCode*> g_pyjionJittedCode;
-
-__declspec(dllexport) bool jit_compile(PyCodeObject* code) {
-    auto jittedCode = (PyjionJittedCode *)code->co_extra;
-
-#ifdef DUMP_TRACES
-    static int compileCount = 0, failCount = 0;
-    printf("Compiling %s from %s line %d #%d (%d failures so far)\r\n",
-        PyUnicode_AsUTF8(code->co_name),
-        PyUnicode_AsUTF8(code->co_filename),
-        code->co_firstlineno,
-        ++compileCount,
-        failCount);
-#endif
-
-    PythonCompiler jitter(code);
-    AbstractInterpreter interp(code, &jitter);
-    auto res = interp.compile();
-
-    if (res == nullptr) {
-#ifdef DUMP_TRACES
-        printf("Compilation failure #%d\r\n", ++failCount);
-#endif
-        jittedCode->j_failed = true;
+bool jit_compile(PyCodeObject* code) {
+    // TODO : support for generator expressions
+    if (strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
         return false;
     }
+#ifdef DUMP_TRACES
+    static int compileCount = 0, failCount = 0;
+    printf("Tracing %s from %s line %d #%d (%d failures so far)\r\n",
+           PyUnicode_AsUTF8(code->co_name),
+           PyUnicode_AsUTF8(code->co_filename),
+           code->co_firstlineno,
+           ++compileCount,
+           failCount);
+#endif
 
-    g_pyjionJittedCode[jittedCode] = res;
-    jittedCode->j_evalfunc = &Jit_EvalHelper;
-    jittedCode->j_evalstate = res->get_code_addr();
+    auto jittedCode = PyJit_EnsureExtra((PyObject *) code);
+
+    jittedCode->j_evalfunc = &Jit_EvalTrace;
     return true;
 }
-
-#else
 
 AbstractValueKind GetAbstractType(PyTypeObject* type) {
     if (type == nullptr) {
@@ -320,29 +271,6 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 	return res;
 }
 
-bool jit_compile(PyCodeObject* code) {
-    // TODO : support for generator expressions
-	if (strcmp(PyUnicode_AsUTF8(code->co_name), "<genexpr>") == 0) {
-        return false;
-    }
-#ifdef DUMP_TRACES
-    static int compileCount = 0, failCount = 0;
-    printf("Tracing %s from %s line %d #%d (%d failures so far)\r\n",
-        PyUnicode_AsUTF8(code->co_name),
-        PyUnicode_AsUTF8(code->co_filename),
-        code->co_firstlineno,
-        ++compileCount,
-        failCount);
-#endif
-
-	auto jittedCode = PyJit_EnsureExtra((PyObject*)code);
-
-	jittedCode->j_evalfunc = &Jit_EvalTrace;
-    return true;
-}
-
-#endif
-
 
 PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject) {
 	auto index = (ssize_t)PyThread_tss_get(g_extraSlot);
@@ -436,15 +364,6 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 }
 
 void PyjionJitFree(void* obj) {
-    // TODO : Figure out what this old code was for.
-//	auto* function = (PyjionJittedCode*)obj;
-//    auto find = g_pyjionJittedCode.find(function);
-//    if (find != g_pyjionJittedCode.end()) {
-//        auto code = find->second;
-//
-//        delete code;
-//        g_pyjionJittedCode.erase(function);
-//    }
     free(obj);
 }
 
@@ -507,6 +426,30 @@ static PyObject *pyjion_info(PyObject *self, PyObject* func) {
 	return res;
 }
 
+static PyObject *pyjion_dump_il(PyObject *self, PyObject* func) {
+    PyObject* code;
+    if (PyFunction_Check(func)) {
+        code = ((PyFunctionObject*)func)->func_code;
+    }
+    else if (PyCode_Check(func)) {
+        code = func;
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError, "Expected function or code");
+        return nullptr;
+    }
+
+    PyjionJittedCode* jitted = PyJit_EnsureExtra(code);
+    if (jitted->j_failed || jitted->j_evalfunc == nullptr)
+         Py_RETURN_NONE;
+
+    auto res = PyBytes_FromString((char*)jitted->j_evalfunc);
+    if (res == nullptr) {
+        return nullptr;
+    }
+    return res;
+}
+
 static PyObject *pyjion_set_threshold(PyObject *self, PyObject* args) {
 	if (!PyLong_Check(args)) {
 		PyErr_SetString(PyExc_TypeError, "Expected int for new threshold");
@@ -553,6 +496,12 @@ static PyMethodDef PyjionMethods[] = {
 		METH_O,
 		"Returns a dictionary describing information about a function or code objects current JIT status."
 	},
+    {
+        "dump_il",
+        pyjion_dump_il,
+        METH_O,
+        "Outputs the IL for the compiled code object."
+    },
 	{
 		"set_threshold",
 		pyjion_set_threshold,

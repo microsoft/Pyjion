@@ -117,6 +117,7 @@ struct ExceptionHandler {
 
 class ExceptionHandlerManager {
     vector<ExceptionHandler*> m_exceptionHandlers;
+    unordered_map<unsigned long, ExceptionHandler*> m_handlerIndexes;
 public:
     ExceptionHandlerManager() = default;
 
@@ -129,13 +130,8 @@ public:
     bool Empty();
     ExceptionHandler* SetRootHandler(Label raiseNoHandlerLabel, Label reraiseNoHandlerLabel, ExceptionVars vars);
     ExceptionHandler* GetRootHandler();
-    ExceptionHandler* AddSetupFinallyHandler(Label raiseLabel,
-                                             Label reraiseLabel,
-                                             Label handlerLabel,
-                                             ValueStack stack,
-                                             ExceptionHandler* currentHandler,
-                                             ExceptionVars vars
-    );
+    ExceptionHandler *AddSetupFinallyHandler(Label raiseLabel, Label reraiseLabel, Label handlerLabel, ValueStack stack,
+                                             ExceptionHandler *currentHandler, ExceptionVars vars, unsigned long handlerIndex);
     ExceptionHandler* AddInTryHandler(Label raiseLabel,
                                                                Label reraiseLabel,
                                                                Label handlerLabel,
@@ -145,6 +141,9 @@ public:
                                                                bool inTryFinally
     );
     vector<ExceptionHandler*> GetHandlers();
+
+    bool IsHandlerAtOffset(int offset);
+    ExceptionHandler* HandlerAtOffset(int offset);
 };
 
 #endif //PYJION_EXCEPTIONHANDLING_H

@@ -31,17 +31,23 @@
 
 using namespace std;
 
+/// Empty helper function given to the JIT as the entry-point callback. Never used
 void helperFtn(){};
-void breakpointFtn(){
 
-}
+/// Empty breakpoint function, put some bonus code in here if you want to debug anything between
+/// CPython opcodes.
+void breakpointFtn(){}
 
+/// Override the default .NET CIL_NEWARR with a custom array allocator. See getHelperFtn
+/// \param size Requested array size
+/// \param arrayMT Array type handle
+/// \return new vector
 vector<PyObject *> newArrayHelperFtn(INT_PTR size, CORINFO_CLASS_HANDLE arrayMT){
     return std::vector<PyObject*> (size);
 }
 
 void stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref){
-    int i = 0;
+    // TODO : Implement vector allocation and assignment logic for CIL_STELEM.x
 }
 
 
@@ -137,7 +143,6 @@ void PythonCompiler::emit_incref(bool maybeTagged) {
 
         m_il.mark_label(done);
     }
-
 }
 
 void PythonCompiler::emit_breakpoint(){
@@ -146,7 +151,6 @@ void PythonCompiler::emit_breakpoint(){
 }
 
 void PythonCompiler::decref() {
-    // TODO : This causes segmentation faults at runtime. Find the root cause.
     m_il.emit_call(METHOD_DECREF_TOKEN, 1);
 }
 
