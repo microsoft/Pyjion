@@ -1,3 +1,5 @@
+from enum import Enum
+
 from ._pyjion import *
 from collections import namedtuple
 
@@ -62,6 +64,155 @@ META = 8
 MOOT = None
 
 OPDEF = namedtuple("OPDEF", "cee_code name es_effect_pre es_effect_post size type n_bytes first_byte second_byte flow_arg")
+
+
+# From pycomp.h
+class MethodTokens (Enum):
+    METHOD_ADD_TOKEN                         = 0x00000000
+    METHOD_MULTIPLY_TOKEN                    = 0x00000001
+    METHOD_SUBTRACT_TOKEN                    = 0x00000002
+    METHOD_DIVIDE_TOKEN                      = 0x00000003
+    METHOD_FLOORDIVIDE_TOKEN                 = 0x00000004
+    METHOD_POWER_TOKEN                       = 0x00000005
+    METHOD_MODULO_TOKEN                      = 0x00000006
+    METHOD_SUBSCR_TOKEN                      = 0x00000007
+    METHOD_STOREMAP_TOKEN                    = 0x00000008
+    METHOD_RICHCMP_TOKEN                     = 0x00000009
+    METHOD_CONTAINS_TOKEN                    = 0x0000000A
+    METHOD_NOTCONTAINS_TOKEN                 = 0x0000000B
+    METHOD_STORESUBSCR_TOKEN                 = 0x0000000C
+    METHOD_DELETESUBSCR_TOKEN                = 0x0000000D
+    METHOD_NEWFUNCTION_TOKEN                 = 0x0000000E
+    METHOD_GETITER_TOKEN                     = 0x0000000F
+    METHOD_DECREF_TOKEN                      = 0x00000010
+    METHOD_GETBUILDCLASS_TOKEN               = 0x00000011
+    METHOD_LOADNAME_TOKEN                    = 0x00000012
+    METHOD_STORENAME_TOKEN                   = 0x00000013
+    METHOD_UNPACK_SEQUENCE_TOKEN             = 0x00000014
+    METHOD_UNPACK_SEQUENCEEX_TOKEN           = 0x00000015
+    METHOD_DELETENAME_TOKEN                  = 0x00000016
+    METHOD_PYCELL_SET_TOKEN                  = 0x00000017
+    METHOD_SET_CLOSURE                       = 0x00000018
+    METHOD_BUILD_SLICE                       = 0x00000019
+    METHOD_UNARY_POSITIVE                    = 0x0000001A
+    METHOD_UNARY_NEGATIVE                    = 0x0000001B
+    METHOD_UNARY_NOT                         = 0x0000001C
+    METHOD_UNARY_INVERT                      = 0x0000001D
+    METHOD_MATRIX_MULTIPLY_TOKEN             = 0x0000001E
+    METHOD_BINARY_LSHIFT_TOKEN               = 0x0000001F
+    METHOD_BINARY_RSHIFT_TOKEN               = 0x00000020
+    METHOD_BINARY_AND_TOKEN                  = 0x00000021
+    METHOD_BINARY_XOR_TOKEN                  = 0x00000022
+    METHOD_BINARY_OR_TOKEN                   = 0x00000023
+    METHOD_LIST_APPEND_TOKEN                 = 0x00000024
+    METHOD_SET_ADD_TOKEN                     = 0x00000025
+    METHOD_INPLACE_POWER_TOKEN               = 0x00000026
+    METHOD_INPLACE_MULTIPLY_TOKEN            = 0x00000027
+    METHOD_INPLACE_MATRIX_MULTIPLY_TOKEN     = 0x00000028
+    METHOD_INPLACE_TRUE_DIVIDE_TOKEN         = 0x00000029
+    METHOD_INPLACE_FLOOR_DIVIDE_TOKEN        = 0x0000002A
+    METHOD_INPLACE_MODULO_TOKEN              = 0x0000002B
+    METHOD_INPLACE_ADD_TOKEN                 = 0x0000002C
+    METHOD_INPLACE_SUBTRACT_TOKEN            = 0x0000002D
+    METHOD_INPLACE_LSHIFT_TOKEN              = 0x0000002E
+    METHOD_INPLACE_RSHIFT_TOKEN              = 0x0000002F
+    METHOD_INPLACE_AND_TOKEN                 = 0x00000030
+    METHOD_INPLACE_XOR_TOKEN                 = 0x00000031
+    METHOD_INPLACE_OR_TOKEN                  = 0x00000032
+    METHOD_MAP_ADD_TOKEN                     = 0x00000033
+    METHOD_PRINT_EXPR_TOKEN                  = 0x00000034
+    METHOD_LOAD_CLASSDEREF_TOKEN             = 0x00000035
+    METHOD_PREPARE_EXCEPTION                 = 0x00000036
+    METHOD_DO_RAISE                          = 0x00000037
+    METHOD_EH_TRACE                          = 0x00000038
+    METHOD_COMPARE_EXCEPTIONS                = 0x00000039
+    METHOD_UNBOUND_LOCAL                     = 0x0000003A
+    METHOD_DEBUG_TRACE                       = 0x0000003B
+    METHOD_DEBUG_DUMP_FRAME                  = 0x0000003E
+    METHOD_UNWIND_EH                         = 0x0000003F
+    METHOD_PY_PUSHFRAME                      = 0x00000041
+    METHOD_PY_POPFRAME                       = 0x00000042
+    METHOD_PY_IMPORTNAME                     = 0x00000043
+
+    METHOD_PY_IMPORTFROM                     = 0x00000045
+    METHOD_PY_IMPORTSTAR                     = 0x00000046
+    METHOD_IS                                = 0x00000049
+    METHOD_ISNOT                             = 0x0000004A
+    METHOD_IS_BOOL                           = 0x0000004B
+    METHOD_ISNOT_BOOL                        = 0x0000004C
+    METHOD_GETITER_OPTIMIZED_TOKEN           = 0x0000004D
+    METHOD_COMPARE_EXCEPTIONS_INT            = 0x0000004E
+
+    METHOD_UNARY_NOT_INT                     = 0x00000051
+    METHOD_FLOAT_FROM_DOUBLE                 = 0x00000053
+    METHOD_BOOL_FROM_LONG                    = 0x00000054
+    METHOD_PYERR_SETSTRING                   = 0x00000055
+    METHOD_BOX_TAGGED_PTR                    = 0x00000056
+
+    METHOD_EQUALS_INT_TOKEN                  = 0x00000065
+    METHOD_LESS_THAN_INT_TOKEN               = 0x00000066
+    METHOD_LESS_THAN_EQUALS_INT_TOKEN        = 0x00000067
+    METHOD_NOT_EQUALS_INT_TOKEN              = 0x00000068
+    METHOD_GREATER_THAN_INT_TOKEN            = 0x00000069
+    METHOD_GREATER_THAN_EQUALS_INT_TOKEN     = 0x0000006A
+    METHOD_PERIODIC_WORK                     = 0x0000006B
+
+    METHOD_EXTENDLIST_TOKEN                  = 0x0000006C
+    METHOD_LISTTOTUPLE_TOKEN                 = 0x0000006D
+    METHOD_SETUPDATE_TOKEN                   = 0x0000006E
+    METHOD_DICTUPDATE_TOKEN                  = 0x0000006F
+    METHOD_UNBOX_LONG_TAGGED                 = 0x00000070
+
+    METHOD_INT_TO_FLOAT                      = 0x00000072
+
+    METHOD_STOREMAP_NO_DECREF_TOKEN          = 0x00000073
+    METHOD_FORMAT_VALUE                      = 0x00000074
+    METHOD_FORMAT_OBJECT                     = 0x00000075
+    METHOD_BUILD_DICT_FROM_TUPLES            = 0x00000076
+    METHOD_DICT_MERGE                        = 0x00000077
+    METHOD_SETUP_ANNOTATIONS                 = 0x00000078
+
+    METHOD_CALL_0_TOKEN        = 0x00010000
+    METHOD_CALL_1_TOKEN        = 0x00010001
+    METHOD_CALL_2_TOKEN        = 0x00010002
+    METHOD_CALL_3_TOKEN        = 0x00010003
+    METHOD_CALL_4_TOKEN        = 0x00010004
+    METHOD_METHCALL_0_TOKEN        = 0x00011000
+    METHOD_METHCALLN_TOKEN        = 0x00011004
+    METHOD_CALL_ARGS            = 0x0001000A
+    METHOD_CALL_KWARGS          = 0x0001000B
+    METHOD_PYUNICODE_JOINARRAY  = 0x0002000C
+    METHOD_CALLN_TOKEN          = 0x000101FF
+    METHOD_KWCALLN_TOKEN        = 0x000103FF
+    METHOD_LOAD_METHOD      = 0x00010400
+    METHOD_PYTUPLE_NEW           = 0x00020000
+    METHOD_PYLIST_NEW            = 0x00020001
+    METHOD_PYDICT_NEWPRESIZED    = 0x00020002
+    METHOD_PYSET_NEW             = 0x00020003
+    METHOD_PYSET_ADD             = 0x00020004
+    METHOD_PYOBJECT_ISTRUE       = 0x00020005
+    METHOD_PYITER_NEXT           = 0x00020006
+    METHOD_PYCELL_GET            = 0x00020007
+    METHOD_PYERR_RESTORE         = 0x00020008
+    METHOD_PYOBJECT_STR          = 0x00020009
+    METHOD_PYOBJECT_REPR         = 0x0002000A
+    METHOD_PYOBJECT_ASCII        = 0x0002000B
+
+    METHOD_LOADGLOBAL_TOKEN      = 0x00030000
+    METHOD_LOADATTR_TOKEN        = 0x00030001
+    METHOD_STOREATTR_TOKEN       = 0x00030002
+    METHOD_DELETEATTR_TOKEN      = 0x00030003
+    METHOD_STOREGLOBAL_TOKEN     = 0x00030004
+    METHOD_DELETEGLOBAL_TOKEN    = 0x00030005
+    METHOD_LOAD_ASSERTION_ERROR  = 0x00030006
+
+    METHOD_FLOAT_POWER_TOKEN    = 0x00050000
+    METHOD_FLOAT_FLOOR_TOKEN    = 0x00050001
+    METHOD_FLOAT_MODULUS_TOKEN  = 0x00050002
+
+    SIG_ITERNEXT_TOKEN            = 0x00040000
+    SIG_ITERNEXT_OPTIMIZED_TOKEN  = 0x00040001
+
 
 # Copy + Paste these from opcode.def and wrap the CEE codes in quotes.
 
@@ -375,9 +526,18 @@ def print_il(il):
         while True:
             pc += 1
             first = next(i)
+            if first == 0:
+                label = int.from_bytes((first, next(i), next(i), next(i)), byteorder='little', signed=True)
+                print(f"--- {label} ---")
+                continue
+
             op = opcode_map[first]
             if op.size == InlineNone:
                 print(f"[{pc}] - {op.name}")
+                continue
+            elif op.size == ShortInlineBrTarget:
+                target = int.from_bytes((next(i),), byteorder='little', signed=True)
+                print(f"[{pc}] SB {op.name} -> {target}")
                 continue
             elif op.size == InlineBrTarget:
                 target = int.from_bytes((next(i), next(i), next(i), next(i)), byteorder='little', signed=True)
@@ -397,7 +557,8 @@ def print_il(il):
                 continue
             elif op.size == InlineMethod:
                 target = int.from_bytes((next(i), next(i), next(i), next(i)), byteorder='little', signed=True)
-                print(f"[{pc}] M {op.name} ({target})")
+                meth = MethodTokens(target)
+                print(f"[{pc}] M {op.name} ({target} : {meth})")
                 continue
             elif op.size == InlineSig:
                 target = int.from_bytes((next(i), next(i), next(i), next(i)), byteorder='little', signed=True)

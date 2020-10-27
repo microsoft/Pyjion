@@ -434,12 +434,10 @@ static PyObject *pyjion_dump_il(PyObject *self, PyObject* func) {
     if (jitted->j_failed || jitted->j_evalfunc == nullptr)
          Py_RETURN_NONE;
 
-    auto res = PyList_New(jitted->j_ilLen);
+    auto res = PyByteArray_FromStringAndSize(reinterpret_cast<const char *>(jitted->j_il), jitted->j_ilLen);
     if (res == nullptr) {
         return nullptr;
     }
-    for (int i =0 ; i < jitted->j_ilLen ; i++)
-        PyList_SET_ITEM(res, i, PyLong_FromUnsignedLong(jitted->j_il[i]));
     return res;
 }
 
