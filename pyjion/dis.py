@@ -522,62 +522,71 @@ for opcode in opcodes:
 def print_il(il):
     i = iter(il)
     try:
-        pc = -1
+        pc = 0
         while True:
-            pc += 1
             first = next(i)
-            if first == 0:
-                label = int.from_bytes((first, next(i), next(i), next(i)), byteorder='little', signed=True)
-                print(f"--- {label} ---")
-                continue
+            if first == 0 and pc == 0:
+                print(f"!!! Corrupt IL !!!")
+                return
 
             op = opcode_map[first]
             if op.size == InlineNone:
-                print(f"[{pc}] - {op.name}")
+                print(f"[IL_{pc:04x}] - {op.name:15}")
+                pc += 1
                 continue
             elif op.size == ShortInlineBrTarget:
                 target = int.from_bytes((next(i),), byteorder='little', signed=True)
-                print(f"[{pc}] SB {op.name} -> {target}")
+                print(f"[IL_{pc:04x}] SB {op.name:15} -> {target}")
+                pc += 2
                 continue
             elif op.size == InlineBrTarget:
                 target = int.from_bytes((next(i), next(i), next(i), next(i)), byteorder='little', signed=True)
-                print(f"[{pc}] B {op.name} -> {target}")
+                print(f"[IL_{pc:04x}] B {op.name:15} -> {target}")
+                pc += 5
                 continue
             elif op.size == InlineField:
                 field = int.from_bytes((next(i), next(i), next(i), next(i)), byteorder='little', signed=True)
-                print(f"[{pc}] F {op.name} ({field})")
+                print(f"[IL_{pc:04x}] F {op.name:15} ({field})")
+                pc += 5
                 continue
             elif op.size == InlineI:
                 target = int.from_bytes((next(i), next(i), next(i), next(i)), byteorder='little', signed=True)
-                print(f"[{pc}] I {op.name} ({target})")
+                print(f"[IL_{pc:04x}] I {op.name:15} ({target})")
+                pc += 5
                 continue
             elif op.size == InlineI8:
                 target = int.from_bytes((next(i), next(i), next(i), next(i), next(i), next(i), next(i), next(i)), byteorder='little', signed=True)
-                print(f"[{pc}] I8 {op.name} ({target})")
+                print(f"[IL_{pc:04x}] I8 {op.name:15} ({target})")
+                pc += 9
                 continue
             elif op.size == InlineMethod:
                 target = int.from_bytes((next(i), next(i), next(i), next(i)), byteorder='little', signed=True)
                 meth = MethodTokens(target)
-                print(f"[{pc}] M {op.name} ({target} : {meth})")
+                print(f"[IL_{pc:04x}] M {op.name:15} ({target} : {meth})")
+                pc += 5
                 continue
             elif op.size == InlineSig:
                 target = int.from_bytes((next(i), next(i), next(i), next(i)), byteorder='little', signed=True)
-                print(f"[{pc}] S {op.name} ({target})")
+                print(f"[IL_{pc:04x}] S {op.name:15} ({target})")
+                pc += 5
                 continue
             elif op.size == InlineString:
                 target = int.from_bytes((next(i), next(i), next(i), next(i)), byteorder='little', signed=True)
-                print(f"[{pc}] M {op.name} ({target})")
+                print(f"[IL_{pc:04x}] M {op.name:15} ({target})")
+                pc += 5
                 continue
             elif op.size == ShortInlineVar:
                 target = int.from_bytes((next(i),), byteorder='little', signed=True)
-                print(f"[{pc}] SV {op.name} ({target})")
+                print(f"[IL_{pc:04x}] SV {op.name:15} ({target})")
+                pc += 2
                 continue
             elif op.size == InlineVar:
                 target = int.from_bytes((next(i), next(i)), byteorder='little', signed=True)
-                print(f"[{pc}] V {op.name} ({target})")
+                print(f"[IL_{pc:04x}] V {op.name:15} ({target})")
+                pc += 3
                 continue
             else:
-                raise NotImplementedError(op.size)
+                raise NotImplementedError(f"Haven't implemented IL Opcode with size {op.size}")
 
     except StopIteration:
         pass
