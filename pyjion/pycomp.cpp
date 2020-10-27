@@ -1151,7 +1151,7 @@ void PythonCompiler::emit_periodic_work() {
 }
 
 JittedCode* PythonCompiler::emit_compile() {
-    CorJitInfo* jitInfo = new CorJitInfo(m_code, m_module);
+    auto* jitInfo = new CorJitInfo(m_code, m_module);
     auto addr = m_il.compile(jitInfo, g_jit, m_code->co_stacksize + 100).m_addr;
     if (addr == nullptr) {
 #ifdef DEBUG

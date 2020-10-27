@@ -630,12 +630,13 @@ public:
         return methodInfo;
     }
 
-    Method compile(ICorJitInfo* jitInfo, ICorJitCompiler* jit, int stackSize) {
+    Method compile(CorJitInfo* jitInfo, ICorJitCompiler* jit, int stackSize) {
         BYTE* nativeEntry;
         ULONG nativeSizeOfCode;
         auto res = Method(m_module, m_retType, m_params, nullptr);
-        CORINFO_METHOD_INFO methodInfo = to_method(&res, stackSize);
 
+        CORINFO_METHOD_INFO methodInfo = to_method(&res, stackSize);
+        jitInfo->assignIL(methodInfo.ILCode, methodInfo.ILCodeSize);
         CorJitResult result = jit->compileMethod(
                 jitInfo,
                 &methodInfo,

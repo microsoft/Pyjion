@@ -81,7 +81,6 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
     }
 
 	frame->f_executing = 1;
-    // TODO : Catch corrupt memory address before faulting on RIP offset.
     auto res = ((Py_EvalFunc)state)(nullptr, frame);
 
 #ifdef DUMP_TRACES
@@ -174,11 +173,6 @@ PyTypeObject* GetArgType(int arg, PyObject** locals) {
     PyTypeObject* type = nullptr;
     if (objValue != nullptr) {
         type = objValue->ob_type;
-        // We currently only generate optimal code for ints and floats,
-        // so don't bother specializing on other types...
-        if (type != &PyLong_Type && type != &PyFloat_Type) {
-            type = nullptr;
-        }
     }
     return type;
 }
@@ -232,14 +226,11 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 			}
 
 			auto res = interp.compile();
-			bool isSpecialized = false;
-
 #ifdef DUMP_TRACES
-			printf("Tracing %s from %s line %d %s\r\n",
+			printf("Tracing %s from %s line %d\r\n",
 				PyUnicode_AsUTF8(frame->f_code->co_name),
 				PyUnicode_AsUTF8(frame->f_code->co_filename),
-				frame->f_code->co_firstlineno,
-				isSpecialized ? "specialized" : ""
+				frame->f_code->co_firstlineno
 			);
 #endif
 
@@ -256,13 +247,13 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 			target->addr = (Py_EvalFunc)res->get_code_addr();
 			assert(target->addr != nullptr);
 			target->jittedCode = res;
-			if (!isSpecialized) {
-				// We didn't produce a specialized function, force all code down
-				// the generic code path.
-				trace->j_generic = target->addr;
-				trace->j_evalfunc = Jit_EvalGeneric;
-			}
-			
+
+			trace->j_il = res->get_il();
+			trace->j_ilLen = res->get_il_len();
+
+            trace->j_generic = target->addr;
+            trace->j_evalfunc = Jit_EvalGeneric;
+
 			return Jit_EvalHelper((void*)target->addr, frame);
 		}
 	}
@@ -443,10 +434,12 @@ static PyObject *pyjion_dump_il(PyObject *self, PyObject* func) {
     if (jitted->j_failed || jitted->j_evalfunc == nullptr)
          Py_RETURN_NONE;
 
-    auto res = PyBytes_FromString((char*)jitted->j_evalfunc);
+    auto res = PyList_New(jitted->j_ilLen);
     if (res == nullptr) {
         return nullptr;
     }
+    for (int i =0 ; i < jitted->j_ilLen ; i++)
+        PyList_SET_ITEM(res, i, PyLong_FromUnsignedLong(jitted->j_il[i]));
     return res;
 }
 

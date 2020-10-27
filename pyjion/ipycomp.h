@@ -26,6 +26,8 @@
 #ifndef PYJION_IPYCOMP_H
 #define PYJION_IPYCOMP_H
 
+#include <cstdint>
+
 class Local {
 public:
     int m_index;
@@ -68,6 +70,8 @@ class JittedCode {
 public:
     virtual ~JittedCode() = default;
     virtual void* get_code_addr() = 0;
+    virtual uint8_t * get_il() = 0;
+    virtual unsigned int get_il_len() = 0;
 };
 
 // Defines the interface between the abstract compiler and code generator

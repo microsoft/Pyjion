@@ -1768,13 +1768,6 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 m_comp->emit_set_annotations();
                 intErrorCheck("failed to setup annotations");
                 break;
-            case RERAISE:{
-                m_comp->emit_restore_err();
-                //decStack(3);
-                unwindHandlers();
-                skipEffect = true;
-                break;
-            }
             case JUMP_ABSOLUTE:
                 jumpAbsolute(oparg, opcodeIndex); break;
             case JUMP_FORWARD:
@@ -2146,6 +2139,13 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 skipEffect = true;
             }
             break;
+            case RERAISE:{
+                m_comp->emit_restore_err();
+                //decStack(3);
+                unwindHandlers();
+                skipEffect = true;
+                break;
+            }
             case POP_EXCEPT:
                 popExcept();
                 decStack(3);

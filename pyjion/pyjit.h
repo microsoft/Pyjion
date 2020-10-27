@@ -76,6 +76,8 @@ public:
 	std::vector<SpecializedTreeNode*> j_optimized;
 	Py_EvalFunc j_generic;
     void *j_evalstate;
+    uint8_t *j_il;
+    unsigned int j_ilLen;
 
 	explicit PyjionJittedCode(PyObject* code) {
 		j_code = code;

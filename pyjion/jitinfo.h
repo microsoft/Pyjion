@@ -65,6 +65,8 @@ class CorJitInfo : public ICorJitInfo, public JittedCode {
     void* m_dataAddr;
     PyCodeObject *m_code;
     UserModule* m_module;
+    uint8_t* m_il;
+    unsigned int m_ilLen;
 
 public:
 
@@ -72,6 +74,8 @@ public:
         m_codeAddr = m_dataAddr = nullptr;
         m_code = code;
         m_module = module;
+        m_il = nullptr;
+        m_ilLen = 0;
     }
 
     ~CorJitInfo() override {
@@ -86,6 +90,14 @@ public:
 
     void* get_code_addr() override {
         return m_codeAddr;
+    }
+
+    uint8_t* get_il() override {
+        return m_il;
+    }
+
+    unsigned int get_il_len() override {
+        return m_ilLen;
     }
 
     void freeMem(PVOID code) {
@@ -1824,6 +1836,10 @@ public:
                         CORINFO_METHOD_HANDLE methodHandle) override {
     }
 
+    void assignIL(uint8_t *il, unsigned int ilLen) {
+        m_il = il;
+        m_ilLen = ilLen;
+    }
 };
 
 #endif
