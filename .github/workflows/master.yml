@@ -54,7 +54,7 @@ jobs:
 
       - name: Run test suite
         shell: bash
-        run: python Tests/test.py -f Tests/python_smoke_tests.txt
+        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
 
 
   build-mac:
