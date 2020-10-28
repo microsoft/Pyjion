@@ -295,7 +295,6 @@ public:
     AbstractValue* getReturnInfo();
 
 private:
-    void compilePopBlock();
     AbstractValue* toAbstract(PyObject* obj);
     AbstractValue* toAbstract(AbstractValueKind kind);
     static bool mergeStates(InterpreterState& newState, InterpreterState& mergeTo);
@@ -385,6 +384,8 @@ private:
     void testBoolAndBranch(Local value, bool isTrue, Label target);
 
     void unwindHandlers();
+
+    void emitRaise(ExceptionHandler *handler);
 };
 
 

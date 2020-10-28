@@ -52,9 +52,6 @@ AbstractInterpreter::~AbstractInterpreter() {
     for (auto source : m_sources) {
         delete source;
     }
-    for (auto absValue : m_values) {
-        delete absValue;
-    }
 }
 
 bool AbstractInterpreter::preprocess() {
@@ -1238,7 +1235,7 @@ void AbstractInterpreter::intErrorCheck(const char* reason) {
     m_comp->emit_int(0);
     m_comp->emit_branch(BranchEqual, noErr);
 
-     branchRaise(reason);
+    branchRaise(reason);
     m_comp->emit_mark_label(noErr);
 }
 
@@ -1325,6 +1322,7 @@ void AbstractInterpreter::branchRaise(const char *reason) {
         m_comp->emit_debug_msg(reason);
     }
 #endif
+    m_comp->emit_eh_trace();
 
     // number of stack entries we need to clear...
     size_t count = m_stack.size() - entryStack.size();
@@ -1582,6 +1580,15 @@ void AbstractInterpreter::raiseOnNegativeOne() {
     m_comp->emit_mark_label(noErr);
 }
 
+void AbstractInterpreter::emitRaise(ExceptionHandler * handler) {
+    m_comp->emit_load_local(handler->ExVars.PrevTraceback);
+    m_comp->emit_load_local(handler->ExVars.PrevExcVal);
+    m_comp->emit_load_local(handler->ExVars.PrevExc);
+    m_comp->emit_load_local(handler->ExVars.FinallyTb);
+    m_comp->emit_load_local(handler->ExVars.FinallyValue);
+    m_comp->emit_load_local(handler->ExVars.FinallyExc);
+}
+
 JittedCode* AbstractInterpreter::compileWorker() {
     Label ok;
 
@@ -1629,22 +1636,8 @@ JittedCode* AbstractInterpreter::compileWorker() {
 #endif
             ExceptionHandler* handler = m_exceptionHandler.HandlerAtOffset(curByte);
             m_comp->emit_mark_label(handler->ErrorTarget);
-            m_comp->emit_load_local(handler->ExVars.PrevTraceback);
-            m_comp->emit_load_local(handler->ExVars.PrevExcVal);
-            m_comp->emit_load_local(handler->ExVars.PrevExc);
-            m_comp->emit_load_local(handler->ExVars.FinallyTb);
-            m_comp->emit_load_local(handler->ExVars.FinallyValue);
-            m_comp->emit_load_local(handler->ExVars.FinallyExc);
+            emitRaise(handler);
             incStack(6);
-        }
-
-        // If this operation goes beyond "EndOffset", pop the stack.
-        if (m_blockStack.beyond(curByte)) {
-#ifdef DUMP_TRACES
-            printf("Compiling new block beyond EndOffset %d\n", curByte);
-#endif
-            // TODO : Check if this is needed anymore. The compiler seems to put a POP_BLOCK at the end of a TRY block
-            compilePopBlock();
         }
 
 #ifdef DUMP_TRACES
@@ -1680,7 +1673,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 break;
             case DUP_TOP:
                 m_comp->emit_dup_top();
-                m_stack.dup_top();
+                m_stack.dup_top(); // implicit incStack(1)
                 break;
             case DUP_TOP_TWO:
                 incStack(2);
@@ -2019,7 +2012,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             {
                 auto current = m_blockStack.back();
                 auto jumpTo = oparg + curByte + sizeof(_Py_CODEUNIT);
-                auto handlerLabel = m_comp->emit_define_label(); //getOffsetLabel(jumpTo);
+                auto handlerLabel = m_comp->emit_define_label();
                 auto newHandler = m_exceptionHandler.AddSetupFinallyHandler(
                         handlerLabel,
                         m_stack,
@@ -2277,8 +2270,6 @@ JittedCode* AbstractInterpreter::compileWorker() {
 #endif
     }
 
-    unwindHandlers();
-
     // label branch for error handling when we have no EH handlers, (return NULL).
     m_comp->emit_branch(BranchAlways, rootHandlerLabel);
     m_comp->emit_mark_label(rootHandlerLabel);
@@ -2298,11 +2289,6 @@ JittedCode* AbstractInterpreter::compileWorker() {
     m_comp->emit_ret(1);
 
     return m_comp->emit_compile();
-}
-
-void AbstractInterpreter::compilePopBlock() {
-    auto curBlock = m_blockStack.back();
-    m_blockStack.pop_back();
 }
 
 void AbstractInterpreter::emitRaiseAndFree(ExceptionHandler* handler) {

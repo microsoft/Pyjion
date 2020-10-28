@@ -58,25 +58,6 @@ ExceptionHandler * ExceptionHandlerManager::AddSetupFinallyHandler(Label handler
     return newHandler;
 }
 
-ExceptionHandler* ExceptionHandlerManager::AddInTryHandler(Label handlerLabel,
-                                                          ValueStack stack,
-                                                          ExceptionHandler* currentHandler,
-                                                          ExceptionVars vars,
-                                                          bool inTryFinally
-) {
-    auto newHandler = new ExceptionHandler(
-            m_exceptionHandlers.size(),
-            vars,
-            handlerLabel,
-            stack,
-            inTryFinally ? EhfTryFinally | EhfInExceptHandler : EhfInExceptHandler,
-            currentHandler);
-    m_exceptionHandlers.push_back(
-            newHandler
-    );
-    return newHandler;
-}
-
 ExceptionHandler* ExceptionHandlerManager::GetRootHandler() {
     return m_exceptionHandlers[0];
 }
@@ -95,10 +76,6 @@ ExceptionHandler* ExceptionHandlerManager::HandlerAtOffset(int offset){
 
 vector<ExceptionHandler*> ExceptionHandlerManager::GetHandlers() {
     return m_exceptionHandlers;
-}
-
-void ExceptionHandlerManager::PopBack() {
-    m_exceptionHandlers.pop_back();
 }
 
 ehFlags operator | (ehFlags lhs, ehFlags rhs) {

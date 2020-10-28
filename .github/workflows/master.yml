@@ -47,6 +47,15 @@ jobs:
         shell: bash
         run: cmake --build . --config $BUILD_TYPE --target _pyjion
 
+      - name: Build Python Package
+        shell: bash
+        run: pip install .
+
+      - name: Run smoke tests
+        shell: bash
+        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
+
+
   build-mac:
     runs-on: macos-latest
     strategy:
@@ -76,6 +85,14 @@ jobs:
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: cmake --build . --config $BUILD_TYPE
+
+      - name: Build Python Package
+        shell: bash
+        run: pip install .
+
+      - name: Run smoke tests
+        shell: bash
+        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
 
       - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
@@ -110,14 +127,17 @@ jobs:
       - name: Configure CMake
         shell: bash
         working-directory: ${{runner.workspace}}/build
-        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=Release
+        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=Release -DDO_TESTS=1
 
       - name: Build
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: cmake --build . --config Release
 
-      - name: Run unit tests
-        working-directory: ${{runner.workspace}}/build
+      - name: Build Python Package
         shell: bash
-        run: ./unit_tests.exe
+        run: pip install .
+
+      - name: Run smoke tests
+        shell: bash
+        run: python Tests\test_pyjion.py -f Tests\python_smoke_tests.txt
