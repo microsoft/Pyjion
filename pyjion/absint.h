@@ -384,6 +384,8 @@ private:
     void testBoolAndBranch(Local value, bool isTrue, Label target);
 
     void unwindHandlers();
+
+    void emitRaise(ExceptionHandler *handler);
 };
 
 

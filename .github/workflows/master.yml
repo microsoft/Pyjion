@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: pip install .
 
-      - name: Run test suite
+      - name: Run smoke tests
         shell: bash
         run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
 
@@ -85,6 +85,14 @@ jobs:
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: cmake --build . --config $BUILD_TYPE
+
+      - name: Build Python Package
+        shell: bash
+        run: pip install .
+
+      - name: Run smoke tests
+        shell: bash
+        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
 
       - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
@@ -130,6 +138,6 @@ jobs:
         shell: bash
         run: pip install .
 
-      - name: Run test suite
+      - name: Run smoke tests
         shell: bash
         run: python Tests\test_pyjion.py -f Tests\python_smoke_tests.txt

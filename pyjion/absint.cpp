@@ -1580,6 +1580,15 @@ void AbstractInterpreter::raiseOnNegativeOne() {
     m_comp->emit_mark_label(noErr);
 }
 
+void AbstractInterpreter::emitRaise(ExceptionHandler * handler) {
+    m_comp->emit_load_local(handler->ExVars.PrevTraceback);
+    m_comp->emit_load_local(handler->ExVars.PrevExcVal);
+    m_comp->emit_load_local(handler->ExVars.PrevExc);
+    m_comp->emit_load_local(handler->ExVars.FinallyTb);
+    m_comp->emit_load_local(handler->ExVars.FinallyValue);
+    m_comp->emit_load_local(handler->ExVars.FinallyExc);
+}
+
 JittedCode* AbstractInterpreter::compileWorker() {
     Label ok;
 
@@ -1627,12 +1636,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
 #endif
             ExceptionHandler* handler = m_exceptionHandler.HandlerAtOffset(curByte);
             m_comp->emit_mark_label(handler->ErrorTarget);
-            m_comp->emit_load_local(handler->ExVars.PrevTraceback);
-            m_comp->emit_load_local(handler->ExVars.PrevExcVal);
-            m_comp->emit_load_local(handler->ExVars.PrevExc);
-            m_comp->emit_load_local(handler->ExVars.FinallyTb);
-            m_comp->emit_load_local(handler->ExVars.FinallyValue);
-            m_comp->emit_load_local(handler->ExVars.FinallyExc);
+            emitRaise(handler);
             incStack(6);
         }
 
