@@ -401,7 +401,7 @@ public:
     // Sets the current exception type and text
     virtual void emit_pyerr_setstring(void* exception, const char*msg) = 0;
 
-    virtual void emit_incref(bool maybeTagged = false) = 0; 
+    virtual void emit_incref(bool maybeTagged = false) = 0;
 
     virtual void emit_debug_msg(const char* msg) = 0;
 

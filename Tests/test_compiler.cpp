@@ -262,17 +262,20 @@ TEST_CASE("Annotation tests") {
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                break\n            finally:\n                pass\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("Break from a double nested try/finally needs to unwind all exceptions") {
+    }
+    SECTION("Break from a double nested try/finally needs to unwind all exceptions") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                raise Exception()\n            finally:\n                try:\n                     break\n                finally:\n                    pass\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("return from nested try/finally should use BranchLeave to clear stack when branching to return label") {
+    }
+    SECTION("return from nested try/finally should use BranchLeave to clear stack when branching to return label") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            return 42\n        finally:\n            pass"
         );
         CHECK(t.returns() == "42");
-    }SECTION("Return from nested try/finally should unwind nested exception handlers") {
+    }
+    SECTION("Return from nested try/finally should unwind nested exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            raise Exception()\n        finally:\n            try:\n                return 42\n            finally:\n                pass\n    return 23"
         );
@@ -475,54 +478,62 @@ TEST_CASE("X Conditional returns") {
                 "def f():\n    x = 0\n    x += 1\n    x -= 1\n    return x or 1"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }
+    SECTION("test2") {
         auto t = CompilerTest(
                 "def f():\n    x = 0\n    x += 1\n    x -= 1\n    return x and 1"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test") {
+    }
+    SECTION("test3") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    x += 1\n    x -= 1\n    return x or 2"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }
+    SECTION("test4") {
         auto t = CompilerTest(
                 "def f():\n    x = 1\n    x += 1\n    x -= 1\n    return x and 2"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test") {
+    }
+    SECTION("test5") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    return x or 1"
         );
         CHECK(t.returns() == "4611686018427387903");
-    }SECTION("test") {
+    }
+    SECTION("test6") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    return x and 1"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }
+    SECTION("test7") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    x -= 4611686018427387903\n    return x or 1"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test") {
+    }
+    SECTION("test8") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    x -= 4611686018427387903\n    return x and 1"
         );
         CHECK(t.returns() == "0");
     }
-
-    SECTION("test") {
+    SECTION("test9") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    x -= 1\n    return -x"
         );
         CHECK(t.returns() == "-4611686018427387903");
-    }SECTION("test") {
+    }
+    SECTION("test10") {
         auto t = CompilerTest(
                 "def f():\n    x = 4611686018427387903\n    x += 1\n    return -x"
         );
         CHECK(t.returns() == "-4611686018427387904");
-    }SECTION("test") {
+    }
+    SECTION("test11") {
         auto t = CompilerTest(
                 "def f():\n    x = -4611686018427387904\n    x += 1\n    x -= 1\n    return -x"
         );
@@ -1509,432 +1520,254 @@ TEST_CASE("optimized cases") {
                 "def f():\n    def g(*a): return a\n    return g(*(1, 2, 3))"
         );
         CHECK(t.returns() == "(1, 2, 3)");
-    }SECTION("test60") {
+    }
+    SECTION("test60") {
         auto t = CompilerTest(
                 "def f():\n    def g(*a): return a\n    return g(1, *(2, 3))"
         );
         CHECK(t.returns() == "(1, 2, 3)");
-    }SECTION("test61") {
+    }
+    SECTION("test61") {
         auto t = CompilerTest(
                 "def f():\n    def g(): pass\n    g.abc = {fn.lower() for fn in ['A']}\n    return g.abc"
         );
         CHECK(t.returns() == "{'a'}");
-    }SECTION("test62") {
+    }
+    SECTION("test62") {
         auto t = CompilerTest(
                 "def f():\n    for abc in [1,2,3]:\n        try:\n            break\n        except ImportError:\n            continue\n    return abc"
         );
         CHECK(t.returns() == "1");
     }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f():\n    a = 1\n    b = 2\n    def x():\n        return a, b\n    return x()",
-//                        );
-//CHECK(t.returns() == "(1, 2)", vector<PyObject *>({NULL, PyCell_New(NULL), PyCell_New(NULL)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f() :\n    def g(x) :\n        return x\n    a = 1\n    def x() :\n        return g(a)\n    return x()",
-//                        );
-//CHECK(t.returns() == "1", vector<PyObject *>({NULL, PyCell_New(NULL), PyCell_New(NULL)}))
-//                }
     SECTION("test63") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test64") {
+    }
+    SECTION("test64") {
         auto t = CompilerTest(
                 "def f():\n	try:\n		pass\n	except ImportError:\n		pass\n	except Exception as e:\n		pass"
         );
         CHECK(t.returns() == "None");
-    }SECTION("test65") {
+    }
+    SECTION("test65") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception('hi')\n    except:\n        return 42"
         );
         CHECK(t.returns() == "42");
     }
-        //SECTION("test"){auto t = CompilerTest(
-        //	"def f(sys_module, _imp_module):\n    '''Setup importlib by importing needed built - in modules and injecting them\n    into the global namespace.\n\n    As sys is needed for sys.modules access and _imp is needed to load built - in\n    modules, those two modules must be explicitly passed in.\n\n    '''\n    global _imp, sys\n    _imp = _imp_module\n    sys = sys_module\n\n    # Set up the spec for existing builtin/frozen modules.\n    module_type = type(sys)\n    for name, module in sys.modules.items():\n        if isinstance(module, module_type):\n            if name in sys.builtin_module_names:\n                loader = BuiltinImporter\n            elif _imp.is_frozen(name):\n                loader = FrozenImporter\n            else:\n                continue\n            spec = _spec_from_module(module, loader)\n            _init_module_attrs(spec, module)\n\n    # Directly load built-in modules needed during bootstrap.\n    self_module = sys.modules[__name__]\n    for builtin_name in ('_warnings',):\n        if builtin_name not in sys.modules:\n            builtin_module = _builtin_from_name(builtin_name)\n        else:\n            builtin_module = sys.modules[builtin_name]\n        setattr(self_module, builtin_name, builtin_module)\n\n    # Directly load the _thread module (needed during bootstrap).\n    try:\n        thread_module = _builtin_from_name('_thread')\n    except ImportError:\n        # Python was built without threads\n        thread_module = None\n    setattr(self_module, '_thread', thread_module)\n\n    # Directly load the _weakref module (needed during bootstrap).\n    weakref_module = _builtin_from_name('_weakref')\n    setattr(self_module, '_weakref', weakref_module)\n",
-        //	);
-        // CHECK(t.returns() == "42");
-        //}
     SECTION("test66") {
         auto t = CompilerTest(
                 "def f():\n    x = {}\n    try:\n        return x[42]\n    except KeyError:\n        return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test67") {
+    }
+    SECTION("test67") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        pass\n    finally:\n        pass\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test68") {
+    }
+    SECTION("test68") {
         auto t = CompilerTest(
                 "def f():\n    x = {}\n    x.update(y=2)\n    return x"
         );
         CHECK(t.returns() == "{'y': 2}");
     }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a):\n    return 1 if a else 2",
-//                        vector<TestInput>({
-//                                                  );
-//CHECK(t.returns() == "1", vector<PyObject *>({PyLong_FromLong(42)})),
-//                                                  );
-//CHECK(t.returns() == "2", vector<PyObject *>({PyLong_FromLong(0)})),
-//                                                  );
-//CHECK(t.returns() == "1", vector<PyObject *>({Incremented(Py_True)})),
-//                                                  );
-//CHECK(t.returns() == "2", vector<PyObject *>({Incremented(Py_False)}))
-//                                          })
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(v):\n    try:\n        x = v.real\n    except AttributeError:\n        return 42\n    else:\n        return x\n",
-//                        vector<TestInput>({
-//                                                  );
-//CHECK(t.returns() == "1", vector<PyObject *>({PyLong_FromLong(1)})),
-//                                                  );
-//CHECK(t.returns() == "42", vector<PyObject *>({PyUnicode_FromString("hi")}))
-//                                          })}
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f():\n    a=1\n    def x():\n        return a\n    return a",
-//                        );
-//CHECK(t.returns() == "1", vector<PyObject *>({NULL, PyCell_New(NULL)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f():\n    x = 2\n    def g():    return x\n    \n    str(g)\n    return g()",
-//                        );
-//CHECK(t.returns() == "2", vector<PyObject *>({NULL, PyCell_New(NULL)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f():\n    a=2\n    def g(): return a\n    return g()",
-//                        );
-//CHECK(t.returns() == "2", vector<PyObject *>({NULL, PyCell_New(NULL)}))
-//                }
     SECTION("test69") {
         auto t = CompilerTest(
                 "def f():\n    def g(a=2): return a\n    return g()"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test70") {
+    }
+    SECTION("test70") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            continue\n        finally:\n            return i"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test71") {
+    }
+    SECTION("test71") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        pass"
         );
         CHECK(t.raises() == PyExc_Exception);
-    }SECTION("test72") {
+    }
+    SECTION("test72") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        pass\n    finally:\n        return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test73") {
+    }
+    SECTION("test73") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    except:\n        return 2"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test74") {
+    }
+    SECTION("test74") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    except Exception:\n        return 2"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test75") {
+    }
+    SECTION("test75") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    except AssertionError:\n        return 2\n    return 4"
         );
         CHECK(t.raises() == PyExc_Exception);
-    }SECTION("test76") {
+    }
+    SECTION("test76") {
         auto t = CompilerTest(
                 "def f():\n    global x\n    x = 2\n    return x"
         );
         CHECK(t.returns() == "2");
     }
-//                SECTION("test"){auto t = CompilerTest(    // hits JUMP_FORWARD
-//                        "def f(a):\n    if a:\n        x = 1\n    else:\n        x = 2\n    return x",
-//                        vector<TestInput>({
-//                                                  );
-//CHECK(t.returns() == "1", vector<PyObject *>({PyLong_FromLong(42)})),
-//                                                  );
-//CHECK(t.returns() == "2", vector<PyObject *>({PyLong_FromLong(0)})),
-//                                                  );
-//CHECK(t.returns() == "1", vector<PyObject *>({Incremented(Py_True)})),
-//                                                  );
-//CHECK(t.returns() == "2", vector<PyObject *>({Incremented(Py_False)}))
-//                                          })}
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    return a and b",
-//                        vector<TestInput>({
-//                                                  );
-//CHECK(t.returns() == "2", vector<PyObject *>(
-//                                                          {PyLong_FromLong(1), PyLong_FromLong(2)})),
-//                                                  );
-//CHECK(t.returns() == "0", vector<PyObject *>(
-//                                                          {PyLong_FromLong(0), PyLong_FromLong(1)})),
-//                                                  );
-//CHECK(t.returns() == "False", vector<PyObject *>({Py_True, Py_False})),
-//                                                  );
-//CHECK(t.returns() == "False", vector<PyObject *>({Py_False, Py_True})),
-//                                                  );
-//CHECK(t.returns() == "True", vector<PyObject *>({Py_True, Py_True})),
-//                                                  );
-//CHECK(t.returns() == "False", vector<PyObject *>({Py_False, Py_False}))
-//                                          })
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    return a or b",
-//                        vector<TestInput>({
-//                                                  );
-//CHECK(t.returns() == "1", vector<PyObject *>(
-//                                                          {PyLong_FromLong(1), PyLong_FromLong(2)})),
-//                                                  );
-//CHECK(t.returns() == "1", vector<PyObject *>(
-//                                                          {PyLong_FromLong(0), PyLong_FromLong(1)})),
-//                                                  );
-//CHECK(t.returns() == "True", vector<PyObject *>({Py_True, Py_False})),
-//                                                  );
-//CHECK(t.returns() == "True", vector<PyObject *>({Py_False, Py_True})),
-//                                                  );
-//CHECK(t.returns() == "True", vector<PyObject *>({Py_True, Py_True})),
-//                                                  );
-//CHECK(t.returns() == "False", vector<PyObject *>({Py_False, Py_False}))
-//                                          })}
-//                SECTION("test"){auto t = CompilerTest(         // hits ROT_TWO, POP_TWO, DUP_TOP, ROT_THREE
-//                        "def f(a, b, c):\n    return a < b < c",
-//                        vector<TestInput>({
-//                                                  );
-//CHECK(t.returns() == "True", vector<PyObject *>(
-//                                                          {PyLong_FromLong(2), PyLong_FromLong(3),
-//                                                           PyLong_FromLong(4)})),
-//                                                  );
-//CHECK(t.returns() == "False", vector<PyObject *>(
-//                                                          {PyLong_FromLong(4), PyLong_FromLong(3), PyLong_FromLong(2)}))
-//                                          })
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    a **= b\n    return a",
-//                        );
-//CHECK(t.returns() == "8", vector<PyObject *>({PyLong_FromLong(2), PyLong_FromLong(3)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    a *= b\n    return a",
-//                        );
-//CHECK(t.returns() == "6", vector<PyObject *>({PyLong_FromLong(2), PyLong_FromLong(3)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    a /= b\n    return a",
-//                        );
-//CHECK(t.returns() == "0.5", vector<PyObject *>({PyLong_FromLong(2), PyLong_FromLong(4)}))
-//                }
-//
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    a %= b\n    return a",
-//                        );
-//CHECK(t.returns() == "1", vector<PyObject *>({PyLong_FromLong(3), PyLong_FromLong(2)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    a -= b\n    return a",
-//                        );
-//CHECK(t.returns() == "1", vector<PyObject *>({PyLong_FromLong(3), PyLong_FromLong(2)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    a <<= b\n    return a",
-//                        );
-//CHECK(t.returns() == "4", vector<PyObject *>({PyLong_FromLong(1), PyLong_FromLong(2)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    a >>= b\n    return a",
-//                        );
-//CHECK(t.returns() == "1", vector<PyObject *>({PyLong_FromLong(2), PyLong_FromLong(1)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    a &= b\n    return a",
-//                        );
-//CHECK(t.returns() == "2", vector<PyObject *>({PyLong_FromLong(6), PyLong_FromLong(3)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    a ^= b\n    return a",
-//                        );
-//CHECK(t.returns() == "5", vector<PyObject *>({PyLong_FromLong(6), PyLong_FromLong(3)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b):\n    a |= b\n    return a",
-//                        );
-//CHECK(t.returns() == "7", vector<PyObject *>({PyLong_FromLong(6), PyLong_FromLong(3)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(x):\n    return -x",
-//                        );
-//CHECK(t.returns() == "-1", vector<PyObject *>({PyLong_FromLong(1)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(x):\n    return +x",
-//                        );
-//CHECK(t.returns() == "1", vector<PyObject *>({PyLong_FromLong(1)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(x):\n    return ~x",
-//                        );
-//CHECK(t.returns() == "-2", vector<PyObject *>({PyLong_FromLong(1)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b): return a << b",
-//                        );
-//CHECK(t.returns() == "4", vector<PyObject *>({PyLong_FromLong(1), PyLong_FromLong(2)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b): return a >> b",
-//                        );
-//CHECK(t.returns() == "2", vector<PyObject *>({PyLong_FromLong(4), PyLong_FromLong(1)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b): return a & b",
-//                        );
-//CHECK(t.returns() == "2", vector<PyObject *>({PyLong_FromLong(6), PyLong_FromLong(3)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b): return a | b",
-//                        );
-//CHECK(t.returns() == "3", vector<PyObject *>({PyLong_FromLong(1), PyLong_FromLong(2)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(a, b): return a ^ b",
-//                        );
-//CHECK(t.returns() == "6", vector<PyObject *>({PyLong_FromLong(3), PyLong_FromLong(5)}))
-//                }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f(x):\n    return not x",
-//                        vector<TestInput>({
-//                                                  );
-//CHECK(t.returns() == "False", vector<PyObject *>({PyLong_FromLong(1)}));
-//CHECK(t.returns() == "True", vector<PyObject *>({PyLong_FromLong(0)}));
-//                                          })}
     SECTION("test77") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(3):\n        if i == 0: continue\n        break\n    return i"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test78") {
+    }
+    SECTION("test78") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(3):\n        if i == 1: break\n    return i"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test79") {
+    }
+    SECTION("test79") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][1:]"
         );
         CHECK(t.returns() == "[2, 3]");
-    }SECTION("test80") {
+    }
+    SECTION("test80") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][:1]"
         );
         CHECK(t.returns() == "[1]");
-    }SECTION("test81") {
+    }
+    SECTION("test81") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][1:2]"
         );
         CHECK(t.returns() == "[2]");
-    }SECTION("test82") {
+    }
+    SECTION("test82") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][0::2]"
         );
         CHECK(t.returns() == "[1, 3]");
     }
-//                SECTION("test"){auto t = CompilerTest(
-//                        "def f():\n    x = 2\n    def g():    return x\n    return g()",
-//                        );
-//CHECK(t.returns() == "2", vector<PyObject *>({NULL, PyCell_New(NULL)}))
-//                }
     SECTION("test83") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = range(3)\n    return a"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test84") {
+    }
+    SECTION("test84") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = range(3)\n    return b"
         );
         CHECK(t.returns() == "[1]");
-    }SECTION("test85") {
+    }
+    SECTION("test85") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = range(3)\n    return c"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test86") {
+    }
+    SECTION("test86") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 2, 3\n    return a"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test87") {
+    }
+    SECTION("test87") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 2, 3\n    return b"
         );
         CHECK(t.returns() == "[2]");
-    }SECTION("test88") {
+    }
+    SECTION("test88") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 2, 3\n    return c"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test89") {
+    }
+    SECTION("test89") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 3\n    return c"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test90") {
+    }
+    SECTION("test90") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 3\n    return b"
         );
         CHECK(t.returns() == "[]");
-    }SECTION("test91") {
+    }
+    SECTION("test91") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 2, 3]\n    return a"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test92") {
+    }
+    SECTION("test92") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 2, 3]\n    return b"
         );
         CHECK(t.returns() == "[2]");
-    }SECTION("test92") {
+    }
+    SECTION("test92") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 2, 3]\n    return c"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test93") {
+    }
+    SECTION("test93") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 3]\n    return c"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test94") {
+    }
+    SECTION("test94") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 3]\n    return b"
         );
         CHECK(t.returns() == "[]");
-    }SECTION("test95") {
+    }
+    SECTION("test95") {
         auto t = CompilerTest(
                 "def f():\n    a, b = range(2)\n    return a"
         );
         CHECK(t.returns() == "0");
-    }SECTION("test96") {
+    }
+    SECTION("test96") {
         auto t = CompilerTest(
                 "def f():\n    a, b = 1, 2\n    return a"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test97") {
+    }
+    SECTION("test97") {
         auto t = CompilerTest(
                 "def f():\n    class C:\n        pass\n    return C"
         );
         CHECK(t.returns() == "<class 'C'>");
-    }SECTION("test98") {
+    }
+    SECTION("test98") {
         auto t = CompilerTest(
                 "def f():\n    a = 0\n    for x in[1]:\n        a = a + 1\n    return a"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test99") {
+    }
+    SECTION("test99") {
         auto t = CompilerTest(
                 "def f(): return [x for x in range(2)]"
         );
         CHECK(t.returns() == "[0, 1]");
-    }SECTION("test100") {
+    }
+    SECTION("test100") {
         auto t = CompilerTest(
                 "def f():\n    def g(): pass\n    return g.__name__"
         );
