@@ -1274,13 +1274,6 @@ void AbstractInterpreter::ensureRaiseAndFreeLocals(size_t localCount) {
     }
 }
 
-void AbstractInterpreter::spillStackForRaise(size_t localCount) {
-    ensureRaiseAndFreeLocals(localCount);
-    for (size_t i = 0; i < localCount; i++) {
-        m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
-    }
-}
-
 vector<Label>& AbstractInterpreter::getRaiseAndFreeLabels(size_t blockId) {
     while (m_raiseAndFree.size() <= blockId) {
         m_raiseAndFree.emplace_back();
@@ -1372,17 +1365,6 @@ void AbstractInterpreter::branchRaise(const char *reason) {
         }
     }
     m_comp->emit_branch(BranchAlways, ehBlock->ErrorTarget);
-}
-
-void AbstractInterpreter::cleanStackForReraise() {
-    auto ehBlock = getEhblock();
-
-    auto& entryStack = ehBlock->EntryStack;
-    size_t count = m_stack.size() - entryStack.size();
-
-    for (size_t i = m_stack.size(); i-- > entryStack.size();) {
-        m_comp->pop_top();
-    }
 }
 
 void AbstractInterpreter::buildTuple(size_t argCnt) {
@@ -1646,6 +1628,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             printf("Recovering EH stack\n");
 #endif
             ExceptionHandler* handler = m_exceptionHandler.HandlerAtOffset(curByte);
+            m_comp->emit_mark_label(handler->ErrorTarget);
             m_comp->emit_load_local(handler->ExVars.PrevTraceback);
             m_comp->emit_load_local(handler->ExVars.PrevExcVal);
             m_comp->emit_load_local(handler->ExVars.PrevExc);
@@ -2017,12 +2000,10 @@ JittedCode* AbstractInterpreter::compileWorker() {
                         // returns 1 if we're doing a re-raise in which case we don't need
                         // to update the traceback.  Otherwise returns 0.
                         auto curHandler = getEhblock();
-                        auto stackDepth = m_stack.size() - curHandler->EntryStack.size();
                         if (oparg == 0) {
                                 // The stack actually ended up being empty - either because we didn't
                                 // have any values, or the values were all non-objects that we could
                                 // spill eagerly.
-
                                 // TODO : Validate this logic.
                                 m_comp->emit_branch(BranchAlways, curHandler->ErrorTarget);
                         }
@@ -2038,7 +2019,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             {
                 auto current = m_blockStack.back();
                 auto jumpTo = oparg + curByte + sizeof(_Py_CODEUNIT);
-                auto handlerLabel = getOffsetLabel(jumpTo);
+                auto handlerLabel = m_comp->emit_define_label(); //getOffsetLabel(jumpTo);
                 auto newHandler = m_exceptionHandler.AddSetupFinallyHandler(
                         handlerLabel,
                         m_stack,

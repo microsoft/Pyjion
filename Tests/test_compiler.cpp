@@ -212,6 +212,12 @@ TEST_CASE("Test general errors") {
         );
         CHECK(t.returns() == "1");
     }
+    SECTION("test nested try and pass") {
+        auto t = CompilerTest(
+                "def f():\n  a = 1\n  try:\n    try:\n      1/0\n    except:\n      a += 2\n  except:\n    a += 4\n  return a"
+        );
+        CHECK(t.returns() == "3");
+    }
     SECTION("test reraise exception") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise TypeError('hi')\n    except Exception as e:\n         pass\n    finally:\n         pass"
@@ -220,7 +226,7 @@ TEST_CASE("Test general errors") {
     }
     SECTION("test generic nested exception") {
         auto t = CompilerTest(
-                "def f():\n    try:\n        try:\n             raise Exception('hi')\n        finally:\n             pass\n    finally:\n        pass"
+                "def f():\n    try:\n        try:\n             raise Exception('borkborkbork')\n        finally:\n             pass\n    finally:\n        pass"
         );
         CHECK(t.raises() == PyExc_Exception);
     }
@@ -229,6 +235,12 @@ TEST_CASE("Test general errors") {
                 "def f():\n    try:\n        try:\n             1/0\n        finally:\n             pass\n    finally:\n        pass"
         );
         CHECK(t.raises() == PyExc_ZeroDivisionError);
+    }
+    SECTION("test simple exception filters") {
+        auto t = CompilerTest(
+                "def f():\n  try:\n    raise TypeError('err')\n  except ValueError:\n    pass\n  return 2\n"
+        );
+        CHECK(t.raises() == PyExc_TypeError);
     }
     SECTION("test exception filters") {
         auto t = CompilerTest(
