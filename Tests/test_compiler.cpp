@@ -194,6 +194,18 @@ TEST_CASE("Test general errors") {
         );
         CHECK(t.returns() == "1");
     }
+    SECTION("test simply try catch and handle implicit null branch") {
+        auto t = CompilerTest(
+                "def f():\n  a=0\n  try:\n    a=1/0\n  except:\n    a=2\n  return a\n"
+        );
+        CHECK(t.returns() == "2");
+    }
+    SECTION("test simply try catch and handle explicit raise branch") {
+        auto t = CompilerTest(
+                "def f():\n  a=0\n  try:\n    a=1\n    raise Exception('bork')\n  except:\n    a=2\n  return a\n"
+        );
+        CHECK(t.returns() == "2");
+    }
     SECTION("test return within try") {
         auto t = CompilerTest(
                 "def f():\n  try:\n    return 1\n  except:\n    return 2\n"
@@ -206,11 +218,17 @@ TEST_CASE("Test general errors") {
         );
         CHECK(t.returns() == "None");
     }
-    SECTION("test generic exception") {
+    SECTION("test generic nested exception") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        try:\n             raise Exception('hi')\n        finally:\n             pass\n    finally:\n        pass"
         );
         CHECK(t.raises() == PyExc_Exception);
+    }
+    SECTION("test generic implicit exception") {
+        auto t = CompilerTest(
+                "def f():\n    try:\n        try:\n             1/0\n        finally:\n             pass\n    finally:\n        pass"
+        );
+        CHECK(t.raises() == PyExc_ZeroDivisionError);
     }
     SECTION("test exception filters") {
         auto t = CompilerTest(
@@ -265,7 +283,7 @@ TEST_CASE("Annotation tests") {
         );
         CHECK(t.returns() == "42");
     }
-    SECTION("test exception raise") {
+    SECTION("test exception raise inside finally") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()"
         );

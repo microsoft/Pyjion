@@ -1349,7 +1349,7 @@ void AbstractInterpreter::branchRaise(const char *reason) {
 
     if (!count) {
         // No values on the stack, we can just branch directly to the raise label
-        m_comp->emit_branch(BranchAlways, ehBlock->Raise);
+        m_comp->emit_branch(BranchAlways, ehBlock->ErrorTarget);
         return;
     }
 
@@ -1371,7 +1371,7 @@ void AbstractInterpreter::branchRaise(const char *reason) {
             m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
         }
     }
-    m_comp->emit_branch(BranchAlways, labels[count - 1]);
+    m_comp->emit_branch(BranchAlways, ehBlock->ErrorTarget);
 }
 
 void AbstractInterpreter::cleanStackForReraise() {
@@ -1583,32 +1583,6 @@ int AbstractInterpreter::getExtendedOpcode(int curByte) {
     return opcode;
 }
 
-// Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
-// If the value on the stack is -1, we branch to the current error handler.
-// Otherwise branches based if the current value is true/false based upon the current opcode 
-void AbstractInterpreter::branchOrError(int& curByte) {
-    curByte += sizeof(_Py_CODEUNIT);
-    auto jmpType = GET_OPCODE(curByte);
-    auto oparg = GET_OPARG(curByte);
-    while (jmpType == EXTENDED_ARG) {
-        curByte += sizeof(_Py_CODEUNIT);
-        oparg = (oparg << 8) | GET_OPARG(curByte);
-        jmpType = GET_OPCODE(curByte);
-    }
-    markOffsetLabel(curByte);
-
-    raiseOnNegativeOne();
-
-    if (oparg <= curByte) {
-        auto tmp = m_comp->emit_spill();
-        periodicWork();
-        m_comp->emit_load_and_free_local(tmp);
-    }
-
-    m_comp->emit_branch(jmpType == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, getOffsetLabel(oparg));
-    m_offsetStack[oparg] = m_stack;
-}
-
 // Checks to see if -1 is the current value on the stack, and if so, falls into
 // the logic for raising an exception.  If not execution continues forward progress.
 // Used for checking if an API reports an error (typically true/false/-1)
@@ -1626,39 +1600,15 @@ void AbstractInterpreter::raiseOnNegativeOne() {
     m_comp->emit_mark_label(noErr);
 }
 
-// Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
-// Branches based if the current value is true/false based upon the current opcode 
-void AbstractInterpreter::branch(int& curByte) {
-    curByte += sizeof(_Py_CODEUNIT);
-    auto jmpType = GET_OPCODE(curByte);
-    auto oparg = GET_OPARG(curByte);
-    while (jmpType == EXTENDED_ARG) {
-        curByte += sizeof(_Py_CODEUNIT);
-        oparg = (oparg << 8) | GET_OPARG(curByte);
-        jmpType = GET_OPCODE(curByte);
-    }
-
-    markOffsetLabel(curByte);
-
-    if (oparg <= curByte) {
-        periodicWork();
-    }
-    m_comp->emit_branch(jmpType == POP_JUMP_IF_FALSE ? BranchFalse : BranchTrue, getOffsetLabel(oparg));
-    decStack();
-    m_offsetStack[oparg] = m_stack;
-}
-
 JittedCode* AbstractInterpreter::compileWorker() {
     Label ok;
-
-    auto raiseNoHandlerLabel = m_comp->emit_define_label();
-    auto reraiseNoHandlerLabel = m_comp->emit_define_label();
 
     m_comp->emit_lasti_init();
     m_comp->emit_push_frame();
 
+    auto rootHandlerLabel = m_comp->emit_define_label();
     // Push a catch-all error handler onto the handler list
-    auto rootHandler = m_exceptionHandler.SetRootHandler(raiseNoHandlerLabel, reraiseNoHandlerLabel, ExceptionVars(m_comp));
+    auto rootHandler = m_exceptionHandler.SetRootHandler(rootHandlerLabel, ExceptionVars(m_comp));
 
     // Push root block to stack, has no end offset
     m_blockStack.push_back(BlockInfo(-1, NOP, rootHandler));
@@ -1780,7 +1730,8 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 break;
             case POP_JUMP_IF_TRUE:
             case POP_JUMP_IF_FALSE:
-                popJumpIf(byte != POP_JUMP_IF_FALSE, opcodeIndex, oparg); break;
+                popJumpIf(byte != POP_JUMP_IF_FALSE, opcodeIndex, oparg);
+                break;
             case LOAD_NAME:
                 m_comp->emit_load_name(PyTuple_GetItem(mCode->co_names, oparg));
                 errorCheck("load name failed");
@@ -2068,39 +2019,12 @@ JittedCode* AbstractInterpreter::compileWorker() {
                         auto curHandler = getEhblock();
                         auto stackDepth = m_stack.size() - curHandler->EntryStack.size();
                         if (oparg == 0) {
-                            bool noStack = true;
-                            if (stackDepth != 0) {
-                                // This is pretty rare, you need to do a re-raise with something
-                                // already on the stack.  One way to get to it is doing a bare raise
-                                // inside of finally block.  We spill the result of the raise into a
-                                // temporary, then we clear up any values on the stack, and we generate
-                                // a set of labels for freeing objects on the stack for the re-raise.
-                                auto raiseTmp = m_comp->emit_define_local(LK_Bool);
-                                m_comp->emit_store_local(raiseTmp);
-                                auto count = clearValueStack();
-
-                                auto& raiseLabels = getRaiseAndFreeLabels(curHandler->RaiseAndFreeId);
-                                auto& reraiseLabels = getReraiseAndFreeLabels(curHandler->RaiseAndFreeId);
-
-                                m_comp->emit_load_and_free_local(raiseTmp);
-                                if (count != 0) {
-                                    ensureLabels(raiseLabels, count);
-                                    ensureLabels(reraiseLabels, count);
-
-                                    spillStackForRaise(count);
-                                    m_comp->emit_branch(BranchFalse, raiseLabels[count - 1]);
-                                    m_comp->emit_branch(BranchAlways, reraiseLabels[count - 1]);
-                                    noStack = false;
-                                }
-                            }
-
-                            if (noStack) {
                                 // The stack actually ended up being empty - either because we didn't
                                 // have any values, or the values were all non-objects that we could
                                 // spill eagerly.
-                                m_comp->emit_branch(BranchFalse, curHandler->Raise);
-                                m_comp->emit_branch(BranchAlways, curHandler->ReRaise);
-                            }
+
+                                // TODO : Validate this logic.
+                                m_comp->emit_branch(BranchAlways, curHandler->ErrorTarget);
                         }
                         else {
                             // if we have args we'll always return 0...
@@ -2115,11 +2039,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 auto current = m_blockStack.back();
                 auto jumpTo = oparg + curByte + sizeof(_Py_CODEUNIT);
                 auto handlerLabel = getOffsetLabel(jumpTo);
-                auto raiseLabel = m_comp->emit_define_label();
-                auto reraiseLabel = m_comp->emit_define_label();
                 auto newHandler = m_exceptionHandler.AddSetupFinallyHandler(
-                        raiseLabel,
-                        reraiseLabel,
                         handlerLabel,
                         m_stack,
                         current.CurrentHandler,
@@ -2148,8 +2068,10 @@ JittedCode* AbstractInterpreter::compileWorker() {
             }
             case POP_EXCEPT:
                 popExcept();
+                m_comp->pop_top();
+                m_comp->pop_top();
+                m_comp->pop_top();
                 decStack(3);
-                m_exceptionHandler.PopBack();
                 skipEffect = true;
                 break;
             case POP_BLOCK:
@@ -2374,19 +2296,21 @@ JittedCode* AbstractInterpreter::compileWorker() {
 #endif
     }
 
-exception_unwind:
     unwindHandlers();
 
     // label branch for error handling when we have no EH handlers, (return NULL).
-    emitRaiseAndFree(rootHandler);
-
+    m_comp->emit_branch(BranchAlways, rootHandlerLabel);
+    m_comp->emit_mark_label(rootHandlerLabel);
     m_comp->emit_null();
+
     auto finalRet = m_comp->emit_define_label();
     m_comp->emit_branch(BranchAlways, finalRet);
 
+    // Return value from local
     m_comp->emit_mark_label(m_retLabel);
     m_comp->emit_load_local(m_retValue);
 
+    // Final return position, pop frame and return
     m_comp->emit_mark_label(finalRet);
     m_comp->emit_pop_frame();
 
@@ -2401,54 +2325,15 @@ void AbstractInterpreter::compilePopBlock() {
 }
 
 void AbstractInterpreter::emitRaiseAndFree(ExceptionHandler* handler) {
-    auto reraiseAndFreeLabels = getReraiseAndFreeLabels(handler->RaiseAndFreeId);
-    for (auto cur = reraiseAndFreeLabels.size() - 1; cur != -1; cur--) {
-        m_comp->emit_mark_label(reraiseAndFreeLabels[cur]);
-        m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
-        m_comp->emit_pop_top();
-    }
-    if (!reraiseAndFreeLabels.empty()) {
-        m_comp->emit_branch(BranchAlways, handler->ReRaise);
-    }
-    auto raiseAndFreeLabels = getRaiseAndFreeLabels(handler->RaiseAndFreeId);
-    for (auto cur = raiseAndFreeLabels.size() - 1; cur != -1; cur--) {
-        m_comp->emit_mark_label(raiseAndFreeLabels[cur]);
-        m_comp->emit_load_local(m_raiseAndFreeLocals[cur]);
-        m_comp->emit_pop_top();
-    }
-
     if (handler->Flags & EhfInExceptHandler) {
-        // We're in an except handler and we're raising a new exception.  First we need
-        // to unwind the current exception.  If we're doing a raise we need to update the
-        // traceback with our line/frame information.  If we're doing a re-raise we need
-        // to skip that.
-        auto prepare = m_comp->emit_define_label();
-
-        m_comp->emit_mark_label(handler->Raise);
         unwindEh(handler);
 
         m_comp->emit_eh_trace();     // update the traceback
-
         if (!handler->HasErrorTarget()) {
             // We're in an except handler raising an exception with no outer exception
             // handlers.  We'll return NULL from the function indicating an error has
             // occurred
-            m_comp->emit_branch(BranchAlways, m_exceptionHandler.GetRootHandler()->Raise);
-        }
-        else {
-            m_comp->emit_branch(BranchAlways, prepare);
-        }
-
-        m_comp->emit_mark_label(handler->ReRaise);
-
-        unwindEh(handler);
-
-        m_comp->emit_mark_label(prepare);
-        if (!handler->HasErrorTarget()) {
-            // We're in an except handler re-raising an exception with no outer exception
-            // handlers.  We'll return NULL from the function indicating an error has
-            // occurred
-            m_comp->emit_branch(BranchAlways, m_exceptionHandler.GetRootHandler()->ReRaise);
+            m_comp->emit_branch(BranchAlways, m_exceptionHandler.GetRootHandler()->ErrorTarget);
         }
     }
     else {
@@ -2456,13 +2341,8 @@ void AbstractInterpreter::emitRaiseAndFree(ExceptionHandler* handler) {
         // line tracing information if we're doing a raise, and skip it if
         // we're a re-raise.  Then we prepare the exception and branch to 
         // whatever opcode will handle the exception.
-        m_comp->emit_mark_label(handler->Raise);
-
-        m_comp->emit_eh_trace();
-
-        m_comp->emit_mark_label(handler->ReRaise);
+        m_comp->emit_branch(BranchAlways, m_exceptionHandler.GetRootHandler()->ErrorTarget);
     }
-
 }
 
 void AbstractInterpreter::testBoolAndBranch(Local value, bool isTrue, Label target) {
@@ -2640,7 +2520,7 @@ void AbstractInterpreter::unwindHandlers(){
     if (!m_exceptionHandler.Empty()) {
         // TODO: Unify the first handler with this loop
         for (auto handler: m_exceptionHandler.GetHandlers()) {
-            emitRaiseAndFree(handler);
+            //emitRaiseAndFree(handler);
 
             if (handler->HasErrorTarget()) {
                 m_comp->emit_prepare_exception(

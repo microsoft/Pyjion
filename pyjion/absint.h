@@ -362,14 +362,6 @@ private:
     // Gets the next opcode skipping for EXTENDED_ARG
     int getExtendedOpcode(int curByte);
 
-    // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a possible error value on the stack.
-    // If the value on the stack is -1, we branch to the current error handler.
-    // Otherwise branches based if the current value is true/false based upon the current opcode
-    void branchOrError(int& i);
-
-    // Handles POP_JUMP_IF_FALSE/POP_JUMP_IF_TRUE with a bool value known to be on the stack.
-    // Branches based if the current value is true/false based upon the current opcode
-    void branch(int& i);
     JittedCode* compileWorker();
 
     void periodicWork();

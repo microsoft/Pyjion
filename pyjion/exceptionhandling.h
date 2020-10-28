@@ -66,17 +66,13 @@ struct ExceptionVars {
 struct ExceptionHandler {
     size_t RaiseAndFreeId;
     ehFlags Flags;
-    Label Raise,        // our raise stub label, prepares the exception
-    ReRaise,        // our re-raise stub label, prepares the exception w/o traceback update
-    ErrorTarget;    // The place to branch to for handling errors
+    Label ErrorTarget;    // The place to branch to for handling errors
     ExceptionVars ExVars;
     ValueStack EntryStack;
     ExceptionHandler* BackHandler;
 
     ExceptionHandler(size_t raiseAndFreeId,
                      ExceptionVars exceptionVars,
-                     Label raise,
-                     Label reraise,
                      Label errorTarget,
                      ValueStack entryStack,
                      ehFlags flags = EhfNone,
@@ -84,8 +80,6 @@ struct ExceptionHandler {
         RaiseAndFreeId = raiseAndFreeId;
         Flags = flags;
         EntryStack = entryStack;
-        Raise = raise;
-        ReRaise = reraise;
         ErrorTarget = errorTarget;
         BackHandler = backHandler;
     }
@@ -128,17 +122,15 @@ public:
     }
 
     bool Empty();
-    ExceptionHandler* SetRootHandler(Label raiseNoHandlerLabel, Label reraiseNoHandlerLabel, ExceptionVars vars);
+    ExceptionHandler* SetRootHandler(Label handlerLabel, ExceptionVars vars);
     ExceptionHandler* GetRootHandler();
-    ExceptionHandler *AddSetupFinallyHandler(Label raiseLabel, Label reraiseLabel, Label handlerLabel, ValueStack stack,
+    ExceptionHandler *AddSetupFinallyHandler(Label handlerLabel, ValueStack stack,
                                              ExceptionHandler *currentHandler, ExceptionVars vars, unsigned long handlerIndex);
-    ExceptionHandler* AddInTryHandler(Label raiseLabel,
-                                                               Label reraiseLabel,
-                                                               Label handlerLabel,
-                                                               ValueStack stack,
-                                                               ExceptionHandler* currentHandler,
-                                                               ExceptionVars vars,
-                                                               bool inTryFinally
+    ExceptionHandler* AddInTryHandler(Label handlerLabel,
+                                       ValueStack stack,
+                                       ExceptionHandler* currentHandler,
+                                       ExceptionVars vars,
+                                       bool inTryFinally
     );
     vector<ExceptionHandler*> GetHandlers();
 

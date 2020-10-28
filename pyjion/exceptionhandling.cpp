@@ -26,13 +26,11 @@
 #include "exceptionhandling.h"
 #include "stack.h"
 
-ExceptionHandler* ExceptionHandlerManager::SetRootHandler(Label raiseNoHandlerLabel, Label reraiseNoHandlerLabel, ExceptionVars vars) {
+ExceptionHandler* ExceptionHandlerManager::SetRootHandler(Label handlerLabel, ExceptionVars vars) {
     auto rootHandler = new ExceptionHandler(
             0,
             vars,
-            raiseNoHandlerLabel,
-            reraiseNoHandlerLabel,
-            Label(),
+            handlerLabel,
             ValueStack(),
             EhfNone,
             nullptr);
@@ -42,15 +40,12 @@ ExceptionHandler* ExceptionHandlerManager::SetRootHandler(Label raiseNoHandlerLa
     return m_exceptionHandlers[0];
 }
 
-ExceptionHandler * ExceptionHandlerManager::AddSetupFinallyHandler(Label raiseLabel, Label reraiseLabel,
-                                                                   Label handlerLabel, ValueStack stack,
+ExceptionHandler * ExceptionHandlerManager::AddSetupFinallyHandler(Label handlerLabel, ValueStack stack,
                                                                    ExceptionHandler *currentHandler, ExceptionVars vars,
                                                                    unsigned long handlerIndex) {
     auto newHandler = new ExceptionHandler(
             m_exceptionHandlers.size(),
             vars,
-            raiseLabel,
-            reraiseLabel,
             handlerLabel,
             stack,
             EhfTryFinally,
@@ -63,19 +58,15 @@ ExceptionHandler * ExceptionHandlerManager::AddSetupFinallyHandler(Label raiseLa
     return newHandler;
 }
 
-ExceptionHandler* ExceptionHandlerManager::AddInTryHandler(Label raiseLabel,
-                                                              Label reraiseLabel,
-                                                              Label handlerLabel,
-                                                              ValueStack stack,
-                                                              ExceptionHandler* currentHandler,
-                                                              ExceptionVars vars,
-                                                              bool inTryFinally
+ExceptionHandler* ExceptionHandlerManager::AddInTryHandler(Label handlerLabel,
+                                                          ValueStack stack,
+                                                          ExceptionHandler* currentHandler,
+                                                          ExceptionVars vars,
+                                                          bool inTryFinally
 ) {
     auto newHandler = new ExceptionHandler(
             m_exceptionHandlers.size(),
             vars,
-            raiseLabel,
-            reraiseLabel,
             handlerLabel,
             stack,
             inTryFinally ? EhfTryFinally | EhfInExceptHandler : EhfInExceptHandler,
