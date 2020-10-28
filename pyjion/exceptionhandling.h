@@ -126,18 +126,11 @@ public:
     ExceptionHandler* GetRootHandler();
     ExceptionHandler *AddSetupFinallyHandler(Label handlerLabel, ValueStack stack,
                                              ExceptionHandler *currentHandler, ExceptionVars vars, unsigned long handlerIndex);
-    ExceptionHandler* AddInTryHandler(Label handlerLabel,
-                                       ValueStack stack,
-                                       ExceptionHandler* currentHandler,
-                                       ExceptionVars vars,
-                                       bool inTryFinally
-    );
+
     vector<ExceptionHandler*> GetHandlers();
 
     bool IsHandlerAtOffset(int offset);
     ExceptionHandler* HandlerAtOffset(int offset);
-
-    void PopBack();
 };
 
 #endif //PYJION_EXCEPTIONHANDLING_H

@@ -56,6 +56,7 @@ private:
 
 public:
     explicit EmissionTest(const char *code) {
+        PyErr_Clear();
         m_code.reset(CompileCode(code));
         if (m_code.get() == nullptr) {
             FAIL("failed to compile in JIT code");
@@ -152,6 +153,18 @@ TEST_CASE("General list building") {
     SECTION("combine lists") {
         auto t = EmissionTest("def f(): return [1,2,3] + [4,5,6]");
         CHECK(t.returns() == "[1, 2, 3, 4, 5, 6]");
+    }
+}
+
+TEST_CASE("General list comprehensions") {
+    SECTION("static list comprehension") {
+        auto t = EmissionTest("def f(): zzzs=(1,2,3) ; return [z for z in zzzs]");
+        CHECK(t.returns() == "[1, 2, 3]");
+    }
+
+    SECTION("functional list comprehension") {
+        auto t = EmissionTest("def f(): return [i for i in range(6)]");
+        CHECK(t.returns() == "[0, 1, 2, 3, 4, 5]");
     }
 }
 

@@ -87,6 +87,7 @@ public:
         auto res = run();
         REQUIRE(res == nullptr);
         auto excType = PyErr_Occurred();
+        PyErr_Print();
         PyErr_Clear();
         return excType;
     }
@@ -299,7 +300,7 @@ TEST_CASE("Annotation tests") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()"
         );
-        CHECK(t.raises() == PyExc_Exception);
+        CHECK(t.raises() == PyExc_SystemError);
     }
 }
 TEST_CASE("Test math operations") {
