@@ -126,7 +126,10 @@ jobs:
         shell: bash
         run: cmake --build . --config Release
 
-      - name: Run unit tests
-        working-directory: ${{runner.workspace}}/build
+      - name: Build Python Package
         shell: bash
-        run: ./unit_tests.exe
+        run: pip install .
+
+      - name: Run test suite
+        shell: bash
+        run: python Tests\test_pyjion.py -f Tests\python_smoke_tests.txt

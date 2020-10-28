@@ -13,12 +13,16 @@ def _no_dotnet(path):
 
 # try and locate .Net 5
 def _which_dotnet():
-    _dotnet_root = pathlib.Path('/usr/local/share/dotnet/')
+    _dotnet_root = None
     if 'DOTNET_ROOT' in os.environ:
         _dotnet_root = pathlib.Path(os.environ['DOTNET_ROOT'])
-    if not _dotnet_root.exists():
-        _no_dotnet(_dotnet_root)
+        if not _dotnet_root.exists():
+            _no_dotnet(_dotnet_root)
     if platform.system() == "Darwin":
+        if not _dotnet_root:
+            _dotnet_root = pathlib.Path('/usr/local/share/dotnet/')
+            if not _dotnet_root.exists():
+                _no_dotnet(_dotnet_root)
         lib_path = list(_dotnet_root.glob('shared/Microsoft.NETCore.App*/5.0.0*/libclrjit.dylib'))
         if len(lib_path) > 0:
             clrjitlib = str(lib_path[0])
@@ -26,15 +30,29 @@ def _which_dotnet():
         else:
             _no_dotnet(_dotnet_root)
     elif platform.system() == "Linux":
+        if not _dotnet_root:
+            _dotnet_root = pathlib.Path('/usr/local/share/dotnet/')
+            if not _dotnet_root.exists():
+                _no_dotnet(_dotnet_root)
         lib_path = list(_dotnet_root.glob('shared/Microsoft.NETCore.App*/5.0.0*/libclrjit.so'))
         if len(lib_path) > 0:
             clrjitlib = str(lib_path[0])
             ctypes.cdll.LoadLibrary(clrjitlib)
         else:
             _no_dotnet(_dotnet_root)
+    elif platform.system() == "Windows":
+        if not _dotnet_root:
+            _dotnet_root = pathlib.WindowsPath(os.path.expandvars(r'%LocalAppData%\Microsoft\dotnet'))
+            if not _dotnet_root.exists():
+                _no_dotnet(_dotnet_root)
+        lib_path = list(_dotnet_root.glob('shared/Microsoft.NETCore.App*/5.0.0*/clrjit.dll'))
+        if len(lib_path) > 0:
+            clrjitlib = str(lib_path[0])
+            ctypes.cdll.LoadLibrary(clrjitlib)
+        else:
+            _no_dotnet(_dotnet_root)
     else:
-        # TODO : Implement Windows
-        return
+        raise ValueError("Operating System not Supported")
 
 
 _which_dotnet()
