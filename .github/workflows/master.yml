@@ -47,6 +47,16 @@ jobs:
         shell: bash
         run: cmake --build . --config $BUILD_TYPE --target _pyjion
 
+      - name: Build Python Package
+        working-directory: ${{runner.workspace}}
+        shell: bash
+        run: pip install .
+
+      - name: Run test suite
+        shell: bash
+        run: python Tests/test.py -f Tests/python_smoke_tests.txt
+
+
   build-mac:
     runs-on: macos-latest
     strategy:

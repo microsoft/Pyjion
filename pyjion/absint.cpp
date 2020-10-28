@@ -52,9 +52,6 @@ AbstractInterpreter::~AbstractInterpreter() {
     for (auto source : m_sources) {
         delete source;
     }
-    for (auto absValue : m_values) {
-        delete absValue;
-    }
 }
 
 bool AbstractInterpreter::preprocess() {
