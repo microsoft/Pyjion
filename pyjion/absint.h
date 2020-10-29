@@ -333,11 +333,6 @@ private:
     void errorCheck(const char* reason = nullptr);
     void intErrorCheck(const char* reason = nullptr);
 
-    vector<Label>& getRaiseAndFreeLabels(size_t blockId);
-    vector<Label>& getReraiseAndFreeLabels(size_t blockId);
-    void ensureRaiseAndFreeLocals(size_t localCount);
-    void emitRaiseAndFree(ExceptionHandler* handler);
-
     void ensureLabels(vector<Label>& labels, size_t count);
 
     void branchRaise(const char* reason = nullptr);
