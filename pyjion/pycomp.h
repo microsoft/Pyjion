@@ -424,6 +424,9 @@ public:
 
     virtual void emit_breakpoint();
 
+    virtual void emit_inc_local(Local local, int value);
+    virtual void emit_dec_local(Local local, int value);
+
     virtual JittedCode* emit_compile();
     virtual void lift_n_to_top(int pos);
 private:

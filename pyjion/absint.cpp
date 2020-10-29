@@ -1323,9 +1323,8 @@ void AbstractInterpreter::branchRaise(const char *reason) {
     }
 #endif
     m_comp->emit_eh_trace();
-
     // number of stack entries we need to clear...
-    size_t count = m_stack.size() - entryStack.size();
+    int count = m_stack.size() - entryStack.size();
     
     auto cur = m_stack.rbegin();
     for (; cur != m_stack.rend() && count >= 0; cur++) {
@@ -1338,7 +1337,10 @@ void AbstractInterpreter::branchRaise(const char *reason) {
         }
     }
 
-    if (!count) {
+    if (!ehBlock->IsRootHandler())
+        incExcVars(6);
+
+    if (!count || count < 0) {
         // No values on the stack, we can just branch directly to the raise label
         m_comp->emit_branch(BranchAlways, ehBlock->ErrorTarget);
         return;
@@ -1576,7 +1578,7 @@ void AbstractInterpreter::raiseOnNegativeOne() {
     // values on the stack...
 
     m_comp->emit_pop();
-    branchRaise();
+    branchRaise("last operation failed");
     m_comp->emit_mark_label(noErr);
 }
 
@@ -1589,6 +1591,34 @@ void AbstractInterpreter::emitRaise(ExceptionHandler * handler) {
     m_comp->emit_load_local(handler->ExVars.FinallyExc);
 }
 
+void AbstractInterpreter::decExcVars(int count){
+    m_comp->emit_dec_local(mExcVarsOnStack, count);
+}
+
+void AbstractInterpreter::incExcVars(int count) {
+    m_comp->emit_inc_local(mExcVarsOnStack, count);
+}
+
+void AbstractInterpreter::popExcVars(){
+    auto nothing_to_pop = m_comp->emit_define_label();
+    auto loop = m_comp->emit_define_label();
+
+    m_comp->emit_mark_label(loop);
+    m_comp->emit_load_local(mExcVarsOnStack);
+    m_comp->emit_int(0);
+    m_comp->emit_branch(BranchLessThanEqual, nothing_to_pop);
+#ifdef DUMP_TRACES
+    m_comp->emit_debug_msg("popping next 3 exc vars");
+#endif
+    m_comp->emit_pop();
+    m_comp->emit_pop();
+    m_comp->emit_pop();
+    m_comp->emit_dec_local(mExcVarsOnStack, 3);
+    m_comp->emit_branch(BranchAlways, loop);
+
+    m_comp->emit_mark_label(nothing_to_pop);
+}
+
 JittedCode* AbstractInterpreter::compileWorker() {
     Label ok;
 
@@ -1596,6 +1626,10 @@ JittedCode* AbstractInterpreter::compileWorker() {
     m_comp->emit_push_frame();
 
     auto rootHandlerLabel = m_comp->emit_define_label();
+    mExcVarsOnStack = m_comp->emit_define_local(LK_Int);
+    m_comp->emit_int(0);
+    m_comp->emit_store_local(mExcVarsOnStack);
+
     // Push a catch-all error handler onto the handler list
     auto rootHandler = m_exceptionHandler.SetRootHandler(rootHandlerLabel, ExceptionVars(m_comp));
 
@@ -1636,8 +1670,8 @@ JittedCode* AbstractInterpreter::compileWorker() {
 #endif
             ExceptionHandler* handler = m_exceptionHandler.HandlerAtOffset(curByte);
             m_comp->emit_mark_label(handler->ErrorTarget);
+            m_comp->emit_debug_msg("Pushing raise vars");
             emitRaise(handler);
-            incStack(6);
         }
 
 #ifdef DUMP_TRACES
@@ -2003,7 +2037,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                         else {
                             // if we have args we'll always return 0...
                             m_comp->emit_pop();
-                            branchRaise();
+                            branchRaise("hit native error");
                         }
                         break;
                 }
@@ -2013,6 +2047,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 auto current = m_blockStack.back();
                 auto jumpTo = oparg + curByte + sizeof(_Py_CODEUNIT);
                 auto handlerLabel = m_comp->emit_define_label();
+
                 auto newHandler = m_exceptionHandler.AddSetupFinallyHandler(
                         handlerLabel,
                         m_stack,
@@ -2028,6 +2063,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 m_blockStack.push_back(newBlock);
 
                 ValueStack newStack = ValueStack(m_stack);
+                newStack.inc(6, StackEntryKind::STACK_KIND_VALUE);
                 // This stack only gets used if an error occurs within the try:
                 m_offsetStack[jumpTo] = newStack;
                 skipEffect = true;
@@ -2046,6 +2082,8 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 m_comp->pop_top();
                 m_comp->pop_top();
                 decStack(3);
+                decExcVars(6);
+                m_comp->emit_debug_msg("cancelling error flag");
                 skipEffect = true;
                 break;
             case POP_BLOCK:
@@ -2270,9 +2308,12 @@ JittedCode* AbstractInterpreter::compileWorker() {
 #endif
     }
 
+    popExcVars();
+
     // label branch for error handling when we have no EH handlers, (return NULL).
     m_comp->emit_branch(BranchAlways, rootHandlerLabel);
     m_comp->emit_mark_label(rootHandlerLabel);
+
     m_comp->emit_null();
 
     auto finalRet = m_comp->emit_define_label();
@@ -2284,10 +2325,10 @@ JittedCode* AbstractInterpreter::compileWorker() {
 
     // Final return position, pop frame and return
     m_comp->emit_mark_label(finalRet);
+
     m_comp->emit_pop_frame();
 
     m_comp->emit_ret(1);
-
     return m_comp->emit_compile();
 }
 
@@ -2526,7 +2567,7 @@ void AbstractInterpreter::unpackSequence(size_t size, int opcode) {
     auto success = m_comp->emit_define_label();
     m_comp->emit_unpack_sequence(valueTmp, m_sequenceLocals[opcode], success, size);
 
-    branchRaise();
+    branchRaise("failed to unpack sequence");
 
     m_comp->emit_mark_label(success);
     auto fastTmp = m_comp->emit_spill();
@@ -2607,7 +2648,7 @@ void AbstractInterpreter::loadFastWorker(int local, bool checkUnbound) {
 
         m_comp->emit_unbound_local_check();
 
-        branchRaise();
+        branchRaise("unbound local");
 
         m_comp->emit_mark_label(success);
         m_comp->emit_load_local(mErrorCheckLocal);

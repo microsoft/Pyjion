@@ -221,6 +221,7 @@ class AbstractInterpreter {
     _Py_CODEUNIT *mByteCode;
     size_t mSize;
     Local mErrorCheckLocal;
+    Local mExcVarsOnStack; // Counter of the number of exception variables on the stack.
 
     // ** Data consumed during analysis:
     // Tracks the entry point for each POP_BLOCK opcode, so we can restore our
@@ -386,6 +387,9 @@ private:
     void unwindHandlers();
 
     void emitRaise(ExceptionHandler *handler);
+    void popExcVars();
+    void decExcVars(int count);
+    void incExcVars(int count);
 };
 
 

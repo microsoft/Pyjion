@@ -994,6 +994,20 @@ Label PythonCompiler::emit_define_label() {
     return m_il.define_label();
 }
 
+void PythonCompiler::emit_inc_local(Local local, int value) {
+    emit_int(value);
+    emit_load_local(local);
+    m_il.add();
+    emit_store_local(local);
+}
+
+void PythonCompiler::emit_dec_local(Local local, int value) {
+    emit_int(value);
+    emit_load_local(local);
+    m_il.sub();
+    emit_store_local(local);
+}
+
 void PythonCompiler::emit_ret(int size) {
     m_il.ret(size);
 }

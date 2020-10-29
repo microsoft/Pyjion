@@ -64,6 +64,7 @@ enum BranchType {
     BranchEqual,
     BranchNotEqual,
     BranchLeave,
+    BranchLessThanEqual
 };
 
 class JittedCode {
@@ -421,6 +422,9 @@ public:
 
     virtual void lift_n_to_top(int pos) = 0;
     virtual void pop_top() = 0;
+
+    virtual void emit_inc_local(Local local, int value) = 0;
+    virtual void emit_dec_local(Local local, int value) = 0;
 };
 
 #endif

@@ -346,6 +346,9 @@ public:
                 case BranchNotEqual:
                     m_il.push_back(CEE_BNE_UN_S); DEC_CEE_STACK(2); // Pop1+Pop1, Push0
                     break;
+                case BranchLessThanEqual:
+                    m_il.push_back(CEE_BLE_S); DEC_CEE_STACK(2); // Pop1+Pop1, Push0
+                    break;
             }
             m_il.push_back((BYTE)offset - 2);
         }
@@ -368,6 +371,9 @@ public:
                     break;
                 case BranchNotEqual:
                     m_il.push_back(CEE_BNE_UN); DEC_CEE_STACK(2); //  Pop1+Pop1, Push0
+                    break;
+                case BranchLessThanEqual:
+                    m_il.push_back(CEE_BLE); DEC_CEE_STACK(2); // Pop1+Pop1, Push0
                     break;
             }
             emit_int(offset - 5);
