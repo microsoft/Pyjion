@@ -49,7 +49,6 @@ private:
         size_t collected = PyGC_Collect();
         printf("Collected %zu values\n", collected);
         REQUIRE(!m_jittedcode->j_failed);
-
         return res;
     }
 

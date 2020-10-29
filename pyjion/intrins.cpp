@@ -1112,13 +1112,10 @@ PyObject * PyJit_BuildDictFromTuples(PyObject *keys_and_values) {
             goto error;
         }
     }
-    Py_DECREF(keys);
-    for (auto i = 0; i < len; i++)
-        Py_CLEAR(PyTuple_GET_ITEM(keys_and_values, i));
-    return map;
 error:
     Py_DECREF(keys);
-    return nullptr;
+    Py_DECREF(keys_and_values);
+    return map;
 }
 
 PyObject* PyJit_LoadAssertionError() {
