@@ -73,6 +73,8 @@ elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "AMD64")
     if (CMAKE_CL_64)
         set(IS_64 1)
     endif()
+else()
+    message(STATUS "Don't recognise CPU arch " ${CMAKE_SYSTEM_PROCESSOR})
 endif()
 
 if (IS_64)
