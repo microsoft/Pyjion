@@ -1172,7 +1172,7 @@ PyObject* PyJit_DictMerge(PyObject* other, PyObject* dict) {
         goto error;
     Py_DECREF(other);
     return dict;
-    error:
+error:
     Py_DECREF(other);
     return nullptr;
 }
@@ -1779,27 +1779,21 @@ PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
             Py_DECREF(args);
             return nullptr;
         }
+        Py_DECREF(args);
         Py_DECREF(target);
-        // TODO : Causes double dec and segmentation fault.
-        //Py_DECREF(args);
         Py_DECREF(method_info->at(1));
         return res;
     }
     else {
         auto target = method_info->at(0);
-#ifdef DUMP_TRACES
-        printf("Calling method %s with args %s\n",
-               PyUnicode_AsUTF8(PyObject_Repr(target)),
-               PyUnicode_AsUTF8(PyObject_Repr(args)));
-#endif
         res = PyObject_Call(target, args, nullptr);
         if (res == nullptr){
-            Py_DECREF(target);
             Py_DECREF(args);
+            Py_DECREF(target);
             return nullptr;
         }
-        Py_DECREF(target);
         Py_DECREF(args);
+        Py_DECREF(target);
         return res;
     }
 }
