@@ -140,7 +140,7 @@ jobs:
         run: python -m pip install scikit-build ninja
       - name: Build Python Package
         shell: bash
-        run: python setup.py build
+        run: python setup.py build -G "Ninja" --skip-generator-test
       - name: Install Python Package
         shell: bash
         run: python setup.py develop
