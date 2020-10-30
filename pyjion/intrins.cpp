@@ -1765,20 +1765,24 @@ PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
     if (method_info->back() != nullptr)
     {
         auto target = method_info->at(0);
+        auto obj =  method_info->at(1);
         auto args_tuple = PyTuple_New(PyTuple_Size(args) + 1);
-        PyTuple_SetItem(args_tuple, 0, method_info->at(1));
+        PyTuple_SetItem(args_tuple, 0, obj);
         for (int i = 0 ; i < PyTuple_Size(args) ; i ++){
             PyTuple_SetItem(args_tuple, i+1, PyTuple_GetItem(args, i));
         }
         res = PyObject_Call(target, args_tuple, nullptr);
         if (res == nullptr){
-            Py_DECREF(target);
+            Py_DECREF(args_tuple);
             Py_DECREF(args);
+            Py_DECREF(target);
+            Py_DECREF(obj);
             return nullptr;
         }
+        Py_DECREF(args_tuple);
         Py_DECREF(args);
         Py_DECREF(target);
-        Py_DECREF(method_info->at(1));
+        Py_DECREF(obj);
         return res;
     }
     else {

@@ -102,12 +102,12 @@ public:
 
 TEST_CASE("General import test") {
     SECTION("import from case") {
-        auto t = EmissionTest("def f():\n  from pprint import pprint\n  pprint('hello')");
-        CHECK(t.returns() == "None");
+        auto t = EmissionTest("def f():\n  from math import sqrt\n  return sqrt(4)");
+        CHECK(t.returns() == "2.0");
     }
     SECTION("import case") {
-        auto t = EmissionTest("def f():\n  import pprint\n  pprint.pprint('hello')");
-        CHECK(t.returns() == "None");
+        auto t = EmissionTest("def f():\n  import math\n  return math.sqrt(4)");
+        CHECK(t.returns() == "2.0");
     }
 }
 
@@ -196,6 +196,10 @@ TEST_CASE("General method calls") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): a={False};a.add(True);return a");
         CHECK(t.returns() == "{False, True}");
+    }
+    SECTION("failure case") {
+        auto t = EmissionTest("def f(): a={False};a.add([True]);return a");
+        CHECK(t.raises() == PyExc_TypeError);
     }
 }
 
