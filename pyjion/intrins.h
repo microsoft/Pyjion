@@ -39,6 +39,11 @@
     "free variable '%.200s' referenced before assignment" \
     " in enclosing scope"
 
+struct PyMethodLocation {
+    PyObject* object;
+    PyObject* method;
+};
+
 static void
 format_exc_check_arg(PyObject *exc, const char *format_str, PyObject *obj);
 
@@ -254,10 +259,14 @@ PyObject* PyJit_UnicodeJoinArray(PyObject** items, Py_ssize_t count);
 PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec);
 PyObject* PyJit_FormatValue(PyObject* item);
 
-std::vector<PyObject *> * PyJit_LoadMethod(PyObject* object, PyObject* name);
+PyMethodLocation * PyJit_LoadMethod(PyObject* object, PyObject* name);
 
-PyObject* MethCall0(PyObject* self, std::vector<PyObject*>* method_info);
-PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObject* args);
+PyObject* MethCall0(PyObject* self, PyMethodLocation* method_info);
+PyObject* MethCall1(PyObject* self, PyMethodLocation* method_info, PyObject* arg1);
+PyObject* MethCall2(PyObject* self, PyMethodLocation* method_info, PyObject* arg1, PyObject* arg2);
+PyObject* MethCall3(PyObject* self, PyMethodLocation* method_info, PyObject* arg1, PyObject* arg2, PyObject* arg3);
+PyObject* MethCall4(PyObject* self, PyMethodLocation* method_info, PyObject* arg1, PyObject* arg2, PyObject* arg3, PyObject* arg4);
+PyObject* MethCallN(PyObject* self, PyMethodLocation* method_info, PyObject* args);
 
 int PyJit_SetupAnnotations(PyFrameObject* frame);
 #endif

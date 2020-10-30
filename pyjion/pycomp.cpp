@@ -710,12 +710,19 @@ bool PythonCompiler::emit_call(size_t argCnt) {
     return false;
 }
 
-void PythonCompiler::emit_method_call_0() {
-    m_il.emit_call(METHOD_METHCALL_0_TOKEN, 2);
+bool PythonCompiler::emit_method_call(size_t argCnt) {
+    switch (argCnt) {
+        case 0: m_il.emit_call(METHOD_METHCALL_0_TOKEN, 2); return true;
+        case 1: m_il.emit_call(METHOD_METHCALL_1_TOKEN, 3); return true;
+        case 2: m_il.emit_call(METHOD_METHCALL_2_TOKEN, 4); return true;
+        case 3: m_il.emit_call(METHOD_METHCALL_3_TOKEN, 5); return true;
+        case 4: m_il.emit_call(METHOD_METHCALL_4_TOKEN, 6); return true;
+    }
+    return false;
 }
 
-void PythonCompiler::emit_method_call_n(size_t argCnt){
-    m_il.emit_call(METHOD_METHCALLN_TOKEN, argCnt + 2);
+void PythonCompiler::emit_method_call_n(){
+    m_il.emit_call(METHOD_METHCALLN_TOKEN, 3);
 }
 
 void PythonCompiler::emit_call_with_tuple() {
@@ -1379,6 +1386,10 @@ GLOBAL_METHOD(METHOD_FORMAT_OBJECT, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT,
 GLOBAL_METHOD(METHOD_LOAD_METHOD, &PyJit_LoadMethod, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_METHCALL_0_TOKEN, &MethCall0, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL_1_TOKEN, &MethCall1, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL_2_TOKEN, &MethCall2, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL_3_TOKEN, &MethCall3, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL_4_TOKEN, &MethCall4, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_METHCALLN_TOKEN, &MethCallN, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_SETUP_ANNOTATIONS, &PyJit_SetupAnnotations, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT),);

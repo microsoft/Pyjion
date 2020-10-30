@@ -2249,13 +2249,13 @@ JittedCode* AbstractInterpreter::compileWorker() {
             }
             case CALL_METHOD:
             {
-                if (oparg == 0) {
-                    m_comp->emit_method_call_0();
-                } else {
+                if (!m_comp->emit_method_call(oparg)) {
                     buildTuple(oparg);
-                    m_comp->emit_method_call_n(oparg);
+                    m_comp->emit_method_call_n();
+                    decStack(3); // + method + name + nargs
+                } else {
+                    decStack(2 + oparg); // + method + name + nargs
                 }
-                decStack(2); // + method + name + nargs
                 errorCheck("failed to call method");
                 incStack(); //result
                 break;

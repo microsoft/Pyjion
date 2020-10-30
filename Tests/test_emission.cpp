@@ -197,6 +197,10 @@ TEST_CASE("General method calls") {
         auto t = EmissionTest("def f(): a={False};a.add(True);return a");
         CHECK(t.returns() == "{False, True}");
     }
+    SECTION("zero-arg case") {
+        auto t = EmissionTest("def f(): a={False};a.add(True);a.pop(); return a");
+        CHECK(t.returns() == "{True}");
+    }
     SECTION("failure case") {
         auto t = EmissionTest("def f(): a={False};a.add([True]);return a");
         CHECK(t.raises() == PyExc_TypeError);

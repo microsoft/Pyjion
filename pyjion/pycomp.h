@@ -155,7 +155,11 @@
 #define METHOD_CALL_4_TOKEN        0x00010004
 
 #define METHOD_METHCALL_0_TOKEN       0x00011000
-#define METHOD_METHCALLN_TOKEN        0x00011004
+#define METHOD_METHCALL_1_TOKEN       0x00011001
+#define METHOD_METHCALL_2_TOKEN       0x00011002
+#define METHOD_METHCALL_3_TOKEN       0x00011003
+#define METHOD_METHCALL_4_TOKEN       0x00011004
+#define METHOD_METHCALLN_TOKEN        0x00011005
 
 #define METHOD_CALL_ARGS            0x0001000A
 #define METHOD_CALL_KWARGS          0x0001000B
@@ -411,8 +415,8 @@ public:
     virtual void emit_debug_msg(const char* msg);
 
     virtual void emit_load_method(void* name);
-    virtual void emit_method_call_0();
-    virtual void emit_method_call_n(size_t argCnt);
+    virtual bool emit_method_call(size_t argCnt);
+    virtual void emit_method_call_n();
 
     virtual void emit_dict_merge();
 

@@ -1744,28 +1744,70 @@ PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
     return Call<PyObject*>(target, arg0, arg1, arg2, arg3);
 }
 
-PyObject* MethCall0(PyObject* self, std::vector<PyObject*>* method_info) {
+PyObject* MethCall0(PyObject* self, PyMethodLocation* method_info) {
     PyObject* res;
-    if (method_info->back() != nullptr)
-        res = Call<PyObject*>(method_info->at(0), method_info->at(1));
+    if (method_info->object != nullptr)
+        res = Call<PyObject*>(method_info->method, method_info->object);
     else
-        res = Call0(method_info->at(0));
+        res = Call0(method_info->method);
+    delete method_info;
     return res;
 }
 
-PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObject* args) {
+PyObject* MethCall1(PyObject* self, PyMethodLocation* method_info, PyObject* arg1) {
+    PyObject* res;
+    if (method_info->object != nullptr)
+        res = Call<PyObject*>(method_info->method, method_info->object, arg1);
+    else
+        res = Call<PyObject*>(method_info->method, arg1);
+    delete method_info;
+    return res;
+}
+
+PyObject* MethCall2(PyObject* self, PyMethodLocation* method_info, PyObject* arg1, PyObject* arg2) {
+    PyObject* res;
+    if (method_info->object != nullptr)
+        res = Call<PyObject*>(method_info->method, method_info->object, arg1, arg2);
+    else
+        res = Call<PyObject*>(method_info->method, arg1, arg2);
+    delete method_info;
+    return res;
+}
+
+PyObject* MethCall3(PyObject* self, PyMethodLocation* method_info, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
+    PyObject* res;
+    if (method_info->object != nullptr)
+        res = Call<PyObject*>(method_info->method, method_info->object, arg1, arg2, arg3);
+    else
+        res = Call<PyObject*>(method_info->method, arg1, arg2, arg3);
+    delete method_info;
+    return res;
+}
+
+PyObject* MethCall4(PyObject* self, PyMethodLocation* method_info, PyObject* arg1, PyObject* arg2, PyObject* arg3, PyObject* arg4) {
+    PyObject* res;
+    if (method_info->object != nullptr)
+        res = Call<PyObject*>(method_info->method, method_info->object, arg1, arg2, arg3, arg4);
+    else
+        res = Call<PyObject*>(method_info->method, arg1, arg2, arg3, arg4);
+    delete method_info;
+    return res;
+}
+
+PyObject* MethCallN(PyObject* self, PyMethodLocation* method_info, PyObject* args) {
     PyObject* res;
     if(!PyTuple_Check(args)) {
         PyErr_Format(PyExc_TypeError,
                      "invalid arguments for method call");
         Py_DECREF(args);
+        delete method_info;
         return nullptr;
     }
     // TODO : Support vector arg calls.
-    if (method_info->back() != nullptr)
+    if (method_info->object != nullptr)
     {
-        auto target = method_info->at(0);
-        auto obj =  method_info->at(1);
+        auto target = method_info->method;
+        auto obj =  method_info->object;
         auto args_tuple = PyTuple_New(PyTuple_Size(args) + 1);
         PyTuple_SetItem(args_tuple, 0, obj);
         for (int i = 0 ; i < PyTuple_Size(args) ; i ++){
@@ -1777,24 +1819,28 @@ PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObjec
             Py_DECREF(args);
             Py_DECREF(target);
             Py_DECREF(obj);
+            delete method_info;
             return nullptr;
         }
         Py_DECREF(args_tuple);
         Py_DECREF(args);
         Py_DECREF(target);
         Py_DECREF(obj);
+        delete method_info;
         return res;
     }
     else {
-        auto target = method_info->at(0);
+        auto target = method_info->method;
         res = PyObject_Call(target, args, nullptr);
         if (res == nullptr){
             Py_DECREF(args);
             Py_DECREF(target);
+            delete method_info;
             return nullptr;
         }
         Py_DECREF(args);
         Py_DECREF(target);
+        delete method_info;
         return res;
     }
 }
@@ -1909,16 +1955,16 @@ PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec) {
 	return res;
 }
 
-std::vector<PyObject*>* PyJit_LoadMethod(PyObject* object, PyObject* name) {
-    auto * result = new std::vector<PyObject*>(0);
+PyMethodLocation* PyJit_LoadMethod(PyObject* object, PyObject* name) {
+    auto * result = new PyMethodLocation;
     PyObject* method = nullptr;
     int meth_found = _PyObject_GetMethod(object, name, &method);
-    result->push_back(method);
+    result->method = method;
     if (!meth_found) {
         Py_DECREF(object);
-        result->push_back(nullptr);
+        result->object = nullptr;
     } else {
-        result->push_back(object);
+        result->object = object;
     }
     return result;
 }
