@@ -138,8 +138,10 @@ jobs:
 
       - name: Build Python Package
         shell: bash
-        run: pip install .
-
+        run: python setup.py build
+      - name: Install Python Package
+        shell: bash
+        run: python setup.py develop
       - name: Run smoke tests
         shell: bash
         run: python Tests\test_pyjion.py -f Tests\python_smoke_tests.txt
