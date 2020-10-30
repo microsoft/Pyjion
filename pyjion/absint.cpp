@@ -1563,6 +1563,9 @@ void AbstractInterpreter::emitRaise(ExceptionHandler * handler) {
 
 void AbstractInterpreter::decExcVars(int count){
     m_comp->emit_dec_local(mExcVarsOnStack, count);
+#ifdef DUMP_TRACES
+    m_comp->emit_debug_msg("decrementing exception vars");
+#endif
 }
 
 void AbstractInterpreter::incExcVars(int count) {
@@ -2041,7 +2044,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             break;
             case RERAISE:{
                 m_comp->emit_restore_err();
-                //decStack(3);
+                decExcVars(3);
                 unwindHandlers();
                 skipEffect = true;
                 break;
@@ -2052,8 +2055,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 m_comp->pop_top();
                 m_comp->pop_top();
                 decStack(3);
-                decExcVars(6);
-                m_comp->emit_debug_msg("cancelling error flag");
+                decExcVars(3);
                 skipEffect = true;
                 break;
             case POP_BLOCK:
@@ -2252,7 +2254,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 if (!m_comp->emit_method_call(oparg)) {
                     buildTuple(oparg);
                     m_comp->emit_method_call_n();
-                    decStack(3); // + method + name + nargs
+                    decStack(2); // + method + name + nargs
                 } else {
                     decStack(2 + oparg); // + method + name + nargs
                 }

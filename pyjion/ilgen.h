@@ -570,7 +570,7 @@ public:
     }
 
     void sub() {
-        push_back(CEE_SUB); DEC_CEE_STACK(2); INC_CEE_STACK(1); // Pop1+Pop1, Push1
+        push_back(CEE_SUB_OVF); DEC_CEE_STACK(2); INC_CEE_STACK(1); // Pop1+Pop1, Push1
     }
 
     void div() {
