@@ -1265,6 +1265,35 @@ Label AbstractInterpreter::getOffsetLabel(int jumpTo) {
     return jumpToLabel;
 }
 
+void AbstractInterpreter::ensureRaiseAndFreeLocals(size_t localCount) {
+    while (m_raiseAndFreeLocals.size() <= localCount) {
+        m_raiseAndFreeLocals.push_back(m_comp->emit_define_local());
+    }
+}
+
+void AbstractInterpreter::spillStackForRaise(size_t localCount) {
+    ensureRaiseAndFreeLocals(localCount);
+    for (size_t i = 0; i < localCount; i++) {
+        m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
+    }
+}
+
+vector<Label>& AbstractInterpreter::getRaiseAndFreeLabels(size_t blockId) {
+    while (m_raiseAndFree.size() <= blockId) {
+        m_raiseAndFree.emplace_back();
+    }
+
+    return m_raiseAndFree[blockId];
+}
+
+vector<Label>& AbstractInterpreter::getReraiseAndFreeLabels(size_t blockId) {
+    while (m_reraiseAndFree.size() <= blockId) {
+        m_reraiseAndFree.emplace_back();
+    }
+
+    return m_reraiseAndFree[blockId];
+}
+
 size_t AbstractInterpreter::clearValueStack() {
     auto ehBlock = getEhblock();
     auto& entryStack = ehBlock->EntryStack;
@@ -1324,17 +1353,36 @@ void AbstractInterpreter::branchRaise(const char *reason) {
         return;
     }
 
+    vector<Label>& labels = getRaiseAndFreeLabels(ehBlock->RaiseAndFreeId);
+    ensureLabels(labels, count);
+    ensureRaiseAndFreeLocals(count);
+
     // continue walking our stack iterator
     for (auto i = 0; i < count; cur++, i++) {
         if (*cur == STACK_KIND_VALUE) {
             // pop off the stack value...
             m_comp->emit_pop();
+
+            // and store null into our local that needs to be freed
+            m_comp->emit_null();
+            m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
         }
         else {
-            m_comp->emit_pop_top();
+            m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
         }
     }
     m_comp->emit_branch(BranchAlways, ehBlock->ErrorTarget);
+}
+
+void AbstractInterpreter::cleanStackForReraise() {
+    auto ehBlock = getEhblock();
+
+    auto& entryStack = ehBlock->EntryStack;
+    size_t count = m_stack.size() - entryStack.size();
+
+    for (size_t i = m_stack.size(); i-- > entryStack.size();) {
+        m_comp->pop_top();
+    }
 }
 
 void AbstractInterpreter::buildTuple(size_t argCnt) {

@@ -333,11 +333,19 @@ private:
     void errorCheck(const char* reason = nullptr);
     void intErrorCheck(const char* reason = nullptr);
 
+    vector<Label>& getRaiseAndFreeLabels(size_t blockId);
+    vector<Label>& getReraiseAndFreeLabels(size_t blockId);
+    void ensureRaiseAndFreeLocals(size_t localCount);
+    void emitRaiseAndFree(ExceptionHandler* handler);
+    void spillStackForRaise(size_t localCount);
+
     void ensureLabels(vector<Label>& labels, size_t count);
 
     void branchRaise(const char* reason = nullptr);
     size_t clearValueStack();
     void raiseOnNegativeOne();
+
+    void cleanStackForReraise();
 
     void unwindEh(ExceptionHandler* fromHandler, ExceptionHandler* toHandler = nullptr);
 
