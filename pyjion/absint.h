@@ -349,7 +349,7 @@ private:
 
     void unwindEh(ExceptionHandler* fromHandler, ExceptionHandler* toHandler = nullptr);
 
-    ExceptionHandler * getEhblock();
+    ExceptionHandler * currentHandler();
 
     void markOffsetLabel(int index);
 
@@ -377,7 +377,6 @@ private:
 
     void popExcept();
 
-    bool canOptimizePopJump(int opcodeIndex);
     void unaryPositive(int opcodeIndex);
     void unaryNegative(int opcodeIndex);
     void unaryNot(int& opcodeIndex);

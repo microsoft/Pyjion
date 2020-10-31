@@ -1295,7 +1295,7 @@ vector<Label>& AbstractInterpreter::getReraiseAndFreeLabels(size_t blockId) {
 }
 
 size_t AbstractInterpreter::clearValueStack() {
-    auto ehBlock = getEhblock();
+    auto ehBlock = currentHandler();
     auto& entryStack = ehBlock->EntryStack;
 
     // clear any non-object values from the stack up
@@ -1321,7 +1321,7 @@ void AbstractInterpreter::ensureLabels(vector<Label>& labels, size_t count) {
 }
 
 void AbstractInterpreter::branchRaise(const char *reason) {
-    auto ehBlock = getEhblock();
+    auto ehBlock = currentHandler();
     auto& entryStack = ehBlock->EntryStack;
 
 #ifdef DEBUG
@@ -1375,7 +1375,7 @@ void AbstractInterpreter::branchRaise(const char *reason) {
 }
 
 void AbstractInterpreter::cleanStackForReraise() {
-    auto ehBlock = getEhblock();
+    auto ehBlock = currentHandler();
 
     auto& entryStack = ehBlock->EntryStack;
     size_t count = m_stack.size() - entryStack.size();
@@ -1904,11 +1904,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             case UNARY_NEGATIVE:
                 unaryNegative(opcodeIndex); break;
             case UNARY_NOT:
-                m_comp->emit_unary_not();
-                decStack(1);
-                errorCheck("unary not failed");
-                incStack();
-                break;
+                unaryNot(opcodeIndex); break;
             case UNARY_INVERT:
                 m_comp->emit_unary_invert();
                 decStack(1);
@@ -2048,7 +2044,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                         m_comp->emit_raise_varargs();
                         // returns 1 if we're doing a re-raise in which case we don't need
                         // to update the traceback.  Otherwise returns 0.
-                        auto curHandler = getEhblock();
+                        auto curHandler = currentHandler();
                         if (oparg == 0) {
                                 // The stack actually ended up being empty - either because we didn't
                                 // have any values, or the values were all non-objects that we could
@@ -2440,30 +2436,22 @@ void AbstractInterpreter::popJumpIf(bool isTrue, int opcodeIndex, int jumpTo) {
 }
 
 void AbstractInterpreter::unaryPositive(int opcodeIndex) {
-    decStack();
     m_comp->emit_unary_positive();
+    decStack();
     errorCheck("unary positive failed");
     incStack();
 }
 
 void AbstractInterpreter::unaryNegative(int opcodeIndex) {
-    decStack();
     m_comp->emit_unary_negative();
+    decStack();
     errorCheck("unary negative failed");
     incStack();
 }
 
-/* Unused for now? */
-bool AbstractInterpreter::canOptimizePopJump(int opcodeIndex) {
-    auto opcode = getExtendedOpcode(opcodeIndex + sizeof(_Py_CODEUNIT));
-    if (opcode == POP_JUMP_IF_TRUE || opcode == POP_JUMP_IF_FALSE) {
-        return m_jumpsTo.find(opcodeIndex + sizeof(_Py_CODEUNIT)) == m_jumpsTo.end();
-    }
-    return false;
-}
-
 void AbstractInterpreter::unaryNot(int& opcodeIndex) {
     m_comp->emit_unary_not();
+    decStack(1);
     errorCheck("unary not failed");
     incStack();
 }
@@ -2745,7 +2733,7 @@ void AbstractInterpreter::unwindEh(ExceptionHandler* fromHandler, ExceptionHandl
     } while (cur != nullptr && !cur->IsRootHandler() && cur != toHandler && !cur->IsTryExceptOrFinally());
 }
 
-ExceptionHandler* AbstractInterpreter::getEhblock() {
+inline ExceptionHandler* AbstractInterpreter::currentHandler() {
     return m_blockStack.back().CurrentHandler;
 }
 
@@ -2765,7 +2753,7 @@ void AbstractInterpreter::markOffsetLabel(int index) {
     }
 }
 
-LocalKind getOptimizedLocalKind(AbstractValueKind kind) {
+inline LocalKind getOptimizedLocalKind(AbstractValueKind kind) {
     // Remove optimizations for now, always use PyObject* /Lk_ptr/ NATIVEINT
     return LK_Pointer;
 }
