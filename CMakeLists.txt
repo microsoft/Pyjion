@@ -153,7 +153,7 @@ target_link_libraries(_pyjion ${Python3_LIBRARIES})
 if (DO_TESTS)
     # Testing
     add_subdirectory(Tests/Catch)
-    set(TEST_SOURCES Tests/testing_util.cpp Tests/test_emission.cpp Tests/test_compiler.cpp Tests/test_absint.cpp Tests/Tests.cpp Tests/test_wrappers.cpp)
+    set(TEST_SOURCES Tests/testing_util.cpp Tests/test_emission.cpp Tests/test_compiler.cpp Tests/test_absint.cpp Tests/Tests.cpp Tests/test_wrappers.cpp Tests/test_exceptions.cpp)
     add_executable(unit_tests ${TEST_SOURCES} $<TARGET_OBJECTS:pyjionlib>)
     if (NOT WIN32)
         set_property(TARGET unit_tests PROPERTY CXX_STANDARD 17)

@@ -1518,6 +1518,7 @@ void AbstractInterpreter::buildMap(size_t  argCnt) {
 void AbstractInterpreter::makeFunction(int oparg) {
     m_comp->emit_new_function();
     decStack(2);
+    errorCheck("new function failed");
 
     if (oparg & 0x0f) {
         auto func = m_comp->emit_spill();
@@ -1528,13 +1529,13 @@ void AbstractInterpreter::makeFunction(int oparg) {
             m_comp->emit_load_and_free_local(tmp);
             m_comp->emit_set_closure();
             decStack();
+
         }
         if (oparg & 0x04) {
             // annoations
             auto tmp = m_comp->emit_spill();
             m_comp->emit_load_local(func);
             m_comp->emit_load_and_free_local(tmp);
-
             m_comp->emit_set_annotations();
             decStack();
         }
@@ -1543,7 +1544,6 @@ void AbstractInterpreter::makeFunction(int oparg) {
             auto tmp = m_comp->emit_spill();
             m_comp->emit_load_local(func);
             m_comp->emit_load_and_free_local(tmp);
-
             m_comp->emit_set_kw_defaults();
             decStack();
         }
@@ -1854,11 +1854,12 @@ JittedCode* AbstractInterpreter::compileWorker() {
             {
                 if (!m_comp->emit_call(oparg)) {
                     buildTuple(oparg);
+                    incStack();
                     m_comp->emit_call_with_tuple();
-                    decStack();// function
+                    decStack(2);// target + args
                 }
                 else {
-                    decStack(oparg + 1); // + function
+                    decStack(oparg + 1); // target + args(oparg)
                 }
 
                 errorCheck("call function failed");

@@ -117,6 +117,15 @@ TEST_CASE("Test ITER", "[float][binary op][inference]") {
         CHECK(t.returns() == "369");
     }
 }
+TEST_CASE("Annotation tests") {
+    SECTION("test annotations") {
+        auto t = CompilerTest(
+                "def f():\n    def f(self) -> 42 : pass\n    return 42"
+        );
+        CHECK(t.returns() == "42");
+    }
+}
+
 TEST_CASE("Test math errors") {
     SECTION("test2") {
         auto t = CompilerTest(
@@ -185,130 +194,7 @@ TEST_CASE("Test method loads and calls") {
     }
 }
 
-TEST_CASE("Test general errors") {
-    SECTION("test UnboundLocalError") {
-        auto t = CompilerTest(
-                "def f():\n  x = y\n  y = 1"
-        );
-        CHECK(t.raises() == PyExc_UnboundLocalError);
-    }
-    SECTION("test simply try catch") {
-        auto t = CompilerTest(
-                "def f():\n  a=0\n  try:\n    a=1\n  except:\n    a=2\n  return a\n"
-        );
-        CHECK(t.returns() == "1");
-    }
-    SECTION("test simply try catch and handle implicit null branch") {
-        auto t = CompilerTest(
-                "def f():\n  a=0\n  try:\n    a=1/0\n  except:\n    a=2\n  return a\n"
-        );
-        CHECK(t.returns() == "2");
-    }
-    SECTION("test simply try catch and handle explicit raise branch") {
-        auto t = CompilerTest(
-                "def f():\n  a=0\n  try:\n    a=1\n    raise Exception('bork')\n  except:\n    a=2\n  return a\n"
-        );
-        CHECK(t.returns() == "2");
-    }
-    SECTION("test return within try") {
-        auto t = CompilerTest(
-                "def f():\n  try:\n    return 1\n  except:\n    return 2\n"
-        );
-        CHECK(t.returns() == "1");
-    }
-    SECTION("test nested try and pass") {
-        auto t = CompilerTest(
-                "def f():\n  a = 1\n  try:\n    try:\n      1/0\n    except:\n      a += 2\n  except:\n    a += 4\n  return a"
-        );
-        CHECK(t.returns() == "3");
-    }
-    SECTION("test reraise exception") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n         raise TypeError('hi')\n    except Exception as e:\n         pass\n    finally:\n         pass"
-        );
-        CHECK(t.returns() == "None");
-    }
-    SECTION("test generic nested exception") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        try:\n             raise Exception('borkborkbork')\n        finally:\n             pass\n    finally:\n        pass"
-        );
-        CHECK(t.raises() == PyExc_Exception);
-    }
-    SECTION("test generic implicit exception") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        try:\n             1/0\n        finally:\n             pass\n    finally:\n        pass"
-        );
-        CHECK(t.raises() == PyExc_ZeroDivisionError);
-    }
-    SECTION("test simple exception filters") {
-        auto t = CompilerTest(
-                "def f():\n  try:\n    raise TypeError('err')\n  except ValueError:\n    pass\n  return 2\n"
-        );
-        CHECK(t.raises() == PyExc_TypeError);
-    }
-    SECTION("test exception filters") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        try:\n             try:\n                  raise TypeError('err')\n             except BaseException:\n                  raise\n        finally:\n             pass\n    finally:\n        return 42\n"
-        );
-        CHECK(t.returns() == "42");
-    }
-}
-TEST_CASE("Annotation tests") {
-    SECTION("test annotations") {
-        auto t = CompilerTest(
-                "def f():\n    def f(self) -> 42 : pass\n    return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("Break from nested try/finally needs to use BranchLeave to clear the stack") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                break\n            finally:\n                pass\n    return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("Break from a double nested try/finally needs to unwind all exceptions") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                raise Exception()\n            finally:\n                try:\n                     break\n                finally:\n                    pass\n    return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("return from nested try/finally should use BranchLeave to clear stack when branching to return label") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            return 42\n        finally:\n            pass"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("Return from nested try/finally should unwind nested exception handlers") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            raise Exception()\n        finally:\n            try:\n                return 42\n            finally:\n                pass\n    return 23"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("Break from a nested exception handler needs to unwind all exception handlers") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  break\n    return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("Return from a nested exception handler needs to unwind all exception handlers") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  return 23\n    return 42"
-        );
-        CHECK(t.returns() == "23");
-    }
-    SECTION("We need to do BranchLeave to clear the stack when doing a break inside of a finally") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            break\n    return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("test exception raise inside finally") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()"
-        );
-        CHECK(t.raises() == PyExc_SystemError);
-    }
-}
+
 TEST_CASE("Test math operations") {
     SECTION("test binary multiply") {
         auto t = CompilerTest(
@@ -359,42 +245,7 @@ TEST_CASE("Test math operations") {
         CHECK(t.returns() == "42");
     }
 }
-TEST_CASE("Test try") {
-    SECTION("test1") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        try:\n            pass\n        finally:\n            raise OSError\n    except OSError as e:\n        return 1\n    return 0\n"
-        );
-        CHECK(t.returns() == "1");
-    }
 
-    SECTION("test2") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        raise\n    except RuntimeError:\n        return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-
-    SECTION("test3") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        while True:\n            try:\n                raise Exception()\n            except Exception:\n                break\n    finally:\n        pass\n    return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-
-    SECTION("test raise in finally causes runtime error") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        pass\n    finally:\n        raise"
-        );
-        CHECK(t.raises() == PyExc_RuntimeError);
-    }
-
-    SECTION("test raise custom exception in finally") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        pass\n    finally:\n        raise OSError"
-        );
-        CHECK(t.raises() == PyExc_OSError);
-    }
-}
 TEST_CASE("X Test boxing") {
     SECTION("partial should be boxed because it's consumed by print after being assigned in the break loop") {
         auto t = CompilerTest(
@@ -457,13 +308,6 @@ TEST_CASE("X Test boxing") {
                 "def f():\n    a, b, c = len"
         );
         CHECK(t.raises() == PyExc_TypeError);
-    }
-
-    SECTION("test stack dump") {
-        auto t = CompilerTest(
-                "def x():\n     try:\n         b\n     except:\n         c\n\ndef f():\n    try:\n        x()\n    except:\n        pass\n    return sys.exc_info()[0]\n\n"
-        );
-        CHECK(t.returns() == "None");
     }
 
     SECTION("test") {
@@ -1221,20 +1065,10 @@ TEST_CASE("Unary tests") {
                 "def f():\n    x = 9223372036854775807\n    y = 9223372036854775807\n    return x * y"
         );
         CHECK(t.returns() == "85070591730234615847396907784232501249");
-    }SECTION("test126") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        min(1,2)\n    finally:\n        try:\n            min(1,2)\n        except EnvironmentError:\n            pass\n    return 1"
-        );
-        CHECK(t.returns() == "1");
-    }SECTION("test127") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        min(1,2)\n    finally:\n        try:\n            min(1,2)\n        finally:\n            pass\n    return 1"
-        );
-        CHECK(t.returns() == "1");
     }
 }
-TEST_CASE("optimized cases") {
-        // Simple optimized code test cases...
+TEST_CASE("test binary/arithmetic operations") {
+    // Simple optimized code test cases...
     SECTION("test") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = +x\n    return y"
@@ -1446,8 +1280,7 @@ TEST_CASE("optimized cases") {
                 "def f():\n    x = 1\n    y = 0\n    try:\n        return x // y\n    except:\n        return 42"
         );
         CHECK(t.returns() == "42");
-    }
-    SECTION("test43") {
+    }SECTION("test43") {
         auto t = CompilerTest(
                 "def f():\n    a = RefCountCheck()\n    del a\n    return finalized"
         );
@@ -1457,38 +1290,20 @@ TEST_CASE("optimized cases") {
                 "def f():\n    for i in {2:3}:\n        pass\n    return i"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test45") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n            break\n        finally:\n            pass"
-        );
-        CHECK(t.returns() == "None");
-    }SECTION("test46") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n            pass\n        finally:\n            return i"
-        );
-        CHECK(t.returns() == "0");
-    }SECTION("test47") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n            break\n        finally:\n            return i"
-        );
-        CHECK(t.returns() == "0");
-    }SECTION("test48") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        raise Exception(2)\n    except Exception as e:\n        return e.args[0]"
-        );
-        CHECK(t.returns() == "2");
-    }SECTION("test49") {
+    }
+}
+TEST_CASE("test make function") {
+    SECTION("test make function with argument annotations - return introspected annotation") {
         auto t = CompilerTest(
                 "def f():\n    def g(b:1, *, a = 2):\n     return a\n    return g.__annotations__['b']"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test50") {
+    }SECTION("test make function with argument annotations - return result") {
         auto t = CompilerTest(
                 "def f():\n    def g(b:1, *, a = 2):\n     return a\n    return g(3)"
         );
         CHECK(t.returns() == "2");
-    }
-    SECTION("test51") {
+    }SECTION("test51") {
         auto t = CompilerTest(
                 "def f():\n    def g(*, a = 2):\n     return a\n    return g()"
         );
@@ -1523,254 +1338,177 @@ TEST_CASE("optimized cases") {
                 "def f():\n    def g(*a): return a\n    return g(*(1, 2, 3))"
         );
         CHECK(t.returns() == "(1, 2, 3)");
-    }
-    SECTION("test60") {
+    }SECTION("test60") {
         auto t = CompilerTest(
                 "def f():\n    def g(*a): return a\n    return g(1, *(2, 3))"
         );
         CHECK(t.returns() == "(1, 2, 3)");
     }
+}
+TEST_CASE("test function calls") {
     SECTION("test61") {
         auto t = CompilerTest(
                 "def f():\n    def g(): pass\n    g.abc = {fn.lower() for fn in ['A']}\n    return g.abc"
         );
         CHECK(t.returns() == "{'a'}");
     }
-    SECTION("test62") {
-        auto t = CompilerTest(
-                "def f():\n    for abc in [1,2,3]:\n        try:\n            break\n        except ImportError:\n            continue\n    return abc"
-        );
-        CHECK(t.returns() == "1");
-    }
-    SECTION("test63") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        raise Exception()\n    finally:\n        return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("test64") {
-        auto t = CompilerTest(
-                "def f():\n	try:\n		pass\n	except ImportError:\n		pass\n	except Exception as e:\n		pass"
-        );
-        CHECK(t.returns() == "None");
-    }
-    SECTION("test65") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        raise Exception('hi')\n    except:\n        return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("test66") {
-        auto t = CompilerTest(
-                "def f():\n    x = {}\n    try:\n        return x[42]\n    except KeyError:\n        return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("test67") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        pass\n    finally:\n        pass\n    return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
+
     SECTION("test68") {
         auto t = CompilerTest(
                 "def f():\n    x = {}\n    x.update(y=2)\n    return x"
         );
         CHECK(t.returns() == "{'y': 2}");
-    }
-    SECTION("test69") {
+    }SECTION("test69") {
         auto t = CompilerTest(
                 "def f():\n    def g(a=2): return a\n    return g()"
         );
         CHECK(t.returns() == "2");
     }
-    SECTION("test70") {
-        auto t = CompilerTest(
-                "def f():\n    for i in range(5):\n        try:\n            continue\n        finally:\n            return i"
-        );
-        CHECK(t.returns() == "0");
-    }
-    SECTION("test71") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        raise Exception()\n    finally:\n        pass"
-        );
-        CHECK(t.raises() == PyExc_Exception);
-    }
-    SECTION("test72") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        pass\n    finally:\n        return 42"
-        );
-        CHECK(t.returns() == "42");
-    }
-    SECTION("test73") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        raise Exception()\n    except:\n        return 2"
-        );
-        CHECK(t.returns() == "2");
-    }
-    SECTION("test74") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        raise Exception()\n    except Exception:\n        return 2"
-        );
-        CHECK(t.returns() == "2");
-    }
-    SECTION("test75") {
-        auto t = CompilerTest(
-                "def f():\n    try:\n        raise Exception()\n    except AssertionError:\n        return 2\n    return 4"
-        );
-        CHECK(t.raises() == PyExc_Exception);
-    }
+
     SECTION("test76") {
         auto t = CompilerTest(
                 "def f():\n    global x\n    x = 2\n    return x"
         );
         CHECK(t.returns() == "2");
     }
-    SECTION("test77") {
+}
+TEST_CASE("test range generators") {
+    SECTION("test range iterator with continue/break") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(3):\n        if i == 0: continue\n        break\n    return i"
         );
         CHECK(t.returns() == "1");
     }
-    SECTION("test78") {
+    SECTION("test range iterator with break") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(3):\n        if i == 1: break\n    return i"
         );
         CHECK(t.returns() == "1");
     }
+}
+TEST_CASE("test slicing"){
     SECTION("test79") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][1:]"
         );
         CHECK(t.returns() == "[2, 3]");
-    }
-    SECTION("test80") {
+    }SECTION("test80") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][:1]"
         );
         CHECK(t.returns() == "[1]");
-    }
-    SECTION("test81") {
+    }SECTION("test81") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][1:2]"
         );
         CHECK(t.returns() == "[2]");
-    }
-    SECTION("test82") {
+    }SECTION("test82") {
         auto t = CompilerTest(
                 "def f():\n    return [1,2,3][0::2]"
         );
         CHECK(t.returns() == "[1, 3]");
     }
+}
+TEST_CASE("test unpacking") {
     SECTION("test83") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = range(3)\n    return a"
         );
         CHECK(t.returns() == "0");
-    }
-    SECTION("test84") {
+    }SECTION("test84") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = range(3)\n    return b"
         );
         CHECK(t.returns() == "[1]");
-    }
-    SECTION("test85") {
+    }SECTION("test85") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = range(3)\n    return c"
         );
         CHECK(t.returns() == "2");
-    }
-    SECTION("test86") {
+    }SECTION("test86") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 2, 3\n    return a"
         );
         CHECK(t.returns() == "1");
-    }
-    SECTION("test87") {
+    }SECTION("test87") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 2, 3\n    return b"
         );
         CHECK(t.returns() == "[2]");
-    }
-    SECTION("test88") {
+    }SECTION("test88") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 2, 3\n    return c"
         );
         CHECK(t.returns() == "3");
-    }
-    SECTION("test89") {
+    }SECTION("test89") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 3\n    return c"
         );
         CHECK(t.returns() == "3");
-    }
-    SECTION("test90") {
+    }SECTION("test90") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = 1, 3\n    return b"
         );
         CHECK(t.returns() == "[]");
-    }
-    SECTION("test91") {
+    }SECTION("test91") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 2, 3]\n    return a"
         );
         CHECK(t.returns() == "1");
-    }
-    SECTION("test92") {
+    }SECTION("test92") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 2, 3]\n    return b"
         );
         CHECK(t.returns() == "[2]");
-    }
-    SECTION("test92") {
+    }SECTION("test * unpack 1") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 2, 3]\n    return c"
         );
         CHECK(t.returns() == "3");
-    }
-    SECTION("test93") {
+    }SECTION("test * unpack 2") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 3]\n    return c"
         );
         CHECK(t.returns() == "3");
-    }
-    SECTION("test94") {
+    }SECTION("test * unpack 3") {
         auto t = CompilerTest(
                 "def f():\n    a, *b, c = [1, 3]\n    return b"
         );
         CHECK(t.returns() == "[]");
-    }
-    SECTION("test95") {
+    }SECTION("test unpack") {
         auto t = CompilerTest(
                 "def f():\n    a, b = range(2)\n    return a"
         );
         CHECK(t.returns() == "0");
-    }
-    SECTION("test96") {
+    }SECTION("test multiple assignments by unpack") {
         auto t = CompilerTest(
                 "def f():\n    a, b = 1, 2\n    return a"
         );
         CHECK(t.returns() == "1");
     }
-    SECTION("test97") {
+}
+TEST_CASE("test classes") {
+    SECTION("test class definition") {
         auto t = CompilerTest(
                 "def f():\n    class C:\n        pass\n    return C"
         );
         CHECK(t.returns() == "<class 'C'>");
     }
-    SECTION("test98") {
+}
+TEST_CASE("test language features") {
+    SECTION("test slice") {
         auto t = CompilerTest(
                 "def f():\n    a = 0\n    for x in[1]:\n        a = a + 1\n    return a"
         );
         CHECK(t.returns() == "1");
     }
-    SECTION("test99") {
+    SECTION("test list comprehension") {
         auto t = CompilerTest(
                 "def f(): return [x for x in range(2)]"
         );
         CHECK(t.returns() == "[0, 1]");
     }
-    SECTION("test100") {
+    SECTION("test attribute access") {
         auto t = CompilerTest(
                 "def f():\n    def g(): pass\n    return g.__name__"
         );

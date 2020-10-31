@@ -161,7 +161,6 @@ PyObject* PyJit_NewFunction(PyObject* code, PyObject* qualname, PyFrameObject* f
     auto res = PyFunction_NewWithQualName(code, frame->f_globals, qualname);
     Py_DECREF(code);
     Py_DECREF(qualname);
-
     return res;
 }
 

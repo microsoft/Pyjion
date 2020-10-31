@@ -330,7 +330,7 @@ void PythonCompiler::emit_dup_top_two() {
 }
 
 void PythonCompiler::emit_dict_build_from_map() {
-    m_il.emit_call(METHOD_BUILD_DICT_FROM_TUPLES, 2);
+    m_il.emit_call(METHOD_BUILD_DICT_FROM_TUPLES, 1);
 }
 
 void PythonCompiler::emit_new_list(size_t argCnt) {
@@ -864,39 +864,32 @@ void PythonCompiler::emit_new_function() {
     m_il.emit_call(METHOD_NEWFUNCTION_TOKEN, 3);
 }
 
-void PythonCompiler::emit_set_closure() {
-	auto tmp = emit_spill();
-	m_il.ld_i(offsetof(PyFunctionObject, func_closure));
-	m_il.add(); 
-	
-	// Emit value
-	emit_load_and_free_local(tmp);
-
-	m_il.st_ind_i();
-}
-
 void PythonCompiler::emit_setup_annotations() {
     load_frame();
     m_il.emit_call(METHOD_SETUP_ANNOTATIONS, 1);
+}
+
+void PythonCompiler::emit_set_closure() {
+	auto func = emit_spill();
+	m_il.ld_i(offsetof(PyFunctionObject, func_closure));
+	m_il.add();
+	emit_load_and_free_local(func);
+	m_il.st_ind_i();
 }
 
 void PythonCompiler::emit_set_annotations() {
 	auto tmp = emit_spill();
 	m_il.ld_i(offsetof(PyFunctionObject, func_annotations));
 	m_il.add();
-
-	// Emit value
 	emit_load_and_free_local(tmp);
+    m_il.st_ind_i();
 }
 
 void PythonCompiler::emit_set_kw_defaults() {
 	auto tmp = emit_spill();
 	m_il.ld_i(offsetof(PyFunctionObject, func_kwdefaults));
 	m_il.add();
-
-	// Emit value
 	emit_load_and_free_local(tmp);
-
 	m_il.st_ind_i();
 }
 
@@ -904,10 +897,7 @@ void PythonCompiler::emit_set_defaults() {
 	auto tmp = emit_spill();
 	m_il.ld_i(offsetof(PyFunctionObject, func_defaults));
 	m_il.add();
-
-	// Emit value
 	emit_load_and_free_local(tmp);
-
 	m_il.st_ind_i(); 
 }
 
