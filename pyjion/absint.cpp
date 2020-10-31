@@ -1574,15 +1574,6 @@ void AbstractInterpreter::periodicWork() {
     intErrorCheck("periodic work");
 }
 
-int AbstractInterpreter::getExtendedOpcode(int curByte) {
-    auto opcode = GET_OPCODE(curByte);
-    while (opcode == EXTENDED_ARG) {
-        curByte += 2;
-        opcode = GET_OPCODE(curByte);
-    }
-    return opcode;
-}
-
 // Checks to see if -1 is the current value on the stack, and if so, falls into
 // the logic for raising an exception.  If not execution continues forward progress.
 // Used for checking if an API reports an error (typically true/false/-1)
@@ -1671,10 +1662,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
         auto oparg = GET_OPARG(curByte);
 
     processOpCode:
-        // See FOR_ITER for special handling of the offset label
-        if (getExtendedOpcode(curByte) != FOR_ITER) {
-            markOffsetLabel(curByte);
-        }
+        markOffsetLabel(curByte);
 
         // See if current index is part of offset stack, used for jump operations
         auto curStackDepth = m_offsetStack.find(curByte);
@@ -1979,11 +1967,14 @@ JittedCode* AbstractInterpreter::compileWorker() {
             }
             case FOR_ITER:
             {
-                BlockInfo *loopBlock = nullptr;
+                auto jumpTo = curByte + oparg + sizeof(_Py_CODEUNIT);
+                auto newStack = ValueStack(m_stack);
+                newStack.inc(1, STACK_KIND_OBJECT);
+                m_offsetStack[jumpTo] = newStack;
                 forIter(
                         curByte + oparg + sizeof(_Py_CODEUNIT),
                         opcodeIndex,
-                        loopBlock
+                        m_blockStack.back()
                 );
                 skipEffect = true; // has jump effect
                 break;
@@ -2580,38 +2571,23 @@ void AbstractInterpreter::unpackSequence(size_t size, int opcode) {
     m_comp->emit_free_local(fastTmp);
 }
 
-void AbstractInterpreter::forIter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo) {
-    // CPython always generates LOAD_FAST or a GET_ITER before a FOR_ITER.
-    // Therefore we know that we always fall into a FOR_ITER when it is
-    // initialized, and we branch back to it for the loop condition.  We
-    // do this because keeping the value on the stack becomes problematic.
-    // At the very least it requires that we spill the value out when we
-    // are doing a "continue" in a for loop.
-
-    // oparg is where to jump on break
-    auto iterValue = m_comp->emit_spill();
-    decStack();
-    if (loopInfo != nullptr) {
-        loopInfo->LoopVar = iterValue;
-    }
-
-    // now that we've saved the value into a temp we can mark the offset
-    // label.
-    markOffsetLabel(opcodeIndex);
-
-    m_comp->emit_load_local(iterValue);
-
-    // TODO: It'd be nice to inline this...
-    auto processValue = m_comp->emit_define_label();
-
-    m_comp->emit_for_next(processValue, iterValue);
-
-    intErrorCheck("for_iter failed");
-
-    jumpAbsolute(loopIndex, opcodeIndex);
-
-    m_comp->emit_mark_label(processValue);
+void AbstractInterpreter::forIter(int loopIndex, int opcodeIndex, BlockInfo loopInfo) {
+    m_comp->emit_dup(); // dup the iter so that it stays on the stack for the next iteration
     incStack();
+
+    m_comp->emit_for_next(); // emits NULL on error, 0xff on StopIter and ptr on next
+
+    errorCheck("failed to fetch iter");
+    auto next = m_comp->emit_define_label();
+
+    m_comp->emit_dup();
+    m_comp->emit_ptr((void*)0xff);
+    m_comp->emit_branch(BranchNotEqual, next);
+
+    m_comp->emit_pop_top(); // POP and DECREF iter
+    m_comp->emit_branch(BranchAlways, getOffsetLabel(loopIndex)); // Goto: post-stack
+
+    m_comp->emit_mark_label(next);
 }
 
 void AbstractInterpreter::loadFast(int local, int opcodeIndex) {

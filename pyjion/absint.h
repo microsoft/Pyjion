@@ -326,7 +326,7 @@ private:
     void buildMap(size_t argCnt);
 
     Label getOffsetLabel(int jumpTo);
-    void forIter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo);
+    void forIter(int loopIndex, int opcodeIndex, BlockInfo loopInfo);
 
     // Checks to see if we have a null value as the last value on our stack
     // indicating an error, and if so, branches to our current error handler.
@@ -358,9 +358,6 @@ private:
     void decStack(size_t size = 1);
 
     void incStack(size_t size = 1, StackEntryKind kind = STACK_KIND_OBJECT);
-
-    // Gets the next opcode skipping for EXTENDED_ARG
-    int getExtendedOpcode(int curByte);
 
     JittedCode* compileWorker();
 

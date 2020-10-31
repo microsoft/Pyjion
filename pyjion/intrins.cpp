@@ -1264,16 +1264,15 @@ PyObject* PyJit_GetIterOptimized(PyObject* iterable, size_t* iterstate1, size_t*
     return res;
 }
 
-PyObject* PyJit_IterNext(PyObject* iter, int*error) {
+PyObject* PyJit_IterNext(PyObject* iter) {
     auto res = (*iter->ob_type->tp_iternext)(iter);
     if (res == nullptr) {
         if (PyErr_Occurred()) {
             if (!PyErr_ExceptionMatches(PyExc_StopIteration)) {
-                *error = 1;
                 return nullptr;
             }
-            *error = 0;
             PyErr_Clear();
+            return (PyObject*)(0xff);
         }
     }
     return res;

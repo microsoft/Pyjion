@@ -302,7 +302,7 @@ void PythonCompiler::pop_top() {
 }
 
 void PythonCompiler::emit_dup_top() {
-    // TODO : Figure out why it does DUP twice?
+    // Dup top and incref
     m_il.dup();
     m_il.dup();
     emit_incref(true);
@@ -1025,21 +1025,8 @@ void PythonCompiler::emit_box_tagged_ptr() {
     m_il.emit_call(METHOD_BOX_TAGGED_PTR, 1);
 }
 
-void PythonCompiler::emit_for_next(Label processValue, Local iterValue) {
-    auto error = m_il.define_local(Parameter(CORINFO_TYPE_INT));
-    m_il.ld_loca(error);
-    m_il.emit_call(SIG_ITERNEXT_TOKEN, 2);
-
-    m_il.dup();
-    m_il.ld_i(nullptr);
-    m_il.branch(BranchNotEqual, processValue);
-
-    // iteration has ended, or an exception was raised...
-
-    m_il.pop();
-    m_il.ld_loc(iterValue);
-    decref();
-    emit_load_and_free_local(error);
+void PythonCompiler::emit_for_next() {
+    m_il.emit_call(METHOD_ITERNEXT_TOKEN, 1);
 }
 
 void PythonCompiler::emit_debug_msg(const char* msg) {
@@ -1279,7 +1266,7 @@ GLOBAL_METHOD(METHOD_STORENAME_TOKEN, &PyJit_StoreName, CORINFO_TYPE_INT, Parame
 GLOBAL_METHOD(METHOD_DELETENAME_TOKEN, &PyJit_DeleteName, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_GETITER_TOKEN, &PyJit_GetIter, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(SIG_ITERNEXT_TOKEN, &PyJit_IterNext, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_ITERNEXT_TOKEN, &PyJit_IterNext, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_DECREF_TOKEN, &PyJit_DecRef, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
 

@@ -205,7 +205,7 @@ PyObject* PyJit_GetIter(PyObject* iterable);
 PyObject* PyJit_GetIterOptimized(PyObject* iterable, size_t* iterstate1, size_t* iterstate2);
 PyObject* PyJit_IterNextOptimized(PyObject* iter, int*error, size_t* iterstate1, size_t* iterstate2);
 
-PyObject* PyJit_IterNext(PyObject* iter, int*error);
+PyObject* PyJit_IterNext(PyObject* iter);
 
 void PyJit_CellSet(PyObject* value, PyObject* cell);
 

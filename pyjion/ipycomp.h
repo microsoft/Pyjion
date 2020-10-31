@@ -340,7 +340,7 @@ public:
      * Iteration */
     virtual void emit_getiter() = 0;
     //void emit_getiter_opt() = 0;
-    virtual void emit_for_next(Label processValue, Local iterValue) = 0;
+    virtual void emit_for_next() = 0;
 
     /*****************************************************
      * Operators */

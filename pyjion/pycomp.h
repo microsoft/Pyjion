@@ -201,11 +201,8 @@
 #define METHOD_FLOAT_FLOOR_TOKEN    0x00050001
 #define METHOD_FLOAT_MODULUS_TOKEN  0x00050002
 
-// signatures for calli methods
-#define SIG_ITERNEXT_TOKEN            0x00040000
+#define METHOD_ITERNEXT_TOKEN         0x00040000
 #define SIG_ITERNEXT_OPTIMIZED_TOKEN  0x00040001
-
-#define FIRST_USER_FUNCTION_TOKEN     0x00100000
 
 #define LD_FIELDA(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); 
 #define LD_FIELD(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); m_il.ld_ind_i();
@@ -360,7 +357,7 @@ public:
     virtual void emit_print_expr();
     virtual void emit_load_classderef(int index);
     virtual void emit_getiter();
-    virtual void emit_for_next(Label processValue, Local iterValue);
+    virtual void emit_for_next();
 
     virtual void emit_binary_float(int opcode);
     virtual void emit_binary_object(int opcode);
