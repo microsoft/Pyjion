@@ -1968,14 +1968,12 @@ JittedCode* AbstractInterpreter::compileWorker() {
             case FOR_ITER:
             {
                 auto jumpTo = curByte + oparg + sizeof(_Py_CODEUNIT);
-                auto newStack = ValueStack(m_stack);
-                newStack.inc(1, STACK_KIND_OBJECT);
-                m_offsetStack[jumpTo] = newStack;
                 forIter(
-                        curByte + oparg + sizeof(_Py_CODEUNIT),
-                        opcodeIndex,
-                        m_blockStack.back()
+                        jumpTo
                 );
+                auto newStack = ValueStack(m_stack);
+                newStack.dec(2);
+                m_offsetStack[jumpTo] = newStack;
                 skipEffect = true; // has jump effect
                 break;
             }
@@ -2571,21 +2569,28 @@ void AbstractInterpreter::unpackSequence(size_t size, int opcode) {
     m_comp->emit_free_local(fastTmp);
 }
 
-void AbstractInterpreter::forIter(int loopIndex, int opcodeIndex, BlockInfo loopInfo) {
+void AbstractInterpreter::forIter(int loopIndex) {
     m_comp->emit_dup(); // dup the iter so that it stays on the stack for the next iteration
     incStack();
 
     m_comp->emit_for_next(); // emits NULL on error, 0xff on StopIter and ptr on next
 
+    /* Start error branch */
     errorCheck("failed to fetch iter");
+    /* End error branch */
+
     auto next = m_comp->emit_define_label();
 
+    /* Start next iter branch */
     m_comp->emit_dup();
     m_comp->emit_ptr((void*)0xff);
     m_comp->emit_branch(BranchNotEqual, next);
+    /* End next iter branch */
 
+    /* Start stop iter branch */
     m_comp->emit_pop_top(); // POP and DECREF iter
     m_comp->emit_branch(BranchAlways, getOffsetLabel(loopIndex)); // Goto: post-stack
+    /* End stop iter error branch */
 
     m_comp->emit_mark_label(next);
 }

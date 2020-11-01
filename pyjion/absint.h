@@ -326,7 +326,7 @@ private:
     void buildMap(size_t argCnt);
 
     Label getOffsetLabel(int jumpTo);
-    void forIter(int loopIndex, int opcodeIndex, BlockInfo loopInfo);
+    void forIter(int loopIndex);
 
     // Checks to see if we have a null value as the last value on our stack
     // indicating an error, and if so, branches to our current error handler.
