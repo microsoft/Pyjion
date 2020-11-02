@@ -1258,12 +1258,6 @@ PyObject* PyJit_GetIter(PyObject* iterable) {
     return res;
 }
 
-PyObject* PyJit_GetIterOptimized(PyObject* iterable, size_t* iterstate1, size_t* iterstate2) {
-    auto res = PyObject_GetIter(iterable);
-    Py_DECREF(iterable);
-    return res;
-}
-
 PyObject* PyJit_IterNext(PyObject* iter) {
     auto res = (*iter->ob_type->tp_iternext)(iter);
     if (res == nullptr) {
@@ -1275,22 +1269,6 @@ PyObject* PyJit_IterNext(PyObject* iter) {
             return (PyObject*)(0xff);
         } else {
             return (PyObject*)(0xff);
-        }
-    }
-    return res;
-}
-
-
-PyObject* PyJit_IterNextOptimized(PyObject* iter, int*error, size_t* iterstate1, size_t* iterstate2) {
-    auto res = (*iter->ob_type->tp_iternext)(iter);
-    if (res == nullptr) {
-        if (PyErr_Occurred()) {
-            if (!PyErr_ExceptionMatches(PyExc_StopIteration)) {
-                *error = 1;
-                return nullptr;
-            }
-            *error = 0;
-            PyErr_Clear();
         }
     }
     return res;

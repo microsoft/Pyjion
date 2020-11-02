@@ -202,8 +202,6 @@ int PyJit_DeleteGlobal(PyFrameObject* f, PyObject* name);
 PyObject* PyJit_LoadGlobal(PyFrameObject* f, PyObject* name);
 
 PyObject* PyJit_GetIter(PyObject* iterable);
-PyObject* PyJit_GetIterOptimized(PyObject* iterable, size_t* iterstate1, size_t* iterstate2);
-PyObject* PyJit_IterNextOptimized(PyObject* iter, int*error, size_t* iterstate1, size_t* iterstate2);
 
 PyObject* PyJit_IterNext(PyObject* iter);
 

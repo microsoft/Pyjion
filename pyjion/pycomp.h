@@ -115,7 +115,6 @@
 #define METHOD_ISNOT                             0x0000004A
 #define METHOD_IS_BOOL                           0x0000004B
 #define METHOD_ISNOT_BOOL                        0x0000004C
-#define METHOD_GETITER_OPTIMIZED_TOKEN           0x0000004D
 #define METHOD_COMPARE_EXCEPTIONS_INT            0x0000004E
 
 #define METHOD_UNARY_NOT_INT                     0x00000051
@@ -173,7 +172,6 @@
 
 #define METHOD_LOAD_METHOD      0x00010400
 
-
 // Py* helpers
 #define METHOD_PYTUPLE_NEW           0x00020000
 #define METHOD_PYLIST_NEW            0x00020001
@@ -202,7 +200,6 @@
 #define METHOD_FLOAT_MODULUS_TOKEN  0x00050002
 
 #define METHOD_ITERNEXT_TOKEN         0x00040000
-#define SIG_ITERNEXT_OPTIMIZED_TOKEN  0x00040001
 
 #define LD_FIELDA(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); 
 #define LD_FIELD(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); m_il.ld_ind_i();
