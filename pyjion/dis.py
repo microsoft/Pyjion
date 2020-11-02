@@ -531,8 +531,7 @@ def print_il(il):
         while True:
             first = next(i)
             if first == 0 and pc == 0:
-                print(f"!!! Corrupt IL !!!")
-                return
+                raise NotImplementedError(f"CorILMethod_FatFormat not yet supported")
 
             op = opcode_map[first]
             if op.size == InlineNone:

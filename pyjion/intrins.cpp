@@ -1273,6 +1273,8 @@ PyObject* PyJit_IterNext(PyObject* iter) {
             }
             PyErr_Clear();
             return (PyObject*)(0xff);
+        } else {
+            return (PyObject*)(0xff);
         }
     }
     return res;

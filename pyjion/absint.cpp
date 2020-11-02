@@ -1967,12 +1967,12 @@ JittedCode* AbstractInterpreter::compileWorker() {
             }
             case FOR_ITER:
             {
+                auto newStack = ValueStack(m_stack);
+                newStack.dec(1);
                 auto jumpTo = curByte + oparg + sizeof(_Py_CODEUNIT);
                 forIter(
                         jumpTo
                 );
-                auto newStack = ValueStack(m_stack);
-                newStack.dec(2);
                 m_offsetStack[jumpTo] = newStack;
                 skipEffect = true; // has jump effect
                 break;
@@ -2532,7 +2532,7 @@ void AbstractInterpreter::unwindHandlers(){
 
 void AbstractInterpreter::returnValue(int opcodeIndex) {
     m_comp->emit_store_local(m_retValue);
-    m_comp->emit_branch(BranchLeave, m_retLabel);
+    m_comp->emit_branch(BranchAlways, m_retLabel);
     decStack();
 }
 
@@ -2570,14 +2570,17 @@ void AbstractInterpreter::unpackSequence(size_t size, int opcode) {
 }
 
 void AbstractInterpreter::forIter(int loopIndex) {
-    m_comp->emit_dup(); // dup the iter so that it stays on the stack for the next iteration
-    incStack();
+    // dup the iter so that it stays on the stack for the next iteration
+    m_comp->emit_dup(); // ..., iter -> iter, iter, ...
 
-    m_comp->emit_for_next(); // emits NULL on error, 0xff on StopIter and ptr on next
+    // emits NULL on error, 0xff on StopIter and ptr on next
+    m_comp->emit_for_next(); // ..., iter, iter -> "next", iter, ...
 
     /* Start error branch */
     errorCheck("failed to fetch iter");
     /* End error branch */
+
+    incStack(1);
 
     auto next = m_comp->emit_define_label();
 
@@ -2588,6 +2591,7 @@ void AbstractInterpreter::forIter(int loopIndex) {
     /* End next iter branch */
 
     /* Start stop iter branch */
+    m_comp->emit_pop(); // Pop the 0xff StopIter value
     m_comp->emit_pop_top(); // POP and DECREF iter
     m_comp->emit_branch(BranchAlways, getOffsetLabel(loopIndex)); // Goto: post-stack
     /* End stop iter error branch */
