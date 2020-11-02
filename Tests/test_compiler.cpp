@@ -246,7 +246,7 @@ TEST_CASE("Test math operations") {
     }
 }
 
-TEST_CASE("X Test boxing") {
+TEST_CASE("Test boxing") {
     SECTION("partial should be boxed because it's consumed by print after being assigned in the break loop") {
         auto t = CompilerTest(
                 "def f():\n    partial = 0\n    while 1:\n        partial = 1\n        break\n    if not partial:\n        print(partial)\n        return True\n    return False\n"
@@ -318,7 +318,7 @@ TEST_CASE("X Test boxing") {
     }
 
 }
-TEST_CASE("X Conditional returns") {
+TEST_CASE("Conditional returns") {
     // +=, -= checks are to avoid constant folding
     SECTION("test") {
         auto t = CompilerTest(
@@ -1496,11 +1496,17 @@ TEST_CASE("test classes") {
     }
 }
 TEST_CASE("test language features") {
-    SECTION("test slice") {
+    SECTION("test basic iter") {
         auto t = CompilerTest(
-                "def f():\n    a = 0\n    for x in[1]:\n        a = a + 1\n    return a"
+                "def f():\n    a = 0\n    for x in [1]:\n        a = a + 1\n    return a"
         );
         CHECK(t.returns() == "1");
+    }
+    SECTION("test nested iter") {
+        auto t = CompilerTest(
+                "def f():\n  a = 0\n  for y in [1,2,3]:\n    for x in [1, 2, 3]:\n      a += x + y\n  return a"
+        );
+        CHECK(t.returns() == "36");
     }
     SECTION("test list comprehension") {
         auto t = CompilerTest(

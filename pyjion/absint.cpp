@@ -1967,13 +1967,13 @@ JittedCode* AbstractInterpreter::compileWorker() {
             }
             case FOR_ITER:
             {
-                auto newStack = ValueStack(m_stack);
-                newStack.dec(1);
+                auto postIterStack = ValueStack(m_stack);
+                postIterStack.dec(1); // pop iter when stopiter happens
                 auto jumpTo = curByte + oparg + sizeof(_Py_CODEUNIT);
                 forIter(
                         jumpTo
                 );
-                m_offsetStack[jumpTo] = newStack;
+                m_offsetStack[jumpTo] = postIterStack;
                 skipEffect = true; // has jump effect
                 break;
             }
