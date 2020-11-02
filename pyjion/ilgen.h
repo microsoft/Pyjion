@@ -650,7 +650,7 @@ public:
                 &nativeEntry,
                 &nativeSizeOfCode
         );
-
+        jitInfo->setNativeSize(nativeSizeOfCode);
         switch (result){
             case CORJIT_OK:
                 res.m_addr = nativeEntry;

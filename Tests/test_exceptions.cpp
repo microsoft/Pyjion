@@ -375,3 +375,26 @@ TEST_CASE("Exception Filters"){
         CHECK(t.returns() == "42");
     }
 }
+
+TEST_CASE("try else"){
+    SECTION("test try except keep scope to else") {
+        auto t = CompilerTest(
+                "def f():\n  try:\n    a = 1\n  except:\n    a = 2\n  else:\n    a += 4\n  return a"
+        );
+        CHECK(t.returns() == "5");
+    }
+
+    SECTION("test try except keep scope to else with raise") {
+        auto t = CompilerTest(
+                "def f():\n  try:\n    a = 1/0\n  except:\n    a = 2\n  else:\n    a += 4\n  return a"
+        );
+        CHECK(t.returns() == "2");
+    }
+
+    SECTION("test try except keep scope to else with raise and filter") {
+        auto t = CompilerTest(
+                "def f():\n  try:\n    a = 1/0\n  except OSError:\n    a = 2\n  else:\n    a += 4\n  return a"
+        );
+        CHECK(t.returns() == "5");
+    }
+}

@@ -73,6 +73,7 @@ public:
     virtual void* get_code_addr() = 0;
     virtual uint8_t * get_il() = 0;
     virtual unsigned int get_il_len() = 0;
+    virtual unsigned long get_native_size() = 0;
 };
 
 // Defines the interface between the abstract compiler and code generator

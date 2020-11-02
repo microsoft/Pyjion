@@ -250,7 +250,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 
 			trace->j_il = res->get_il();
 			trace->j_ilLen = res->get_il_len();
-
+            trace->j_nativeSize = res->get_native_size();
             trace->j_generic = target->addr;
             trace->j_evalfunc = Jit_EvalGeneric;
 
@@ -441,6 +441,30 @@ static PyObject *pyjion_dump_il(PyObject *self, PyObject* func) {
     return res;
 }
 
+static PyObject *pyjion_dump_native(PyObject *self, PyObject* func) {
+    PyObject* code;
+    if (PyFunction_Check(func)) {
+        code = ((PyFunctionObject*)func)->func_code;
+    }
+    else if (PyCode_Check(func)) {
+        code = func;
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError, "Expected function or code");
+        return nullptr;
+    }
+
+    PyjionJittedCode* jitted = PyJit_EnsureExtra(code);
+    if (jitted->j_failed || jitted->j_evalfunc == nullptr)
+        Py_RETURN_NONE;
+
+    auto res = PyByteArray_FromStringAndSize(reinterpret_cast<const char *>(jitted->j_evalfunc), jitted->j_nativeSize);
+    if (res == nullptr) {
+        return nullptr;
+    }
+    return res;
+}
+
 static PyObject *pyjion_set_threshold(PyObject *self, PyObject* args) {
 	if (!PyLong_Check(args)) {
 		PyErr_SetString(PyExc_TypeError, "Expected int for new threshold");
@@ -492,6 +516,12 @@ static PyMethodDef PyjionMethods[] = {
         pyjion_dump_il,
         METH_O,
         "Outputs the IL for the compiled code object."
+    },
+    {
+        "dump_native",
+        pyjion_dump_native,
+        METH_O,
+        "Outputs the machine code for the compiled code object."
     },
 	{
 		"set_threshold",

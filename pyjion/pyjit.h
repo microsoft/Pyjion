@@ -78,6 +78,7 @@ public:
     void *j_evalstate;
     uint8_t *j_il;
     unsigned int j_ilLen;
+    unsigned long j_nativeSize;
 
 	explicit PyjionJittedCode(PyObject* code) {
 		j_code = code;

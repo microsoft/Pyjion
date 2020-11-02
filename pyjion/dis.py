@@ -606,3 +606,13 @@ def dis(f):
         return
     print_il(il)
 
+
+def dis_native(f):
+    try:
+        import distorm3
+    except ImportError:
+        raise ModuleNotFoundError("Install distorm3 before disassembling native functions")
+    code = dump_native(f)
+    iterable = distorm3.DecodeGenerator(0x00000000, bytes(code), distorm3.Decode64Bits)
+    for (offset, size, instruction, hexdump) in iterable:
+        print("%.8x: %s" % (offset, instruction))

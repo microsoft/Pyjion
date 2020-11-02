@@ -67,6 +67,7 @@ class CorJitInfo : public ICorJitInfo, public JittedCode {
     UserModule* m_module;
     uint8_t* m_il;
     unsigned int m_ilLen;
+    ULONG m_nativeSize;
 
 public:
 
@@ -98,6 +99,10 @@ public:
 
     unsigned int get_il_len() override {
         return m_ilLen;
+    }
+
+    unsigned long get_native_size() override {
+        return m_nativeSize;
     }
 
     void freeMem(PVOID code) {
@@ -1839,6 +1844,10 @@ public:
     void assignIL(uint8_t *il, unsigned int ilLen) {
         m_il = il;
         m_ilLen = ilLen;
+    }
+
+    void setNativeSize(ULONG i) {
+        m_nativeSize = i;
     }
 };
 
