@@ -53,7 +53,7 @@ jobs:
 
       - name: Run smoke tests
         shell: bash
-        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
+        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -vW -j1
 
 
   build-mac:
@@ -97,7 +97,7 @@ jobs:
 
       - name: Run smoke tests
         shell: bash
-        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
+        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -vW -j1
 
 
 
@@ -148,4 +148,4 @@ jobs:
         run: python setup.py develop
       - name: Run smoke tests
         shell: bash
-        run: python Tests\test_pyjion.py -f Tests\python_smoke_tests.txt
+        run: python Tests\test_pyjion.py -f Tests\python_smoke_tests.txt -vW -j1
