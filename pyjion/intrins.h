@@ -163,8 +163,6 @@ PyObject* PyJit_CallKwArgs(PyObject* func, PyObject*callargs, PyObject*kwargs);
 
 PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names);
 
-void PyJit_DebugDumpFrame(PyFrameObject* frame);
-
 void PyJit_PushFrame(PyFrameObject* frame);
 void PyJit_PopFrame(PyFrameObject* frame);
 

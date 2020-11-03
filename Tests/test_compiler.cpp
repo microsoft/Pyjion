@@ -1069,6 +1069,19 @@ TEST_CASE("Unary tests") {
 }
 TEST_CASE("test binary/arithmetic operations") {
     // Simple optimized code test cases...
+    SECTION("inplace left shift") {
+        auto t = CompilerTest(
+                "def f():\n    x = 2\n    x <<= 2\n    return x"
+        );
+        CHECK(t.returns() == "8");
+    }
+    SECTION("inplace right shift") {
+        auto t = CompilerTest(
+                "def f():\n    x = 8\n    x >>= 2\n    return x"
+        );
+        CHECK(t.returns() == "2");
+    }
+
     SECTION("test") {
         auto t = CompilerTest(
                 "def f():\n    x = 1.0\n    y = +x\n    return y"
@@ -1346,26 +1359,36 @@ TEST_CASE("test make function") {
     }
 }
 TEST_CASE("test function calls") {
-    SECTION("test61") {
+    SECTION("test function declarations") {
         auto t = CompilerTest(
                 "def f():\n    def g(): pass\n    g.abc = {fn.lower() for fn in ['A']}\n    return g.abc"
         );
         CHECK(t.returns() == "{'a'}");
     }
 
-    SECTION("test68") {
+    SECTION("test keyword calling") {
         auto t = CompilerTest(
                 "def f():\n    x = {}\n    x.update(y=2)\n    return x"
         );
         CHECK(t.returns() == "{'y': 2}");
-    }SECTION("test69") {
+    }
+
+    SECTION("test default arguments") {
         auto t = CompilerTest(
                 "def f():\n    def g(a=2): return a\n    return g()"
         );
         CHECK(t.returns() == "2");
     }
 
-    SECTION("test76") {
+    SECTION("test lots of default arguments") {
+        auto t = CompilerTest(
+                "def f():\n    def g(a,b,c,d,e,f,g,h,i): return a + b + c + d + e + f + g + h + i\n    return g(1,2,4,8,16,32,64,128,256)"
+        );
+        CHECK(t.returns() == "511");
+    }
+}
+TEST_CASE("Test Globals"){
+    SECTION("test globals") {
         auto t = CompilerTest(
                 "def f():\n    global x\n    x = 2\n    return x"
         );
@@ -1494,6 +1517,12 @@ TEST_CASE("test classes") {
         );
         CHECK(t.returns() == "<class 'C'>");
     }
+    SECTION("test class definition with annotations") {
+        auto t = CompilerTest(
+                "def f():\n    class C:\n      property: int = 0\n    return C"
+        );
+        CHECK(t.returns() == "<class 'C'>");
+    }
 }
 TEST_CASE("test language features") {
     SECTION("test basic iter") {
@@ -1520,4 +1549,25 @@ TEST_CASE("test language features") {
         );
         CHECK(t.returns() == "'g'");
     };
+}
+TEST_CASE("Test augassign"){
+    SECTION("test basic augassign every operator") {
+        auto t = CompilerTest(
+                "def f():\n    x = 2;x += 1;x *= 2;x **= 2;x -= 8;x //= 5;x %= 3;x &= 2;x |= 5;x ^= 1;x /= 2\n    return x"
+        );
+        CHECK(t.returns() == "3.0");
+    }
+    SECTION("test list augassign every operator") {
+        auto t = CompilerTest(
+                "def f():\n  x = [2];x[0] += 1;x[0] *= 2;x[0] **= 2;x[0] -= 8;x[0] //= 5;x[0] %= 3;x[0] &= 2;x[0] |= 5;x[0] ^= 1;x[0] /= 2\n  return x[0]"
+        );
+        CHECK(t.returns() == "3.0");
+    }
+    SECTION("test dict augassign every operator") {
+        auto t = CompilerTest(
+                "def f():\n  x = {0: 2};x[0] += 1;x[0] *= 2;x[0] **= 2;x[0] -= 8;x[0] //= 5;x[0] %= 3;x[0] &= 2;x[0] |= 5;x[0] ^= 1;x[0] /= 2;\n  return x[0]"
+        );
+        CHECK(t.returns() == "3.0");
+    }
+
 }

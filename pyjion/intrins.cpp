@@ -857,31 +857,6 @@ error:
 	return result;
 }
 
-void PyJit_DebugDumpFrame(PyFrameObject* frame) {
-    static bool _dumping = false;
-    if (_dumping) {
-        return;
-    }
-    _dumping = true;
-
-    int argCount = frame->f_code->co_argcount;
-    for (int i = 0; i < argCount; i++) {
-        auto local = frame->f_localsplus[i];
-        if (local != nullptr) {
-            if (local->ob_type != nullptr) {
-                printf("Arg %d %s\r\n", i, local->ob_type->tp_name);
-            }
-            else {
-                printf("Null local type?");
-            }
-        }
-        else {
-            printf("Null local?");
-        }
-    }
-    _dumping = false;
-}
-
 void PyJit_PushFrame(PyFrameObject* frame) {
     PyThreadState_Get()->frame = frame;
 }
@@ -1650,7 +1625,9 @@ PyObject* Call(PyObject *target, Args...args) {
     }
     else {
         auto t_args = PyTuple_New(sizeof...(args));
+#ifdef DEBUG_TUPLE_ALLOCATIONS
         fprintf(g_traceLog, "Tuple <%lu> at %p (Call<T>)\n", sizeof...(args), t_args);
+#endif
         if (t_args == nullptr) {
             std::vector<PyObject*> argsVector = {args...};
             for (auto &i: argsVector)
@@ -1764,7 +1741,9 @@ PyObject* MethCallN(PyObject* self, PyMethodLocation* method_info, PyObject* arg
         auto target = method_info->method;
         auto obj =  method_info->object;
         auto args_tuple = PyTuple_New(PyTuple_Size(args) + 1);
+#ifdef DEBUG_TUPLE_ALLOCATIONS
         fprintf(g_traceLog, "Tuple <%lu> at %p (MethCallN)\n", PyTuple_Size(args) + 1, args_tuple);
+#endif
         PyTuple_SetItem(args_tuple, 0, obj);
         for (int i = 0 ; i < PyTuple_Size(args) ; i ++){
             PyTuple_SetItem(args_tuple, i+1, PyTuple_GetItem(args, i));
@@ -1807,7 +1786,9 @@ PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names) {
 	auto argCount = PyTuple_Size(args) - PyTuple_Size(names);
 	PyObject* posArgs;
 	posArgs = PyTuple_New(argCount);
+#ifdef DEBUG_TUPLE_ALLOCATIONS
     fprintf(g_traceLog, "Tuple <%lu> at %p (PyJit_KwCallN)\n", argCount, posArgs);
+#endif
 	if (posArgs == nullptr) {
 		goto error;
 	}
@@ -1841,7 +1822,9 @@ error:
 
 PyObject* PyJit_PyTuple_New(ssize_t len){
     auto t = PyTuple_New(len);
+#ifdef DEBUG_TUPLE_ALLOCATIONS
     fprintf(g_traceLog, "Tuple <%lu> at %p (buildTuple)\n", len, t);
+#endif
     return t;
 }
 

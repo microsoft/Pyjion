@@ -133,6 +133,11 @@ TEST_CASE("General dict comprehensions") {
         auto t = EmissionTest("def f():\n  return dict({k: v for k, v in enumerate((1,2,3,))})");
         CHECK(t.returns() == "{0: 1, 1: 2, 2: 3}");
     }
+
+    SECTION("test inline"){
+        auto t = EmissionTest("def f():\n  return {k: k + 10 for k in range(10)}");
+        CHECK(t.returns() == "{0: 10, 1: 11, 2: 12, 3: 13, 4: 14, 5: 15, 6: 16, 7: 17, 8: 18, 9: 19}");
+    }
 }
 
 TEST_CASE("General tuple unpacking") {

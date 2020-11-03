@@ -103,7 +103,6 @@
 #define METHOD_COMPARE_EXCEPTIONS                0x00000039
 #define METHOD_UNBOUND_LOCAL                     0x0000003A
 #define METHOD_DEBUG_TRACE                       0x0000003B
-#define METHOD_DEBUG_DUMP_FRAME                  0x0000003E
 #define METHOD_UNWIND_EH                         0x0000003F
 #define METHOD_PY_PUSHFRAME                      0x00000041
 #define METHOD_PY_POPFRAME                       0x00000042
