@@ -27,6 +27,10 @@
 #include "pyjit.h"
 #include "pycomp.h"
 
+#ifdef WINDOWS
+#include <libloaderapi.h>
+typedef ICorJitCompiler* (__cdecl* GETJIT)();
+#endif
 
 HINSTANCE            g_pMSCorEE;
 
@@ -98,7 +102,13 @@ static Py_tss_t* g_extraSlot;
 void JitInit() {
 	g_extraSlot = PyThread_tss_alloc();
 	PyThread_tss_create(g_extraSlot);
+#ifdef WINDOWS
+	auto getJit = (GETJIT)GetProcAddress(GetModuleHandle(TEXT("clrjit.dll")), "getJit");
+	if (getJit != nullptr)
+		g_jit = getJit();
+#else
 	g_jit = getJit();
+#endif
     g_emptyTuple = PyTuple_New(0);
 }
 

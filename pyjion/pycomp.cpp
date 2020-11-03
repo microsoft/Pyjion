@@ -27,6 +27,11 @@
 #include <windows.h>
 #include <corjit.h>
 
+#ifdef WINDOWS
+#include <libloaderapi.h>
+typedef void(__cdecl* JITSTARTUP)(ICorJitHost*);
+#endif
+
 #include "pycomp.h"
 
 using namespace std;
@@ -54,7 +59,13 @@ void stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref)
 CCorJitHost g_jitHost;
 
 void CeeInit() {
+#ifdef WINDOWS
+    auto jitStartup = (JITSTARTUP)GetProcAddress(GetModuleHandle(TEXT("clrjit.dll")), "jitStartup");
+    if (jitStartup != nullptr)
+        jitStartup(&g_jitHost);
+#else
 	jitStartup(&g_jitHost);
+#endif
 }
 
 class InitHolder {
