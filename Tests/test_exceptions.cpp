@@ -403,7 +403,7 @@ TEST_CASE("Exception Filters", "[!mayfail]"){
     }
 }
 
-TEST_CASE("try else"){
+TEST_CASE("try else", "[!mayfail]"){
     SECTION("test try except keep scope to else") {
         auto t = CompilerTest(
                 "def f():\n  try:\n    a = 1\n  except:\n    a = 2\n  else:\n    a += 4\n  return a"
