@@ -119,6 +119,8 @@ jobs:
           dotnet-version: '5.0.100-rc.2.20479.15'
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.0.2
+        with:
+          vs-version: '[15.2]'
       - name: Create Build Environment
         run: cmake -E make_directory ${{runner.workspace}}/build
 
