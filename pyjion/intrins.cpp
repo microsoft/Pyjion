@@ -34,6 +34,7 @@ using namespace msl::utilities;
 #endif
 
 PyObject* g_emptyTuple;
+
 #include <dictobject.h>
 #include <vector>
 
@@ -45,6 +46,8 @@ PyObject* g_emptyTuple;
 #define UNBOUNDFREE_ERROR_MSG \
     "free variable '%.200s' referenced before assignment" \
     " in enclosing scope"
+
+FILE * g_traceLog = stderr;
 
 template<typename T>
 void decref(T v) {
@@ -1647,6 +1650,7 @@ PyObject* Call(PyObject *target, Args...args) {
     }
     else {
         auto t_args = PyTuple_New(sizeof...(args));
+        fprintf(g_traceLog, "Tuple <%lu> at %p (Call<T>)\n", sizeof...(args), t_args);
         if (t_args == nullptr) {
             std::vector<PyObject*> argsVector = {args...};
             for (auto &i: argsVector)
@@ -1760,6 +1764,7 @@ PyObject* MethCallN(PyObject* self, PyMethodLocation* method_info, PyObject* arg
         auto target = method_info->method;
         auto obj =  method_info->object;
         auto args_tuple = PyTuple_New(PyTuple_Size(args) + 1);
+        fprintf(g_traceLog, "Tuple <%lu> at %p (MethCallN)\n", PyTuple_Size(args) + 1, args_tuple);
         PyTuple_SetItem(args_tuple, 0, obj);
         for (int i = 0 ; i < PyTuple_Size(args) ; i ++){
             PyTuple_SetItem(args_tuple, i+1, PyTuple_GetItem(args, i));
@@ -1802,6 +1807,7 @@ PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names) {
 	auto argCount = PyTuple_Size(args) - PyTuple_Size(names);
 	PyObject* posArgs;
 	posArgs = PyTuple_New(argCount);
+    fprintf(g_traceLog, "Tuple <%lu> at %p (PyJit_KwCallN)\n", argCount, posArgs);
 	if (posArgs == nullptr) {
 		goto error;
 	}
@@ -1831,6 +1837,12 @@ error:
 	Py_DECREF(args);
 	Py_DECREF(names);
 	return result;
+}
+
+PyObject* PyJit_PyTuple_New(ssize_t len){
+    auto t = PyTuple_New(len);
+    fprintf(g_traceLog, "Tuple <%lu> at %p (buildTuple)\n", len, t);
+    return t;
 }
 
 PyObject* PyJit_Is(PyObject* lhs, PyObject* rhs) {

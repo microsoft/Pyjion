@@ -207,6 +207,8 @@ PyObject* PyJit_IterNext(PyObject* iter);
 
 void PyJit_CellSet(PyObject* value, PyObject* cell);
 
+PyObject* PyJit_PyTuple_New(ssize_t len);
+
 PyObject* PyJit_BuildClass(PyFrameObject *f);
 
 // Returns: the address for the 1st set of items, the constructed list, and the
@@ -244,7 +246,6 @@ PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
 
 extern PyObject* g_emptyTuple;
 
-
 void PyJit_DecRef(PyObject* value);
 
 PyObject* PyJit_BinaryLShift_Int(PyObject *left, PyObject *right);
@@ -267,4 +268,5 @@ PyObject* MethCall4(PyObject* self, PyMethodLocation* method_info, PyObject* arg
 PyObject* MethCallN(PyObject* self, PyMethodLocation* method_info, PyObject* args);
 
 int PyJit_SetupAnnotations(PyFrameObject* frame);
+
 #endif
