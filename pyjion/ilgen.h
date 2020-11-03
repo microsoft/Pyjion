@@ -168,8 +168,8 @@ public:
     void ld_r8(double i) {
         push_back(CEE_LDC_R8); // Pop0 + PushR8
         auto* value = (unsigned char*)(&i);
-        for (int i = 0; i < 8; i++) {
-            push_back(value[i]);
+        for (int j = 0; j < 8; j++) {
+            push_back(value[j]);
         }
     }
 
@@ -552,7 +552,7 @@ public:
     }
 
     void ld_loca(int index) {
-        _ASSERTE(index != -1);
+        assert(index != -1);
         if (index < 256) {
             m_il.push_back(CEE_LDLOCA_S); // Pop0, PushI
             m_il.push_back(index);
@@ -679,7 +679,6 @@ public:
 #endif
                 break;
         }
-        // TODO: use dumpILRange(nativeEntry, nativeSizeOfCode); to dump IL
         return res;
     }
 

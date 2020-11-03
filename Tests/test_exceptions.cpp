@@ -106,52 +106,72 @@ TEST_CASE("Test exception handling") {
                 "def f():\n  x = y\n  y = 1"
         );
         CHECK(t.raises() == PyExc_UnboundLocalError);
-    }SECTION("test simply try catch") {
+    }
+
+    SECTION("test simply try catch") {
         auto t = CompilerTest(
                 "def f():\n  a=0\n  try:\n    a=1\n  except:\n    a=2\n  return a\n"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test simply try catch and handle implicit null branch") {
+    }
+
+    SECTION("test simply try catch and handle implicit null branch") {
         auto t = CompilerTest(
                 "def f():\n  a=0\n  try:\n    a=1/0\n  except:\n    a=2\n  return a\n"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test simply try catch and handle explicit raise branch") {
+    }
+
+    SECTION("test simply try catch and handle explicit raise branch") {
         auto t = CompilerTest(
                 "def f():\n  a=0\n  try:\n    a=1\n    raise Exception('bork')\n  except:\n    a=2\n  return a\n"
         );
         CHECK(t.returns() == "2");
-    }SECTION("test return within try") {
+    }
+
+    SECTION("test return within try") {
         auto t = CompilerTest(
                 "def f():\n  try:\n    return 1\n  except:\n    return 2\n"
         );
         CHECK(t.returns() == "1");
-    }SECTION("test nested try and pass") {
+    }
+
+    SECTION("test nested try and pass") {
         auto t = CompilerTest(
                 "def f():\n  a = 1\n  try:\n    try:\n      1/0\n    except:\n      a += 2\n  except:\n    a += 4\n  return a"
         );
         CHECK(t.returns() == "3");
-    }SECTION("test reraise exception") {
+    }
+
+    SECTION("test reraise exception") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise TypeError('hi')\n    except Exception as e:\n         pass\n    finally:\n         pass"
         );
         CHECK(t.returns() == "None");
-    }SECTION("test generic nested exception") {
+    }
+
+    SECTION("test generic nested exception") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        try:\n             raise Exception('borkborkbork')\n        finally:\n             pass\n    finally:\n        pass"
         );
         CHECK(t.raises() == PyExc_Exception);
-    }SECTION("test generic implicit exception") {
+    }
+
+    SECTION("test generic implicit exception") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        try:\n             1/0\n        finally:\n             pass\n    finally:\n        pass"
         );
         CHECK(t.raises() == PyExc_ZeroDivisionError);
-    }SECTION("test simple exception filters") {
+    }
+
+    SECTION("test simple exception filters") {
         auto t = CompilerTest(
                 "def f():\n  try:\n    raise TypeError('err')\n  except ValueError:\n    pass\n  return 2\n"
         );
         CHECK(t.raises() == PyExc_TypeError);
-    }SECTION("test exception filters") {
+    }
+
+    SECTION("test exception filters") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        try:\n             try:\n                  raise TypeError('err')\n             except BaseException:\n                  raise\n        finally:\n             pass\n    finally:\n        return 42\n"
         );
@@ -163,44 +183,56 @@ TEST_CASE("Test exception handling") {
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                break\n            finally:\n                pass\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("Break from a double nested try/finally needs to unwind all exceptions") {
+    }
+
+    SECTION("Break from a double nested try/finally needs to unwind all exceptions") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            try:\n                raise Exception()\n            finally:\n                try:\n                     break\n                finally:\n                    pass\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("return from nested try/finally should use BranchLeave to clear stack when branching to return label") {
+    }
+
+    SECTION("return from nested try/finally should use BranchLeave to clear stack when branching to return label") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            return 42\n        finally:\n            pass"
         );
         CHECK(t.returns() == "42");
-    }SECTION("Return from nested try/finally should unwind nested exception handlers") {
+    }
+
+    SECTION("Return from nested try/finally should unwind nested exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        try:\n            raise Exception()\n        finally:\n            try:\n                return 42\n            finally:\n                pass\n    return 23"
         );
         CHECK(t.returns() == "42");
-    }SECTION("Break from a nested exception handler needs to unwind all exception handlers") {
+    }
+
+    SECTION("Break from a nested exception handler needs to unwind all exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  break\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("Return from a nested exception handler needs to unwind all exception handlers") {
+    }
+
+    SECTION("Return from a nested exception handler needs to unwind all exception handlers") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n             raise Exception()\n        except:\n             try:\n                  raise TypeError()\n             finally:\n                  return 23\n    return 42"
         );
         CHECK(t.returns() == "23");
-    }SECTION("We need to do BranchLeave to clear the stack when doing a break inside of a finally") {
+    }
+
+    SECTION("We need to do BranchLeave to clear the stack when doing a break inside of a finally") {
         auto t = CompilerTest(
                 "def f():\n    for i in range(5):\n        try:\n            raise Exception()\n        finally:\n            break\n    return 42"
         );
         CHECK(t.returns() == "42");
-    }SECTION("test exception raise inside finally") {
+    }
+
+    SECTION("test exception raise inside finally") {
         auto t = CompilerTest(
                 "def f():\n    try:\n         raise Exception()\n    finally:\n        raise Exception()"
         );
         CHECK(t.raises() == PyExc_SystemError);
     }
-
-
 
     SECTION("test raise in finally causes runtime error") {
         auto t = CompilerTest(
@@ -251,8 +283,6 @@ TEST_CASE("Test exception handling") {
         CHECK(t.returns() == "0");
     }
 
-
-
     SECTION("test return constant within finally") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception()\n    finally:\n        return 42"
@@ -260,15 +290,12 @@ TEST_CASE("Test exception handling") {
         CHECK(t.returns() == "42");
     }
 
-
-
     SECTION("test really simple try except with explicit errors") {
         auto t = CompilerTest(
                 "def f():\n    try:\n        raise Exception('hi')\n    except:\n        return 42"
         );
         CHECK(t.returns() == "42");
     }
-
 
     SECTION("test empty try finally") {
         auto t = CompilerTest(
@@ -308,7 +335,7 @@ TEST_CASE("Test exception handling") {
 TEST_CASE("Exception Filters"){
     SECTION("test filters positive case") {
         auto t = CompilerTest(
-                "def f():\n    try:\n        raise Exception()\n    except Exception:\n        return 2"
+                "def f():\n    a = 1\n    try:\n        raise Exception()\n    except Exception:\n        a = 2\n    return a"
         );
         CHECK(t.returns() == "2");
     }

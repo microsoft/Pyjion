@@ -1271,13 +1271,6 @@ void AbstractInterpreter::ensureRaiseAndFreeLocals(size_t localCount) {
     }
 }
 
-void AbstractInterpreter::spillStackForRaise(size_t localCount) {
-    ensureRaiseAndFreeLocals(localCount);
-    for (size_t i = 0; i < localCount; i++) {
-        m_comp->emit_store_local(m_raiseAndFreeLocals[i]);
-    }
-}
-
 vector<Label>& AbstractInterpreter::getRaiseAndFreeLabels(size_t blockId) {
     while (m_raiseAndFree.size() <= blockId) {
         m_raiseAndFree.emplace_back();
@@ -1372,17 +1365,6 @@ void AbstractInterpreter::branchRaise(const char *reason) {
         }
     }
     m_comp->emit_branch(BranchAlways, ehBlock->ErrorTarget);
-}
-
-void AbstractInterpreter::cleanStackForReraise() {
-    auto ehBlock = currentHandler();
-
-    auto& entryStack = ehBlock->EntryStack;
-    size_t count = m_stack.size() - entryStack.size();
-
-    for (size_t i = m_stack.size(); i-- > entryStack.size();) {
-        m_comp->pop_top();
-    }
 }
 
 void AbstractInterpreter::buildTuple(size_t argCnt) {
@@ -2344,86 +2326,6 @@ void AbstractInterpreter::testBoolAndBranch(Local value, bool isTrue, Label targ
     m_comp->emit_branch(BranchEqual, target);
 }
 
-void AbstractInterpreter::jumpIfOrPop(bool isTrue, int opcodeIndex, int jumpTo) {
-    auto stackInfo = getStackInfo(opcodeIndex);
-
-    if (jumpTo <= opcodeIndex) {
-        periodicWork();
-    }
-
-    auto target = getOffsetLabel(jumpTo);
-    m_offsetStack[jumpTo] = ValueStack(m_stack);
-    decStack();
-
-    auto tmp = m_comp->emit_spill();
-    auto noJump = m_comp->emit_define_label();
-    auto willJump = m_comp->emit_define_label();
-
-    // fast checks for true/false.
-    testBoolAndBranch(tmp, isTrue, noJump);
-    testBoolAndBranch(tmp, !isTrue, willJump);
-
-    // Use PyObject_IsTrue
-    m_comp->emit_load_local(tmp);
-    m_comp->emit_is_true();
-
-    raiseOnNegativeOne();
-
-    m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
-
-    // Jumping, load the value back and jump
-    m_comp->emit_mark_label(willJump);
-    m_comp->emit_load_local(tmp);    // load the value back onto the stack
-    m_comp->emit_branch(BranchAlways, target);
-
-    // not jumping, load the value and dec ref it
-    m_comp->emit_mark_label(noJump);
-    m_comp->emit_load_local(tmp);
-    m_comp->emit_pop_top();
-
-    m_comp->emit_free_local(tmp);
-    incStack();
-}
-
-void AbstractInterpreter::popJumpIf(bool isTrue, int opcodeIndex, int jumpTo) {
-    if (jumpTo <= opcodeIndex) {
-        periodicWork();
-    }
-    auto target = getOffsetLabel(jumpTo);
-
-    auto noJump = m_comp->emit_define_label();
-    auto willJump = m_comp->emit_define_label();
-
-    // fast checks for true/false...
-    m_comp->emit_dup();
-    m_comp->emit_ptr(isTrue ? Py_False : Py_True);
-    m_comp->emit_branch(BranchEqual, noJump);
-
-    m_comp->emit_dup();
-    m_comp->emit_ptr(isTrue ? Py_True : Py_False);
-    m_comp->emit_branch(BranchEqual, willJump);
-
-    // Use PyObject_IsTrue
-    m_comp->emit_dup();
-    m_comp->emit_is_true();
-
-    raiseOnNegativeOne();
-
-    m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
-
-    // Branching, pop the value and branch
-    m_comp->emit_mark_label(willJump);
-    m_comp->emit_pop_top();
-    m_comp->emit_branch(BranchAlways, target);
-
-    // Not branching, just pop the value and fall through
-    m_comp->emit_mark_label(noJump);
-    m_comp->emit_pop_top();
-
-    decStack();
-    m_offsetStack[jumpTo] = ValueStack(m_stack);
-}
-
 void AbstractInterpreter::unaryPositive(int opcodeIndex) {
     m_comp->emit_unary_positive();
     decStack();
@@ -2680,6 +2582,87 @@ void AbstractInterpreter::unpackEx(size_t size, int opcode) {
     m_comp->emit_free_local(remainderTmp);
 }
 
+
+void AbstractInterpreter::jumpIfOrPop(bool isTrue, int opcodeIndex, int jumpTo) {
+    auto stackInfo = getStackInfo(opcodeIndex);
+
+    if (jumpTo <= opcodeIndex) {
+        periodicWork();
+    }
+
+    auto target = getOffsetLabel(jumpTo);
+    m_offsetStack[jumpTo] = ValueStack(m_stack);
+    decStack();
+
+    auto tmp = m_comp->emit_spill();
+    auto noJump = m_comp->emit_define_label();
+    auto willJump = m_comp->emit_define_label();
+
+    // fast checks for true/false.
+    testBoolAndBranch(tmp, isTrue, noJump);
+    testBoolAndBranch(tmp, !isTrue, willJump);
+
+    // Use PyObject_IsTrue
+    m_comp->emit_load_local(tmp);
+    m_comp->emit_is_true();
+
+    raiseOnNegativeOne();
+
+    m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
+
+    // Jumping, load the value back and jump
+    m_comp->emit_mark_label(willJump);
+    m_comp->emit_load_local(tmp);    // load the value back onto the stack
+    m_comp->emit_branch(BranchAlways, target);
+
+    // not jumping, load the value and dec ref it
+    m_comp->emit_mark_label(noJump);
+    m_comp->emit_load_local(tmp);
+    m_comp->emit_pop_top();
+
+    m_comp->emit_free_local(tmp);
+    incStack();
+}
+
+void AbstractInterpreter::popJumpIf(bool isTrue, int opcodeIndex, int jumpTo) {
+    if (jumpTo <= opcodeIndex) {
+        periodicWork();
+    }
+    auto target = getOffsetLabel(jumpTo);
+
+    auto noJump = m_comp->emit_define_label();
+    auto willJump = m_comp->emit_define_label();
+
+    // fast checks for true/false...
+    m_comp->emit_dup();
+    m_comp->emit_ptr(isTrue ? Py_False : Py_True);
+    m_comp->emit_branch(BranchEqual, noJump);
+
+    m_comp->emit_dup();
+    m_comp->emit_ptr(isTrue ? Py_True : Py_False);
+    m_comp->emit_branch(BranchEqual, willJump);
+
+    // Use PyObject_IsTrue
+    m_comp->emit_dup();
+    m_comp->emit_is_true();
+
+    raiseOnNegativeOne();
+
+    m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
+
+    // Branching, pop the value and branch
+    m_comp->emit_mark_label(willJump);
+    m_comp->emit_pop_top();
+    m_comp->emit_branch(BranchAlways, target);
+
+    // Not branching, just pop the value and fall through
+    m_comp->emit_mark_label(noJump);
+    m_comp->emit_pop_top();
+
+    decStack();
+    m_offsetStack[jumpTo] = ValueStack(m_stack);
+}
+
 void AbstractInterpreter::jumpAbsolute(size_t index, size_t from) {
     if (index <= from) {
         periodicWork();
@@ -2694,10 +2677,12 @@ void AbstractInterpreter::jumpIfNotExact(int opcodeIndex, int jumpTo) {
         periodicWork();
     }
     auto target = getOffsetLabel(jumpTo);
-    m_comp->emit_compare_exceptions_int();
+    m_comp->emit_compare_exceptions();
     decStack(2);
-    raiseOnNegativeOne();
-    m_comp->emit_branch(BranchFalse, target);
+    errorCheck("failed to compare exceptions");
+    m_comp->emit_ptr(Py_False);
+    m_comp->emit_branch(BranchEqual, target);
+
     m_offsetStack[jumpTo] = ValueStack(m_stack);
 }
 

@@ -116,13 +116,6 @@ public:
     virtual void emit_int(int value) = 0;
     // Emits an unboxed floating point value onto the stack
     virtual void emit_float(double value) = 0;
-    // Emits a unboxed tagged integer value onto the stack
-    virtual void emit_tagged_int(size_t value) = 0;
-    // Takes a Python long off the stack and converts it to a tagged int, or leaves
-    // it as an object if the long doesn't fix in a tagged int.
-    virtual void emit_unbox_int_tagged() = 0;
-    // Takes a Python float off the stack and converts it to a native double
-    virtual void emit_unbox_float() = 0;
 
     // Emits an unboxed bool onto the stack
     virtual void emit_bool(bool value) = 0;
@@ -135,16 +128,6 @@ public:
     virtual void emit_pop() = 0;
     // Dups the current value on the stack, performing no operations related to reference counting
     virtual void emit_dup() = 0;
-
-    /*****************************************************
-     * Boxing */
-
-     // Boxes a raw floating point value into a Python object
-    virtual void emit_box_float() = 0;
-    // Boxes a raw bool into a Python object
-    virtual void emit_box_bool() = 0;
-    // Boxes a tagged int into a Python object
-    virtual void emit_box_tagged_ptr() = 0;
 
     /*****************************************************
      * Stack based locals */
@@ -398,8 +381,6 @@ public:
     virtual void emit_reraise() = 0;
     // Compares to see if an exception is handled, pushing a Python bool onto the stack
     virtual void emit_compare_exceptions() = 0;
-    // Compares to see if an exception is handled, pushing an int on the stack indicating true (1), false (0), or error (-1)
-    virtual void emit_compare_exceptions_int() = 0;
     // Sets the current exception type and text
     virtual void emit_pyerr_setstring(void* exception, const char*msg) = 0;
 

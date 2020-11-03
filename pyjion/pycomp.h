@@ -115,7 +115,6 @@
 #define METHOD_ISNOT                             0x0000004A
 #define METHOD_IS_BOOL                           0x0000004B
 #define METHOD_ISNOT_BOOL                        0x0000004C
-#define METHOD_COMPARE_EXCEPTIONS_INT            0x0000004E
 
 #define METHOD_UNARY_NOT_INT                     0x00000051
 #define METHOD_FLOAT_FROM_DOUBLE                 0x00000053
@@ -135,7 +134,6 @@
 #define METHOD_LISTTOTUPLE_TOKEN                 0x0000006D
 #define METHOD_SETUPDATE_TOKEN                   0x0000006E
 #define METHOD_DICTUPDATE_TOKEN                  0x0000006F
-#define METHOD_UNBOX_LONG_TAGGED                 0x00000070
 
 #define METHOD_INT_TO_FLOAT                      0x00000072
 
@@ -381,9 +379,6 @@ public:
 
     virtual void emit_int(int value);
     virtual void emit_float(double value);
-    virtual void emit_tagged_int(size_t value);
-    virtual void emit_unbox_int_tagged();
-    virtual void emit_unbox_float();
     virtual void emit_ptr(void *value);
     virtual void emit_bool(bool value);
 
@@ -394,16 +389,12 @@ public:
     virtual void emit_pyerr_setstring(void* exception, const char*msg);
 
     virtual void emit_compare_exceptions();
-    virtual void emit_compare_exceptions_int();
 
     // Pops a value off the stack, performing no operations related to reference counting
     virtual void emit_pop();
     // Dups the current value on the stack, performing no operations related to reference counting
     virtual void emit_dup();
 
-    virtual void emit_box_float();
-    virtual void emit_box_bool();
-    virtual void emit_box_tagged_ptr();
     virtual void emit_incref(bool maybeTagged = false);
 
     virtual void emit_debug_msg(const char* msg);

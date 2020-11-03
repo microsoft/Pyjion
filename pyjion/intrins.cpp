@@ -566,38 +566,6 @@ PyObject* PyJit_CompareExceptions(PyObject*v, PyObject* w) {
     return v;
 }
 
-// Returns -1 on an error, 1 if the exceptions match, or 0 if they don't.
-int PyJit_CompareExceptions_Int(PyObject*v, PyObject* w) {
-    if (PyTuple_Check(w)) {
-        Py_ssize_t i, length;
-        length = PyTuple_Size(w);
-        for (i = 0; i < length; i += 1) {
-            PyObject *exc = PyTuple_GET_ITEM(w, i);
-            if (!PyExceptionClass_Check(exc)) {
-                PyErr_SetString(PyExc_TypeError,
-                    CANNOT_CATCH_MSG);
-                Py_DECREF(v);
-                Py_DECREF(w);
-                return -1;
-            }
-        }
-    }
-    else {
-        if (!PyExceptionClass_Check(w)) {
-            PyErr_SetString(PyExc_TypeError,
-                CANNOT_CATCH_MSG);
-            Py_DECREF(v);
-            Py_DECREF(w);
-            return -1;
-        }
-    }
-    int res = PyErr_GivenExceptionMatches(v, w);
-    Py_DECREF(v);
-    Py_DECREF(w);
-    return res ? 1 : 0;
-}
-
-
 void PyJit_UnboundLocal(PyObject* name) {
     format_exc_check_arg(
         PyExc_UnboundLocalError,
@@ -1259,6 +1227,11 @@ PyObject* PyJit_GetIter(PyObject* iterable) {
 }
 
 PyObject* PyJit_IterNext(PyObject* iter) {
+    if (iter == nullptr){
+        PyErr_SetString(PyExc_ValueError,
+                        "Invalid iterator given to iternext");
+        return nullptr;
+    }
     auto res = (*iter->ob_type->tp_iternext)(iter);
     if (res == nullptr) {
         if (PyErr_Occurred()) {
