@@ -168,8 +168,8 @@ public:
     void ld_r8(double i) {
         push_back(CEE_LDC_R8); // Pop0 + PushR8
         auto* value = (unsigned char*)(&i);
-        for (int i = 0; i < 8; i++) {
-            push_back(value[i]);
+        for (int j = 0; j < 8; j++) {
+            push_back(value[j]);
         }
     }
 
@@ -346,6 +346,9 @@ public:
                 case BranchNotEqual:
                     m_il.push_back(CEE_BNE_UN_S); DEC_CEE_STACK(2); // Pop1+Pop1, Push0
                     break;
+                case BranchLessThanEqual:
+                    m_il.push_back(CEE_BLE_S); DEC_CEE_STACK(2); // Pop1+Pop1, Push0
+                    break;
             }
             m_il.push_back((BYTE)offset - 2);
         }
@@ -368,6 +371,9 @@ public:
                     break;
                 case BranchNotEqual:
                     m_il.push_back(CEE_BNE_UN); DEC_CEE_STACK(2); //  Pop1+Pop1, Push0
+                    break;
+                case BranchLessThanEqual:
+                    m_il.push_back(CEE_BLE); DEC_CEE_STACK(2); // Pop1+Pop1, Push0
                     break;
             }
             emit_int(offset - 5);
@@ -546,7 +552,7 @@ public:
     }
 
     void ld_loca(int index) {
-        _ASSERTE(index != -1);
+        assert(index != -1);
         if (index < 256) {
             m_il.push_back(CEE_LDLOCA_S); // Pop0, PushI
             m_il.push_back(index);
@@ -564,7 +570,7 @@ public:
     }
 
     void sub() {
-        push_back(CEE_SUB); DEC_CEE_STACK(2); INC_CEE_STACK(1); // Pop1+Pop1, Push1
+        push_back(CEE_SUB_OVF); DEC_CEE_STACK(2); INC_CEE_STACK(1); // Pop1+Pop1, Push1
     }
 
     void div() {
@@ -644,7 +650,7 @@ public:
                 &nativeEntry,
                 &nativeSizeOfCode
         );
-
+        jitInfo->setNativeSize(nativeSizeOfCode);
         switch (result){
             case CORJIT_OK:
                 res.m_addr = nativeEntry;
@@ -673,7 +679,6 @@ public:
 #endif
                 break;
         }
-        // TODO: use dumpILRange(nativeEntry, nativeSizeOfCode); to dump IL
         return res;
     }
 

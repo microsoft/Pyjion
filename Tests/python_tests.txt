@@ -1,14 +1,25 @@
-# A list of all tests in Python 3.6.
-# To run tests from PowerShell in a Pyjion checkout:
-#   .\Python\python.bat -m test -n -f Tests\python_tests.txt
-#
-# When reproducing failures, make sure to run under `-m test`, e.g.,:
-#   .\Python\python.bat -m test test_concurrent_futures
-#
+# A list of all tests in Python 3.9.
+
 # A skipped test is commented out with a leading `##` marker along with a preceding comment explaining why the test is skipped
 # (which makes it easy to search for skipped tests instead of any comment).
 # If the skip is because of a bug, then the explanation comment should lead with a `TODO` comment.
 # ----------
+test_grammar
+test_opcodes
+test_dict
+test_builtin
+test_exceptions
+test_types
+test_unittest
+test_doctest
+test_doctest2
+test_support
+test___all__
+test___future__
+test__locale
+test__opcode
+test__osx_support
+test__xxsubinterpreters
 test_abc
 test_abstract_numbers
 test_aifc
@@ -17,16 +28,18 @@ test_array
 test_asdl_parser
 test_ast
 # TODO: https://github.com/Microsoft/Pyjion/issues/86
-#test_asyncgen
+##test_asyncgen
 test_asynchat
 # TODO: https://github.com/Microsoft/Pyjion/issues/135
 ##test_asyncio
 test_asyncore
 test_atexit
 test_audioop
+test_audit
 test_augassign
 test_base64
 test_baseexception
+test_bdb
 test_bigaddrspace
 test_bigmem
 test_binascii
@@ -36,22 +49,25 @@ test_bisect
 test_bool
 test_buffer
 test_bufio
-#test_builtin
 test_bytes
 test_bz2
+test_c_locale_coercion
 test_calendar
 test_call
-#test_capi  # Crashes due to thread local co extra storage
+test_capi
 test_cgi
 test_cgitb
 test_charmapcodec
+test_check_c_globals
 test_class
+test_clinic
 test_cmath
 test_cmd
 # TODO: https://github.com/Microsoft/Pyjion/issues/116
 ##test_cmd_line
 test_cmd_line_script
 test_code
+test_code_module
 test_codeccallbacks
 test_codecencodings_cn
 test_codecencodings_hk
@@ -67,87 +83,80 @@ test_codecmaps_kr
 test_codecmaps_tw
 test_codecs
 test_codeop
-test_code_module
 test_collections
 test_colorsys
 test_compare
-# eats all the RAM
-#test_compile
-#test_compileall
+test_compile
+test_compileall
 test_complex
-# Triggering timeout failures due to JIT taking longer than test is willing to wait.
-##test_concurrent_futures
+test_concurrent_futures
 test_configparser
 test_contains
+test_context
 test_contextlib
+test_contextlib_async
 test_copy
 test_copyreg
 test_coroutines
 test_cprofile
 test_crashers
-# No module named '_crypt'
-##test_crypt
+test_crypt
 test_csv
 test_ctypes
-# Use of the 'curses' resource not enabled
-##test_curses
+test_curses
+test_dataclasses
 test_datetime
 test_dbm
+test_dbm_dumb
+test_dbm_gnu
+test_dbm_ndbm
 test_decimal
 test_decorators
 test_defaultdict
 test_deque
 test_descr
 test_descrtut
-# test works only on Solaris OS family
-##test_devpoll
-test_dict
+test_devpoll
+test_dict_version
 test_dictcomps
 test_dictviews
-test_dict_version
 test_difflib
 test_dis
 test_distutils
-# Known failure
-##test_doctest
-test_doctest2
 test_docxmlrpc
 test_dtrace
 test_dynamic
 test_dynamicclassattribute
 test_eintr
 test_email
+test_embed
 test_ensurepip
 test_enum
 test_enumerate
 test_eof
-# test works only on Linux 2.6
-##test_epoll
+test_epoll
 test_errno
-test_exceptions
 test_exception_hierarchy
 test_exception_variations
 test_extcall
 test_faulthandler
-# No module named 'fcntl'
-##test_fcntl
+test_fcntl
 test_file
+test_file_eintr
 test_filecmp
 test_fileinput
 test_fileio
-test_file_eintr
 test_finalization
 test_float
 test_flufl
 test_fnmatch
-# No os.fork() on Windows
-##test_fork1
+test_fork1
 test_format
 test_fractions
 # TODO: https://github.com/Microsoft/Pyjion/issues/93
 ##test_frame
-# TODO : Fix the memory leak
-# test_fstring
+test_frozen
+test_fstring
 test_ftplib
 test_funcattrs
 test_functools
@@ -156,11 +165,12 @@ test_future3
 test_future4
 test_future5
 test_gc
-# Couldn't find gdb on the path
-##test_gdb
+test_gdb
+test_generator_stop
 # TODO: https://github.com/Microsoft/Pyjion/issues/86
 ##test_generators
-test_generator_stop
+test_genericalias
+test_genericclass
 test_genericpath
 test_genexps
 test_getargs2
@@ -169,9 +179,8 @@ test_getpass
 test_gettext
 test_glob
 test_global
-test_grammar
-# No module named 'grp'
-##test_grp
+test_graphlib
+test_grp
 test_gzip
 test_hash
 test_hashlib
@@ -179,11 +188,10 @@ test_heapq
 test_hmac
 test_html
 test_htmlparser
-test_httplib
-# TODO : takes too long.
-# test_httpservers
 test_http_cookiejar
 test_http_cookies
+test_httplib
+test_httpservers
 test_idle
 test_imaplib
 test_imghdr
@@ -196,8 +204,7 @@ test_index
 test_int
 test_int_literal
 test_io
-# No module named 'fcntl'
-##test_ioctl
+test_ioctl
 test_ipaddress
 test_isinstance
 test_iter
@@ -207,21 +214,18 @@ test_itertools
 ##test_json
 test_keyword
 test_keywordonlyarg
-# test works only on BSD
-##test_kqueue
+test_kqueue
 test_largefile
 test_lib2to3
 test_linecache
 test_list
 test_listcomps
+test_lltrace
 test_locale
-# TODO : Crashes on os.fork()
-# test_logging
+test_logging
 test_long
 test_longexp
 test_lzma
-test_macpath
-test_macurl2path
 test_mailbox
 test_mailcap
 test_marshal
@@ -238,48 +242,41 @@ test_msilib
 test_multibytecodec
 test_multiprocessing_fork
 test_multiprocessing_forkserver
-# Failing due to timeout due to JITting taking "too long"
-##test_multiprocessing_main_handling
-# Failing due to timeout issues
-##test_multiprocessing_spawn
+test_multiprocessing_main_handling
+test_multiprocessing_spawn
+test_named_expressions
 test_netrc
-# No module named 'nis'
-##test_nis
+test_nis
 test_nntplib
-test_normalization
 test_ntpath
 test_numeric_tower
-test_opcodes
-# os.openpty() not available.
-##test_openpty
+test_openpty
 test_operator
 test_optparse
 test_ordered_dict
 test_os
-# Use of the 'audio' resource not enabled
-##test_ossaudiodev
+test_ossaudiodev
 test_osx_env
-# TODO: crashes
-##test_parser
+test_parser
 test_pathlib
 # TODO: https://github.com/Microsoft/Pyjion/issues/123
 ##test_pdb
 test_peepholer
+test_peg_generator
+test_peg_parser
 test_pickle
+test_picklebuffer
 test_pickletools
-# pipes module only works on posix
-##test_pipes
+test_pipes
 test_pkg
-test_pkgimport
 test_pkgutil
 test_platform
 test_plistlib
-# select.poll not defined
-##test_poll
+test_poll
 test_popen
 test_poplib
-# No module named 'posix'
-##test_posix
+test_positional_only_arg
+test_posix
 test_posixpath
 test_pow
 test_pprint
@@ -287,34 +284,29 @@ test_print
 test_profile
 test_property
 test_pstats
-# No module named 'termios'
-##test_pty
+test_pty
 test_pulldom
-# No module named 'pwd'
-##test_pwd
+test_pwd
+test_py_compile
 test_pyclbr
 test_pydoc
 test_pyexpat
-test_py_compile
 test_queue
 test_quopri
 test_raise
-# Known failure
-##test_random
+test_random
 test_range
 test_re
-# No module named 'readline'
-##test_readline
+test_readline
 test_regrtest
+test_repl
 test_reprlib
-# No module named 'resource'
-##test_resource
+test_resource
 test_richcmp
 test_rlcompleter
 test_robotparser
 test_runpy
-# Known failure
-##test_sax
+test_sax
 test_sched
 test_scope
 test_script_helper
@@ -331,16 +323,13 @@ test_site
 test_slice
 test_smtpd
 test_smtplib
-# Use of the 'network' resource not enabled
-##test_smtpnet
+test_smtpnet
 test_sndhdr
 test_socket
-# Use of the 'network' resource not enabled
-##test_socketserver
+test_socketserver
 test_sort
 test_source_encoding
-# No module named 'spwd'
-##test_spwd
+test_spwd
 test_sqlite
 test_ssl
 test_startfile
@@ -356,24 +345,21 @@ test_struct
 test_structmembers
 test_structseq
 test_subclassinit
-# Fails due to timeout issues.
-##test_subprocess
+test_subprocess
 test_sunau
 test_sundry
 test_super
-test_support
+test_symbol
 test_symtable
 test_syntax
-# TODO: crashes
-##test_sys
-test_sysconfig
-# No module named 'syslog'
-##test_syslog
+test_sys
 # TODO: https://github.com/Microsoft/Pyjion/issues/108
 ##test_sys_setprofile
 # TODO: https://github.com/Microsoft/Pyjion/issues/92
 ##test_sys_settrace
-# Takes a while.
+test_sysconfig
+test_syslog
+test_tabnanny
 test_tarfile
 test_tcl
 test_telnetlib
@@ -381,66 +367,55 @@ test_tempfile
 test_textwrap
 test_thread
 test_threadedtempfile
-test_threaded_import
 test_threading
 test_threading_local
-# Can't test signal on win32
-##test_threadsignals
-# Known failure
-##test_time
+test_threadsignals
+test_time
 test_timeit
-# Use of the 'network' resource not enabled
-##test_timeout
-# Use of the 'gui' resource not enabled
-##test_tix
-# Use of the 'gui' resource not enabled
-##test_tk
-#test_tokenize
+test_timeout
+test_tix
+test_tk
+test_tokenize
 test_tools
 test_trace
 # TODO: https://github.com/Microsoft/Pyjion/issues/93
 ##test_traceback
 test_tracemalloc
-# Use of the 'gui' resource not enabled
-##test_ttk_guionly
+test_ttk_guionly
 test_ttk_textonly
 test_tuple
 test_turtle
+test_type_comments
 test_typechecks
-test_types
 test_typing
 test_ucn
 test_unary
 test_unicode
-test_unicodedata
 test_unicode_file
 test_unicode_file_functions
 test_unicode_identifiers
-test_unittest
+test_unicodedata
 test_univnewlines
 test_unpack
 test_unpack_ex
+test_unparse
 test_urllib
 test_urllib2
-# Use of the 'network' resource not enabled
-##test_urllib2net
 test_urllib2_localnet
-# Use of the 'network' resource not enabled
-##test_urllibnet
+test_urllib2net
 test_urllib_response
+test_urllibnet
 test_urlparse
 test_userdict
 test_userlist
 test_userstring
+test_utf8_mode
 test_utf8source
 test_uu
 test_uuid
-# Test fails under debug builds due to IL-related output to stdout.
-##test_venv
-# os.fork not defined
-##test_wait3
-# os.fork not defined
-##test_wait4
+test_venv
+test_wait3
+test_wait4
 test_warnings
 test_wave
 test_weakref
@@ -448,27 +423,21 @@ test_weakset
 test_webbrowser
 test_winconsoleio
 test_winreg
-# Use of the 'audio' resource not enabled
-##test_winsound
+test_winsound
 test_with
 test_wsgiref
 test_xdrlib
-test_xmlrpc
-# Use of the 'network' resource not enabled
-##test_xmlrpc_net
 test_xml_dom_minicompat
 test_xml_etree
 test_xml_etree_c
+test_xmlrpc
+test_xmlrpc_net
+test_xxtestfuzz
 test_yield_from
 test_zipapp
 test_zipfile
-# test requires loads of disk-space bytes and a long time to run
-##test_zipfile64
+test_zipfile64
 test_zipimport
 test_zipimport_support
 test_zlib
-test__locale
-test__opcode
-test__osx_support
-test___all__
-test___future__
+test_zoneinfo

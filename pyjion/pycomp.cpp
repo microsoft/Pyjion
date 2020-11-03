@@ -313,7 +313,7 @@ void PythonCompiler::pop_top() {
 }
 
 void PythonCompiler::emit_dup_top() {
-    // TODO : Figure out why it does DUP twice?
+    // Dup top and incref
     m_il.dup();
     m_il.dup();
     emit_incref(true);
@@ -341,7 +341,7 @@ void PythonCompiler::emit_dup_top_two() {
 }
 
 void PythonCompiler::emit_dict_build_from_map() {
-    m_il.emit_call(METHOD_BUILD_DICT_FROM_TUPLES, 2);
+    m_il.emit_call(METHOD_BUILD_DICT_FROM_TUPLES, 1);
 }
 
 void PythonCompiler::emit_new_list(size_t argCnt) {
@@ -721,12 +721,19 @@ bool PythonCompiler::emit_call(size_t argCnt) {
     return false;
 }
 
-void PythonCompiler::emit_method_call_0() {
-    m_il.emit_call(METHOD_METHCALL_0_TOKEN, 2);
+bool PythonCompiler::emit_method_call(size_t argCnt) {
+    switch (argCnt) {
+        case 0: m_il.emit_call(METHOD_METHCALL_0_TOKEN, 2); return true;
+        case 1: m_il.emit_call(METHOD_METHCALL_1_TOKEN, 3); return true;
+        case 2: m_il.emit_call(METHOD_METHCALL_2_TOKEN, 4); return true;
+        case 3: m_il.emit_call(METHOD_METHCALL_3_TOKEN, 5); return true;
+        case 4: m_il.emit_call(METHOD_METHCALL_4_TOKEN, 6); return true;
+    }
+    return false;
 }
 
-void PythonCompiler::emit_method_call_n(size_t argCnt){
-    m_il.emit_call(METHOD_METHCALLN_TOKEN, argCnt + 2);
+void PythonCompiler::emit_method_call_n(){
+    m_il.emit_call(METHOD_METHCALLN_TOKEN, 3);
 }
 
 void PythonCompiler::emit_call_with_tuple() {
@@ -788,10 +795,6 @@ void PythonCompiler::emit_compare_exceptions() {
     m_il.emit_call(METHOD_COMPARE_EXCEPTIONS, 2);
 }
 
-void PythonCompiler::emit_compare_exceptions_int() {
-    m_il.emit_call(METHOD_COMPARE_EXCEPTIONS_INT, 2);
-}
-
 void PythonCompiler::emit_pyerr_setstring(void* exception, const char*msg) {
     emit_ptr(exception);
     emit_ptr((void*)msg);
@@ -831,22 +834,8 @@ void PythonCompiler::emit_int(int value) {
     m_il.ld_i4(value);
 }
 
-void PythonCompiler::emit_unbox_int_tagged() {
-    m_il.emit_call(METHOD_UNBOX_LONG_TAGGED, 1);
-}
-
-void PythonCompiler::emit_unbox_float() {
-    m_il.ld_i(offsetof(PyFloatObject, ob_fval));
-    m_il.add();
-    m_il.ld_ind_r8();
-}
-
 void PythonCompiler::emit_reraise() {
     m_il.emit_call(METHOD_UNWIND_EH, 3);
-}
-
-void PythonCompiler::emit_tagged_int(size_t value) {
-    m_il.ld_i((size_t)((value << 1) | 0x01));
 }
 
 void PythonCompiler::emit_float(double value) {
@@ -868,39 +857,32 @@ void PythonCompiler::emit_new_function() {
     m_il.emit_call(METHOD_NEWFUNCTION_TOKEN, 3);
 }
 
-void PythonCompiler::emit_set_closure() {
-	auto tmp = emit_spill();
-	m_il.ld_i(offsetof(PyFunctionObject, func_closure));
-	m_il.add(); 
-	
-	// Emit value
-	emit_load_and_free_local(tmp);
-
-	m_il.st_ind_i();
-}
-
 void PythonCompiler::emit_setup_annotations() {
     load_frame();
     m_il.emit_call(METHOD_SETUP_ANNOTATIONS, 1);
+}
+
+void PythonCompiler::emit_set_closure() {
+	auto func = emit_spill();
+	m_il.ld_i(offsetof(PyFunctionObject, func_closure));
+	m_il.add();
+	emit_load_and_free_local(func);
+	m_il.st_ind_i();
 }
 
 void PythonCompiler::emit_set_annotations() {
 	auto tmp = emit_spill();
 	m_il.ld_i(offsetof(PyFunctionObject, func_annotations));
 	m_il.add();
-
-	// Emit value
 	emit_load_and_free_local(tmp);
+    m_il.st_ind_i();
 }
 
 void PythonCompiler::emit_set_kw_defaults() {
 	auto tmp = emit_spill();
 	m_il.ld_i(offsetof(PyFunctionObject, func_kwdefaults));
 	m_il.add();
-
-	// Emit value
 	emit_load_and_free_local(tmp);
-
 	m_il.st_ind_i();
 }
 
@@ -908,10 +890,7 @@ void PythonCompiler::emit_set_defaults() {
 	auto tmp = emit_spill();
 	m_il.ld_i(offsetof(PyFunctionObject, func_defaults));
 	m_il.add();
-
-	// Emit value
 	emit_load_and_free_local(tmp);
-
 	m_il.st_ind_i(); 
 }
 
@@ -1005,6 +984,20 @@ Label PythonCompiler::emit_define_label() {
     return m_il.define_label();
 }
 
+void PythonCompiler::emit_inc_local(Local local, int value) {
+    emit_int(value);
+    emit_load_local(local);
+    m_il.add();
+    emit_store_local(local);
+}
+
+void PythonCompiler::emit_dec_local(Local local, int value) {
+    emit_load_local(local);
+    emit_int(value);
+    m_il.sub();
+    emit_store_local(local);
+}
+
 void PythonCompiler::emit_ret(int size) {
     m_il.ret(size);
 }
@@ -1013,33 +1006,8 @@ void PythonCompiler::emit_mark_label(Label label) {
     m_il.mark_label(label);
 }
 
-void PythonCompiler::emit_box_bool() {
-    m_il.emit_call(METHOD_BOOL_FROM_LONG, 1);
-}
-
-void PythonCompiler::emit_box_float() {
-    m_il.emit_call(METHOD_FLOAT_FROM_DOUBLE, 1);
-}
-
-void PythonCompiler::emit_box_tagged_ptr() {
-    m_il.emit_call(METHOD_BOX_TAGGED_PTR, 1);
-}
-
-void PythonCompiler::emit_for_next(Label processValue, Local iterValue) {
-    auto error = m_il.define_local(Parameter(CORINFO_TYPE_INT));
-    m_il.ld_loca(error);
-    m_il.emit_call(SIG_ITERNEXT_TOKEN, 2);
-
-    m_il.dup();
-    m_il.ld_i(nullptr);
-    m_il.branch(BranchNotEqual, processValue);
-
-    // iteration has ended, or an exception was raised...
-
-    m_il.pop();
-    m_il.ld_loc(iterValue);
-    decref();
-    emit_load_and_free_local(error);
+void PythonCompiler::emit_for_next() {
+    m_il.emit_call(METHOD_ITERNEXT_TOKEN, 1);
 }
 
 void PythonCompiler::emit_debug_msg(const char* msg) {
@@ -1215,7 +1183,6 @@ GLOBAL_METHOD(METHOD_BINARY_LSHIFT_TOKEN, &PyJit_BinaryLShift, CORINFO_TYPE_NATI
 GLOBAL_METHOD(METHOD_BINARY_RSHIFT_TOKEN, &PyJit_BinaryRShift, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_BINARY_AND_TOKEN, &PyJit_BinaryAnd, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_BINARY_XOR_TOKEN, &PyJit_BinaryXor, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-
 GLOBAL_METHOD(METHOD_BINARY_OR_TOKEN, &PyJit_BinaryOr, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_PYLIST_NEW, &PyList_New, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
@@ -1229,9 +1196,8 @@ GLOBAL_METHOD(METHOD_DELETESUBSCR_TOKEN, &PyJit_DeleteSubscr, CORINFO_TYPE_INT, 
 GLOBAL_METHOD(METHOD_BUILD_DICT_FROM_TUPLES, &PyJit_BuildDictFromTuples, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_DICT_MERGE, &PyJit_DictMerge, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
-
 GLOBAL_METHOD(METHOD_PYDICT_NEWPRESIZED, &_PyDict_NewPresized, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_PYTUPLE_NEW, &PyTuple_New, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PYTUPLE_NEW, &PyJit_PyTuple_New, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_PYSET_NEW, &PySet_New, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_PYOBJECT_STR, &PyObject_Str, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
@@ -1279,14 +1245,13 @@ GLOBAL_METHOD(METHOD_STORENAME_TOKEN, &PyJit_StoreName, CORINFO_TYPE_INT, Parame
 GLOBAL_METHOD(METHOD_DELETENAME_TOKEN, &PyJit_DeleteName, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_GETITER_TOKEN, &PyJit_GetIter, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(SIG_ITERNEXT_TOKEN, &PyJit_IterNext, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_ITERNEXT_TOKEN, &PyJit_IterNext, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_DECREF_TOKEN, &PyJit_DecRef, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_PYCELL_SET_TOKEN, &PyJit_CellSet, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_SET_CLOSURE, &PyJit_SetClosure, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_BUILD_SLICE, &PyJit_BuildSlice, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-
 
 GLOBAL_METHOD(METHOD_UNARY_POSITIVE, &PyJit_UnaryPositive, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_UNARY_NEGATIVE, &PyJit_UnaryNegative, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
@@ -1327,14 +1292,11 @@ GLOBAL_METHOD(METHOD_DO_RAISE, &PyJit_Raise, CORINFO_TYPE_INT, Parameter(CORINFO
 GLOBAL_METHOD(METHOD_EH_TRACE, &PyJit_EhTrace, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_COMPARE_EXCEPTIONS, &PyJit_CompareExceptions, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(METHOD_COMPARE_EXCEPTIONS_INT, &PyJit_CompareExceptions_Int, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_UNBOUND_LOCAL, &PyJit_UnboundLocal, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_PYERR_RESTORE, &PyJit_PyErrRestore, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_DEBUG_TRACE, &PyJit_DebugTrace, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
-
-GLOBAL_METHOD(METHOD_DEBUG_DUMP_FRAME, &PyJit_DebugDumpFrame, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_PY_POPFRAME, &PyJit_PopFrame, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_PY_PUSHFRAME, &PyJit_PushFrame, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
@@ -1348,15 +1310,11 @@ GLOBAL_METHOD(METHOD_CALL_KWARGS, &PyJit_CallKwArgs, CORINFO_TYPE_NATIVEINT, Par
 GLOBAL_METHOD(METHOD_PY_IMPORTFROM, &PyJit_ImportFrom, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_PY_IMPORTSTAR, &PyJit_ImportStar, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
-
 GLOBAL_METHOD(METHOD_IS, &PyJit_Is, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_ISNOT, &PyJit_IsNot, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_IS_BOOL, &PyJit_Is_Bool, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_ISNOT_BOOL, &PyJit_IsNot_Bool, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-
-GLOBAL_METHOD(METHOD_GETITER_OPTIMIZED_TOKEN, &PyJit_GetIterOptimized, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-GLOBAL_METHOD(SIG_ITERNEXT_OPTIMIZED_TOKEN, &PyJit_IterNextOptimized, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_FLOAT_POWER_TOKEN, static_cast<double(*)(double, double)>(pow), CORINFO_TYPE_DOUBLE, Parameter(CORINFO_TYPE_DOUBLE), Parameter(CORINFO_TYPE_DOUBLE));
 GLOBAL_METHOD(METHOD_FLOAT_FLOOR_TOKEN, static_cast<double(*)(double)>(floor), CORINFO_TYPE_DOUBLE, Parameter(CORINFO_TYPE_DOUBLE));
@@ -1365,7 +1323,6 @@ GLOBAL_METHOD(METHOD_FLOAT_FROM_DOUBLE, PyFloat_FromDouble, CORINFO_TYPE_NATIVEI
 GLOBAL_METHOD(METHOD_BOOL_FROM_LONG, PyBool_FromLong, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_INT));
 
 GLOBAL_METHOD(METHOD_PYERR_SETSTRING, PyErr_SetString, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
-
 
 GLOBAL_METHOD(METHOD_PERIODIC_WORK, PyJit_PeriodicWork, CORINFO_TYPE_INT)
 
@@ -1376,6 +1333,10 @@ GLOBAL_METHOD(METHOD_FORMAT_OBJECT, &PyJit_FormatObject, CORINFO_TYPE_NATIVEINT,
 GLOBAL_METHOD(METHOD_LOAD_METHOD, &PyJit_LoadMethod, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_METHCALL_0_TOKEN, &MethCall0, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL_1_TOKEN, &MethCall1, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL_2_TOKEN, &MethCall2, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL_3_TOKEN, &MethCall3, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_METHCALL_4_TOKEN, &MethCall4, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_METHCALLN_TOKEN, &MethCallN, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
 GLOBAL_METHOD(METHOD_SETUP_ANNOTATIONS, &PyJit_SetupAnnotations, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT),);

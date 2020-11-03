@@ -1288,7 +1288,7 @@ vector<Label>& AbstractInterpreter::getReraiseAndFreeLabels(size_t blockId) {
 }
 
 size_t AbstractInterpreter::clearValueStack() {
-    auto ehBlock = getEhblock();
+    auto ehBlock = currentHandler();
     auto& entryStack = ehBlock->EntryStack;
 
     // clear any non-object values from the stack up
@@ -1314,7 +1314,7 @@ void AbstractInterpreter::ensureLabels(vector<Label>& labels, size_t count) {
 }
 
 void AbstractInterpreter::branchRaise(const char *reason) {
-    auto ehBlock = getEhblock();
+    auto ehBlock = currentHandler();
     auto& entryStack = ehBlock->EntryStack;
 
 #ifdef DEBUG
@@ -1323,9 +1323,8 @@ void AbstractInterpreter::branchRaise(const char *reason) {
     }
 #endif
     m_comp->emit_eh_trace();
-
     // number of stack entries we need to clear...
-    size_t count = m_stack.size() - entryStack.size();
+    int count = m_stack.size() - entryStack.size();
     
     auto cur = m_stack.rbegin();
     for (; cur != m_stack.rend() && count >= 0; cur++) {
@@ -1338,7 +1337,10 @@ void AbstractInterpreter::branchRaise(const char *reason) {
         }
     }
 
-    if (!count) {
+    if (!ehBlock->IsRootHandler())
+        incExcVars(6);
+
+    if (!count || count < 0) {
         // No values on the stack, we can just branch directly to the raise label
         m_comp->emit_branch(BranchAlways, ehBlock->ErrorTarget);
         return;
@@ -1498,6 +1500,7 @@ void AbstractInterpreter::buildMap(size_t  argCnt) {
 void AbstractInterpreter::makeFunction(int oparg) {
     m_comp->emit_new_function();
     decStack(2);
+    errorCheck("new function failed");
 
     if (oparg & 0x0f) {
         auto func = m_comp->emit_spill();
@@ -1508,13 +1511,13 @@ void AbstractInterpreter::makeFunction(int oparg) {
             m_comp->emit_load_and_free_local(tmp);
             m_comp->emit_set_closure();
             decStack();
+
         }
         if (oparg & 0x04) {
             // annoations
             auto tmp = m_comp->emit_spill();
             m_comp->emit_load_local(func);
             m_comp->emit_load_and_free_local(tmp);
-
             m_comp->emit_set_annotations();
             decStack();
         }
@@ -1523,7 +1526,6 @@ void AbstractInterpreter::makeFunction(int oparg) {
             auto tmp = m_comp->emit_spill();
             m_comp->emit_load_local(func);
             m_comp->emit_load_and_free_local(tmp);
-
             m_comp->emit_set_kw_defaults();
             decStack();
         }
@@ -1554,15 +1556,6 @@ void AbstractInterpreter::periodicWork() {
     intErrorCheck("periodic work");
 }
 
-int AbstractInterpreter::getExtendedOpcode(int curByte) {
-    auto opcode = GET_OPCODE(curByte);
-    while (opcode == EXTENDED_ARG) {
-        curByte += 2;
-        opcode = GET_OPCODE(curByte);
-    }
-    return opcode;
-}
-
 // Checks to see if -1 is the current value on the stack, and if so, falls into
 // the logic for raising an exception.  If not execution continues forward progress.
 // Used for checking if an API reports an error (typically true/false/-1)
@@ -1576,7 +1569,7 @@ void AbstractInterpreter::raiseOnNegativeOne() {
     // values on the stack...
 
     m_comp->emit_pop();
-    branchRaise();
+    branchRaise("last operation failed");
     m_comp->emit_mark_label(noErr);
 }
 
@@ -1589,6 +1582,37 @@ void AbstractInterpreter::emitRaise(ExceptionHandler * handler) {
     m_comp->emit_load_local(handler->ExVars.FinallyExc);
 }
 
+void AbstractInterpreter::decExcVars(int count){
+    m_comp->emit_dec_local(mExcVarsOnStack, count);
+#ifdef DUMP_TRACES
+    m_comp->emit_debug_msg("decrementing exception vars");
+#endif
+}
+
+void AbstractInterpreter::incExcVars(int count) {
+    m_comp->emit_inc_local(mExcVarsOnStack, count);
+}
+
+void AbstractInterpreter::popExcVars(){
+    auto nothing_to_pop = m_comp->emit_define_label();
+    auto loop = m_comp->emit_define_label();
+
+    m_comp->emit_mark_label(loop);
+    m_comp->emit_load_local(mExcVarsOnStack);
+    m_comp->emit_int(0);
+    m_comp->emit_branch(BranchLessThanEqual, nothing_to_pop);
+#ifdef DUMP_TRACES
+    m_comp->emit_debug_msg("popping next 3 exc vars");
+#endif
+    m_comp->emit_pop();
+    m_comp->emit_pop();
+    m_comp->emit_pop();
+    m_comp->emit_dec_local(mExcVarsOnStack, 3);
+    m_comp->emit_branch(BranchAlways, loop);
+
+    m_comp->emit_mark_label(nothing_to_pop);
+}
+
 JittedCode* AbstractInterpreter::compileWorker() {
     Label ok;
 
@@ -1596,6 +1620,10 @@ JittedCode* AbstractInterpreter::compileWorker() {
     m_comp->emit_push_frame();
 
     auto rootHandlerLabel = m_comp->emit_define_label();
+    mExcVarsOnStack = m_comp->emit_define_local(LK_Int);
+    m_comp->emit_int(0);
+    m_comp->emit_store_local(mExcVarsOnStack);
+
     // Push a catch-all error handler onto the handler list
     auto rootHandler = m_exceptionHandler.SetRootHandler(rootHandlerLabel, ExceptionVars(m_comp));
 
@@ -1616,10 +1644,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
         auto oparg = GET_OPARG(curByte);
 
     processOpCode:
-        // See FOR_ITER for special handling of the offset label
-        if (getExtendedOpcode(curByte) != FOR_ITER) {
-            markOffsetLabel(curByte);
-        }
+        markOffsetLabel(curByte);
 
         // See if current index is part of offset stack, used for jump operations
         auto curStackDepth = m_offsetStack.find(curByte);
@@ -1636,8 +1661,8 @@ JittedCode* AbstractInterpreter::compileWorker() {
 #endif
             ExceptionHandler* handler = m_exceptionHandler.HandlerAtOffset(curByte);
             m_comp->emit_mark_label(handler->ErrorTarget);
+            m_comp->emit_debug_msg("Pushing raise vars");
             emitRaise(handler);
-            incStack(6);
         }
 
 #ifdef DUMP_TRACES
@@ -1799,11 +1824,12 @@ JittedCode* AbstractInterpreter::compileWorker() {
             {
                 if (!m_comp->emit_call(oparg)) {
                     buildTuple(oparg);
+                    incStack();
                     m_comp->emit_call_with_tuple();
-                    decStack();// function
+                    decStack(2);// target + args
                 }
                 else {
-                    decStack(oparg + 1); // + function
+                    decStack(oparg + 1); // target + args(oparg)
                 }
 
                 errorCheck("call function failed");
@@ -1848,11 +1874,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             case UNARY_NEGATIVE:
                 unaryNegative(opcodeIndex); break;
             case UNARY_NOT:
-                m_comp->emit_unary_not();
-                decStack(1);
-                errorCheck("unary not failed");
-                incStack();
-                break;
+                unaryNot(opcodeIndex); break;
             case UNARY_INVERT:
                 m_comp->emit_unary_invert();
                 decStack(1);
@@ -1927,12 +1949,13 @@ JittedCode* AbstractInterpreter::compileWorker() {
             }
             case FOR_ITER:
             {
-                BlockInfo *loopBlock = nullptr;
+                auto postIterStack = ValueStack(m_stack);
+                postIterStack.dec(1); // pop iter when stopiter happens
+                auto jumpTo = curByte + oparg + sizeof(_Py_CODEUNIT);
                 forIter(
-                        curByte + oparg + sizeof(_Py_CODEUNIT),
-                        opcodeIndex,
-                        loopBlock
+                        jumpTo
                 );
+                m_offsetStack[jumpTo] = postIterStack;
                 skipEffect = true; // has jump effect
                 break;
             }
@@ -1992,7 +2015,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                         m_comp->emit_raise_varargs();
                         // returns 1 if we're doing a re-raise in which case we don't need
                         // to update the traceback.  Otherwise returns 0.
-                        auto curHandler = getEhblock();
+                        auto curHandler = currentHandler();
                         if (oparg == 0) {
                                 // The stack actually ended up being empty - either because we didn't
                                 // have any values, or the values were all non-objects that we could
@@ -2003,7 +2026,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                         else {
                             // if we have args we'll always return 0...
                             m_comp->emit_pop();
-                            branchRaise();
+                            branchRaise("hit native error");
                         }
                         break;
                 }
@@ -2013,6 +2036,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 auto current = m_blockStack.back();
                 auto jumpTo = oparg + curByte + sizeof(_Py_CODEUNIT);
                 auto handlerLabel = m_comp->emit_define_label();
+
                 auto newHandler = m_exceptionHandler.AddSetupFinallyHandler(
                         handlerLabel,
                         m_stack,
@@ -2028,6 +2052,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 m_blockStack.push_back(newBlock);
 
                 ValueStack newStack = ValueStack(m_stack);
+                newStack.inc(6, StackEntryKind::STACK_KIND_VALUE);
                 // This stack only gets used if an error occurs within the try:
                 m_offsetStack[jumpTo] = newStack;
                 skipEffect = true;
@@ -2035,7 +2060,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             break;
             case RERAISE:{
                 m_comp->emit_restore_err();
-                //decStack(3);
+                decExcVars(3);
                 unwindHandlers();
                 skipEffect = true;
                 break;
@@ -2046,6 +2071,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 m_comp->pop_top();
                 m_comp->pop_top();
                 decStack(3);
+                decExcVars(3);
                 skipEffect = true;
                 break;
             case POP_BLOCK:
@@ -2241,13 +2267,13 @@ JittedCode* AbstractInterpreter::compileWorker() {
             }
             case CALL_METHOD:
             {
-                if (oparg == 0) {
-                    m_comp->emit_method_call_0();
-                } else {
+                if (!m_comp->emit_method_call(oparg)) {
                     buildTuple(oparg);
-                    m_comp->emit_method_call_n(oparg);
+                    m_comp->emit_method_call_n();
+                    decStack(2); // + method + name + nargs
+                } else {
+                    decStack(2 + oparg); // + method + name + nargs
                 }
-                decStack(2); // + method + name + nargs
                 errorCheck("failed to call method");
                 incStack(); //result
                 break;
@@ -2270,9 +2296,12 @@ JittedCode* AbstractInterpreter::compileWorker() {
 #endif
     }
 
+    popExcVars();
+
     // label branch for error handling when we have no EH handlers, (return NULL).
     m_comp->emit_branch(BranchAlways, rootHandlerLabel);
     m_comp->emit_mark_label(rootHandlerLabel);
+
     m_comp->emit_null();
 
     auto finalRet = m_comp->emit_define_label();
@@ -2284,32 +2313,11 @@ JittedCode* AbstractInterpreter::compileWorker() {
 
     // Final return position, pop frame and return
     m_comp->emit_mark_label(finalRet);
+
     m_comp->emit_pop_frame();
 
     m_comp->emit_ret(1);
-
     return m_comp->emit_compile();
-}
-
-void AbstractInterpreter::emitRaiseAndFree(ExceptionHandler* handler) {
-    if (handler->Flags & EhfInExceptHandler) {
-        unwindEh(handler);
-
-        m_comp->emit_eh_trace();     // update the traceback
-        if (!handler->HasErrorTarget()) {
-            // We're in an except handler raising an exception with no outer exception
-            // handlers.  We'll return NULL from the function indicating an error has
-            // occurred
-            m_comp->emit_branch(BranchAlways, m_exceptionHandler.GetRootHandler()->ErrorTarget);
-        }
-    }
-    else {
-        // We're not in a nested exception handler, we just need to emit our
-        // line tracing information if we're doing a raise, and skip it if
-        // we're a re-raise.  Then we prepare the exception and branch to 
-        // whatever opcode will handle the exception.
-        m_comp->emit_branch(BranchAlways, m_exceptionHandler.GetRootHandler()->ErrorTarget);
-    }
 }
 
 void AbstractInterpreter::testBoolAndBranch(Local value, bool isTrue, Label target) {
@@ -2318,111 +2326,23 @@ void AbstractInterpreter::testBoolAndBranch(Local value, bool isTrue, Label targ
     m_comp->emit_branch(BranchEqual, target);
 }
 
-void AbstractInterpreter::jumpIfOrPop(bool isTrue, int opcodeIndex, int jumpTo) {
-    auto stackInfo = getStackInfo(opcodeIndex);
-
-    if (jumpTo <= opcodeIndex) {
-        periodicWork();
-    }
-
-    auto target = getOffsetLabel(jumpTo);
-    m_offsetStack[jumpTo] = ValueStack(m_stack);
-    decStack();
-
-    auto tmp = m_comp->emit_spill();
-    auto noJump = m_comp->emit_define_label();
-    auto willJump = m_comp->emit_define_label();
-
-    // fast checks for true/false.
-    testBoolAndBranch(tmp, isTrue, noJump);
-    testBoolAndBranch(tmp, !isTrue, willJump);
-
-    // Use PyObject_IsTrue
-    m_comp->emit_load_local(tmp);
-    m_comp->emit_is_true();
-
-    raiseOnNegativeOne();
-
-    m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
-
-    // Jumping, load the value back and jump
-    m_comp->emit_mark_label(willJump);
-    m_comp->emit_load_local(tmp);    // load the value back onto the stack
-    m_comp->emit_branch(BranchAlways, target);
-
-    // not jumping, load the value and dec ref it
-    m_comp->emit_mark_label(noJump);
-    m_comp->emit_load_local(tmp);
-    m_comp->emit_pop_top();
-
-    m_comp->emit_free_local(tmp);
-    incStack();
-}
-
-void AbstractInterpreter::popJumpIf(bool isTrue, int opcodeIndex, int jumpTo) {
-    if (jumpTo <= opcodeIndex) {
-        periodicWork();
-    }
-    auto target = getOffsetLabel(jumpTo);
-
-    auto noJump = m_comp->emit_define_label();
-    auto willJump = m_comp->emit_define_label();
-
-    // fast checks for true/false...
-    m_comp->emit_dup();
-    m_comp->emit_ptr(isTrue ? Py_False : Py_True);
-    m_comp->emit_branch(BranchEqual, noJump);
-
-    m_comp->emit_dup();
-    m_comp->emit_ptr(isTrue ? Py_True : Py_False);
-    m_comp->emit_branch(BranchEqual, willJump);
-
-    // Use PyObject_IsTrue
-    m_comp->emit_dup();
-    m_comp->emit_is_true();
-
-    raiseOnNegativeOne();
-
-    m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
-
-    // Branching, pop the value and branch
-    m_comp->emit_mark_label(willJump);
-    m_comp->emit_pop_top();
-    m_comp->emit_branch(BranchAlways, target);
-
-    // Not branching, just pop the value and fall through
-    m_comp->emit_mark_label(noJump);
-    m_comp->emit_pop_top();
-
-    decStack();
-    m_offsetStack[jumpTo] = ValueStack(m_stack);
-}
-
 void AbstractInterpreter::unaryPositive(int opcodeIndex) {
-    decStack();
     m_comp->emit_unary_positive();
+    decStack();
     errorCheck("unary positive failed");
     incStack();
 }
 
 void AbstractInterpreter::unaryNegative(int opcodeIndex) {
-    decStack();
     m_comp->emit_unary_negative();
+    decStack();
     errorCheck("unary negative failed");
     incStack();
 }
 
-/* Unused for now? */
-bool AbstractInterpreter::canOptimizePopJump(int opcodeIndex) {
-    auto opcode = getExtendedOpcode(opcodeIndex + sizeof(_Py_CODEUNIT));
-    if (opcode == POP_JUMP_IF_TRUE || opcode == POP_JUMP_IF_FALSE) {
-        return m_jumpsTo.find(opcodeIndex + sizeof(_Py_CODEUNIT)) == m_jumpsTo.end();
-    }
-    return false;
-}
-
 void AbstractInterpreter::unaryNot(int& opcodeIndex) {
     m_comp->emit_unary_not();
+    decStack(1);
     errorCheck("unary not failed");
     incStack();
 }
@@ -2514,7 +2434,7 @@ void AbstractInterpreter::unwindHandlers(){
 
 void AbstractInterpreter::returnValue(int opcodeIndex) {
     m_comp->emit_store_local(m_retValue);
-    m_comp->emit_branch(BranchLeave, m_retLabel);
+    m_comp->emit_branch(BranchAlways, m_retLabel);
     decStack();
 }
 
@@ -2526,7 +2446,7 @@ void AbstractInterpreter::unpackSequence(size_t size, int opcode) {
     auto success = m_comp->emit_define_label();
     m_comp->emit_unpack_sequence(valueTmp, m_sequenceLocals[opcode], success, size);
 
-    branchRaise();
+    branchRaise("failed to unpack sequence");
 
     m_comp->emit_mark_label(success);
     auto fastTmp = m_comp->emit_spill();
@@ -2551,38 +2471,34 @@ void AbstractInterpreter::unpackSequence(size_t size, int opcode) {
     m_comp->emit_free_local(fastTmp);
 }
 
-void AbstractInterpreter::forIter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo) {
-    // CPython always generates LOAD_FAST or a GET_ITER before a FOR_ITER.
-    // Therefore we know that we always fall into a FOR_ITER when it is
-    // initialized, and we branch back to it for the loop condition.  We
-    // do this because keeping the value on the stack becomes problematic.
-    // At the very least it requires that we spill the value out when we
-    // are doing a "continue" in a for loop.
+void AbstractInterpreter::forIter(int loopIndex) {
+    // dup the iter so that it stays on the stack for the next iteration
+    m_comp->emit_dup(); // ..., iter -> iter, iter, ...
 
-    // oparg is where to jump on break
-    auto iterValue = m_comp->emit_spill();
-    decStack();
-    if (loopInfo != nullptr) {
-        loopInfo->LoopVar = iterValue;
-    }
+    // emits NULL on error, 0xff on StopIter and ptr on next
+    m_comp->emit_for_next(); // ..., iter, iter -> "next", iter, ...
 
-    // now that we've saved the value into a temp we can mark the offset
-    // label.
-    markOffsetLabel(opcodeIndex);
+    /* Start error branch */
+    errorCheck("failed to fetch iter");
+    /* End error branch */
 
-    m_comp->emit_load_local(iterValue);
+    incStack(1);
 
-    // TODO: It'd be nice to inline this...
-    auto processValue = m_comp->emit_define_label();
+    auto next = m_comp->emit_define_label();
 
-    m_comp->emit_for_next(processValue, iterValue);
+    /* Start next iter branch */
+    m_comp->emit_dup();
+    m_comp->emit_ptr((void*)0xff);
+    m_comp->emit_branch(BranchNotEqual, next);
+    /* End next iter branch */
 
-    intErrorCheck("for_iter failed");
+    /* Start stop iter branch */
+    m_comp->emit_pop(); // Pop the 0xff StopIter value
+    m_comp->emit_pop_top(); // POP and DECREF iter
+    m_comp->emit_branch(BranchAlways, getOffsetLabel(loopIndex)); // Goto: post-stack
+    /* End stop iter error branch */
 
-    jumpAbsolute(loopIndex, opcodeIndex);
-
-    m_comp->emit_mark_label(processValue);
-    incStack();
+    m_comp->emit_mark_label(next);
 }
 
 void AbstractInterpreter::loadFast(int local, int opcodeIndex) {
@@ -2607,7 +2523,7 @@ void AbstractInterpreter::loadFastWorker(int local, bool checkUnbound) {
 
         m_comp->emit_unbound_local_check();
 
-        branchRaise();
+        branchRaise("unbound local");
 
         m_comp->emit_mark_label(success);
         m_comp->emit_load_local(mErrorCheckLocal);
@@ -2666,6 +2582,87 @@ void AbstractInterpreter::unpackEx(size_t size, int opcode) {
     m_comp->emit_free_local(remainderTmp);
 }
 
+
+void AbstractInterpreter::jumpIfOrPop(bool isTrue, int opcodeIndex, int jumpTo) {
+    auto stackInfo = getStackInfo(opcodeIndex);
+
+    if (jumpTo <= opcodeIndex) {
+        periodicWork();
+    }
+
+    auto target = getOffsetLabel(jumpTo);
+    m_offsetStack[jumpTo] = ValueStack(m_stack);
+    decStack();
+
+    auto tmp = m_comp->emit_spill();
+    auto noJump = m_comp->emit_define_label();
+    auto willJump = m_comp->emit_define_label();
+
+    // fast checks for true/false.
+    testBoolAndBranch(tmp, isTrue, noJump);
+    testBoolAndBranch(tmp, !isTrue, willJump);
+
+    // Use PyObject_IsTrue
+    m_comp->emit_load_local(tmp);
+    m_comp->emit_is_true();
+
+    raiseOnNegativeOne();
+
+    m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
+
+    // Jumping, load the value back and jump
+    m_comp->emit_mark_label(willJump);
+    m_comp->emit_load_local(tmp);    // load the value back onto the stack
+    m_comp->emit_branch(BranchAlways, target);
+
+    // not jumping, load the value and dec ref it
+    m_comp->emit_mark_label(noJump);
+    m_comp->emit_load_local(tmp);
+    m_comp->emit_pop_top();
+
+    m_comp->emit_free_local(tmp);
+    incStack();
+}
+
+void AbstractInterpreter::popJumpIf(bool isTrue, int opcodeIndex, int jumpTo) {
+    if (jumpTo <= opcodeIndex) {
+        periodicWork();
+    }
+    auto target = getOffsetLabel(jumpTo);
+
+    auto noJump = m_comp->emit_define_label();
+    auto willJump = m_comp->emit_define_label();
+
+    // fast checks for true/false...
+    m_comp->emit_dup();
+    m_comp->emit_ptr(isTrue ? Py_False : Py_True);
+    m_comp->emit_branch(BranchEqual, noJump);
+
+    m_comp->emit_dup();
+    m_comp->emit_ptr(isTrue ? Py_True : Py_False);
+    m_comp->emit_branch(BranchEqual, willJump);
+
+    // Use PyObject_IsTrue
+    m_comp->emit_dup();
+    m_comp->emit_is_true();
+
+    raiseOnNegativeOne();
+
+    m_comp->emit_branch(isTrue ? BranchFalse : BranchTrue, noJump);
+
+    // Branching, pop the value and branch
+    m_comp->emit_mark_label(willJump);
+    m_comp->emit_pop_top();
+    m_comp->emit_branch(BranchAlways, target);
+
+    // Not branching, just pop the value and fall through
+    m_comp->emit_mark_label(noJump);
+    m_comp->emit_pop_top();
+
+    decStack();
+    m_offsetStack[jumpTo] = ValueStack(m_stack);
+}
+
 void AbstractInterpreter::jumpAbsolute(size_t index, size_t from) {
     if (index <= from) {
         periodicWork();
@@ -2680,10 +2677,12 @@ void AbstractInterpreter::jumpIfNotExact(int opcodeIndex, int jumpTo) {
         periodicWork();
     }
     auto target = getOffsetLabel(jumpTo);
-    m_comp->emit_compare_exceptions_int();
+    m_comp->emit_compare_exceptions();
     decStack(2);
-    raiseOnNegativeOne();
-    m_comp->emit_branch(BranchFalse, target);
+    errorCheck("failed to compare exceptions");
+    m_comp->emit_ptr(Py_False);
+    m_comp->emit_branch(BranchEqual, target);
+
     m_offsetStack[jumpTo] = ValueStack(m_stack);
 }
 
@@ -2704,7 +2703,7 @@ void AbstractInterpreter::unwindEh(ExceptionHandler* fromHandler, ExceptionHandl
     } while (cur != nullptr && !cur->IsRootHandler() && cur != toHandler && !cur->IsTryExceptOrFinally());
 }
 
-ExceptionHandler* AbstractInterpreter::getEhblock() {
+inline ExceptionHandler* AbstractInterpreter::currentHandler() {
     return m_blockStack.back().CurrentHandler;
 }
 
@@ -2724,7 +2723,7 @@ void AbstractInterpreter::markOffsetLabel(int index) {
     }
 }
 
-LocalKind getOptimizedLocalKind(AbstractValueKind kind) {
+inline LocalKind getOptimizedLocalKind(AbstractValueKind kind) {
     // Remove optimizations for now, always use PyObject* /Lk_ptr/ NATIVEINT
     return LK_Pointer;
 }

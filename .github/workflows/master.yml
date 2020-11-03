@@ -53,8 +53,7 @@ jobs:
 
       - name: Run smoke tests
         shell: bash
-        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
-
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -j1
 
   build-mac:
     runs-on: macos-latest
@@ -90,14 +89,15 @@ jobs:
         shell: bash
         run: pip install .
 
-      - name: Run smoke tests
-        shell: bash
-        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
-
       - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: ./unit_tests
+
+      - name: Run smoke tests
+        shell: bash
+        run: python -X dev Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -j1
+
 
   build-windows:
     runs-on: windows-latest
@@ -117,6 +117,8 @@ jobs:
       - uses: actions/setup-dotnet@v1
         with:
           dotnet-version: '5.0.100-rc.2.20479.15'
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.0.2
       - name: Create Build Environment
         run: cmake -E make_directory ${{runner.workspace}}/build
 
@@ -130,10 +132,18 @@ jobs:
         shell: bash
         run: cmake --build . --config Release
 
+      - name: Install build deps
+        shell: bash
+        run: python -m pip install scikit-build ninja
+
       - name: Build Python Package
         shell: bash
-        run: pip install .
+        run: python setup.py build -G "Ninja" --skip-generator-test
+
+      - name: Install Python Package
+        shell: bash
+        run: python setup.py develop
 
       - name: Run smoke tests
         shell: bash
-        run: python Tests\test_pyjion.py -f Tests\python_smoke_tests.txt
+        run: python -X dev -q Tests\test_pyjion.py -f Tests\python_smoke_tests.txt -j1

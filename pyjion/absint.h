@@ -221,6 +221,7 @@ class AbstractInterpreter {
     _Py_CODEUNIT *mByteCode;
     size_t mSize;
     Local mErrorCheckLocal;
+    Local mExcVarsOnStack; // Counter of the number of exception variables on the stack.
 
     // ** Data consumed during analysis:
     // Tracks the entry point for each POP_BLOCK opcode, so we can restore our
@@ -325,7 +326,7 @@ private:
     void buildMap(size_t argCnt);
 
     Label getOffsetLabel(int jumpTo);
-    void forIter(int loopIndex, int opcodeIndex, BlockInfo *loopInfo);
+    void forIter(int loopIndex);
 
     // Checks to see if we have a null value as the last value on our stack
     // indicating an error, and if so, branches to our current error handler.
@@ -345,7 +346,7 @@ private:
 
     void unwindEh(ExceptionHandler* fromHandler, ExceptionHandler* toHandler = nullptr);
 
-    ExceptionHandler * getEhblock();
+    ExceptionHandler * currentHandler();
 
     void markOffsetLabel(int index);
 
@@ -354,9 +355,6 @@ private:
     void decStack(size_t size = 1);
 
     void incStack(size_t size = 1, StackEntryKind kind = STACK_KIND_OBJECT);
-
-    // Gets the next opcode skipping for EXTENDED_ARG
-    int getExtendedOpcode(int curByte);
 
     JittedCode* compileWorker();
 
@@ -373,7 +371,6 @@ private:
 
     void popExcept();
 
-    bool canOptimizePopJump(int opcodeIndex);
     void unaryPositive(int opcodeIndex);
     void unaryNegative(int opcodeIndex);
     void unaryNot(int& opcodeIndex);
@@ -386,6 +383,9 @@ private:
     void unwindHandlers();
 
     void emitRaise(ExceptionHandler *handler);
+    void popExcVars();
+    void decExcVars(int count);
+    void incExcVars(int count);
 };
 
 

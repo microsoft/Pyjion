@@ -50,6 +50,9 @@ private:
         auto frame = PyFrame_New(PyThreadState_Get(), m_code.get(), globals.get(), PyObject_ptr(PyDict_New()).get());
 
         auto res = m_jittedcode->j_evalfunc(m_jittedcode.get(), frame);
+
+        size_t collected = PyGC_Collect();
+        printf("Collected %zu values\n", collected);
         REQUIRE(!m_jittedcode->j_failed);
         return res;
     }
@@ -99,12 +102,12 @@ public:
 
 TEST_CASE("General import test") {
     SECTION("import from case") {
-        auto t = EmissionTest("def f():\n  from pprint import pprint\n  pprint('hello')");
-        CHECK(t.returns() == "None");
+        auto t = EmissionTest("def f():\n  from math import sqrt\n  return sqrt(4)");
+        CHECK(t.returns() == "2.0");
     }
     SECTION("import case") {
-        auto t = EmissionTest("def f():\n  import pprint\n  pprint.pprint('hello')");
-        CHECK(t.returns() == "None");
+        auto t = EmissionTest("def f():\n  import math\n  return math.sqrt(4)");
+        CHECK(t.returns() == "2.0");
     }
 }
 
@@ -129,6 +132,11 @@ TEST_CASE("General dict comprehensions") {
     SECTION("more complex case") {
         auto t = EmissionTest("def f():\n  return dict({k: v for k, v in enumerate((1,2,3,))})");
         CHECK(t.returns() == "{0: 1, 1: 2, 2: 3}");
+    }
+
+    SECTION("test inline"){
+        auto t = EmissionTest("def f():\n  return {k: k + 10 for k in range(10)}");
+        CHECK(t.returns() == "{0: 10, 1: 11, 2: 12, 3: 13, 4: 14, 5: 15, 6: 16, 7: 17, 8: 18, 9: 19}");
     }
 }
 
@@ -193,6 +201,26 @@ TEST_CASE("General method calls") {
     SECTION("common case") {
         auto t = EmissionTest("def f(): a={False};a.add(True);return a");
         CHECK(t.returns() == "{False, True}");
+    }
+    SECTION("zero-arg case") {
+        auto t = EmissionTest("def f(): a={False};a.add(True);a.pop(); return a");
+        CHECK(t.returns() == "{True}");
+    }
+    SECTION("four-arg case") {
+        auto t = EmissionTest("def f(): a = OSError(1,2,3,4); return a");
+        CHECK(t.returns() == "PermissionError(1, 2)");
+    }
+    SECTION("N-arg case") {
+        auto t = EmissionTest("def f(): from pathlib import PurePosixPath; p = PurePosixPath().joinpath('a', 'b', 'c', 'd', 'e', 'f', 'g'); return p");
+        CHECK(t.returns() == "PurePosixPath('a/b/c/d/e/f/g')");
+    }
+    SECTION("N-arg failure case") {
+        auto t = EmissionTest("def f(): from pathlib import PurePosixPath; p = PurePosixPath().joinpath('a', 'b', 'c', 'd', 'e', 'f', 'g', None); return p");
+        CHECK(t.raises() == PyExc_TypeError);
+    }
+    SECTION("failure case") {
+        auto t = EmissionTest("def f(): a={False};a.add([True]);return a");
+        CHECK(t.raises() == PyExc_TypeError);
     }
 }
 

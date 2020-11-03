@@ -75,9 +75,9 @@ public:
 	PyObject* j_code;
 	std::vector<SpecializedTreeNode*> j_optimized;
 	Py_EvalFunc j_generic;
-    void *j_evalstate;
     uint8_t *j_il;
     unsigned int j_ilLen;
+    unsigned long j_nativeSize;
 
 	explicit PyjionJittedCode(PyObject* code) {
 		j_code = code;
@@ -86,7 +86,6 @@ public:
 		j_evalfunc = nullptr;
 		j_specialization_threshold = HOT_CODE;
 		j_generic = nullptr;
-		j_evalstate = nullptr;
 	}
 
 	~PyjionJittedCode();

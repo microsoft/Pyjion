@@ -84,19 +84,3 @@ TEST_CASE("Basic delete tests", "[float][binary op][inference]") {
                         }));
     }
 }
-TEST_CASE("Type tracking tests", "[float][binary op][inference]") {
-    SECTION("test 1") {
-        VerifyOldTest(
-                // Type tracking / merging...
-                AITestCase(
-                        "def f():\n    if abc:\n        x = 1\n    else:\n        x = 'abc'\n        y = 1",
-                        {
-                                new VariableVerifier(6, 0, AVK_Undefined, true),    // STORE_FAST x
-                                new VariableVerifier(8, 0, AVK_Integer),           // JUMP_FORWARD
-                                new VariableVerifier(12, 0, AVK_Undefined, true),   // STORE_FAST x
-                                new VariableVerifier(14, 0, AVK_String),            // LOAD_CONST
-                                new VariableVerifier(18, 0, AVK_Any),               // LOAD_CONST None
-                        }));
-    }
-}
-

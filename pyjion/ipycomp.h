@@ -64,6 +64,7 @@ enum BranchType {
     BranchEqual,
     BranchNotEqual,
     BranchLeave,
+    BranchLessThanEqual
 };
 
 class JittedCode {
@@ -72,6 +73,7 @@ public:
     virtual void* get_code_addr() = 0;
     virtual uint8_t * get_il() = 0;
     virtual unsigned int get_il_len() = 0;
+    virtual unsigned long get_native_size() = 0;
 };
 
 // Defines the interface between the abstract compiler and code generator
@@ -114,13 +116,6 @@ public:
     virtual void emit_int(int value) = 0;
     // Emits an unboxed floating point value onto the stack
     virtual void emit_float(double value) = 0;
-    // Emits a unboxed tagged integer value onto the stack
-    virtual void emit_tagged_int(size_t value) = 0;
-    // Takes a Python long off the stack and converts it to a tagged int, or leaves
-    // it as an object if the long doesn't fix in a tagged int.
-    virtual void emit_unbox_int_tagged() = 0;
-    // Takes a Python float off the stack and converts it to a native double
-    virtual void emit_unbox_float() = 0;
 
     // Emits an unboxed bool onto the stack
     virtual void emit_bool(bool value) = 0;
@@ -133,16 +128,6 @@ public:
     virtual void emit_pop() = 0;
     // Dups the current value on the stack, performing no operations related to reference counting
     virtual void emit_dup() = 0;
-
-    /*****************************************************
-     * Boxing */
-
-     // Boxes a raw floating point value into a Python object
-    virtual void emit_box_float() = 0;
-    // Boxes a raw bool into a Python object
-    virtual void emit_box_bool() = 0;
-    // Boxes a tagged int into a Python object
-    virtual void emit_box_tagged_ptr() = 0;
 
     /*****************************************************
      * Stack based locals */
@@ -304,8 +289,8 @@ public:
     virtual bool emit_call(size_t argCnt) = 0;
 
     // Emits a call for the specified argument count.
-    virtual void emit_method_call_0() = 0;
-    virtual void emit_method_call_n(size_t argCnt) = 0;
+    virtual bool emit_method_call(size_t argCnt) = 0;
+    virtual void emit_method_call_n() = 0;
 
     // Emits a call with the arguments to be invoked in a tuple object
     virtual void emit_call_with_tuple() = 0;
@@ -339,7 +324,7 @@ public:
      * Iteration */
     virtual void emit_getiter() = 0;
     //void emit_getiter_opt() = 0;
-    virtual void emit_for_next(Label processValue, Local iterValue) = 0;
+    virtual void emit_for_next() = 0;
 
     /*****************************************************
      * Operators */
@@ -396,8 +381,6 @@ public:
     virtual void emit_reraise() = 0;
     // Compares to see if an exception is handled, pushing a Python bool onto the stack
     virtual void emit_compare_exceptions() = 0;
-    // Compares to see if an exception is handled, pushing an int on the stack indicating true (1), false (0), or error (-1)
-    virtual void emit_compare_exceptions_int() = 0;
     // Sets the current exception type and text
     virtual void emit_pyerr_setstring(void* exception, const char*msg) = 0;
 
@@ -421,6 +404,9 @@ public:
 
     virtual void lift_n_to_top(int pos) = 0;
     virtual void pop_top() = 0;
+
+    virtual void emit_inc_local(Local local, int value) = 0;
+    virtual void emit_dec_local(Local local, int value) = 0;
 };
 
 #endif

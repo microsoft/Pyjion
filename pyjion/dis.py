@@ -177,14 +177,19 @@ class MethodTokens (Enum):
     METHOD_CALL_2_TOKEN        = 0x00010002
     METHOD_CALL_3_TOKEN        = 0x00010003
     METHOD_CALL_4_TOKEN        = 0x00010004
-    METHOD_METHCALL_0_TOKEN        = 0x00011000
-    METHOD_METHCALLN_TOKEN        = 0x00011004
-    METHOD_CALL_ARGS            = 0x0001000A
-    METHOD_CALL_KWARGS          = 0x0001000B
-    METHOD_PYUNICODE_JOINARRAY  = 0x0002000C
-    METHOD_CALLN_TOKEN          = 0x000101FF
-    METHOD_KWCALLN_TOKEN        = 0x000103FF
-    METHOD_LOAD_METHOD      = 0x00010400
+    METHOD_METHCALL_0_TOKEN    = 0x00011000
+    METHOD_METHCALL_1_TOKEN    = 0x00011001
+    METHOD_METHCALL_2_TOKEN    = 0x00011002
+    METHOD_METHCALL_3_TOKEN    = 0x00011003
+    METHOD_METHCALL_4_TOKEN    = 0x00011004
+    METHOD_METHCALLN_TOKEN     = 0x00011005
+
+    METHOD_CALL_ARGS             = 0x0001000A
+    METHOD_CALL_KWARGS           = 0x0001000B
+    METHOD_PYUNICODE_JOINARRAY   = 0x0002000C
+    METHOD_CALLN_TOKEN           = 0x000101FF
+    METHOD_KWCALLN_TOKEN         = 0x000103FF
+    METHOD_LOAD_METHOD           = 0x00010400
     METHOD_PYTUPLE_NEW           = 0x00020000
     METHOD_PYLIST_NEW            = 0x00020001
     METHOD_PYDICT_NEWPRESIZED    = 0x00020002
@@ -526,8 +531,7 @@ def print_il(il):
         while True:
             first = next(i)
             if first == 0 and pc == 0:
-                print(f"!!! Corrupt IL !!!")
-                return
+                raise NotImplementedError(f"CorILMethod_FatFormat not yet supported")
 
             op = opcode_map[first]
             if op.size == InlineNone:
@@ -602,3 +606,13 @@ def dis(f):
         return
     print_il(il)
 
+
+def dis_native(f):
+    try:
+        import distorm3
+    except ImportError:
+        raise ModuleNotFoundError("Install distorm3 before disassembling native functions")
+    code = dump_native(f)
+    iterable = distorm3.DecodeGenerator(0x00000000, bytes(code), distorm3.Decode64Bits)
+    for (offset, size, instruction, hexdump) in iterable:
+        print("%.8x: %s" % (offset, instruction))

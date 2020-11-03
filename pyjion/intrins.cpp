@@ -34,6 +34,7 @@ using namespace msl::utilities;
 #endif
 
 PyObject* g_emptyTuple;
+
 #include <dictobject.h>
 #include <vector>
 
@@ -45,6 +46,8 @@ PyObject* g_emptyTuple;
 #define UNBOUNDFREE_ERROR_MSG \
     "free variable '%.200s' referenced before assignment" \
     " in enclosing scope"
+
+FILE * g_traceLog = stderr;
 
 template<typename T>
 void decref(T v) {
@@ -161,7 +164,6 @@ PyObject* PyJit_NewFunction(PyObject* code, PyObject* qualname, PyFrameObject* f
     auto res = PyFunction_NewWithQualName(code, frame->f_globals, qualname);
     Py_DECREF(code);
     Py_DECREF(qualname);
-
     return res;
 }
 
@@ -567,38 +569,6 @@ PyObject* PyJit_CompareExceptions(PyObject*v, PyObject* w) {
     return v;
 }
 
-// Returns -1 on an error, 1 if the exceptions match, or 0 if they don't.
-int PyJit_CompareExceptions_Int(PyObject*v, PyObject* w) {
-    if (PyTuple_Check(w)) {
-        Py_ssize_t i, length;
-        length = PyTuple_Size(w);
-        for (i = 0; i < length; i += 1) {
-            PyObject *exc = PyTuple_GET_ITEM(w, i);
-            if (!PyExceptionClass_Check(exc)) {
-                PyErr_SetString(PyExc_TypeError,
-                    CANNOT_CATCH_MSG);
-                Py_DECREF(v);
-                Py_DECREF(w);
-                return -1;
-            }
-        }
-    }
-    else {
-        if (!PyExceptionClass_Check(w)) {
-            PyErr_SetString(PyExc_TypeError,
-                CANNOT_CATCH_MSG);
-            Py_DECREF(v);
-            Py_DECREF(w);
-            return -1;
-        }
-    }
-    int res = PyErr_GivenExceptionMatches(v, w);
-    Py_DECREF(v);
-    Py_DECREF(w);
-    return res ? 1 : 0;
-}
-
-
 void PyJit_UnboundLocal(PyObject* name) {
     format_exc_check_arg(
         PyExc_UnboundLocalError,
@@ -887,31 +857,6 @@ error:
 	return result;
 }
 
-void PyJit_DebugDumpFrame(PyFrameObject* frame) {
-    static bool _dumping = false;
-    if (_dumping) {
-        return;
-    }
-    _dumping = true;
-
-    int argCount = frame->f_code->co_argcount;
-    for (int i = 0; i < argCount; i++) {
-        auto local = frame->f_localsplus[i];
-        if (local != nullptr) {
-            if (local->ob_type != nullptr) {
-                printf("Arg %d %s\r\n", i, local->ob_type->tp_name);
-            }
-            else {
-                printf("Null local type?");
-            }
-        }
-        else {
-            printf("Null local?");
-        }
-    }
-    _dumping = false;
-}
-
 void PyJit_PushFrame(PyFrameObject* frame) {
     PyThreadState_Get()->frame = frame;
 }
@@ -1112,13 +1057,10 @@ PyObject * PyJit_BuildDictFromTuples(PyObject *keys_and_values) {
             goto error;
         }
     }
-    Py_DECREF(keys);
-    for (auto i = 0; i < len; i++)
-        Py_CLEAR(PyTuple_GET_ITEM(keys_and_values, i));
-    return map;
 error:
     Py_DECREF(keys);
-    return nullptr;
+    Py_DECREF(keys_and_values);
+    return map;
 }
 
 PyObject* PyJit_LoadAssertionError() {
@@ -1172,7 +1114,7 @@ PyObject* PyJit_DictMerge(PyObject* other, PyObject* dict) {
         goto error;
     Py_DECREF(other);
     return dict;
-    error:
+error:
     Py_DECREF(other);
     return nullptr;
 }
@@ -1262,38 +1204,23 @@ PyObject* PyJit_GetIter(PyObject* iterable) {
     return res;
 }
 
-PyObject* PyJit_GetIterOptimized(PyObject* iterable, size_t* iterstate1, size_t* iterstate2) {
-    auto res = PyObject_GetIter(iterable);
-    Py_DECREF(iterable);
-    return res;
-}
-
-PyObject* PyJit_IterNext(PyObject* iter, int*error) {
-    auto res = (*iter->ob_type->tp_iternext)(iter);
-    if (res == nullptr) {
-        if (PyErr_Occurred()) {
-            if (!PyErr_ExceptionMatches(PyExc_StopIteration)) {
-                *error = 1;
-                return nullptr;
-            }
-            *error = 0;
-            PyErr_Clear();
-        }
+PyObject* PyJit_IterNext(PyObject* iter) {
+    if (iter == nullptr || !PyIter_Check(iter)){
+        PyErr_Format(PyExc_ValueError,
+                        "Invalid iterator given to iternext, got %s.", ObjInfo(iter));
+        return nullptr;
     }
-    return res;
-}
 
-
-PyObject* PyJit_IterNextOptimized(PyObject* iter, int*error, size_t* iterstate1, size_t* iterstate2) {
     auto res = (*iter->ob_type->tp_iternext)(iter);
     if (res == nullptr) {
         if (PyErr_Occurred()) {
             if (!PyErr_ExceptionMatches(PyExc_StopIteration)) {
-                *error = 1;
                 return nullptr;
             }
-            *error = 0;
             PyErr_Clear();
+            return (PyObject*)(0xff);
+        } else {
+            return (PyObject*)(0xff);
         }
     }
     return res;
@@ -1699,6 +1626,9 @@ PyObject* Call(PyObject *target, Args...args) {
     }
     else {
         auto t_args = PyTuple_New(sizeof...(args));
+#ifdef DEBUG_TUPLE_ALLOCATIONS
+        fprintf(g_traceLog, "Tuple <%lu> at %p (Call<T>)\n", sizeof...(args), t_args);
+#endif
         if (t_args == nullptr) {
             std::vector<PyObject*> argsVector = {args...};
             for (auto &i: argsVector)
@@ -1747,59 +1677,106 @@ PyObject* Call4(PyObject *target, PyObject* arg0, PyObject* arg1, PyObject* arg2
     return Call<PyObject*>(target, arg0, arg1, arg2, arg3);
 }
 
-PyObject* MethCall0(PyObject* self, std::vector<PyObject*>* method_info) {
+PyObject* MethCall0(PyObject* self, PyMethodLocation* method_info) {
     PyObject* res;
-    if (method_info->back() != nullptr)
-        res = Call<PyObject*>(method_info->at(0), method_info->at(1));
+    if (method_info->object != nullptr)
+        res = Call<PyObject*>(method_info->method, method_info->object);
     else
-        res = Call0(method_info->at(0));
+        res = Call0(method_info->method);
+    delete method_info;
     return res;
 }
 
-PyObject* MethCallN(PyObject* self, std::vector<PyObject*>* method_info, PyObject* args) {
+PyObject* MethCall1(PyObject* self, PyMethodLocation* method_info, PyObject* arg1) {
+    PyObject* res;
+    if (method_info->object != nullptr)
+        res = Call<PyObject*>(method_info->method, method_info->object, arg1);
+    else
+        res = Call<PyObject*>(method_info->method, arg1);
+    delete method_info;
+    return res;
+}
+
+PyObject* MethCall2(PyObject* self, PyMethodLocation* method_info, PyObject* arg1, PyObject* arg2) {
+    PyObject* res;
+    if (method_info->object != nullptr)
+        res = Call<PyObject*>(method_info->method, method_info->object, arg1, arg2);
+    else
+        res = Call<PyObject*>(method_info->method, arg1, arg2);
+    delete method_info;
+    return res;
+}
+
+PyObject* MethCall3(PyObject* self, PyMethodLocation* method_info, PyObject* arg1, PyObject* arg2, PyObject* arg3) {
+    PyObject* res;
+    if (method_info->object != nullptr)
+        res = Call<PyObject*>(method_info->method, method_info->object, arg1, arg2, arg3);
+    else
+        res = Call<PyObject*>(method_info->method, arg1, arg2, arg3);
+    delete method_info;
+    return res;
+}
+
+PyObject* MethCall4(PyObject* self, PyMethodLocation* method_info, PyObject* arg1, PyObject* arg2, PyObject* arg3, PyObject* arg4) {
+    PyObject* res;
+    if (method_info->object != nullptr)
+        res = Call<PyObject*>(method_info->method, method_info->object, arg1, arg2, arg3, arg4);
+    else
+        res = Call<PyObject*>(method_info->method, arg1, arg2, arg3, arg4);
+    delete method_info;
+    return res;
+}
+
+PyObject* MethCallN(PyObject* self, PyMethodLocation* method_info, PyObject* args) {
     PyObject* res;
     if(!PyTuple_Check(args)) {
         PyErr_Format(PyExc_TypeError,
                      "invalid arguments for method call");
         Py_DECREF(args);
+        delete method_info;
         return nullptr;
     }
     // TODO : Support vector arg calls.
-    if (method_info->back() != nullptr)
+    if (method_info->object != nullptr)
     {
-        auto target = method_info->at(0);
+        auto target = method_info->method;
+        auto obj =  method_info->object;
         auto args_tuple = PyTuple_New(PyTuple_Size(args) + 1);
-        PyTuple_SetItem(args_tuple, 0, method_info->at(1));
+#ifdef DEBUG_TUPLE_ALLOCATIONS
+        fprintf(g_traceLog, "Tuple <%lu> at %p (MethCallN)\n", PyTuple_Size(args) + 1, args_tuple);
+#endif
+        PyTuple_SetItem(args_tuple, 0, obj);
         for (int i = 0 ; i < PyTuple_Size(args) ; i ++){
             PyTuple_SetItem(args_tuple, i+1, PyTuple_GetItem(args, i));
         }
         res = PyObject_Call(target, args_tuple, nullptr);
         if (res == nullptr){
-            Py_DECREF(target);
+            Py_DECREF(args_tuple);
             Py_DECREF(args);
+            Py_DECREF(target);
+            Py_DECREF(obj);
+            delete method_info;
             return nullptr;
         }
+        Py_DECREF(args_tuple);
+        Py_DECREF(args);
         Py_DECREF(target);
-        // TODO : Causes double dec and segmentation fault.
-        //Py_DECREF(args);
-        Py_DECREF(method_info->at(1));
+        Py_DECREF(obj);
+        delete method_info;
         return res;
     }
     else {
-        auto target = method_info->at(0);
-#ifdef DUMP_TRACES
-        printf("Calling method %s with args %s\n",
-               PyUnicode_AsUTF8(PyObject_Repr(target)),
-               PyUnicode_AsUTF8(PyObject_Repr(args)));
-#endif
+        auto target = method_info->method;
         res = PyObject_Call(target, args, nullptr);
         if (res == nullptr){
-            Py_DECREF(target);
             Py_DECREF(args);
+            Py_DECREF(target);
+            delete method_info;
             return nullptr;
         }
-        Py_DECREF(target);
         Py_DECREF(args);
+        Py_DECREF(target);
+        delete method_info;
         return res;
     }
 }
@@ -1810,6 +1787,9 @@ PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names) {
 	auto argCount = PyTuple_Size(args) - PyTuple_Size(names);
 	PyObject* posArgs;
 	posArgs = PyTuple_New(argCount);
+#ifdef DEBUG_TUPLE_ALLOCATIONS
+    fprintf(g_traceLog, "Tuple <%lu> at %p (PyJit_KwCallN)\n", argCount, posArgs);
+#endif
 	if (posArgs == nullptr) {
 		goto error;
 	}
@@ -1839,6 +1819,14 @@ error:
 	Py_DECREF(args);
 	Py_DECREF(names);
 	return result;
+}
+
+PyObject* PyJit_PyTuple_New(ssize_t len){
+    auto t = PyTuple_New(len);
+#ifdef DEBUG_TUPLE_ALLOCATIONS
+    fprintf(g_traceLog, "Tuple <%lu> at %p (buildTuple)\n", len, t);
+#endif
+    return t;
 }
 
 PyObject* PyJit_Is(PyObject* lhs, PyObject* rhs) {
@@ -1914,16 +1902,16 @@ PyObject* PyJit_FormatObject(PyObject* item, PyObject*fmtSpec) {
 	return res;
 }
 
-std::vector<PyObject*>* PyJit_LoadMethod(PyObject* object, PyObject* name) {
-    auto * result = new std::vector<PyObject*>(0);
+PyMethodLocation* PyJit_LoadMethod(PyObject* object, PyObject* name) {
+    auto * result = new PyMethodLocation;
     PyObject* method = nullptr;
     int meth_found = _PyObject_GetMethod(object, name, &method);
-    result->push_back(method);
+    result->method = method;
     if (!meth_found) {
         Py_DECREF(object);
-        result->push_back(nullptr);
+        result->object = nullptr;
     } else {
-        result->push_back(object);
+        result->object = object;
     }
     return result;
 }

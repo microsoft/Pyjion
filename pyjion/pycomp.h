@@ -103,7 +103,6 @@
 #define METHOD_COMPARE_EXCEPTIONS                0x00000039
 #define METHOD_UNBOUND_LOCAL                     0x0000003A
 #define METHOD_DEBUG_TRACE                       0x0000003B
-#define METHOD_DEBUG_DUMP_FRAME                  0x0000003E
 #define METHOD_UNWIND_EH                         0x0000003F
 #define METHOD_PY_PUSHFRAME                      0x00000041
 #define METHOD_PY_POPFRAME                       0x00000042
@@ -115,8 +114,6 @@
 #define METHOD_ISNOT                             0x0000004A
 #define METHOD_IS_BOOL                           0x0000004B
 #define METHOD_ISNOT_BOOL                        0x0000004C
-#define METHOD_GETITER_OPTIMIZED_TOKEN           0x0000004D
-#define METHOD_COMPARE_EXCEPTIONS_INT            0x0000004E
 
 #define METHOD_UNARY_NOT_INT                     0x00000051
 #define METHOD_FLOAT_FROM_DOUBLE                 0x00000053
@@ -136,7 +133,6 @@
 #define METHOD_LISTTOTUPLE_TOKEN                 0x0000006D
 #define METHOD_SETUPDATE_TOKEN                   0x0000006E
 #define METHOD_DICTUPDATE_TOKEN                  0x0000006F
-#define METHOD_UNBOX_LONG_TAGGED                 0x00000070
 
 #define METHOD_INT_TO_FLOAT                      0x00000072
 
@@ -154,8 +150,12 @@
 #define METHOD_CALL_3_TOKEN        0x00010003
 #define METHOD_CALL_4_TOKEN        0x00010004
 
-#define METHOD_METHCALL_0_TOKEN        0x00011000
-#define METHOD_METHCALLN_TOKEN        0x00011004
+#define METHOD_METHCALL_0_TOKEN       0x00011000
+#define METHOD_METHCALL_1_TOKEN       0x00011001
+#define METHOD_METHCALL_2_TOKEN       0x00011002
+#define METHOD_METHCALL_3_TOKEN       0x00011003
+#define METHOD_METHCALL_4_TOKEN       0x00011004
+#define METHOD_METHCALLN_TOKEN        0x00011005
 
 #define METHOD_CALL_ARGS            0x0001000A
 #define METHOD_CALL_KWARGS          0x0001000B
@@ -168,7 +168,6 @@
 // method helpers
 
 #define METHOD_LOAD_METHOD      0x00010400
-
 
 // Py* helpers
 #define METHOD_PYTUPLE_NEW           0x00020000
@@ -197,11 +196,7 @@
 #define METHOD_FLOAT_FLOOR_TOKEN    0x00050001
 #define METHOD_FLOAT_MODULUS_TOKEN  0x00050002
 
-// signatures for calli methods
-#define SIG_ITERNEXT_TOKEN            0x00040000
-#define SIG_ITERNEXT_OPTIMIZED_TOKEN  0x00040001
-
-#define FIRST_USER_FUNCTION_TOKEN     0x00100000
+#define METHOD_ITERNEXT_TOKEN         0x00040000
 
 #define LD_FIELDA(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); 
 #define LD_FIELD(type, field) m_il.ld_i(offsetof(type, field)); m_il.add(); m_il.ld_ind_i();
@@ -356,7 +351,7 @@ public:
     virtual void emit_print_expr();
     virtual void emit_load_classderef(int index);
     virtual void emit_getiter();
-    virtual void emit_for_next(Label processValue, Local iterValue);
+    virtual void emit_for_next();
 
     virtual void emit_binary_float(int opcode);
     virtual void emit_binary_object(int opcode);
@@ -383,9 +378,6 @@ public:
 
     virtual void emit_int(int value);
     virtual void emit_float(double value);
-    virtual void emit_tagged_int(size_t value);
-    virtual void emit_unbox_int_tagged();
-    virtual void emit_unbox_float();
     virtual void emit_ptr(void *value);
     virtual void emit_bool(bool value);
 
@@ -396,23 +388,19 @@ public:
     virtual void emit_pyerr_setstring(void* exception, const char*msg);
 
     virtual void emit_compare_exceptions();
-    virtual void emit_compare_exceptions_int();
 
     // Pops a value off the stack, performing no operations related to reference counting
     virtual void emit_pop();
     // Dups the current value on the stack, performing no operations related to reference counting
     virtual void emit_dup();
 
-    virtual void emit_box_float();
-    virtual void emit_box_bool();
-    virtual void emit_box_tagged_ptr();
     virtual void emit_incref(bool maybeTagged = false);
 
     virtual void emit_debug_msg(const char* msg);
 
     virtual void emit_load_method(void* name);
-    virtual void emit_method_call_0();
-    virtual void emit_method_call_n(size_t argCnt);
+    virtual bool emit_method_call(size_t argCnt);
+    virtual void emit_method_call_n();
 
     virtual void emit_dict_merge();
 
@@ -423,6 +411,9 @@ public:
     virtual void emit_setup_annotations();
 
     virtual void emit_breakpoint();
+
+    virtual void emit_inc_local(Local local, int value);
+    virtual void emit_dec_local(Local local, int value);
 
     virtual JittedCode* emit_compile();
     virtual void lift_n_to_top(int pos);
