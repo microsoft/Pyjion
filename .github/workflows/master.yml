@@ -90,14 +90,16 @@ jobs:
         shell: bash
         run: pip install .
 
-      - name: Run smoke tests
-        shell: bash
-        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
-
       - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: ./unit_tests
+
+      - name: Run smoke tests
+        shell: bash
+        run: python Tests/test_pyjion.py -f Tests/python_smoke_tests.txt
+
+
 
   build-windows:
     runs-on: windows-latest
