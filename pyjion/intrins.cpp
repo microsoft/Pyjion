@@ -1205,11 +1205,12 @@ PyObject* PyJit_GetIter(PyObject* iterable) {
 }
 
 PyObject* PyJit_IterNext(PyObject* iter) {
-    if (iter == nullptr){
+    if (iter == nullptr || !PyIter_Check(iter)){
         PyErr_SetString(PyExc_ValueError,
                         "Invalid iterator given to iternext");
         return nullptr;
     }
+
     auto res = (*iter->ob_type->tp_iternext)(iter);
     if (res == nullptr) {
         if (PyErr_Occurred()) {
