@@ -1543,9 +1543,21 @@ TEST_CASE("test language features") {
         );
         CHECK(t.returns() == "[0, 1]");
     }
+
+    SECTION("test if inside list comprehension") {
+        auto t = CompilerTest(
+                "def f():\n"
+                "   path_parts = ('a', 'b', 'c') \n"
+                "   return '/'.join([part.rstrip('-') for part in path_parts if part])"
+        );
+        CHECK(t.returns() == "'a/b/c'");
+    }
     SECTION("test attribute access") {
         auto t = CompilerTest(
-                "def f():\n    def g(): pass\n    return g.__name__"
+                "def f():\n"
+                "   def g():\n"
+                "    pass\n"
+                "   return g.__name__"
         );
         CHECK(t.returns() == "'g'");
     };
