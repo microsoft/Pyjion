@@ -57,10 +57,11 @@ struct SpecializedTreeNode {
 
 
 PyjionJittedCode::~PyjionJittedCode() {
-	for (auto cur = j_optimized.begin(); cur != j_optimized.end(); cur++) {
-		delete *cur;
+	for (auto & cur : j_optimized) {
+		delete cur;
 	}
 }
+
 PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame);
 PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
 #ifdef DUMP_TRACES
@@ -202,7 +203,7 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 	SpecializedTreeNode* target = nullptr;
 
     // record the new trace...
-    if (target == nullptr && trace->j_optimized.size() < MAX_TRACE) {
+    if (trace->j_optimized.size() < MAX_TRACE) {
         int argCount = frame->f_code->co_argcount + frame->f_code->co_kwonlyargcount;
         vector<PyTypeObject*> types;
         for (int i = 0; i < argCount; i++) {

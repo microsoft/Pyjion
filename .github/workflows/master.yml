@@ -138,7 +138,7 @@ jobs:
 
       - name: Build Python Package
         shell: bash
-        run: python setup.py build -G "Ninja" --skip-generator-test
+        run: python setup.py build
 
       - name: Install Python Package
         shell: bash

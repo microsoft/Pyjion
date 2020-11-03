@@ -165,15 +165,11 @@ if (DO_TESTS)
 
     if (NOT WIN32)
         target_link_libraries(unit_tests ${DOTNETPATH}/${CLR_JIT_LIB})
-    else ()
-        #target_link_libraries(unit_tests ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
     endif()
 endif(DO_TESTS)
 
 if (NOT WIN32)
     target_link_libraries(_pyjion ${DOTNETPATH}/${CLR_JIT_LIB})
-else ()
-    #target_link_libraries(_pyjion ${CMAKE_SOURCE_DIR}/CoreCLR/artifacts/obj/coreclr/${CLR_OS_BUILD}/src/jit/standalone/Debug/clrjit.lib)
 endif()
 
 if (SKBUILD)
