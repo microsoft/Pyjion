@@ -897,28 +897,20 @@ void PythonCompiler::emit_set_defaults() {
 void PythonCompiler::emit_load_deref(int index) {
     load_frame();
     m_il.ld_i4(index);
-    // TODO : Find out why this is commented out? The next function isnt
-    //m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + oparg) * sizeof(size_t));
-    //m_il.add();
-    //m_il.ld_ind_i();
     m_il.emit_call(METHOD_PYCELL_GET, 2);
 }
 
 void PythonCompiler::emit_store_deref(int index) {
     load_frame();
-    m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + index) * sizeof(size_t));
-    m_il.add();
-    m_il.ld_ind_i();
-    m_il.emit_call(METHOD_PYCELL_SET_TOKEN, 2);
+    m_il.ld_i4(index);
+    m_il.emit_call(METHOD_PYCELL_SET_TOKEN, 3);
 }
 
 void PythonCompiler::emit_delete_deref(int index) {
     m_il.load_null();
     load_frame();
-    m_il.ld_i(offsetof(PyFrameObject, f_localsplus) + (m_code->co_nlocals + index) * sizeof(size_t));
-    m_il.add();
-    m_il.ld_ind_i();
-    m_il.emit_call(METHOD_PYCELL_SET_TOKEN, 2);
+    m_il.ld_i4(index);
+    m_il.emit_call(METHOD_PYCELL_SET_TOKEN, 3);
 }
 
 void PythonCompiler::emit_load_closure(int index) {
@@ -1207,7 +1199,9 @@ GLOBAL_METHOD(METHOD_PYOBJECT_ASCII, &PyObject_ASCII, CORINFO_TYPE_NATIVEINT, Pa
 GLOBAL_METHOD(METHOD_PYOBJECT_ISTRUE, &PyObject_IsTrue, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_PYITER_NEXT, &PyIter_Next, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 
-GLOBAL_METHOD(METHOD_PYCELL_GET, &PyJit_CellGet, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PYCELL_GET, &PyJit_CellGet, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_INT));
+GLOBAL_METHOD(METHOD_PYCELL_SET_TOKEN, &PyJit_CellSet, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_INT));
+
 GLOBAL_METHOD(METHOD_RICHCMP_TOKEN, &PyJit_RichCompare, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_INT));
 
 GLOBAL_METHOD(METHOD_CONTAINS_TOKEN, &PyJit_Contains, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
@@ -1249,7 +1243,6 @@ GLOBAL_METHOD(METHOD_ITERNEXT_TOKEN, &PyJit_IterNext, CORINFO_TYPE_NATIVEINT, Pa
 
 GLOBAL_METHOD(METHOD_DECREF_TOKEN, &PyJit_DecRef, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT));
 
-GLOBAL_METHOD(METHOD_PYCELL_SET_TOKEN, &PyJit_CellSet, CORINFO_TYPE_VOID, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_SET_CLOSURE, &PyJit_SetClosure, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_BUILD_SLICE, &PyJit_BuildSlice, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 

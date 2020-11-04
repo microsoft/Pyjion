@@ -328,3 +328,28 @@ TEST_CASE("Binary subscripts") {
         CHECK(t.returns() == "12345");
     }
 }
+
+TEST_CASE("*args and **kwargs") {
+    SECTION("assert *args as sequence") {
+        auto t = EmissionTest("def f():\n"
+                              "  def g(*args):\n"
+                              "     return '-'.join(str(arg) for arg in args)\n"
+                              "  return g(1,2,3)\n");
+        CHECK(t.returns() == "'1-2-3'");
+    }
+    SECTION("assert *args as iterator") {
+        auto t = EmissionTest("def f():\n"
+                              "  sep = '-'\n"
+                              "  def g(*args):\n"
+                              "     return sep.join([str(arg) for arg in args if arg % 2 ])\n"
+                              "  return g(1,2,3)\n");
+        CHECK(t.returns() == "'1-3'");
+    }
+    SECTION("assert **kwargs as dict") {
+        auto t = EmissionTest("def f():\n"
+                              "  def g(**kwargs):\n"
+                              "     return kwargs['x']\n"
+                              "  return g(x=1)\n");
+        CHECK(t.returns() == "1");
+    }
+}

@@ -57,6 +57,7 @@ PyObject* PyJit_Subscr(PyObject *left, PyObject *right);
 PyObject* PyJit_RichCompare(PyObject *left, PyObject *right, size_t op);
 
 PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index);
+void PyJit_CellSet(PyObject* value, PyFrameObject* frame, size_t index);
 
 PyObject* PyJit_Contains(PyObject *left, PyObject *right);
 PyObject* PyJit_NotContains(PyObject *left, PyObject *right);
@@ -202,8 +203,6 @@ PyObject* PyJit_LoadGlobal(PyFrameObject* f, PyObject* name);
 PyObject* PyJit_GetIter(PyObject* iterable);
 
 PyObject* PyJit_IterNext(PyObject* iter);
-
-void PyJit_CellSet(PyObject* value, PyObject* cell);
 
 PyObject* PyJit_PyTuple_New(ssize_t len);
 

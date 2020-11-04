@@ -147,19 +147,6 @@ PyObject* PyJit_NotContains(PyObject *left, PyObject *right) {
     return ret;
 }
 
-PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index) {
-    PyObject** cells = frame->f_localsplus + frame->f_code->co_nlocals;
-    PyObject *value = PyCell_GET(cells[index]);
-
-    if (value == nullptr) {
-        format_exc_unbound(frame->f_code, (int)index);
-    }
-    else {
-        Py_INCREF(value);
-    }
-    return value;
-}
-
 PyObject* PyJit_NewFunction(PyObject* code, PyObject* qualname, PyFrameObject* frame) {
     auto res = PyFunction_NewWithQualName(code, frame->f_globals, qualname);
     Py_DECREF(code);
@@ -1207,7 +1194,7 @@ PyObject* PyJit_GetIter(PyObject* iterable) {
 PyObject* PyJit_IterNext(PyObject* iter) {
     if (iter == nullptr || !PyIter_Check(iter)){
         PyErr_Format(PyExc_ValueError,
-                        "Invalid iterator given to iternext, got %s.", ObjInfo(iter));
+                        "Invalid iterator given to iternext, got %s - %s.", ObjInfo(iter), PyUnicode_AsUTF8(PyObject_Repr(iter)));
         return nullptr;
     }
 
@@ -1226,9 +1213,29 @@ PyObject* PyJit_IterNext(PyObject* iter) {
     return res;
 }
 
-void PyJit_CellSet(PyObject* value, PyObject* cell) {
-    PyCell_Set(cell, value);
-    Py_DecRef(value);
+PyObject* PyJit_CellGet(PyFrameObject* frame, size_t index) {
+    PyObject** cells = frame->f_localsplus + frame->f_code->co_nlocals;
+    PyObject *value = PyCell_GET(cells[index]);
+
+    if (value == nullptr) {
+        format_exc_unbound(frame->f_code, (int)index);
+    }
+    else {
+        Py_INCREF(value);
+    }
+    return value;
+}
+
+void PyJit_CellSet(PyObject* value, PyFrameObject* frame, size_t index) {
+    PyObject** cells = frame->f_localsplus + frame->f_code->co_nlocals;
+    auto cell = cells[index];
+    if (cell == nullptr){
+        cells[index] = PyCell_New(value);
+    } else {
+        auto oldobj = PyCell_Get(cell);
+        PyCell_Set(cell, value);
+        Py_XDECREF(oldobj);
+    }
 }
 
 PyObject* PyJit_BuildClass(PyFrameObject *f) {

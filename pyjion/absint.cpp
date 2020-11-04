@@ -1932,8 +1932,8 @@ JittedCode* AbstractInterpreter::compileWorker() {
                 incStack();
                 break;
             case STORE_DEREF:
-                decStack();
                 m_comp->emit_store_deref(oparg);
+                decStack();
                 break;
             case DELETE_DEREF: m_comp->emit_delete_deref(oparg); break;
             case LOAD_CLOSURE:
