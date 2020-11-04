@@ -1670,7 +1670,8 @@ JittedCode* AbstractInterpreter::compileWorker() {
         int ilLen = m_comp->il_length();
         m_comp->emit_breakpoint();
 #endif
-        m_comp->emit_lasti_update(curByte);
+        if (!canSkipLastiUpdate(curByte))
+            m_comp->emit_lasti_update(curByte);
 
         int curStackSize = m_stack.size();
         bool skipEffect = false;
