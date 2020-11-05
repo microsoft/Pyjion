@@ -52,7 +52,7 @@
 struct SpecializedTreeNode;
 class PyjionJittedCode;
 
-void JitInit();
+bool JitInit();
 PyObject* PyJit_EvalFrame(PyThreadState *, PyFrameObject *, int);
 PyjionJittedCode* PyJit_EnsureExtra(PyObject* codeObject);
 

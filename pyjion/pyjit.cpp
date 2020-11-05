@@ -100,17 +100,23 @@ PyObject* Jit_EvalHelper(void* state, PyFrameObject*frame) {
 
 static Py_tss_t* g_extraSlot;
 
-void JitInit() {
+bool JitInit() {
 	g_extraSlot = PyThread_tss_alloc();
 	PyThread_tss_create(g_extraSlot);
 #ifdef WINDOWS
-	auto getJit = (GETJIT)GetProcAddress(GetModuleHandle(TEXT("clrjit.dll")), "getJit");
+	auto clrJitHandle = LoadLibrary(TEXT("clrjit.dll"));
+	if (clrJitHandle == nullptr) {
+	    PyErr_SetString(PyExc_RuntimeError, "Failed to load clrjit.dll, check that .NET is installed.")
+        return false;
+	}
+	auto getJit = (GETJIT)GetProcAddress(clrJitHandle, "getJit");
 	if (getJit != nullptr)
 		g_jit = getJit();
 #else
 	g_jit = getJit();
 #endif
     g_emptyTuple = PyTuple_New(0);
+    return true;
 }
 
 bool jit_compile(PyCodeObject* code) {
@@ -561,7 +567,8 @@ static struct PyModuleDef pyjionmodule = {
 PyMODINIT_FUNC PyInit__pyjion(void)
 {
 	// Install our frame evaluation function
-	JitInit();
-
-	return PyModule_Create(&pyjionmodule);
+	if (JitInit())
+	    return PyModule_Create(&pyjionmodule);
+	else
+	    return nullptr;
 }

@@ -48,6 +48,6 @@
 
 ICorJitCompiler* g_jit;
 
-extern "C" __declspec(dllexport) void JitInit()
+extern "C" __declspec(dllexport) bool JitInit()
 
 #endif
