@@ -134,23 +134,18 @@ jobs:
         shell: bash
         run: cmake --build . --config Release
 
-      - name: Unit Tests
-        working-directory: ${{runner.workspace}}/build/Release
+      - name: Install build deps
         shell: bash
-        run: unit_tests.exe
+        run: python -m pip install -U https://github.com/tonybaloney/scikit-build/archive/vs2019.zip
 
-#      - name: Install build deps
-#        shell: bash
-#        run: python -m pip install scikit-build ninja
-#
-#      - name: Build Python Package
-#        shell: bash
-#        run: python setup.py build --skip-generator-test --generator "Ninja"
-#
-#      - name: Install Python Package
-#        shell: bash
-#        run: python setup.py develop
-#
-#      - name: Run smoke tests
-#        shell: bash
-#        run: python -X dev -q Tests\test_pyjion.py -f Tests\python_smoke_tests.txt -j1
+      - name: Build Python Package
+        shell: bash
+        run: python setup.py build --generator "Visual Studio 16 2019"
+
+      - name: Install Python Package
+        shell: bash
+        run: python setup.py develop
+
+      - name: Run smoke tests
+        shell: bash
+        run: python -X dev -q Tests\test_pyjion.py -f Tests\python_smoke_tests.txt -j1
