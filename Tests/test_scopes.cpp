@@ -54,7 +54,10 @@ private:
 
         // Don't DECREF as frames are recycled.
         auto frame = PyFrame_New(PyThreadState_Get(), m_code.get(), globals.get(), locals.get());
+        auto prev = _PyInterpreterState_GetEvalFrameFunc(PyInterpreterState_Main());
+        _PyInterpreterState_SetEvalFrameFunc(PyInterpreterState_Main(), PyJit_EvalFrame);
         auto res = m_jittedcode->j_evalfunc(m_jittedcode.get(), frame);
+        _PyInterpreterState_SetEvalFrameFunc(PyInterpreterState_Main(), prev);
         //Py_DECREF(frame);
         size_t collected = PyGC_Collect();
         printf("Collected %zu values\n", collected);
