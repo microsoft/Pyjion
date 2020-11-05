@@ -148,4 +148,4 @@ jobs:
 
       - name: Run smoke tests
         shell: bash
-        run: python -X dev -q Tests\\test_pyjion.py -f Tests\\python_smoke_tests.txt -j1
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -j1
