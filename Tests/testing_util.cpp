@@ -53,6 +53,31 @@ PyCodeObject* CompileCode(const char* code) {
     return codeObj;
 }
 
+PyCodeObject* CompileCode(const char* code, vector<const char*> locals, vector<const char*> globals) {
+    auto globals_dict = PyObject_ptr(PyDict_New());
+
+    auto builtins = PyEval_GetBuiltins();
+    PyDict_SetItemString(globals_dict.get(), "__builtins__", builtins);
+    for (auto & local: globals)
+        PyDict_SetItemString(globals_dict.get(), local, Py_None);
+
+    auto locals_dict = PyObject_ptr(PyDict_New());
+    for (auto & local: locals)
+        PyDict_SetItemString(locals_dict.get(), local, Py_None);
+
+    PyRun_String(code, Py_file_input, globals_dict.get(), locals_dict.get());
+    if (PyErr_Occurred()) {
+        PyErr_Print();
+        PyErr_Clear();
+        FAIL("error occurred during Python compilation");
+        return nullptr;
+    }
+    auto func = PyObject_ptr(PyObject_GetItem(locals_dict.get(), PyUnicode_FromString("f")));
+    auto codeObj = (PyCodeObject*)PyObject_GetAttrString(func.get(), "__code__");
+
+    return codeObj;
+}
+
 void VerifyOldTest(AITestCase testCase) {
     auto codeObj = CompileCode(testCase.m_code);
 

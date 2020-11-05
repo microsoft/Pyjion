@@ -1387,14 +1387,7 @@ TEST_CASE("test function calls") {
         CHECK(t.returns() == "511");
     }
 }
-TEST_CASE("Test Globals"){
-    SECTION("test globals") {
-        auto t = CompilerTest(
-                "def f():\n    global x\n    x = 2\n    return x"
-        );
-        CHECK(t.returns() == "2");
-    }
-}
+
 TEST_CASE("test range generators") {
     SECTION("test range iterator with continue/break") {
         auto t = CompilerTest(

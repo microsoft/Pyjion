@@ -7,7 +7,7 @@
 #include <absint.h>
 
 PyCodeObject* CompileCode(const char*);
-
+PyCodeObject* CompileCode(const char* code, vector<const char*> locals, vector<const char*> globals);
 
 class TestInput {
 public:

@@ -1194,7 +1194,8 @@ PyObject* PyJit_GetIter(PyObject* iterable) {
 PyObject* PyJit_IterNext(PyObject* iter) {
     if (iter == nullptr || !PyIter_Check(iter)){
         PyErr_Format(PyExc_ValueError,
-                        "Invalid iterator given to iternext, got %s - %s.", ObjInfo(iter), PyUnicode_AsUTF8(PyObject_Repr(iter)));
+                     "Invalid iterator given to iternext, got %s - %s at %p.", ObjInfo(iter),
+                     PyUnicode_AsUTF8(PyObject_Repr(iter)), iter);
         return nullptr;
     }
 
@@ -1273,12 +1274,12 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
     if (PyTuple_CheckExact(seq) && ((size_t)PyTuple_GET_SIZE(seq)) >= (leftSize + rightSize)) {
         auto listSize = PyTuple_GET_SIZE(seq) - (leftSize + rightSize);
         auto list = (PyListObject*)PyList_New(listSize);
+        printf("unpacked %p \n", list);
         if (list == nullptr) {
             return nullptr;
         }
         for (int i = 0; i < listSize; i++) {
             list->ob_item[i] = ((PyTupleObject *)seq)->ob_item[i + leftSize];
-
         }
         *remainder = ((PyTupleObject *)seq)->ob_item + leftSize + listSize;
         *listRes = (PyObject*)list;
@@ -1292,6 +1293,7 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
     else if (PyList_CheckExact(seq) && ((size_t)PyList_GET_SIZE(seq)) >= (leftSize + rightSize)) {
         auto listSize = PyList_GET_SIZE(seq) - (leftSize + rightSize);
         auto list = (PyListObject*)PyList_New(listSize);
+        printf("unpacked from list %p \n", list);
         if (list == nullptr) {
             return nullptr;
         }

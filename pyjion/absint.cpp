@@ -2351,7 +2351,7 @@ void AbstractInterpreter::unaryNot(int& opcodeIndex) {
 JittedCode* AbstractInterpreter::compile() {
     bool interpreted = interpret();
     if (!interpreted) {
-#ifdef DEBUG
+#ifdef DUMP_TRACES
         printf("Failed to interpret");
 #endif
         return nullptr;
@@ -2367,6 +2367,7 @@ JittedCode* AbstractInterpreter::compile() {
 }
 
 bool AbstractInterpreter::canSkipLastiUpdate(int opcodeIndex) {
+    // TODO : Check this list is up to date with ceval.
     switch (GET_OPCODE(opcodeIndex)) {
         case DUP_TOP:
         case NOP:
@@ -2722,11 +2723,6 @@ void AbstractInterpreter::markOffsetLabel(int index) {
         m_offsetLabels[index] = label;
         m_comp->emit_mark_label(label);
     }
-}
-
-inline LocalKind getOptimizedLocalKind(AbstractValueKind kind) {
-    // Remove optimizations for now, always use PyObject* /Lk_ptr/ NATIVEINT
-    return LK_Pointer;
 }
 
 void AbstractInterpreter::popExcept() {
