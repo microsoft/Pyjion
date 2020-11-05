@@ -144,7 +144,7 @@ jobs:
 
       - name: Install Python Package
         shell: bash
-        run: python setup.py develop
+        run: python setup.py install --generator "Visual Studio 16 2019"
 
       - name: Run smoke tests
         shell: bash
