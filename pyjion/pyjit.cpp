@@ -106,15 +106,17 @@ bool JitInit() {
 #ifdef WINDOWS
 	auto clrJitHandle = LoadLibrary(TEXT("clrjit.dll"));
 	if (clrJitHandle == nullptr) {
-	    PyErr_SetString(PyExc_RuntimeError, "Failed to load clrjit.dll, check that .NET is installed.")
+	    PyErr_SetString(PyExc_RuntimeError, "Failed to load clrjit.dll, check that .NET is installed.");
         return false;
 	}
 	auto getJit = (GETJIT)GetProcAddress(clrJitHandle, "getJit");
-	if (getJit != nullptr)
-		g_jit = getJit();
-#else
-	g_jit = getJit();
+	if (getJit == nullptr) {
+		PyErr_SetString(PyExc_RuntimeError, "Failed to load clrjit.dll::getJit(), check that the correct version of .NET is installed.");
+        return false;
+	}
 #endif
+	g_jit = getJit();
+
     g_emptyTuple = PyTuple_New(0);
     return true;
 }
