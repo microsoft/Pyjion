@@ -1038,8 +1038,8 @@ PyObject * PyJit_BuildDictFromTuples(PyObject *keys_and_values) {
     assert(keys_and_values != nullptr);
     auto len = PyTuple_GET_SIZE(keys_and_values) - 1;
     PyObject* keys = PyTuple_GET_ITEM(keys_and_values, len);
-    if (!PyDict_Check(keys)){
-        PyErr_SetString(PyExc_TypeError, "Cannot build dict, keys are not dict type.");
+    if (!PyTuple_Check(keys)){
+        PyErr_Format(PyExc_TypeError, "Cannot build dict, keys are %s,not tuple type.", keys->ob_type->tp_name);
         return nullptr;
     }
     auto map = _PyDict_NewPresized(len);
