@@ -417,6 +417,9 @@ public:
 
     virtual JittedCode* emit_compile();
     virtual void lift_n_to_top(int pos);
+    virtual void lift_n_to_second(int pos);
+    virtual void lift_n_to_third(int pos);
+    virtual void sink_top_to_n(int pos);
 private:
     void load_frame();
 

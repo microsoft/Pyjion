@@ -47,7 +47,7 @@ PyObject* g_emptyTuple;
     "free variable '%.200s' referenced before assignment" \
     " in enclosing scope"
 
-FILE * g_traceLog = stderr;
+FILE * g_traceLog = stdout;
 
 template<typename T>
 void decref(T v) {
@@ -214,7 +214,15 @@ PyObject* PyJit_UnaryInvert(PyObject* value) {
     return res;
 }
 
-PyObject* PyJit_ListAppend(PyObject* value, PyObject* list) {
+PyObject* PyJit_NewList(size_t size){
+    auto list = PyList_New(size);
+#ifdef DUMP_TRACES
+    fprintf(g_traceLog, "List <%lu> at %p (PyJit_NewList())\n", size, list);
+#endif
+    return list;
+}
+
+PyObject* PyJit_ListAppend(PyObject* list, PyObject* value) {
     assert(list != nullptr);
     assert(PyList_CheckExact(list));
     int err = PyList_Append(list, value);
@@ -225,7 +233,7 @@ PyObject* PyJit_ListAppend(PyObject* value, PyObject* list) {
     return list;
 }
 
-PyObject* PyJit_SetAdd(PyObject* value, PyObject* set) {
+PyObject* PyJit_SetAdd(PyObject* set, PyObject* value) {
     assert(set != nullptr);
     int err ;
     err = PySet_Add(set, value);
@@ -249,7 +257,7 @@ error:
     return nullptr;
 }
 
-PyObject* PyJit_MapAdd(PyObject*value, PyObject*key, PyObject* map) {
+PyObject* PyJit_MapAdd(PyObject*map, PyObject*key, PyObject* value) {
     assert(map != nullptr);
     if (!PyDict_Check(map)) {
         PyErr_SetString(PyExc_TypeError,
@@ -1030,6 +1038,10 @@ PyObject * PyJit_BuildDictFromTuples(PyObject *keys_and_values) {
     assert(keys_and_values != nullptr);
     auto len = PyTuple_GET_SIZE(keys_and_values) - 1;
     PyObject* keys = PyTuple_GET_ITEM(keys_and_values, len);
+    if (!PyDict_Check(keys)){
+        PyErr_SetString(PyExc_TypeError, "Cannot build dict, keys are not dict type.");
+        return nullptr;
+    }
     auto map = _PyDict_NewPresized(len);
     if (map == nullptr) {
         goto error;
@@ -1081,7 +1093,7 @@ error:
     return nullptr;
 }
 
-PyObject* PyJit_DictMerge(PyObject* other, PyObject* dict) {
+PyObject* PyJit_DictMerge(PyObject* dict, PyObject* other) {
     assert(dict != nullptr);
     int res ;
     if (!PyDict_CheckExact(dict)) {
@@ -1274,7 +1286,6 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
     if (PyTuple_CheckExact(seq) && ((size_t)PyTuple_GET_SIZE(seq)) >= (leftSize + rightSize)) {
         auto listSize = PyTuple_GET_SIZE(seq) - (leftSize + rightSize);
         auto list = (PyListObject*)PyList_New(listSize);
-        printf("unpacked %p \n", list);
         if (list == nullptr) {
             return nullptr;
         }
@@ -1293,7 +1304,6 @@ PyObject** PyJit_UnpackSequenceEx(PyObject* seq, size_t leftSize, size_t rightSi
     else if (PyList_CheckExact(seq) && ((size_t)PyList_GET_SIZE(seq)) >= (leftSize + rightSize)) {
         auto listSize = PyList_GET_SIZE(seq) - (leftSize + rightSize);
         auto list = (PyListObject*)PyList_New(listSize);
-        printf("unpacked from list %p \n", list);
         if (list == nullptr) {
             return nullptr;
         }
@@ -1635,7 +1645,7 @@ PyObject* Call(PyObject *target, Args...args) {
     }
     else {
         auto t_args = PyTuple_New(sizeof...(args));
-#ifdef DEBUG_TUPLE_ALLOCATIONS
+#ifdef DUMP_TRACES
         fprintf(g_traceLog, "Tuple <%lu> at %p (Call<T>)\n", sizeof...(args), t_args);
 #endif
         if (t_args == nullptr) {
@@ -1751,7 +1761,7 @@ PyObject* MethCallN(PyObject* self, PyMethodLocation* method_info, PyObject* arg
         auto target = method_info->method;
         auto obj =  method_info->object;
         auto args_tuple = PyTuple_New(PyTuple_Size(args) + 1);
-#ifdef DEBUG_TUPLE_ALLOCATIONS
+#ifdef DUMP_TRACES
         fprintf(g_traceLog, "Tuple <%lu> at %p (MethCallN)\n", PyTuple_Size(args) + 1, args_tuple);
 #endif
         PyTuple_SetItem(args_tuple, 0, obj);
@@ -1796,7 +1806,7 @@ PyObject* PyJit_KwCallN(PyObject *target, PyObject* args, PyObject* names) {
 	auto argCount = PyTuple_Size(args) - PyTuple_Size(names);
 	PyObject* posArgs;
 	posArgs = PyTuple_New(argCount);
-#ifdef DEBUG_TUPLE_ALLOCATIONS
+#ifdef DUMP_TRACES
     fprintf(g_traceLog, "Tuple <%lu> at %p (PyJit_KwCallN)\n", argCount, posArgs);
 #endif
 	if (posArgs == nullptr) {
@@ -1832,7 +1842,7 @@ error:
 
 PyObject* PyJit_PyTuple_New(ssize_t len){
     auto t = PyTuple_New(len);
-#ifdef DEBUG_TUPLE_ALLOCATIONS
+#ifdef DUMP_TRACES
     fprintf(g_traceLog, "Tuple <%lu> at %p (buildTuple)\n", len, t);
 #endif
     return t;

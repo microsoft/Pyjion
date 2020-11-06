@@ -403,6 +403,9 @@ public:
     virtual JittedCode* emit_compile() = 0;
 
     virtual void lift_n_to_top(int pos) = 0;
+    virtual void lift_n_to_second(int pos) = 0;
+    virtual void lift_n_to_third(int pos) = 0;
+    virtual void sink_top_to_n(int pos) = 0;
     virtual void pop_top() = 0;
 
     virtual void emit_inc_local(Local local, int value) = 0;

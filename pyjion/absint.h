@@ -204,6 +204,13 @@ public:
     }
 };
 
+enum ComprehensionType {
+    COMP_NONE,
+    COMP_LIST,
+    COMP_DICT,
+    COMP_SET
+};
+
 
 #ifdef _WIN32
 class __declspec(dllexport) AbstractInterpreter {
@@ -215,7 +222,6 @@ class AbstractInterpreter {
     // Tracks the interpreter state before each opcode
     unordered_map<size_t, InterpreterState> mStartStates;
     AbstractValue* mReturnValue;
-
     // ** Inputs:
     PyCodeObject* mCode;
     _Py_CODEUNIT *mByteCode;

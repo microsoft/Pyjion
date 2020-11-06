@@ -278,6 +278,107 @@ void PythonCompiler::emit_rot_four(LocalKind kind) {
     m_il.free_local(fourth);
 }
 
+void PythonCompiler::lift_n_to_second(int pos){
+    if (pos == 1)
+        return ; // already is second
+    vector<Local> tmpLocals (pos-1);
+
+    auto top = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+    m_il.st_loc(top);
+
+    // dump stack up to n
+    for (int i = 0 ; i < pos - 1 ; i ++){
+        auto loc = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+        tmpLocals[i] = loc;
+        m_il.st_loc(loc);
+    }
+
+    // pop n
+    auto n = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+    m_il.st_loc(n);
+
+    // recover stack
+    for (auto& loc: tmpLocals){
+        m_il.ld_loc(loc);
+        m_il.free_local(loc);
+    }
+
+    // push n (so its second)
+    m_il.ld_loc(n);
+    m_il.free_local(n);
+
+    // push top
+    m_il.ld_loc(top);
+    m_il.free_local(top);
+}
+
+void PythonCompiler::lift_n_to_third(int pos){
+    if (pos == 1)
+        return ; // already is third
+    vector<Local> tmpLocals (pos-2);
+
+    auto top = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+    m_il.st_loc(top);
+
+    auto second = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+    m_il.st_loc(second);
+
+    // dump stack up to n
+    for (int i = 0 ; i < pos - 2 ; i ++){
+        auto loc = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+        tmpLocals[i] = loc;
+        m_il.st_loc(loc);
+    }
+
+    // pop n
+    auto n = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+    m_il.st_loc(n);
+
+    // recover stack
+    for (auto& loc: tmpLocals){
+        m_il.ld_loc(loc);
+        m_il.free_local(loc);
+    }
+
+    // push n (so its third)
+    m_il.ld_loc(n);
+    m_il.free_local(n);
+
+    // push second
+    m_il.ld_loc(second);
+    m_il.free_local(second);
+
+    // push top
+    m_il.ld_loc(top);
+    m_il.free_local(top);
+}
+
+void PythonCompiler::sink_top_to_n(int pos){
+    if (pos == 0)
+        return ; // already is at the correct position
+    vector<Local> tmpLocals (pos);
+
+    auto top = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+    m_il.st_loc(top);
+
+    // dump stack up to n
+    for (int i = 0 ; i < pos ; i ++){
+        auto loc = m_il.define_local(Parameter(to_clr_type(LK_Pointer)));
+        tmpLocals[i] = loc;
+        m_il.st_loc(loc);
+    }
+
+    // push n
+    m_il.ld_loc(top);
+    m_il.free_local(top);
+
+    // recover stack
+    for (auto& loc: tmpLocals){
+        m_il.ld_loc(loc);
+        m_il.free_local(loc);
+    }
+}
+
 void PythonCompiler::lift_n_to_top(int pos){
     vector<Local> tmpLocals (pos);
 
@@ -1177,7 +1278,7 @@ GLOBAL_METHOD(METHOD_BINARY_AND_TOKEN, &PyJit_BinaryAnd, CORINFO_TYPE_NATIVEINT,
 GLOBAL_METHOD(METHOD_BINARY_XOR_TOKEN, &PyJit_BinaryXor, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_BINARY_OR_TOKEN, &PyJit_BinaryOr, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 
-GLOBAL_METHOD(METHOD_PYLIST_NEW, &PyList_New, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
+GLOBAL_METHOD(METHOD_PYLIST_NEW, &PyJit_NewList, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_EXTENDLIST_TOKEN, &PyJit_ExtendList, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_LISTTOTUPLE_TOKEN, &PyJit_ListToTuple, CORINFO_TYPE_NATIVEINT, Parameter(CORINFO_TYPE_NATIVEINT));
 GLOBAL_METHOD(METHOD_STOREMAP_TOKEN, &PyJit_StoreMap, CORINFO_TYPE_INT, Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT), Parameter(CORINFO_TYPE_NATIVEINT));

@@ -195,6 +195,13 @@ TEST_CASE("General set building") {
     }
 }
 
+TEST_CASE("General set comprehensions") {
+    SECTION("simple setcomp") {
+        auto t = EmissionTest("def f(): return {i for i in range(5)}");
+        CHECK(t.returns() == "{0, 1, 2, 3, 4}");
+    }
+}
+
 TEST_CASE("General method calls") {
     SECTION("easy case") {
         auto t = EmissionTest("def f(): a=set();a.add(1);return a");

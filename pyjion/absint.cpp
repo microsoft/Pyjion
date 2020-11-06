@@ -37,6 +37,7 @@
 
 AbstractInterpreter::AbstractInterpreter(PyCodeObject *code, IPythonCompiler* comp) : mCode(code), m_comp(comp) {
     mByteCode = (_Py_CODEUNIT *)PyBytes_AS_STRING(code->co_code);
+
     mSize = PyBytes_Size(code->co_code);
     mReturnValue = &Undefined;
     if (comp != nullptr) {
@@ -1437,8 +1438,9 @@ void AbstractInterpreter::buildSet(size_t argCnt) {
         // load all the values into the set...
         auto err = m_comp->emit_define_label();
         for (int i = 0; i < argCnt; i++) {
-            m_comp->emit_load_local(tmps[i]);
             m_comp->emit_load_local(setTmp);
+            m_comp->emit_load_local(tmps[i]);
+
             m_comp->emit_set_add();
             frees[i] = m_comp->emit_define_label();
             m_comp->emit_branch(BranchFalse, frees[i]);
@@ -1467,7 +1469,7 @@ void AbstractInterpreter::buildSet(size_t argCnt) {
         // And if the last one failed, then all of the values have been
         // decref'd
         m_comp->emit_mark_label(frees[argCnt - 1]);
-        branchRaise("build add failed");
+        branchRaise("build set failed");
 
         m_comp->emit_mark_label(noErr);
         delete[] frees;
@@ -1962,36 +1964,40 @@ JittedCode* AbstractInterpreter::compileWorker() {
             }
             case SET_ADD:
                 // Calls set.update(TOS1[-i], TOS). Used to build sets.
-                m_comp->lift_n_to_top(oparg);
+                m_comp->lift_n_to_second(oparg);
                 m_comp->emit_set_add();
                 decStack(2); // set, value
                 errorCheck("set update failed");
                 incStack(1); // set
+                m_comp->sink_top_to_n(oparg - 1);
                 break;
             case MAP_ADD:
                 // Calls dict.__setitem__(TOS1[-i], TOS1, TOS). Used to implement dict comprehensions.
-                m_comp->lift_n_to_top(oparg);
+                m_comp->lift_n_to_third(oparg + 1);
                 m_comp->emit_map_add();
                 decStack(3);
                 errorCheck("map add failed");
                 incStack();
+                m_comp->sink_top_to_n(oparg - 1);
                 break;
             case LIST_APPEND: {
                 // Calls list.append(TOS1[-i], TOS).
-                m_comp->lift_n_to_top(oparg);
+                m_comp->lift_n_to_second(oparg);
                 m_comp->emit_list_append();
                 decStack(2); // list, value
                 errorCheck("list append failed");
                 incStack(1);
+                m_comp->sink_top_to_n(oparg - 1);
                 break;
             }
             case DICT_MERGE: {
                 // Calls dict.update(TOS1[-i], TOS). Used to merge dicts.
-                m_comp->lift_n_to_top(oparg);
+                m_comp->lift_n_to_second(oparg);
                 m_comp->emit_dict_merge();
                 decStack(2); // list, value
                 errorCheck("dict merge failed");
                 incStack(1);
+                m_comp->sink_top_to_n(oparg - 1);
                 break;
             }
             case PRINT_EXPR:

@@ -77,6 +77,7 @@ int PyJit_UnaryNot_Int(PyObject* value);
 
 PyObject* PyJit_UnaryInvert(PyObject* value);
 
+PyObject* PyJit_NewList(size_t size);
 PyObject* PyJit_ListAppend(PyObject* value, PyObject* list);
 
 PyObject* PyJit_SetAdd(PyObject* value, PyObject* set);
