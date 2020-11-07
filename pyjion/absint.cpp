@@ -2210,6 +2210,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             }
             case LIST_EXTEND:
             {
+                assert(oparg == 1); // always 1 in 3.9
                 m_comp->lift_n_to_top(oparg);
                 m_comp->emit_list_extend();
                 decStack(2);
@@ -2221,6 +2222,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             case DICT_UPDATE:
             {
                 // Calls dict.update(TOS1[-i], TOS). Used to build dicts.
+                assert(oparg == 1); // always 1 in 3.9
                 m_comp->lift_n_to_top(oparg);
                 m_comp->emit_dict_update();
                 decStack(2); // dict, item
@@ -2231,6 +2233,7 @@ JittedCode* AbstractInterpreter::compileWorker() {
             case SET_UPDATE:
             {
                 // Calls set.update(TOS1[-i], TOS). Used to build sets.
+                assert(oparg == 1); // always 1 in 3.9
                 m_comp->lift_n_to_top(oparg);
                 m_comp->emit_set_extend();
                 decStack(2); // set, iterable

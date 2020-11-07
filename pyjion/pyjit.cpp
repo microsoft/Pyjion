@@ -246,10 +246,11 @@ PyObject* Jit_EvalTrace(PyjionJittedCode* state, PyFrameObject *frame) {
 
 			auto res = interp.compile();
 #ifdef DUMP_TRACES
-			printf("Tracing %s from %s line %d\r\n",
+			printf("Tracing %s from %s line %d (%s)\r\n",
 				PyUnicode_AsUTF8(frame->f_code->co_name),
 				PyUnicode_AsUTF8(frame->f_code->co_filename),
-				frame->f_code->co_firstlineno
+				frame->f_code->co_firstlineno,
+                PyUnicode_AsUTF8(PyObject_Repr(frame->f_code->co_consts))
 			);
 #endif
 
@@ -325,11 +326,12 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 	if (jitted != nullptr && !throwflag) {
 		if (jitted->j_evalfunc != nullptr) {
 #ifdef DUMP_TRACES
-			printf("Calling %s from %s line %d %p\r\n",
+			printf("Calling %s (already jitted) from %s line %d %p (%s)\r\n",
 				PyUnicode_AsUTF8(f->f_code->co_name),
 				PyUnicode_AsUTF8(f->f_code->co_filename),
 				f->f_code->co_firstlineno,
-				jitted
+				jitted,
+				PyUnicode_AsUTF8(PyObject_Repr(f->f_code->co_consts))
 			);
 #endif
 			return jitted->j_evalfunc(jitted, f);
