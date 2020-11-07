@@ -1057,7 +1057,7 @@ PyObject * PyJit_BuildDictFromTuples(PyObject *keys_and_values) {
         }
     }
 error:
-    Py_DECREF(keys);
+    //Py_DECREF(keys);
     Py_DECREF(keys_and_values);
     return map;
 }
