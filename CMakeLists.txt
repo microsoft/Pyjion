@@ -13,6 +13,7 @@ if (UNIX AND NOT APPLE)
 endif()
 
 find_package (Python3 3.9 COMPONENTS Interpreter Development)
+message(STATUS "Use Python libraries " ${Python3_LIBRARIES})
 if (SKBUILD)
     find_package(PythonExtensions REQUIRED)
 endif (SKBUILD)
@@ -97,15 +98,23 @@ endif()
 
 include_directories(CoreCLR/src/coreclr/src/inc CoreCLR/src/coreclr/src/jit)
 
-if (WIN32)
-    set(CLR_OS_BUILD Windows_NT.x64.Debug)
-endif()
+
 
 if (UNIX)
     if(DEFINED ENV{DOTNET_ROOT})
         file(GLOB DOTNETPATH $ENV{DOTNET_ROOT}/shared/Microsoft.NETCore.App*/5.0.0*/)
     else()
         file(GLOB DOTNETPATH /usr/local/share/dotnet/shared/Microsoft.NETCore.App*/5.0.0*/)
+    endif()
+    message(STATUS "Found .NET 5 in " ${DOTNETPATH})
+endif()
+
+if (WIN32)
+    set(CLR_OS_BUILD Windows_NT.x64.Debug)
+    if(DEFINED ENV{DOTNET_ROOT})
+        file(GLOB DOTNETPATH $ENV{DOTNET_ROOT}/shared/Microsoft.NETCore.App*/5.0.0*/)
+    else()
+        file(GLOB DOTNETPATH $ENV{LOCALAPPDATA}/Microsoft/dotnet/shared/Microsoft.NETCore.App*/5.0.0*/)
     endif()
     message(STATUS "Found .NET 5 in " ${DOTNETPATH})
 endif()
@@ -139,6 +148,15 @@ set(SOURCES pyjion/absint.cpp pyjion/absvalue.cpp pyjion/intrins.cpp pyjion/jiti
 
 add_library(pyjionlib OBJECT ${SOURCES})
 add_library(_pyjion MODULE $<TARGET_OBJECTS:pyjionlib>)
+
+if (WIN32)
+    add_custom_command(
+        TARGET _pyjion POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${DOTNETPATH}/clrjit.dll
+        ${CMAKE_CURRENT_BINARY_DIR}/clrjit.dll
+    )
+endif(WIN32)
 
 set_target_properties(
         _pyjion
