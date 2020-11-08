@@ -1057,8 +1057,7 @@ PyObject * PyJit_BuildDictFromTuples(PyObject *keys_and_values) {
         }
     }
 error:
-    Py_DECREF(keys);
-    Py_DECREF(keys_and_values);
+    Py_DECREF(keys_and_values); // will decref 'keys' tuple as part of its dealloc routine
     return map;
 }
 

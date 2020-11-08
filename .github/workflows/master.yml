@@ -55,6 +55,10 @@ jobs:
         shell: bash
         run: python -X dev -q Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -j1
 
+      - name: Run full test suite
+        shell: bash
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_tests.txt -j1
+
   build-mac:
     runs-on: macos-latest
     strategy:
@@ -98,6 +102,9 @@ jobs:
         shell: bash
         run: python -X dev Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -j1
 
+      - name: Run full test suite
+        shell: bash
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_tests.txt -j1
 
   build-windows:
     runs-on: windows-latest
@@ -149,3 +156,7 @@ jobs:
       - name: Run smoke tests
         shell: bash
         run: python -X dev -q Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -j1
+
+      - name: Run full test suite
+        shell: bash
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_tests.txt -j1

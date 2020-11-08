@@ -1382,6 +1382,12 @@ TEST_CASE("test function calls") {
         );
         CHECK(t.returns() == "2");
     }
+    SECTION("test default arguments twice") {
+        auto t = CompilerTest(
+                "def f():\n    def g(a=2): return a\n    return g() + g()"
+        );
+        CHECK(t.returns() == "4");
+    }
 
     SECTION("test lots of default arguments") {
         auto t = CompilerTest(

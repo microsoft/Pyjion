@@ -255,6 +255,13 @@ TEST_CASE("General dict building") {
         auto t = EmissionTest("def f(): return {1:'a', 2: 'b', 3:'c'}");
         CHECK(t.returns() == "{1: 'a', 2: 'b', 3: 'c'}");
     }
+    SECTION("common case in function") {
+        auto t = EmissionTest("def f(): \n"
+                              "  def g(a, b, c):\n"
+                              "     return {'a': a, 'b': b, 'c': c}\n"
+                              "  return g(1,2,3) | g(1,2,3)");
+        CHECK(t.returns() == "{'a': 1, 'b': 2, 'c': 3}");
+    }
     SECTION("key add case") {
         auto t = EmissionTest("def f():\n  a = {1:'a', 2: 'b', 3:'c'}\n  a[4]='d'\n  return a");
         CHECK(t.returns() == "{1: 'a', 2: 'b', 3: 'c', 4: 'd'}");
