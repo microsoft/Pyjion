@@ -68,6 +68,9 @@ class CorJitInfo : public ICorJitInfo, public JittedCode {
     uint8_t* m_il;
     unsigned int m_ilLen;
     ULONG m_nativeSize;
+#ifdef WINDOWS
+    HANDLE m_winHeap;
+#endif
 
 public:
 
@@ -77,6 +80,9 @@ public:
         m_module = module;
         m_il = nullptr;
         m_ilLen = 0;
+#ifdef WINDOWS
+        m_winHeap = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
+#endif
     }
 
     ~CorJitInfo() override {
@@ -86,6 +92,9 @@ public:
         if (m_dataAddr != nullptr) {
             free(m_dataAddr);
         }
+#ifdef WINDOWS
+        HeapDestroy(m_winHeap);
+#endif
         delete m_module;
     }
 
@@ -122,7 +131,8 @@ public:
         ) override {
         // NB: Not honouring flag alignment requested in <flag>, but it is "optional"
 #ifdef WINDOWS
-        *hotCodeBlock = m_codeAddr = VirtualAlloc(NULL, hotCodeSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+        *hotCodeBlock = m_codeAddr = HeapAlloc(m_winHeap, 0 , hotCodeSize);
+        assert(hotCodeBlock != nullptr);
 #else
 #if defined(__APPLE__) && defined(MAP_JIT)
         const int mode = MAP_PRIVATE | MAP_ANONYMOUS | MAP_JIT;
