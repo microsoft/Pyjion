@@ -36,25 +36,6 @@ typedef void(__cdecl* JITSTARTUP)(ICorJitHost*);
 
 using namespace std;
 
-/// Empty helper function given to the JIT as the entry-point callback. Never used
-void helperFtn(){};
-
-/// Empty breakpoint function, put some bonus code in here if you want to debug anything between
-/// CPython opcodes.
-void breakpointFtn(){}
-
-/// Override the default .NET CIL_NEWARR with a custom array allocator. See getHelperFtn
-/// \param size Requested array size
-/// \param arrayMT Array type handle
-/// \return new vector
-vector<PyObject *> newArrayHelperFtn(INT_PTR size, CORINFO_CLASS_HANDLE arrayMT){
-    return std::vector<PyObject*> (size);
-}
-
-void stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref){
-    // TODO : Implement vector allocation and assignment logic for CIL_STELEM.x
-}
-
 
 CCorJitHost g_jitHost;
 

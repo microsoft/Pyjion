@@ -146,6 +146,14 @@ endif()
 
 set(SOURCES pyjion/absint.cpp pyjion/absvalue.cpp pyjion/intrins.cpp pyjion/jitinit.cpp pyjion/pycomp.cpp pyjion/pyjit.cpp pyjion/exceptionhandling.cpp pyjion/stack.cpp pyjion/block.cpp)
 
+if (WIN32)
+    enable_language(ASM_MASM)
+    if (IS_64)
+        set(HOST_ASM_MASM_X86_64 true)
+    endif()
+    set(SOURCES ${SOURCES} pyjion/helpers.asm)
+endif()
+
 add_library(pyjionlib OBJECT ${SOURCES})
 add_library(_pyjion MODULE $<TARGET_OBJECTS:pyjionlib>)
 

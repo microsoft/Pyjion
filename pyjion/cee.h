@@ -58,16 +58,25 @@ protected:
 #ifdef WINDOWS
     map<const WCHAR *, int> intSettings;
     map<const WCHAR *, const WCHAR *> strSettings;
+    typedef pair <const WCHAR*, int> Str_Int_Pair;
+    typedef pair <const WCHAR*, const WCHAR*> Str_Str_Pair;
 #else
     map<std::u16string, int> intSettings;
     map<std::u16string, const char16_t*> strSettings;
 #endif
 
 public: CCorJitHost(){
+    
 #ifdef DUMP_JIT_TRACES
+#ifndef WINDOWS
         intSettings[u"DumpJittedMethods"] = 1;
         intSettings[u"JitDumpIR"] = 1;
         strSettings[u"JitDump"] = u"*";
+#else
+        intSettings.insert(Str_Int_Pair(L"DumpJittedMethods", 1));
+        intSettings.insert(Str_Int_Pair(L"JitDumpIR", 1));
+        strSettings.insert(Str_Str_Pair(L"JitDump", L"*"));
+#endif
 #endif
     }
 

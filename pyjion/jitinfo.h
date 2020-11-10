@@ -52,11 +52,11 @@
 
 using namespace std;
 
-void helperFtn(); // Does nothing, replacement function of the entry-point helper in the CLR.
-void breakpointFtn();
-
-vector<PyObject *> newArrayHelperFtn(INT_PTR size, CORINFO_CLASS_HANDLE arrayMT);
-void stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref);
+#ifdef WINDOWS
+extern "C" void JIT_StackProbe(); // Implemented in helpers.asm
+#else
+void JIT_StackProbe() {};
+#endif
 
 const CORINFO_CLASS_HANDLE PYOBJECT_PTR_TYPE = (CORINFO_CLASS_HANDLE)0x11;
 
@@ -97,6 +97,26 @@ public:
 #endif
         delete m_module;
     }
+
+    /// Empty helper function given to the JIT as the entry-point callback. Never used
+    static void helperFtn() {};
+
+    /// Empty breakpoint function, put some bonus code in here if you want to debug anything between
+    /// CPython opcodes.
+    static void breakpointFtn() {};
+
+    /// Override the default .NET CIL_NEWARR with a custom array allocator. See getHelperFtn
+    /// \param size Requested array size
+    /// \param arrayMT Array type handle
+    /// \return new vector
+    static vector<PyObject*> newArrayHelperFtn(INT_PTR size, CORINFO_CLASS_HANDLE arrayMT) {
+        return std::vector<PyObject*>(size);
+    }
+
+    static void stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref) {
+        // TODO : Implement vector allocation and assignment logic for CIL_STELEM.x
+    }
+
 
     void* get_code_addr() override {
         return m_codeAddr;
@@ -157,7 +177,6 @@ public:
             *coldCodeBlock = PyMem_Malloc(coldCodeSize);
         if (roDataSize>0) // Same as above
             *roDataBlock = PyMem_Malloc(roDataSize);
-
     }
 
     BOOL logMsg(unsigned level, const char* fmt, va_list args) override {
@@ -1611,7 +1630,9 @@ public:
 	DWORD getJitFlags(CORJIT_FLAGS * flags, DWORD sizeInBytes) override
 	{
 		flags->Add(flags->CORJIT_FLAG_SKIP_VERIFICATION);
+#ifdef DEBUG
         flags->Add(flags->CORJIT_FLAG_DEBUG_CODE);
+#endif
         // Extra flags available
         //flags->Add(flags->CORJIT_FLAG_NO_INLINING);
         //flags->Add(flags->CORJIT_FLAG_MIN_OPT);
@@ -1750,7 +1771,7 @@ public:
 
     void *getHelperFtn(CorInfoHelpFunc ftnNum, void **ppIndirection) override {
         if (ppIndirection != nullptr)
-            *ppIndirection = nullptr;
+            ppIndirection = nullptr;
         assert(ftnNum < CORINFO_HELP_COUNT);
         switch (ftnNum){
             case CORINFO_HELP_USER_BREAKPOINT:
@@ -1759,6 +1780,8 @@ public:
                 return (void*)newArrayHelperFtn;
             case CORINFO_HELP_ARRADDR_ST:
                 return (void*)stArrayHelperFtn;
+            case CORINFO_HELP_STACK_PROBE:
+                return JIT_StackProbe;
         }
         return (void*)helperFtn;
     }
