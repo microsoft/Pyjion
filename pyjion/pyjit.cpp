@@ -347,10 +347,12 @@ PyObject* PyJit_EvalFrame(PyThreadState *ts, PyFrameObject *f, int throwflag) {
 					jitted
 				);
 #endif
+				jitPassCounter++;
 				return jitted->j_evalfunc(jitted, f);
 			}
 
 			// no longer try and compile this method...
+            jitFailCounter++;
 			jitted->j_failed = true;
 		}
 	}
@@ -407,6 +409,18 @@ static PyObject *pyjion_status(PyObject *self, PyObject* args) {
         Py_RETURN_TRUE;
     }
     Py_RETURN_FALSE;
+}
+
+static PyObject *pyjion_stats(PyObject *self, PyObject* func) {
+    auto res = PyDict_New();
+    if (res == nullptr) {
+        return nullptr;
+    }
+
+    PyDict_SetItemString(res, "failed", PyLong_FromLongLong(jitFailCounter));
+    PyDict_SetItemString(res, "compiled", PyLong_FromLongLong(jitPassCounter));
+
+    return res;
 }
 
 static PyObject *pyjion_info(PyObject *self, PyObject* func) {
@@ -532,6 +546,12 @@ static PyMethodDef PyjionMethods[] = {
 		METH_O,
 		"Returns a dictionary describing information about a function or code objects current JIT status."
 	},
+    {
+            "stats",
+            pyjion_stats,
+            METH_O,
+            "Returns a dictionary with stats about the JIT compiler."
+    },
     {
         "dump_il",
         pyjion_dump_il,

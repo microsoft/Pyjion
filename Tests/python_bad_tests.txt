@@ -1,0 +1,22 @@
+# TODO: https://github.com/Microsoft/Pyjion/issues/86
+test_asyncgen
+# TODO: https://github.com/Microsoft/Pyjion/issues/135
+test_asyncio
+# TODO: https://github.com/Microsoft/Pyjion/issues/116
+test_cmd_line
+# TODO: https://github.com/Microsoft/Pyjion/issues/93
+test_frame
+# TODO: https://github.com/Microsoft/Pyjion/issues/86
+test_generators
+# TODO: https://github.com/Microsoft/Pyjion/issues/93
+test_inspect
+# TODO: https://github.com/Microsoft/Pyjion/issues/120
+test_json
+# TODO: https://github.com/Microsoft/Pyjion/issues/123
+test_pdb
+# TODO: https://github.com/Microsoft/Pyjion/issues/108
+test_sys_setprofile
+# TODO: https://github.com/Microsoft/Pyjion/issues/92
+test_sys_settrace
+# TODO: https://github.com/Microsoft/Pyjion/issues/93
+test_traceback

@@ -107,7 +107,7 @@ void PythonCompiler::emit_lasti_init() {
 
 void PythonCompiler::emit_lasti_update(int index) {
     m_il.ld_loc(m_lasti);
-    m_il.ld_i(index);
+    m_il.ld_i4(index);
     m_il.st_ind_i4();
 }
 

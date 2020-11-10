@@ -54,8 +54,6 @@ using namespace std;
 
 #ifdef WINDOWS
 extern "C" void JIT_StackProbe(); // Implemented in helpers.asm
-#else
-void JIT_StackProbe() {};
 #endif
 
 const CORINFO_CLASS_HANDLE PYOBJECT_PTR_TYPE = (CORINFO_CLASS_HANDLE)0x11;
@@ -116,7 +114,6 @@ public:
     static void stArrayHelperFtn(std::vector<PyObject*>* array, INT_PTR idx, PyObject* ref) {
         // TODO : Implement vector allocation and assignment logic for CIL_STELEM.x
     }
-
 
     void* get_code_addr() override {
         return m_codeAddr;

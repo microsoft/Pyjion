@@ -821,7 +821,6 @@ bool AbstractInterpreter::interpret() {
                     auto third = lastState.pop(); // tb
                     auto seventh = lastState[lastState.stackSize() - 7]; // exit_func
                     // TODO : Vectorcall (exit_func, stack+1, 3, ..)
-                    assert(false);
                     lastState.push(&Any); // res
                     break;
                 }

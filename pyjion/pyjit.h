@@ -60,6 +60,8 @@ class PyjionJittedCode;
 typedef PyObject* (*Py_EvalFunc)(PyjionJittedCode*, struct _frame*);
 
 static PY_UINT64_T HOT_CODE = 0;
+static PY_UINT64_T jitPassCounter = 0;
+static PY_UINT64_T jitFailCounter = 0;
 
 void PyjionJitFree(void* obj);
 
