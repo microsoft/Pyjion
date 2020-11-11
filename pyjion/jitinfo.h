@@ -772,101 +772,6 @@ public:
         //printf("getGSCookie\r\n");
     }
 
-#ifdef  MDIL
-    virtual unsigned getNumTypeParameters(
-        CORINFO_METHOD_HANDLE       method
-        ) {
-        printf("getNumTypeParameters\r\n"); return 0;
-    }
-
-    virtual CorElementType getTypeOfTypeParameter(
-        CORINFO_METHOD_HANDLE       method,
-        unsigned                    index
-        ) {
-        printf("getTypeOfTypeParameter\r\n");
-        return 0;
-
-    }
-
-    virtual CORINFO_CLASS_HANDLE getTypeParameter(
-        CORINFO_METHOD_HANDLE       method,
-        bool                        classTypeParameter,
-        unsigned                    index
-        ) {
-        printf("getTypeParameter\r\n"); return nullptr;
-    }
-
-    virtual unsigned getStructTypeToken(
-        InlineContext              *context,
-        CORINFO_ARG_LIST_HANDLE     argList
-        ) {
-        printf("getStructTypeToken\r\n");
-        return 0;
-    }
-
-    virtual unsigned getEnclosingClassToken(
-        InlineContext              *context,
-        CORINFO_METHOD_HANDLE       method
-        ) {
-        printf("getEnclosingClassToken\r\n"); return 0;
-    }
-
-    virtual CorInfoType getFieldElementType(
-        unsigned                    fieldToken,
-        CORINFO_MODULE_HANDLE       scope,
-        CORINFO_METHOD_HANDLE       methHnd
-        ) {
-        printf("getFieldElementType\r\n");
-        return 0;
-    }
-
-    // tokens in inlined methods may need to be translated,
-    // for example if they are in a generic method we need to fill in type parameters,
-    // or in one from another module we need to translate tokens so they are valid
-    // in module
-    // tokens in dynamic methods (IL stubs) are always translated because
-    // as generated they are not backed by any metadata
-
-    // this is called at the start of an inline expansion
-    virtual InlineContext *computeInlineContext(
-        InlineContext              *outerContext,
-        unsigned                    inlinedMethodToken,
-        unsigned                    constraintTypeRef,
-        CORINFO_METHOD_HANDLE       methHnd
-        ) {
-        printf("computeInlineContext\r\n");
-        return nullptr;
-
-    }
-
-    // this does the actual translation
-    virtual unsigned translateToken(
-        InlineContext              *inlineContext,
-        CORINFO_MODULE_HANDLE       scopeHnd,
-        unsigned                    token
-        ) {
-        printf("translateToken\r\n");
-        return 0;
-    }
-
-    virtual unsigned getCurrentMethodToken(
-        InlineContext              *inlineContext,
-        CORINFO_METHOD_HANDLE       method
-        ) {
-        printf("getCurrentMethodToken\r\n");
-        return 0;
-    }
-
-    // computes flags for an IL stub method
-    virtual unsigned getStubMethodFlags(
-        CORINFO_METHOD_HANDLE method
-        ) {
-        printf("getStubMethodFlags\r\n");
-        return 0;
-    }
-#endif
-
-
     /**********************************************************************************/
     //
     // ICorModuleInfo
@@ -1372,12 +1277,6 @@ public:
         ) override {
         printf("\r\n");
     }
-#ifdef MDIL
-    virtual DWORD getFieldOrdinal(CORINFO_MODULE_HANDLE  tokenScope,
-        unsigned               fieldToken) {
-        printf("getFieldInfo\r\n");
-    }
-#endif
 
     // Returns true iff "fldHnd" represents a static field.
     bool isFieldStatic(CORINFO_FIELD_HANDLE fldHnd) override {
