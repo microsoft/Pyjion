@@ -32,7 +32,7 @@ jobs:
           libssl-dev libnuma-dev libkrb5-dev zlib1g-dev
       - uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '5.0.100-rc.2.20479.15'
+          dotnet-version: '5.0.100'
 
       - name: Create Build Environment
         run: cmake -E make_directory ${{runner.workspace}}/build
@@ -75,7 +75,7 @@ jobs:
           architecture: x64
       - uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '5.0.100-rc.2.20479.15'
+          dotnet-version: '5.0.100'
       - name: Create Build Environment
         run: cmake -E make_directory ${{runner.workspace}}/build
 
@@ -123,7 +123,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '5.0.100-rc.2.20479.15'
+          dotnet-version: '5.0.100'
 
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.0.2
@@ -159,4 +159,4 @@ jobs:
 
       - name: Run full test suite
         shell: bash
-        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_tests.txt -j1
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_tests_win.txt -j1
