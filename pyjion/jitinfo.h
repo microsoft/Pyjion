@@ -1561,6 +1561,7 @@ public:
         memset(pEEInfoOut, 0, sizeof(CORINFO_EE_INFO));
         pEEInfoOut->inlinedCallFrameInfo.size = 4;
 #ifdef WINDOWS
+        pEEInfoOut->osPageSize = 1000; // Set to the windows default
         pEEInfoOut->osType = CORINFO_WINNT;
 #else
         pEEInfoOut->osType = CORINFO_UNIX;
