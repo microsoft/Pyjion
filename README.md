@@ -1,5 +1,6 @@
 # Pyjion
 Designing a JIT API for CPython
+** Development has moved to https://github.com/tonybaloney/Pyjion **
 
 ## A note on development
 This was a side project at work for the project maintainers, but one of them has
