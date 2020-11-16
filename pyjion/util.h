@@ -23,19 +23,57 @@
 *
 */
 
+#pragma once
+#ifndef PYJION_UTIL_H
+#define PYJION_UTIL_H 1
+
 #include <Python.h>
-#include <pyjit.h>
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
 
+/**
+Use RAII to Py_XDECREF a pointer.
 
-int main(int argc, char* const argv[]) {
-    Py_Initialize();
-    JitInit();
+Inspired by std::unique_ptr.
+*/
+template <class T> class py_ptr {
+private:
+    T* m_ptr;
 
-    int result = Catch::Session().run(argc, argv);
+public:
+    py_ptr() : m_ptr(nullptr) {}
+    explicit py_ptr(T* ptr) : m_ptr(ptr) {}
+    py_ptr(const py_ptr& copy) {
+        m_ptr = copy.get();
+        Py_INCREF(m_ptr);
+    }
 
-    Py_Finalize();
+    ~py_ptr() {
+        Py_XDECREF(m_ptr);
+    }
 
-    return result;
-}
+    void reset(T* ptr) {
+        Py_XDECREF(m_ptr);
+        m_ptr = ptr;
+    }
+
+    T* get() const {
+        return m_ptr;
+    }
+
+    T* operator->() {
+        return m_ptr;
+    }
+
+    T* operator*() {
+        return m_ptr;
+    }
+};
+
+/**
+A concrete PyObject instance of py_ptr.
+*/
+class PyObject_ptr : public py_ptr<PyObject> {
+public:
+    explicit PyObject_ptr(PyObject *ptr) : py_ptr(ptr) {}
+};
+
+#endif // !UTIL_H

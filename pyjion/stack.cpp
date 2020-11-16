@@ -23,19 +23,19 @@
 *
 */
 
-#include <Python.h>
-#include <pyjit.h>
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
+#include "stack.h"
 
 
-int main(int argc, char* const argv[]) {
-    Py_Initialize();
-    JitInit();
+void ValueStack::inc(size_t by, StackEntryKind kind) {
+    for (size_t i = 0; i < by; i++) {
+        push_back(kind);
+    }
+}
 
-    int result = Catch::Session().run(argc, argv);
-
-    Py_Finalize();
-
-    return result;
+void ValueStack::dec(size_t by) {
+    if (size() < by)
+        throw StackUnderflowException();
+    for (size_t i = 0; i < by; i++) {
+        pop_back();
+    }
 }

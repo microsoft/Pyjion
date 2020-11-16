@@ -23,19 +23,23 @@
 *
 */
 
-#include <Python.h>
-#include <pyjit.h>
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
+#ifndef PYJION_FLAGS_H
+#define PYJION_FLAGS_H
 
+enum ehFlags {
+    EhfNone = 0,
+    // The exception handling block includes a continue statement
+    EhfBlockContinues = 0x01,
+    // The exception handling block includes a return statement
+    EhfBlockReturns = 0x02,
+    // The exception handling block includes a break statement
+    EhfBlockBreaks = 0x04,
+    // The exception handling block is in the try portion of a try/finally
+    EhfTryFinally = 0x08,
+    // The exception handling block is in the try portion of a try/except
+    EhfTryExcept = 0x10,
+    // The exception handling block is in the finally or except portion of a try/finally or try/except
+    EhfInExceptHandler = 0x20,
+};
 
-int main(int argc, char* const argv[]) {
-    Py_Initialize();
-    JitInit();
-
-    int result = Catch::Session().run(argc, argv);
-
-    Py_Finalize();
-
-    return result;
-}
+#endif //PYJION_FLAGS_H

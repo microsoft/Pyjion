@@ -4,11 +4,13 @@
 # (which makes it easy to search for skipped tests instead of any comment).
 # If the skip is because of a bug, then the explanation comment should lead with a `TODO` comment.
 # ----------
-test_grammar
+# https://bugs.python.org/issue40754
+## test_grammar
 test_opcodes
 test_dict
 test_builtin
-test_exceptions
+# https://bugs.python.org/issue40754
+##test_exceptions
 test_types
 test_unittest
 test_doctest
@@ -24,7 +26,8 @@ test_abc
 test_abstract_numbers
 test_aifc
 test_argparse
-test_array
+## https://bugs.python.org/issue40754
+##test_array
 test_asdl_parser
 test_ast
 # TODO: https://github.com/Microsoft/Pyjion/issues/86
@@ -47,14 +50,16 @@ test_binhex
 test_binop
 test_bisect
 test_bool
-test_buffer
+# https://bugs.python.org/issue40754
+##test_buffer
 test_bufio
 test_bytes
 test_bz2
 test_c_locale_coercion
 test_calendar
 test_call
-test_capi
+# https://bugs.python.org/issue40754
+##test_capi
 test_cgi
 test_cgitb
 test_charmapcodec
@@ -113,7 +118,8 @@ test_dbm_ndbm
 test_decimal
 test_decorators
 test_defaultdict
-test_deque
+# https://bugs.python.org/issue40754
+## test_deque
 test_descr
 test_descrtut
 test_devpoll
@@ -148,7 +154,8 @@ test_fileinput
 test_fileio
 test_finalization
 test_float
-test_flufl
+## https://bugs.python.org/issue40754
+##test_flufl
 test_fnmatch
 test_fork1
 test_format
@@ -156,7 +163,8 @@ test_fractions
 # TODO: https://github.com/Microsoft/Pyjion/issues/93
 ##test_frame
 test_frozen
-test_fstring
+# https://bugs.python.org/issue40754
+##test_fstring
 test_ftplib
 test_funcattrs
 test_functools
@@ -209,10 +217,12 @@ test_ipaddress
 test_isinstance
 test_iter
 test_iterlen
-test_itertools
+# https://bugs.python.org/issue40754
+## test_itertools
 # TODO: https://github.com/Microsoft/Pyjion/issues/120
 ##test_json
-test_keyword
+# https://bugs.python.org/issue40754
+## test_keyword
 test_keywordonlyarg
 test_kqueue
 test_largefile
@@ -230,7 +240,8 @@ test_mailbox
 test_mailcap
 test_marshal
 test_math
-test_memoryio
+# https://bugs.python.org/issue40754
+## test_memoryio
 test_memoryview
 test_metaclass
 test_mimetypes
@@ -253,18 +264,21 @@ test_numeric_tower
 test_openpty
 test_operator
 test_optparse
-test_ordered_dict
+# https://bugs.python.org/issue40754
+## test_ordered_dict
 test_os
 test_ossaudiodev
 test_osx_env
-test_parser
+# https://bugs.python.org/issue40754
+## test_parser
 test_pathlib
 # TODO: https://github.com/Microsoft/Pyjion/issues/123
 ##test_pdb
 test_peepholer
 test_peg_generator
 test_peg_parser
-test_pickle
+# https://bugs.python.org/issue40754
+## test_pickle
 test_picklebuffer
 test_pickletools
 test_pipes
@@ -337,11 +351,13 @@ test_stat
 test_statistics
 test_strftime
 test_string
-test_string_literals
+# https://bugs.python.org/issue40754
+## test_string_literals
 test_stringprep
 test_strptime
 test_strtod
-test_struct
+# https://bugs.python.org/issue40754
+## test_struct
 test_structmembers
 test_structseq
 test_subclassinit
@@ -351,8 +367,10 @@ test_sundry
 test_super
 test_symbol
 test_symtable
-test_syntax
-test_sys
+# https://bugs.python.org/issue40754
+## test_syntax
+# https://bugs.python.org/issue40754
+## test_sys
 # TODO: https://github.com/Microsoft/Pyjion/issues/108
 ##test_sys_setprofile
 # TODO: https://github.com/Microsoft/Pyjion/issues/92
@@ -429,7 +447,8 @@ test_wsgiref
 test_xdrlib
 test_xml_dom_minicompat
 test_xml_etree
-test_xml_etree_c
+# https://bugs.python.org/issue40754
+## test_xml_etree_c
 test_xmlrpc
 test_xmlrpc_net
 test_xxtestfuzz

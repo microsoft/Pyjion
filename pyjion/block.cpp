@@ -23,19 +23,4 @@
 *
 */
 
-#include <Python.h>
-#include <pyjit.h>
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
-
-
-int main(int argc, char* const argv[]) {
-    Py_Initialize();
-    JitInit();
-
-    int result = Catch::Session().run(argc, argv);
-
-    Py_Finalize();
-
-    return result;
-}
+#include "block.h"

@@ -23,19 +23,31 @@
 *
 */
 
-#include <Python.h>
-#include <pyjit.h>
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
 
+#ifndef PYJION_BLOCK_H
+#define PYJION_BLOCK_H
 
-int main(int argc, char* const argv[]) {
-    Py_Initialize();
-    JitInit();
+#include <cstdio>
+#include <climits>
 
-    int result = Catch::Session().run(argc, argv);
+#include "ipycomp.h"
+#include "flags.h"
 
-    Py_Finalize();
+// forward dec exception handlers.
+class ExceptionHandler;
 
-    return result;
-}
+struct BlockInfo {
+    int EndOffset, Kind, ContinueOffset;
+    ehFlags Flags;
+    ExceptionHandler* CurrentHandler;  // the current exception handler
+
+    BlockInfo(int endOffset, int kind, ExceptionHandler* currentHandler, ehFlags flags = EhfNone, int continueOffset = 0) {
+        EndOffset = endOffset;
+        Kind = kind;
+        Flags = flags;
+        CurrentHandler = currentHandler;
+        ContinueOffset = continueOffset;
+    }
+};
+
+#endif //PYJION_BLOCK_H

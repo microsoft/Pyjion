@@ -1,0 +1,4 @@
+cmake-build-*
+CoreCLR/artifacts
+.git
+CoreCLR/.git

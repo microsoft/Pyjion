@@ -23,19 +23,31 @@
 *
 */
 
-#include <Python.h>
-#include <pyjit.h>
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
+#ifndef PYJION_JITINIT_H
+#define PYJION_JITINIT_H
 
 
-int main(int argc, char* const argv[]) {
-    Py_Initialize();
-    JitInit();
+#define FEATURE_NO_HOST
 
-    int result = Catch::Session().run(argc, argv);
+#include <cstdint>
+#include <windows.h>
+#include <cwchar>
+#include <cstdio>
+#include <cstddef>
+#include <cstdlib>
+#include <climits>
+#include <cstring>
+#include <cfloat>
+#include <share.h>
+#include <intrin.h>
 
-    Py_Finalize();
+#include <vector>
 
-    return result;
-}
+#include <corjit.h>
+#include <openum.h>
+
+ICorJitCompiler* g_jit;
+
+extern "C" __declspec(dllexport) bool JitInit()
+
+#endif

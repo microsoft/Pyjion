@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 env:
-  BUILD_TYPE: Release
+  BUILD_TYPE: Debug
 
 jobs:
   build-linux:
@@ -17,9 +17,23 @@ jobs:
         python-version: [3.9]
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+      - name: Install CLR requirements
+        run: |
+          sudo apt-get install -y cmake llvm-9 clang-9 autoconf automake \
+          libtool build-essential python curl git lldb-6.0 liblldb-6.0-dev \
+          libunwind8 libunwind8-dev gettext libicu-dev liblttng-ust-dev \
+          libssl-dev libnuma-dev libkrb5-dev zlib1g-dev
       - uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '5.0.x'
+          dotnet-version: '5.0.100'
+
       - name: Create Build Environment
         run: cmake -E make_directory ${{runner.workspace}}/build
 
@@ -31,12 +45,20 @@ jobs:
       - name: Build
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: cmake --build . --config $BUILD_TYPE
+        run: cmake --build . --config $BUILD_TYPE --target _pyjion
 
-      - name: Test
-        working-directory: ${{runner.workspace}}/build
+      - name: Build Python Package
         shell: bash
-        run: ctest -C $BUILD_TYPE
+        run: pip install .
+
+      - name: Run smoke tests
+        shell: bash
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -j1
+
+      - name: Run full test suite
+        shell: bash
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_tests.txt -j1
+
   build-mac:
     runs-on: macos-latest
     strategy:
@@ -44,9 +66,16 @@ jobs:
         python-version: [3.9]
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
       - uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '5.0.x'
+          dotnet-version: '5.0.100'
       - name: Create Build Environment
         run: cmake -E make_directory ${{runner.workspace}}/build
 
@@ -60,36 +89,74 @@ jobs:
         shell: bash
         run: cmake --build . --config $BUILD_TYPE
 
-      - name: Test
+      - name: Build Python Package
+        shell: bash
+        run: pip install .
+
+      - name: Run unit tests
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: ctest -C $BUILD_TYPE
+        run: ./unit_tests
+
+      - name: Run smoke tests
+        shell: bash
+        run: python -X dev Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -j1
+
+      - name: Run full test suite
+        shell: bash
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_tests.txt -j1
+
   build-windows:
     runs-on: windows-latest
     strategy:
       matrix:
         python-version: [3.9]
     steps:
-      - name: Add VC to path
-        run: echo '::add-path::C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\bin'
       - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+
       - uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '5.0.x'
+          dotnet-version: '5.0.100'
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.0.2
+
       - name: Create Build Environment
         run: cmake -E make_directory ${{runner.workspace}}/build
 
       - name: Configure CMake
         shell: bash
         working-directory: ${{runner.workspace}}/build
-        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=Release -DDO_TESTS=1
 
       - name: Build
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: cmake --build . --config $BUILD_TYPE
+        run: cmake --build . --config Release
 
-      - name: Test
-        working-directory: ${{runner.workspace}}/build
+      - name: Install build deps
         shell: bash
-        run: ctest -C $BUILD_TYPE
+        run: python -m pip install -U https://github.com/tonybaloney/scikit-build/archive/vs2019.zip
+
+      - name: Build Python Package
+        shell: bash
+        run: python setup.py build --generator "Visual Studio 16 2019"
+
+      - name: Install Python Package
+        shell: bash
+        run: python setup.py install --generator "Visual Studio 16 2019"
+
+      - name: Run smoke tests
+        shell: bash
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_smoke_tests.txt -j1
+
+      - name: Run full test suite
+        shell: bash
+        run: python -X dev -q Tests/test_pyjion.py -f Tests/python_tests_win.txt -j1

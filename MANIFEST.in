@@ -1,0 +1,9 @@
+include *.md
+recursive-include pyjion *.cpp *.h *.py
+prune CoreCLR
+prune Tests
+prune Perf
+include .dockerignore
+include setup.py
+include pyproject.toml
+include Dockerfile
