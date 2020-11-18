@@ -41,7 +41,7 @@ if /i "%__BuildArch%" == "x64" set arch=amd64
 set SUFFIX=
 if /i "%__BuildType%" == "Debug" set SUFFIX=_d
 
-copy %arch%\python35%SUFFIX%.lib ..\..\Libs\%__BuildType%\%__BuildArch%\
+copy %arch%\python36%SUFFIX%.lib ..\..\Libs\%__BuildType%\%__BuildArch%\
 popd
 
 :Done
